@@ -264,7 +264,6 @@
                 submitBtn.disabled = false;
 
                 if (result.success) {
-                    // क्रेडिट काटना
                     const newCredits = window.currentUserData.credits - 1;
                     const userDocRef = doc(db, "users", window.currentUserData.uid);
                     await updateDoc(userDocRef, { credits: newCredits });
@@ -272,7 +271,6 @@
                     window.currentUserData.credits = newCredits;
                     document.getElementById('displayCredits').innerText = newCredits;
 
-                    // डेटाबेस (हिस्ट्री) में सेव करना
                     await addDoc(collection(db, "history"), {
                         userId: window.currentUserData.uid,
                         fileName: `${dataObj.NAME || 'Document'} - ${serviceType}.pdf`,
@@ -282,9 +280,6 @@
                     });
 
                     alert('डॉक्यूमेंट सफलतापूर्वक बन गया है! 1 क्रेडिट काट लिया गया है। अब आप इसे अपनी हिस्ट्री से डाउनलोड कर सकते हैं।');
-                    
-                    // नया टैब (पॉप-अप) खोलने वाला कोड हटा दिया गया है ताकि मोबाइल में दिक्कत न आए।
-                    // इसके बजाय यूज़र को सीधे 'मेरी हिस्ट्री' पेज पर भेज दिया जाएगा।
                     window.switchService('history');
 
                 } else {
@@ -304,7 +299,8 @@
             historyContainer.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-slate-500">लोड हो रहा है...</td></tr>`;
 
             try {
-                const q = query(collection(db, "history"), where("userId", "==", window.currentUserData.uid), orderBy("timestamp", "desc"));
+                // Firebase Composite Index वाली एरर से बचने के लिए orderBy हटा दिया गया है
+                const q = query(collection(db, "history"), where("userId", "==", window.currentUserData.uid));
                 const querySnapshot = await getDocs(q);
 
                 historyContainer.innerHTML = '';
@@ -369,7 +365,7 @@
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">रिश्ता (Relationship - REL)</label>
                                 <select name="REL" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase">
                                     <option value="पुत्र / पुत्री">पुत्र / पुत्री</option>
-                                    <option value="पत्नी    .">पत्नी</option>
+                                    <option value="पत्नी">पत्नी</option>
                                 </select>
                             </div>
                             <div>
@@ -475,8 +471,22 @@
                                 <input type="text" name="AADHAAR" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
                             </div>
                             <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पुरानी जन्मतिथि (Old DOB)</label>
+                                <input type="date" name="OLDDOB" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm">
+                            </div>
+                            <div>
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">नई जन्मतिथि (New DOB)</label>
                                 <input type="date" name="NEWDOB" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पुराना डॉक्यूमेंट (Old Document)</label>
+                                <select name="OLDDOCUMENT" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase">
+                                    <option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option>
+                                    <option value="MARKSHEET">MARKSHEET</option>
+                                    <option value="PASSPORT">PASSPORT</option>
+                                    <option value="TRANSFER CERTIFICATE">TRANSFER CERTIFICATE</option>
+                                    <option value="LIVING CERTIFICATE">LIVING CERTIFICATE</option>
+                                </select>
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">नया डॉक्यूमेंट (New Document)</label>
@@ -487,8 +497,12 @@
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पुरानी जन्मतिथि (Old DOB)</label>
-                                <input type="date" name="OLDDOB" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm">
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">अपडेट कितनी बार हुआ (Times)</label>
+                                <select name="TIMES" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase">
+                                    <option value="NEVER">NEVER</option>
+                                    <option value="ONCE">ONCE</option>
+                                    <option value="MORE THAN ONCE">MORE THAN ONCE</option>
+                                </select>
                             </div>
                             <div class="md:col-span-2">
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पूरा पता (Address)</label>
