@@ -1,734 +1,642 @@
 <!DOCTYPE html>
 <html lang="hi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ओवी आधार प्रिंट सर्विस - पोर्टल</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ओवी आधार प्रिंट सर्विस - पोर्टल</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // Firebase Configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyBSiDAvDYyBG8hkmez7s900JHhlbenG2nU",
-            authDomain: "oaps-d2cce.firebaseapp.com",
-            projectId: "oaps-d2cce",
-            storageBucket: "oaps-d2cce.firebasestorage.app",
-            messagingSenderId: "619616461386",
-            appId: "1:619616461386:web:c3b9b36815369c6f5d7cb3",
-            measurementId: "G-5Y6RHLE2LK"
-        };
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBSiDAvDYyBG8hkmez7s900JHhlbenG2nU",
+            authDomain: "oaps-d2cce.firebaseapp.com",
+            projectId: "oaps-d2cce",
+            storageBucket: "oaps-d2cce.firebasestorage.app",
+            messagingSenderId: "619616461386",
+            appId: "1:619616461386:web:c3b9b36815369c6f5d7cb3",
+            measurementId: "G-5Y6RHLE2LK"
+        };
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
 
-        window.currentUserData = null;
-        const ADMIN_EMAIL = "hkosiun1221@gmail.com"; 
+        window.currentUserData = null;
+        const ADMIN_EMAIL = "hkosiun1221@gmail.com"; 
 
-        const API_URLS = {
-            "BAGHPAT": "https://script.google.com/macros/s/AKfycbyA3916RXjuVRInvDPksOzbzczesTFAWo4gVzvjazGNfQl_REwC0YrYpTu03jlXwlb07w/exec",
-            "SHAMLI": "https://script.google.com/macros/s/AKfycbx14PgIaqdbvNCPQaoIT7gCEbOlEP3I7itkoCgLMTEg8jLBuZ7k490WSC01CkKPvsuP/exec",
-            "MUZAFFARNAGAR": "https://script.google.com/macros/s/AKfycby2FsD_wOd5ovuG4uVRldLBc8zMWKYoGXDPFPUoMKhx1k-KiAZcUa6MRe7TTW5VrfabLg/exec",
-            "DOB": "https://script.google.com/macros/s/AKfycbyncAUbXWLplC_uHgodCqhPCDLTWFiWEQVzxPAInLP7zedGUQRdRbvix_jdDBJrYMlc9w/exec",
-            "ANNEXURE": "https://script.google.com/macros/s/AKfycbxR94qLfbW5qQFp7f9DkdcvB1aiz9wcdhZUYYgiyVSBjHVebNvVo5e95EPE7mRGH18Z/exec"
-        };
-        window.API_URLS = API_URLS;
+        const API_URLS = {
+            "BAGHPAT": "https://script.google.com/macros/s/AKfycbyA3916RXjuVRInvDPksOzbzczesTFAWo4gVzvjazGNfQl_REwC0YrYpTu03jlXwlb07w/exec",
+            "SHAMLI": "https://script.google.com/macros/s/AKfycbx14PgIaqdbvNCPQaoIT7gCEbOlEP3I7itkoCgLMTEg8jLBuZ7k490WSC01CkKPvsuP/exec",
+            "MUZAFFARNAGAR": "https://script.google.com/macros/s/AKfycby2FsD_wOd5ovuG4uVRldLBc8zMWKYoGXDPFPUoMKhx1k-KiAZcUa6MRe7TTW5VrfabLg/exec",
+            "DOB": "https://script.google.com/macros/s/AKfycbyncAUbXWLplC_uHgodCqhPCDLTWFiWEQVzxPAInLP7zedGUQRdRbvix_jdDBJrYMlc9w/exec",
+            "ANNEXURE": "https://script.google.com/macros/s/AKfycbxR94qLfbW5qQFp7f9DkdcvB1aiz9wcdhZUYYgiyVSBjHVebNvVo5e95EPE7mRGH18Z/exec"
+        };
+        window.API_URLS = API_URLS;
 
-        // Login Handler
-        window.handleLogin = async function(event) {
-            event.preventDefault();
-            const emailInput = document.getElementById('loginUsername').value.trim();
-            const passInput = document.getElementById('loginPassword').value.trim();
-            const errorDiv = document.getElementById('loginError');
-            errorDiv.classList.add('hidden');
+        // Login Handler
+        window.handleLogin = async function(event) {
+            event.preventDefault();
+            const emailInput = document.getElementById('loginUsername').value.trim();
+            const passInput = document.getElementById('loginPassword').value.trim();
+            const errorDiv = document.getElementById('loginError');
+            errorDiv.classList.add('hidden');
 
-            const email = emailInput.includes('@') ? emailInput : `${emailInput.toLowerCase()}@ovportal.com`;
+            const email = emailInput.includes('@') ? emailInput : `${emailInput.toLowerCase()}@ovportal.com`;
 
-            try {
-                const userCredential = await signInWithEmailAndPassword(auth, email, passInput);
-                const user = userCredential.user;
-                
-                const userDocRef = doc(db, "users", user.uid);
-                const userDoc = await getDoc(userDocRef);
+            try {
+                const userCredential = await signInWithEmailAndPassword(auth, email, passInput);
+                const user = userCredential.user;
+                
+                const userDocRef = doc(db, "users", user.uid);
+                const userDoc = await getDoc(userDocRef);
 
-                let userCredits = 10;
-                if (userDoc.exists()) {
-                    userCredits = userDoc.data().credits;
-                } else {
-                    await setDoc(userDocRef, { email: email, username: emailInput, credits: 10, createdAt: new Date() });
-                }
+                let userCredits = 10;
+                if (userDoc.exists()) {
+                    userCredits = userDoc.data().credits;
+                } else {
+                    await setDoc(userDocRef, { email: email, username: emailInput, credits: 10, createdAt: new Date() });
+                }
 
-                window.currentUserData = { uid: user.uid, email: email, credits: userCredits, username: emailInput };
-                setupDashboard(emailInput, userCredits, email);
+                window.currentUserData = { uid: user.uid, email: email, credits: userCredits, username: emailInput };
+                setupDashboard(emailInput, userCredits, email);
 
-            } catch (error) {
-                console.error("Login Error:", error);
-                errorDiv.innerText = "लॉगिन असफल: गलत यूजर आईडी या पासवर्ड!";
-                errorDiv.classList.remove('hidden');
-            }
-        };
+            } catch (error) {
+                console.error("Login Error:", error);
+                errorDiv.innerText = "लॉगिन असफल: गलत यूजर आईडी या पासवर्ड!";
+                errorDiv.classList.remove('hidden');
+            }
+        };
 
-        function setupDashboard(username, credits, email) {
-            document.getElementById('displayUser').innerText = username.toUpperCase();
-            document.getElementById('displayCredits').innerText = credits;
+        function setupDashboard(username, credits, email) {
+            document.getElementById('displayUser').innerText = username.toUpperCase();
+            document.getElementById('displayCredits').innerText = credits;
 
-            if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
-                document.getElementById('adminSection').classList.remove('hidden');
-            } else {
-                document.getElementById('adminSection').classList.add('hidden');
-            }
+            if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+                document.getElementById('adminSection').classList.remove('hidden');
+            } else {
+                document.getElementById('adminSection').classList.add('hidden');
+            }
 
-            document.getElementById('loginSection').classList.add('hidden');
-            document.getElementById('dashboardSection').classList.remove('hidden');
-            window.switchService('domicile');
-        }
+            document.getElementById('loginSection').classList.add('hidden');
+            document.getElementById('dashboardSection').classList.remove('hidden');
+            window.switchService('domicile');
+        }
 
-        // Logout Handler
-        window.handleLogout = async function() {
-            try {
-                await signOut(auth);
-                window.currentUserData = null;
-                document.getElementById('dashboardSection').classList.add('hidden');
-                document.getElementById('loginSection').classList.remove('hidden');
-                document.getElementById('loginForm').reset();
-            } catch (error) {
-                console.error("Logout Error:", error);
-            }
-        };
+        // Logout Handler
+        window.handleLogout = async function() {
+            try {
+                await signOut(auth);
+                window.currentUserData = null;
+                document.getElementById('dashboardSection').classList.add('hidden');
+                document.getElementById('loginSection').classList.remove('hidden');
+                document.getElementById('loginForm').reset();
+            } catch (error) {
+                console.error("Logout Error:", error);
+            }
+        };
 
-        // Admin: Create New User
-        window.createNewUserByAdmin = async function(event) {
-            event.preventDefault();
-            if (window.currentUserData.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-                alert('आपके पास अनुमति नहीं है!');
-                return;
-            }
+        // Admin: Create New User
+        window.createNewUserByAdmin = async function(event) {
+            event.preventDefault();
+            if (window.currentUserData.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+                alert('आपके पास अनुमति नहीं है!');
+                return;
+            }
 
-            const newUserEmail = document.getElementById('newAdminUserEmail').value.trim().toLowerCase();
-            const newUserPass = document.getElementById('newAdminUserPass').value.trim();
-            const initialCredits = parseInt(document.getElementById('newAdminUserCredits').value) || 10;
-            const adminMsg = document.getElementById('adminCreateMsg');
-            
-            adminMsg.classList.remove('hidden');
-            adminMsg.className = "mt-2 text-xs font-medium text-amber-800";
-            adminMsg.innerText = "नया यूजर बनाया जा रहा है...";
+            const newUserEmail = document.getElementById('newAdminUserEmail').value.trim().toLowerCase();
+            const newUserPass = document.getElementById('newAdminUserPass').value.trim();
+            const initialCredits = parseInt(document.getElementById('newAdminUserCredits').value) || 10;
+            const adminMsg = document.getElementById('adminCreateMsg');
+            
+            adminMsg.classList.remove('hidden');
+            adminMsg.className = "mt-2 text-xs font-medium text-amber-800";
+            adminMsg.innerText = "नया यूजर बनाया जा रहा है...";
 
-            try {
-                const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: newUserEmail, password: newUserPass, returnSecureToken: true })
-                });
+            try {
+                const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: newUserEmail, password: newUserPass, returnSecureToken: true })
+                });
 
-                const data = await response.json();
-                if (data.error) throw new Error(data.error.message);
+                const data = await response.json();
+                if (data.error) throw new Error(data.error.message);
 
-                const newUserId = data.localId;
-                const userDocRef = doc(db, "users", newUserId);
-                await setDoc(userDocRef, {
-                    email: newUserEmail,
-                    username: newUserEmail.split('@')[0],
-                    credits: initialCredits,
-                    createdAt: new Date()
-                });
+                const newUserId = data.localId;
+                const userDocRef = doc(db, "users", newUserId);
+                await setDoc(userDocRef, {
+                    email: newUserEmail,
+                    username: newUserEmail.split('@')[0],
+                    credits: initialCredits,
+                    createdAt: new Date()
+                });
 
-                adminMsg.className = "mt-2 text-xs font-medium text-green-600";
-                adminMsg.innerText = `सफलता! नया यूजर (${newUserEmail}) बन गया है और ${initialCredits} क्रेडिट दे दिए गए हैं।`;
-                document.getElementById('adminCreateUserForm').reset();
+                adminMsg.className = "mt-2 text-xs font-medium text-green-600";
+                adminMsg.innerText = `सफलता! नया यूजर (${newUserEmail}) बन गया है और ${initialCredits} क्रेडिट दे दिए गए हैं।`;
+                document.getElementById('adminCreateUserForm').reset();
 
-            } catch (err) {
-                console.error("Create User Error:", err);
-                adminMsg.className = "mt-2 text-xs font-medium text-red-600";
-                adminMsg.innerText = "एरर: " + err.message;
-            }
-        };
+            } catch (err) {
+                console.error("Create User Error:", err);
+                adminMsg.className = "mt-2 text-xs font-medium text-red-600";
+                adminMsg.innerText = "एरर: " + err.message;
+            }
+        };
 
-        // Admin: Add Credits
-        window.addCreditsToUser = async function(event) {
-            event.preventDefault();
-            const targetUserQuery = document.getElementById('targetUser').value.trim().toLowerCase();
-            const creditsToAdd = parseInt(document.getElementById('creditsToAdd').value);
-            const adminMsg = document.getElementById('adminMsg');
-            adminMsg.classList.remove('hidden');
-            adminMsg.innerText = "क्रेडिट जोड़ा जा रहा है...";
+        // Admin: Add Credits
+        window.addCreditsToUser = async function(event) {
+            event.preventDefault();
+            const targetUserQuery = document.getElementById('targetUser').value.trim().toLowerCase();
+            const creditsToAdd = parseInt(document.getElementById('creditsToAdd').value);
+            const adminMsg = document.getElementById('adminMsg');
+            adminMsg.classList.remove('hidden');
+            adminMsg.innerText = "क्रेडिट जोड़ा जा रहा है...";
 
-            try {
-                const usersRef = collection(db, "users");
-                const searchEmail = targetUserQuery.includes('@') ? targetUserQuery : `${targetUserQuery}@ovportal.com`;
-                const q = query(usersRef, where("email", "==", searchEmail));
-                const querySnapshot = await getDocs(q);
+            try {
+                const usersRef = collection(db, "users");
+                const searchEmail = targetUserQuery.includes('@') ? targetUserQuery : `${targetUserQuery}@ovportal.com`;
+                const q = query(usersRef, where("email", "==", searchEmail));
+                const querySnapshot = await getDocs(q);
 
-                if (querySnapshot.empty) {
-                    adminMsg.innerText = "एरर: यह यूजर डेटाबेस में नहीं मिला!";
-                    adminMsg.className = "mt-2 text-xs text-red-600 font-medium";
-                    return;
-                }
+                if (querySnapshot.empty) {
+                    adminMsg.innerText = "एरर: यह यूजर डेटाबेस में नहीं मिला!";
+                    adminMsg.className = "mt-2 text-xs text-red-600 font-medium";
+                    return;
+                }
 
-                let userDocId = "";
-                let currentCredits = 0;
-                querySnapshot.forEach((docSnap) => {
-                    userDocId = docSnap.id;
-                    currentCredits = docSnap.data().credits || 0;
-                });
+                let userDocId = "";
+                let currentCredits = 0;
+                querySnapshot.forEach((docSnap) => {
+                    userDocId = docSnap.id;
+                    currentCredits = docSnap.data().credits || 0;
+                });
 
-                const newTotal = currentCredits + creditsToAdd;
-                const targetRef = doc(db, "users", userDocId);
-                await updateDoc(targetRef, { credits: newTotal });
+                const newTotal = currentCredits + creditsToAdd;
+                const targetRef = doc(db, "users", userDocId);
+                await updateDoc(targetRef, { credits: newTotal });
 
-                adminMsg.innerText = `सफलता! यूजर के नए क्रेडिट्स: ${newTotal}`;
-                adminMsg.className = "mt-2 text-xs text-green-600 font-medium";
-                document.getElementById('adminForm').reset();
+                adminMsg.innerText = `सफलता! यूजर के नए क्रेडिट्स: ${newTotal}`;
+                adminMsg.className = "mt-2 text-xs text-green-600 font-medium";
+                document.getElementById('adminForm').reset();
 
-            } catch (err) {
-                console.error("Admin Error:", err);
-                adminMsg.innerText = "एरर: कुछ गलत हो गया है।";
-                adminMsg.className = "mt-2 text-xs text-red-600 font-medium";
-            }
-        };
+            } catch (err) {
+                console.error("Admin Error:", err);
+                adminMsg.innerText = "एरर: कुछ गलत हो गया है।";
+                adminMsg.className = "mt-2 text-xs text-red-600 font-medium";
+            }
+        };
 
-        // Form Submit & Credit Check Logic
-        window.submitForm = async function(event, serviceType) {
-            event.preventDefault();
+        // Form Submit & Credit Check Logic
+        window.submitForm = async function(event, serviceType) {
+            event.preventDefault();
 
-            if (!window.currentUserData) {
-                alert('कृपया पहले लॉगिन करें!');
-                return;
-            }
+            if (!window.currentUserData) {
+                alert('कृपया पहले लॉगिन करें!');
+                return;
+            }
 
-            if (window.currentUserData.credits <= 0) {
-                alert('आपके पास पर्याप्त क्रेडिट्स (Credits) नहीं हैं! कृपया एडमिन से संपर्क करें।');
-                return;
-            }
+            if (window.currentUserData.credits <= 0) {
+                alert('आपके पास पर्याप्त क्रेडिट्स (Credits) नहीं हैं! कृपया एडमिन से संपर्क करें।');
+                return;
+            }
 
-            const formElement = event.target;
-            const formData = new FormData(formElement);
-            
-            formData.append('USER_ID', window.currentUserData.email);
-            formData.append('SERVICE_TYPE', serviceType);
+            const formElement = event.target;
+            const formData = new FormData(formElement);
+            
+            formData.append('USER_ID', window.currentUserData.email);
+            formData.append('SERVICE_TYPE', serviceType);
 
-            let district = formData.get('DISTRICT');
-            let targetUrl = API_URLS["BAGHPAT"];
+            let district = formData.get('DISTRICT');
+            let targetUrl = API_URLS["BAGHPAT"];
 
-            if (serviceType === 'Domicile') {
-                if (district === 'SHAMLI') targetUrl = API_URLS["SHAMLI"];
-                else if (district === 'MUZAFFARNAGAR') targetUrl = API_URLS["MUZAFFARNAGAR"];
-                else targetUrl = API_URLS["BAGHPAT"];
-            } else if (serviceType === 'DOB') {
-                targetUrl = API_URLS["DOB"];
-            } else if (serviceType === 'Annexure') {
-                targetUrl = API_URLS["ANNEXURE"];
-            }
+            if (serviceType === 'Domicile') {
+                if (district === 'SHAMLI') targetUrl = API_URLS["SHAMLI"];
+                else if (district === 'MUZAFFARNAGAR') targetUrl = API_URLS["MUZAFFARNAGAR"];
+                else targetUrl = API_URLS["BAGHPAT"];
+            } else if (serviceType === 'DOB') {
+                targetUrl = API_URLS["DOB"];
+            } else if (serviceType === 'Annexure') {
+                targetUrl = API_URLS["ANNEXURE"];
+            }
 
-            const submitBtn = formElement.querySelector('button[type="submit"]');
-            const originalBtnText = submitBtn.innerText;
-            submitBtn.innerText = 'डॉक्यूमेंट बन रहा है, कृपया प्रतीक्षा करें...';
-            submitBtn.disabled = true;
+            const submitBtn = formElement.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.innerText;
+            submitBtn.innerText = 'डॉक्यूमेंट बन रहा है, कृपया प्रतीक्षा करें...';
+            submitBtn.disabled = true;
 
-            const photoInput = formElement.querySelector('input[type="file"]');
-            if (photoInput && photoInput.files[0]) {
-                const reader = new FileReader();
-                reader.readAsDataURL(photoInput.files[0]);
-                reader.onload = function () {
-                    formData.set('PHOTO', reader.result);
-                    executeBackendRequest(targetUrl, formData, submitBtn, originalBtnText, serviceType);
-                };
-            } else {
-                executeBackendRequest(targetUrl, formData, submitBtn, originalBtnText, serviceType);
-            }
-        };
+            const photoInput = formElement.querySelector('input[type="file"]');
+            if (photoInput && photoInput.files[0]) {
+                const reader = new FileReader();
+                reader.readAsDataURL(photoInput.files[0]);
+                reader.onload = function () {
+                    formData.set('PHOTO', reader.result);
+                    executeBackendRequest(targetUrl, formData, submitBtn, originalBtnText, serviceType);
+                };
+            } else {
+                executeBackendRequest(targetUrl, formData, submitBtn, originalBtnText, serviceType);
+            }
+        };
 
-        async function executeBackendRequest(url, formData, submitBtn, originalBtnText, serviceType) {
-            if (!url) {
-                alert('एरर: इस सर्विस का बैकएंड यूआरएल सेट नहीं है!');
-                submitBtn.innerText = originalBtnText;
-                submitBtn.disabled = false;
-                return;
-            }
+        async function executeBackendRequest(url, formData, submitBtn, originalBtnText, serviceType) {
+            if (!url) {
+                alert('एरर: इस सर्विस का बैकएंड यूआरएल सेट नहीं है!');
+                submitBtn.innerText = originalBtnText;
+                submitBtn.disabled = false;
+                return;
+            }
 
-            const dataObj = {};
-            formData.forEach((value, key) => { dataObj[key] = value; });
+            const dataObj = {};
+            formData.forEach((value, key) => { dataObj[key] = value; });
 
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    body: JSON.stringify(dataObj)
-                });
-                const result = await response.json();
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: JSON.stringify(dataObj)
+                });
+                const result = await response.json();
 
-                submitBtn.innerText = originalBtnText;
-                submitBtn.disabled = false;
+                submitBtn.innerText = originalBtnText;
+                submitBtn.disabled = false;
 
-                if (result.success) {
-                    const newCredits = window.currentUserData.credits - 1;
-                    const userDocRef = doc(db, "users", window.currentUserData.uid);
-                    await updateDoc(userDocRef, { credits: newCredits });
-                    
-                    window.currentUserData.credits = newCredits;
-                    document.getElementById('displayCredits').innerText = newCredits;
+                if (result.success) {
+                    const newCredits = window.currentUserData.credits - 1;
+                    const userDocRef = doc(db, "users", window.currentUserData.uid);
+                    await updateDoc(userDocRef, { credits: newCredits });
+                    
+                    window.currentUserData.credits = newCredits;
+                    document.getElementById('displayCredits').innerText = newCredits;
 
-                    await addDoc(collection(db, "history"), {
-                        userId: window.currentUserData.uid,
-                        fileName: `${dataObj.NAME || 'Document'} - ${serviceType}.pdf`,
-                        fileId: result.fileId,
-                        serviceType: serviceType,
-                        timestamp: new Date()
-                    });
+                    await addDoc(collection(db, "history"), {
+                        userId: window.currentUserData.uid,
+                        fileName: `${dataObj.NAME || 'Document'} - ${serviceType}.pdf`,
+                        fileId: result.fileId,
+                        serviceType: serviceType,
+                        timestamp: new Date()
+                    });
 
-                    alert('डॉक्यूमेंट सफलतापूर्वक बन गया है और 1 क्रेडिट काट लिया गया है!');
-                    window.open(`https://drive.google.com/file/d/${result.fileId}/view`, '_blank');
-                } else {
-                    alert('एरर: ' + (result.error || 'कुछ गलत हो गया है।'));
-                }
-            } catch (error) {
-                submitBtn.innerText = originalBtnText;
-                submitBtn.disabled = false;
-                console.error('Error:', error);
-                alert('कनेक्शन में समस्या आई है। कृपया दोबारा कोशिश करें।');
-            }
-        }
+                    alert('डॉक्यूमेंट सफलतापूर्वक बन गया है और 1 क्रेडिट काट लिया गया है!');
+                    window.open(`https://drive.google.com/file/d/${result.fileId}/view`, '_blank');
+                } else {
+                    alert('एरर: ' + (result.error || 'कुछ गलत हो गया है।'));
+                }
+            } catch (error) {
+                submitBtn.innerText = originalBtnText;
+                submitBtn.disabled = false;
+                console.error('Error:', error);
+                alert('कनेक्शन में समस्या आई है। कृपया दोबारा कोशिश करें।');
+            }
+        }
 
-        window.loadUserHistory = async function() {
-            const historyContainer = document.getElementById('historyTableBody');
-            historyContainer.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-slate-500">लोड हो रहा है...</td></tr>`;
+        window.loadUserHistory = async function() {
+            const historyContainer = document.getElementById('historyTableBody');
+            historyContainer.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-slate-500">लोड हो रहा है...</td></tr>`;
 
-            try {
-                const q = query(collection(db, "history"), where("userId", "==", window.currentUserData.uid), orderBy("timestamp", "desc"));
-                const querySnapshot = await getDocs(q);
+            try {
+                const q = query(collection(db, "history"), where("userId", "==", window.currentUserData.uid), orderBy("timestamp", "desc"));
+                const querySnapshot = await getDocs(q);
 
-                historyContainer.innerHTML = '';
-                if (querySnapshot.empty) {
-                    historyContainer.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-slate-500">कोई पुरानी हिस्ट्री उपलब्ध नहीं है।</td></tr>`;
-                    return;
-                }
+                historyContainer.innerHTML = '';
+                if (querySnapshot.empty) {
+                    historyContainer.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-slate-500">कोई पुरानी हिस्ट्री उपलब्ध नहीं है।</td></tr>`;
+                    return;
+                }
 
-                querySnapshot.forEach((docSnap) => {
-                    const data = docSnap.data();
-                    const dateStr = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleDateString('hi-IN') : 'अभी-अभी';
-                    
-                    historyContainer.innerHTML += `
-                        <tr>
-                            <td class="p-3 font-medium">${data.fileName}</td>
-                            <td class="p-3 text-slate-500">${dateStr}</td>
-                            <td class="p-3 text-right">
-                                <a href="https://drive.google.com/file/d/${data.fileId}/view" target="_blank" class="text-blue-600 hover:underline font-semibold">डाउनलोड / देखें</a>
-                            </td>
-                        </tr>
-                    `;
-                });
-            } catch (err) {
-                console.error("History Error:", err);
-                historyContainer.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-500">हिस्ट्री लोड करने में असफल।</td></tr>`;
-            }
-        };
-    </script>
+                querySnapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    const dateStr = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleDateString('hi-IN') : 'अभी-अभी';
+                    
+                    historyContainer.innerHTML += `
+                        <tr>
+                            <td class="p-3 font-medium">${data.fileName}</td>
+                            <td class="p-3 text-slate-500">${dateStr}</td>
+                            <td class="p-3 text-right">
+                                <a href="https://drive.google.com/file/d/${data.fileId}/view" target="_blank" class="text-blue-600 hover:underline font-semibold">डाउनलोड / देखें</a>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (err) {
+                console.error("History Error:", err);
+                historyContainer.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-500">हिस्ट्री लोड करने में असफल।</td></tr>`;
+            }
+        };
+    </script>
 </head>
 <body class="bg-slate-100 font-sans min-h-screen flex flex-col justify-between">
 
-    <!-- LOGIN SCREEN -->
-    <div id="loginSection" class="flex items-center justify-center flex-grow p-4">
-        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200">
-            <div class="text-center mb-6">
-                <h1 class="text-2xl font-bold text-slate-800">ओवी आधार प्रिंट सर्विस</h1>
-                <p class="text-sm text-slate-500 mt-1">कृपया अपने यूजर आईडी से लॉगिन करें</p>
-            </div>
-            
-            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">यूजर आईडी / ईमेल</label>
-                    <input type="text" id="loginUsername" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">पासवर्ड</label>
-                    <input type="password" id="loginPassword" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                </div>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition duration-200 shadow-md">
-                    लॉगिन करें
-                </button>
-            </form>
-            <div id="loginError" class="mt-4 text-center text-sm text-red-600 hidden"></div>
-        </div>
-    </div>
+    <!-- LOGIN SCREEN -->
+    <div id="loginSection" class="flex items-center justify-center flex-grow p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200">
+            <div class="text-center mb-6">
+                <h1 class="text-2xl font-bold text-slate-800">ओवी आधार प्रिंट सर्विस</h1>
+                <p class="text-sm text-slate-500 mt-1">कृपया अपने यूजर आईडी से लॉगिन करें</p>
+            </div>
+            
+            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">यूजर आईडी / ईमेल</label>
+                    <input type="text" id="loginUsername" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">पासवर्ड</label>
+                    <input type="password" id="loginPassword" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition duration-200 shadow-md">
+                    लॉगिन करें
+                </button>
+            </form>
+            <div id="loginError" class="mt-4 text-center text-sm text-red-600 hidden"></div>
+        </div>
+    </div>
 
-    <!-- DASHBOARD SCREEN -->
-    <div id="dashboardSection" class="hidden flex-grow flex flex-col">
-        <header class="bg-white shadow-sm border-b border-slate-200 px-6 py-4 flex justify-between items-center">
-            <div>
-                <h2 class="text-xl font-bold text-slate-800">ओवी पोर्टल डैशबोर्ड</h2>
-                <p class="text-xs text-slate-500">यूजर: <span id="displayUser" class="font-semibold text-blue-600"></span></p>
-            </div>
-            <div class="flex items-center space-x-4">
-                <div class="bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg text-sm font-medium text-blue-800">
-                    क्रेडिट्स: <span id="displayCredits" class="font-bold text-blue-900">0</span>
-                </div>
-                <button onclick="handleLogout()" class="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-sm font-medium transition">
-                    लॉगआउट
-                </button>
-            </div>
-        </header>
+    <!-- DASHBOARD SCREEN -->
+    <div id="dashboardSection" class="hidden flex-grow flex flex-col">
+        <header class="bg-white shadow-sm border-b border-slate-200 px-6 py-4 flex justify-between items-center">
+            <div>
+                <h2 class="text-xl font-bold text-slate-800">ओवी पोर्टल डैशबोर्ड</h2>
+                <p class="text-xs text-slate-500">यूजर: <span id="displayUser" class="font-semibold text-blue-600"></span></p>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg text-sm font-medium text-blue-800">
+                    क्रेडिट्स: <span id="displayCredits" class="font-bold text-blue-900">0</span>
+                </div>
+                <button onclick="handleLogout()" class="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-sm font-medium transition">
+                    लॉगआउट
+                </button>
+            </div>
+        </header>
 
-        <main class="max-w-4xl mx-auto w-full p-6 flex-grow">
-            
-            <!-- ADMIN SECTION -->
-            <div id="adminSection" class="hidden space-y-4 mb-6">
-                <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm">
-                    <h3 class="text-md font-bold text-amber-800 mb-2">👤 नया यूजर बनाएँ (Create User)</h3>
-                    <form id="adminCreateUserForm" onsubmit="createNewUserByAdmin(event)" class="grid grid-cols-1 md:grid-cols-4 gap-3">
-                        <input type="email" id="newAdminUserEmail" placeholder="नया ईमेल" required class="p-2 border border-amber-300 rounded-lg text-sm bg-white">
-                        <input type="password" id="newAdminUserPass" placeholder="पासवर्ड (कम से कम 6 अंक)" required minlength="6" class="p-2 border border-amber-300 rounded-lg text-sm bg-white">
-                        <input type="number" id="newAdminUserCredits" placeholder="शुरुआती क्रेडिट" required class="p-2 border border-amber-300 rounded-lg text-sm bg-white">
-                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-lg text-sm transition shadow-sm">
-                            यूजर बनाएँ
-                        </button>
-                    </form>
-                    <div id="adminCreateMsg" class="mt-2 text-xs hidden"></div>
-                </div>
+        <main class="max-w-4xl mx-auto w-full p-6 flex-grow">
+            
+            <!-- ADMIN SECTION -->
+            <div id="adminSection" class="hidden space-y-4 mb-6">
+                <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm">
+                    <h3 class="text-md font-bold text-amber-800 mb-2">👤 नया यूजर बनाएँ (Create User)</h3>
+                    <form id="adminCreateUserForm" onsubmit="createNewUserByAdmin(event)" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <input type="email" id="newAdminUserEmail" placeholder="नया ईमेल" required class="p-2 border border-amber-300 rounded-lg text-sm bg-white">
+                        <input type="password" id="newAdminUserPass" placeholder="पासवर्ड (कम से कम 6 अंक)" required minlength="6" class="p-2 border border-amber-300 rounded-lg text-sm bg-white">
+                        <input type="number" id="newAdminUserCredits" placeholder="शुरुआती क्रेडिट" required class="p-2 border border-amber-300 rounded-lg text-sm bg-white">
+                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-lg text-sm transition shadow-sm">
+                            यूजर बनाएँ
+                        </button>
+                    </form>
+                    <div id="adminCreateMsg" class="mt-2 text-xs hidden"></div>
+                </div>
 
-                <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 shadow-sm">
-                    <h3 class="text-md font-bold text-blue-800 mb-2">💰 यूजर को क्रेडिट्स दें (Add Credits)</h3>
-                    <form id="adminForm" onsubmit="addCreditsToUser(event)" class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <input type="text" id="targetUser" placeholder="यूजर ईमेल" required class="p-2 border border-blue-300 rounded-lg text-sm bg-white">
-                        <input type="number" id="creditsToAdd" placeholder="जोड़ने वाले क्रेडिट्स" required class="p-2 border border-blue-300 rounded-lg text-sm bg-white">
-                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-sm transition shadow-sm">
-                            क्रेडिट जोड़ें
-                        </button>
-                    </form>
-                    <div id="adminMsg" class="mt-2 text-xs hidden"></div>
-                </div>
-            </div>
+                <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 shadow-sm">
+                    <h3 class="text-md font-bold text-blue-800 mb-2">💰 यूजर को क्रेडिट्स दें (Add Credits)</h3>
+                    <form id="adminForm" onsubmit="addCreditsToUser(event)" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <input type="text" id="targetUser" placeholder="यूजर ईमेल" required class="p-2 border border-blue-300 rounded-lg text-sm bg-white">
+                        <input type="number" id="creditsToAdd" placeholder="जोड़ने वाले क्रेडिट्स" required class="p-2 border border-blue-300 rounded-lg text-sm bg-white">
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-sm transition shadow-sm">
+                            क्रेडिट जोड़ें
+                        </button>
+                    </form>
+                    <div id="adminMsg" class="mt-2 text-xs hidden"></div>
+                </div>
+            </div>
 
-            <!-- Service Selector Tabs -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                <button onclick="switchService('domicile')" id="btn-domicile" class="service-tab bg-blue-600 text-white py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition">मूल निवास (Domicile)</button>
-                <button onclick="switchService('dob')" id="btn-dob" class="service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50">DOB सर्टिफिकेट</button>
-                <button onclick="switchService('annexure')" id="btn-annexure" class="service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50">Annexure 1</button>
-                <button onclick="switchService('history')" id="btn-history" class="service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50">मेरी हिस्ट्री (History)</button>
-            </div>
+            <!-- Service Selector Tabs -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                <button onclick="switchService('domicile')" id="btn-domicile" class="service-tab bg-blue-600 text-white py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition">मूल निवास (Domicile)</button>
+                <button onclick="switchService('dob')" id="btn-dob" class="service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50">DOB सर्टिफिकेट</button>
+                <button onclick="switchService('annexure')" id="btn-annexure" class="service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50">Annexure 1</button>
+                <button onclick="switchService('history')" id="btn-history" class="service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50">मेरी हिस्ट्री (History)</button>
+            </div>
 
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <div id="formContainer"></div>
-            </div>
-        </main>
-    </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <div id="formContainer"></div>
+            </div>
+        </main>
+    </div>
 
-    <footer class="bg-white border-t border-slate-200 text-center py-4 text-xs text-slate-500">
-        © 2026 ओवी आधार प्रिंट सर्विस. सर्वाधिकार सुरक्षित.
-    </footer>
+    <footer class="bg-white border-t border-slate-200 text-center py-4 text-xs text-slate-500">
+        © 2026 ओवी आधार प्रिंट सर्विस. सर्वाधिकार सुरक्षित.
+    </footer>
 
-    <script>
-        window.switchService = function(serviceName) {
-            document.querySelectorAll('.service-tab').forEach(btn => {
-                btn.className = "service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50";
-            });
-            document.getElementById('btn-' + serviceName).className = "service-tab bg-blue-600 text-white py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition";
+    <script>
+        window.switchService = function(serviceName) {
+            document.querySelectorAll('.service-tab').forEach(btn => {
+                btn.className = "service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50";
+            });
+            document.getElementById('btn-' + serviceName).className = "service-tab bg-blue-600 text-white py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition";
 
-            const container = document.getElementById('formContainer');
-            
-            if(serviceName === 'domicile') {
-                container.innerHTML = `
-                    <h3 class="text-lg font-bold text-slate-800 mb-4">मूल निवास प्रमाण पत्र फॉर्म</h3>
-                    <form onsubmit="submitForm(event, 'Domicile')" class="space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">जिला (District)</label>
-                                <select id="districtSelect" name="DISTRICT" onchange="updateTehsilsAndThanas()" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white">
-                                    <option value="BAGHPAT">बागपत (Baghpat)</option>
-                                    <option value="SHAMLI">शामली (Shamli)</option>
-                                    <option value="MUZAFFARNAGAR">मुजफ्फरनगर (Muzaffarnagar)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">तहसील (Tehsil)</label>
-                                <select id="tehsilSelect" name="TAHSEEL" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase"></select>
-                            </div>
+            const container = document.getElementById('formContainer');
+            
+            if(serviceName === 'domicile') {
+                container.innerHTML = `
+                    <h3 class="text-lg font-bold text-slate-800 mb-4">मूल निवास प्रमाण पत्र फॉर्म</h3>
+                    <form onsubmit="submitForm(event, 'Domicile')" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">जिला (District)</label>
+                                <select id="districtSelect" name="DISTRICT" onchange="updateTehsilsAndThanas()" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white">
+                                    <option value="BAGHPAT">बागपत (Baghpat)</option>
+                                    <option value="SHAMLI">शामली (Shamli)</option>
+                                    <option value="MUZAFFARNAGAR">मुजफ्फरनगर (Muzaffarnagar)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">तहसील (Tehsil)</label>
+                                <select id="tehsilSelect" name="TAHSEEL" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase"></select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">कस्टमर का नाम (Name)</label>
+                                <input type="text" name="NAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">हिंदी नाम (H Name)</label>
+                                <input type="text" name="HNAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पिता का नाम (Father Name)</label>
+                                <input type="text" name="FNAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                            </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">रिश्ता (Relationship - REL)</label>
                                 <select name="REL" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase">
                                     <option value="पुत्र / पुत्री">पुत्र / पुत्री</option>
-                                    <option value="पत्नी     `">पत्नी</option>
+                                    <option value="पत्नी">पत्नी</option>
                                 </select>
                             </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">कस्टमर का नाम (Name)</label>
-                                <input type="text" name="NAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">हिंदी नाम (H Name)</label>
-                                <input type="text" name="HNAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पिता/पति का नाम (Father/Husband Name)</label>
-                                <input type="text" name="FNAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">माता का नाम (Mother Name)</label>
-                                <input type="text" name="MNAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">मकान नंबर (MN)</label>
-                                <input type="text" name="MN" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">मोहल्ला / क्षेत्र (Area)</label>
-                                <input type="text" name="AREA" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">ग्राम / वार्ड (Gram)</label>
-                                <input type="text" name="GRAM" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">थाना (Thana)</label>
-                                <select id="thanaSelect" name="THANA" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase"></select>
-                            </div>
-                            <div class="md:col-span-2">
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">फोटो अपलोड करें (Photo)</label>
-                                <input type="file" name="PHOTO" accept="image/*" required class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-slate-50">
-                            </div>
-                        </div>
-                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow-md transition mt-4">
-                            डॉक्यूमेंट जनरेट करें (1 Credit)
-                        </button>
-                    </form>
-                `;
-                updateTehsilsAndThanas();
-            } else if(serviceName === 'dob') {
-                container.innerHTML = `
-                    <h3 class="text-lg font-bold text-slate-800 mb-4">जन्म प्रमाण पत्र (DOB) फॉर्म</h3>
-                    <form onsubmit="submitForm(event, 'DOB')" class="space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">नाम (Name)</label>
-                                <input type="text" name="NAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">लिंग (Sex)</label>
-                                <select name="SEX" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase">
-                                    <option value="MALE">MALE</option>
-                                    <option value="FEMALE">FEMALE</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">जन्मतिथि (DOB)</label>
-                                <input type="date" name="DOB" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पिता का नाम (F Name)</label>
-                                <input type="text" name="FNAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">माता का नाम (Mother Name)</label>
-                                <input type="text" name="MNAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पिन कोड (Pin)</label>
-                                <input type="text" name="PIN" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
-                            </div>
-                            <div class="md:col-span-2">
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पूरा पता (Address)</label>
-                                <textarea name="ADDRESS" rows="2" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase"></textarea>
-                            </div>
-                        </div>
-                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow-md transition mt-4">
-                            DOB सर्टिफिकेट बनाएं (1 Credit)
-                        </button>
-                    </form>
-                `;
-            } else if(serviceName === 'annexure') {
-                container.innerHTML = `
-                    <h3 class="text-lg font-bold text-slate-800 mb-4">Annexure 1 for Adult फॉर्म</h3>
-                    <form onsubmit="submitForm(event, 'Annexure')" class="space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">नाम (Name)</label>
-                                <input type="text" name="NAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पिता का नाम (Father)</label>
-                                <input type="text" name="FATHER" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">आधार नंबर (Aadhaar)</label>
-                                <input type="text" name="AADHAAR" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">नई जन्मतिथि (New DOB)</label>
-                                <input type="date" name="NEWDOB" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">नया डॉक्यूमेंट (New Document)</label>
-                                <select name="NEWDOCUMENT" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase">
-                                    <option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option>
-                                    <option value="MARKSHEET">MARKSHEET</option>
-                                    <option value="PASSPORT">PASSPORT</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पुरानी जन्मतिथि (Old DOB)</label>
-                                <input type="date" name="OLDDOB" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm">
-                            </div>
-                            <div class="md:col-span-2">
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पूरा पता (Address)</label>
-                                <textarea name="ADDRESS" rows="2" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase"></textarea>
-                            </div>
-                        </div>
-                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow-md transition mt-4">
-                            Annexure 1 जनरेट करें (1 Credit)
-                        </button>
-                    </form>
-                `;
-            } else if(serviceName === 'history') {
-                container.innerHTML = `
-                    <h3 class="text-lg font-bold text-slate-800 mb-4">मेरी जनरेट की गई हिस्ट्री (History)</h3>
-                    <p class="text-sm text-slate-500 mb-4">आपके द्वारा बनाए गए सभी पुराने डॉक्यूमेंट्स की सूची:</p>
-                    <div class="border border-slate-200 rounded-xl overflow-hidden">
-                        <table class="w-full text-left border-collapse">
-                            <thead class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase">
-                                <tr>
-                                    <th class="p-3">फाइल का नाम</th>
-                                    <th class="p-3">तारीख</th>
-                                    <th class="p-3 text-right">एक्शन</th>
-                                </tr>
-                            </thead>
-                            <tbody id="historyTableBody" class="divide-y divide-slate-200 text-sm text-slate-700"></tbody>
-                        </table>
-                    </div>
-                `;
-                window.loadUserHistory();
-            }
-        };
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">माता का नाम (Mother Name)</label>
+                                <input type="text" name="MNAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">मकान नंबर (MN)</label>
+                                <input type="text" name="MN" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">मोहल्ला / क्षेत्र (Area)</label>
+                                <input type="text" name="AREA" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">ग्राम / वार्ड (Gram)</label>
+                                <input type="text" name="GRAM" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">थाना (Thana)</label>
+                                <select id="thanaSelect" name="THANA" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase"></select>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">फोटो अपलोड करें (Photo)</label>
+                                <input type="file" name="PHOTO" accept="image/*" required class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-slate-50">
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow-md transition mt-4">
+                            डॉक्यूमेंट जनरेट करें (1 Credit)
+                        </button>
+                    </form>
+                `;
+                updateTehsilsAndThanas();
+            } else if(serviceName === 'dob') {
+                container.innerHTML = `
+                    <h3 class="text-lg font-bold text-slate-800 mb-4">जन्म प्रमाण पत्र (DOB) फॉर्म</h3>
+                    <form onsubmit="submitForm(event, 'DOB')" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">नाम (Name)</label>
+                                <input type="text" name="NAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">लिंग (Sex)</label>
+                                <select name="SEX" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase">
+                                    <option value="MALE">MALE</option>
+                                    <option value="FEMALE">FEMALE</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">जन्मतिथि (DOB)</label>
+                                <input type="date" name="DOB" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पिता का नाम (F Name)</label>
+                                <input type="text" name="FNAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">माता का नाम (Mother Name)</label>
+                                <input type="text" name="MNAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पिन कोड (Pin)</label>
+                                <input type="text" name="PIN" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पूरा पता (Address)</label>
+                                <textarea name="ADDRESS" rows="2" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase"></textarea>
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow-md transition mt-4">
+                            DOB सर्टिफिकेट बनाएं (1 Credit)
+                        </button>
+                    </form>
+                `;
+            } else if(serviceName === 'annexure') {
+                container.innerHTML = `
+                    <h3 class="text-lg font-bold text-slate-800 mb-4">Annexure 1 for Adult फॉर्म</h3>
+                    <form onsubmit="submitForm(event, 'Annexure')" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">नाम (Name)</label>
+                                <input type="text" name="NAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पिता का नाम (Father)</label>
+                                <input type="text" name="FATHER" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">आधार नंबर (Aadhaar)</label>
+                                <input type="text" name="AADHAAR" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">नई जन्मतिथि (New DOB)</label>
+                                <input type="date" name="NEWDOB" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">नया डॉक्यूमेंट (New Document)</label>
+                                <select name="NEWDOCUMENT" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase">
+                                    <option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option>
+                                    <option value="MARKSHEET">MARKSHEET</option>
+                                    <option value="PASSPORT">PASSPORT</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पुरानी जन्मतिथि (Old DOB)</label>
+                                <input type="date" name="OLDDOB" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पूरा पता (Address)</label>
+                                <textarea name="ADDRESS" rows="2" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase"></textarea>
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow-md transition mt-4">
+                            Annexure 1 जनरेट करें (1 Credit)
+                        </button>
+                    </form>
+                `;
+            } else if(serviceName === 'history') {
+                container.innerHTML = `
+                    <h3 class="text-lg font-bold text-slate-800 mb-4">मेरी जनरेट की गई हिस्ट्री (History)</h3>
+                    <p class="text-sm text-slate-500 mb-4">आपके द्वारा बनाए गए सभी पुराने डॉक्यूमेंट्स की सूची:</p>
+                    <div class="border border-slate-200 rounded-xl overflow-hidden">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase">
+                                <tr>
+                                    <th class="p-3">फाइल का नाम</th>
+                                    <th class="p-3">तारीख</th>
+                                    <th class="p-3 text-right">एक्शन</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyTableBody" class="divide-y divide-slate-200 text-sm text-slate-700"></tbody>
+                        </table>
+                    </div>
+                `;
+                window.loadUserHistory();
+            }
+        };
 
-        window.updateTehsilsAndThanas = function() {
-            const district = document.getElementById('districtSelect').value;
-            const tehsilSelect = document.getElementById('tehsilSelect');
-            const thanaSelect = document.getElementById('thanaSelect');
-            
-            tehsilSelect.innerHTML = '';
-            thanaSelect.innerHTML = '';
+        window.updateTehsilsAndThanas = function() {
+            const district = document.getElementById('districtSelect').value;
+            const tehsilSelect = document.getElementById('tehsilSelect');
+            const thanaSelect = document.getElementById('thanaSelect');
+            
+            tehsilSelect.innerHTML = '';
+            thanaSelect.innerHTML = '';
 
-            let tehsils = [];
-            let thanas = [];
+            let tehsils = [];
+            let thanas = [];
 
-            if (district === 'BAGHPAT') {
-                tehsils = ['बड़ौत', 'खेकड़ा', 'बागपत'];
-                thanas = ['बड़ौत', 'खेकड़ा', 'बागपत', 'छपरोली', 'बिनौली', 'रमाला', 'दोघट', 'सिंघावली अहीर', 'बालैनी', 'चांदीनगर'];
-            } else if (district === 'SHAMLI') {
-                tehsils = ['KAIRANA', 'OON', 'SHAMLI'];
-                thanas = ['थाना भवन', 'कैराना', 'झिंझाना', 'शामली', 'बाबरी', 'कांधला', 'गढ़ी पुख्ता', 'आदर्श मंडी'];
-            } else if (district === 'MUZAFFARNAGAR') {
-                tehsils = ['BUDHANA', 'KHATOLI', 'JANSHATH', 'MUZAFFARNAGAR'];
-                thanas = ['बुढ़ाना', 'खतौली', 'जानसठ', 'मीरापुर', 'सिविल लाइन', 'कोतवाली नगर', 'नई मंडी'];
-            }
+            if (district === 'BAGHPAT') {
+                tehsils = ['बड़ौत', 'खेकड़ा', 'बागपत'];
+                thanas = ['बड़ौत', 'खेकड़ा', 'बागपत', 'छपरोली', 'बिनौली', 'रमाला', 'दोघट', 'सिंघावली अहीर', 'बालैनी', 'चांदीनगर'];
+            } else if (district === 'SHAMLI') {
+                tehsils = ['KAIRANA', 'OON', 'SHAMLI'];
+                thanas = ['थाना भवन', 'कैराना', 'झिंझाना', 'शामली', 'बाबरी', 'कांधला', 'गढ़ी पुख्ता', 'आदर्श मंडी'];
+            } else if (district === 'MUZAFFARNAGAR') {
+                tehsils = ['BUDHANA', 'KHATOLI', 'JANSHATH', 'MUZAFFARNAGAR'];
+                thanas = ['बुढ़ाना', 'खतौली', 'जानसठ', 'मीरापुर', 'सिविल लाइन', 'कोतवाली नगर', 'नई मंडी'];
+            }
 
-            tehsils.forEach(t => {
-                let opt = document.createElement('option');
-                opt.value = t;
-                opt.innerHTML = t;
-                tehsilSelect.appendChild(opt);
-            });
+            tehsils.forEach(t => {
+                let opt = document.createElement('option');
+                opt.value = t;
+                opt.innerHTML = t;
+                tehsilSelect.appendChild(opt);
+            });
 
-            thanas.forEach(th => {
-                let opt = document.createElement('option');
-                opt.value = th;
-                opt.innerHTML = th;
-                thanaSelect.appendChild(opt);
-            });
-        };
-    </script>
-</head>
-<body class="bg-slate-100 font-sans min-h-screen flex flex-col justify-between">
-
-    <!-- LOGIN SCREEN -->
-    <div id="loginSection" class="flex items-center justify-center flex-grow p-4">
-        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200">
-            <div class="text-center mb-6">
-                <h1 class="text-2xl font-bold text-slate-800">ओवी आधार प्रिंट सर्विस</h1>
-                <p class="text-sm text-slate-500 mt-1">कृपया अपने यूजर आईडी से लॉगिन करें</p>
-            </div>
-            
-            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">यूजर आईडी / ईमेल</label>
-                    <input type="text" id="loginUsername" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">पासवर्ड</label>
-                    <input type="password" id="loginPassword" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                </div>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition duration-200 shadow-md">
-                    लॉगिन करें
-                </button>
-            </form>
-            <div id="loginError" class="mt-4 text-center text-sm text-red-600 hidden"></div>
-        </div>
-    </div>
-
-    <!-- DASHBOARD SCREEN -->
-    <div id="dashboardSection" class="hidden flex-grow flex flex-col">
-        <header class="bg-white shadow-sm border-b border-slate-200 px-6 py-4 flex justify-between items-center">
-            <div>
-                <h2 class="text-xl font-bold text-slate-800">ओवी पोर्टल डैशबोर्ड</h2>
-                <p class="text-xs text-slate-500">यूजर: <span id="displayUser" class="font-semibold text-blue-600"></span></p>
-            </div>
-            <div class="flex items-center space-x-4">
-                <div class="bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg text-sm font-medium text-blue-800">
-                    क्रेडिट्स: <span id="displayCredits" class="font-bold text-blue-900">0</span>
-                </div>
-                <button onclick="handleLogout()" class="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-sm font-medium transition">
-                    लॉगआउट
-                </button>
-            </div>
-        </header>
-
-        <main class="max-w-4xl mx-auto w-full p-6 flex-grow">
-            
-            <!-- ADMIN SECTION -->
-            <div id="adminSection" class="hidden space-y-4 mb-6">
-                <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm">
-                    <h3 class="text-md font-bold text-amber-800 mb-2">👤 नया यूजर बनाएँ (Create User)</h3>
-                    <form id="adminCreateUserForm" onsubmit="createNewUserByAdmin(event)" class="grid grid-cols-1 md:grid-cols-4 gap-3">
-                        <input type="email" id="newAdminUserEmail" placeholder="नया ईमेल" required class="p-2 border border-amber-300 rounded-lg text-sm bg-white">
-                        <input type="password" id="newAdminUserPass" placeholder="पासवर्ड (कम से कम 6 अंक)" required minlength="6" class="p-2 border border-amber-300 rounded-lg text-sm bg-white">
-                        <input type="number" id="newAdminUserCredits" placeholder="शुरुआती क्रेडिट" required class="p-2 border border-amber-300 rounded-lg text-sm bg-white">
-                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-lg text-sm transition shadow-sm">
-                            यूजर बनाएँ
-                        </button>
-                    </form>
-                    <div id="adminCreateMsg" class="mt-2 text-xs hidden"></div>
-                </div>
-
-                <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 shadow-sm">
-                    <h3 class="text-md font-bold text-blue-800 mb-2">💰 यूजर को क्रेडिट्स दें (Add Credits)</h3>
-                    <form id="adminForm" onsubmit="addCreditsToUser(event)" class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <input type="text" id="targetUser" placeholder="यूजर ईमेल" required class="p-2 border border-blue-300 rounded-lg text-sm bg-white">
-                        <input type="number" id="creditsToAdd" placeholder="जोड़ने वाले क्रेडिट्स" required class="p-2 border border-blue-300 rounded-lg text-sm bg-white">
-                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-sm transition shadow-sm">
-                            क्रेडिट जोड़ें
-                        </button>
-                    </form>
-                    <div id="adminMsg" class="mt-2 text-xs hidden"></div>
-                </div>
-            </div>
-
-            <!-- Service Selector Tabs -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                <button onclick="switchService('domicile')" id="btn-domicile" class="service-tab bg-blue-600 text-white py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition">मूल निवास (Domicile)</button>
-                <button onclick="switchService('dob')" id="btn-dob" class="service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50">DOB सर्टिफिकेट</button>
-                <button onclick="switchService('annexure')" id="btn-annexure" class="service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50">Annexure 1</button>
-                <button onclick="switchService('history')" id="btn-history" class="service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50">मेरी हिस्ट्री (History)</button>
-            </div>
-
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <div id="formContainer"></div>
-            </div>
-        </main>
-    </div>
-
-    <footer class="bg-white border-t border-slate-200 text-center py-4 text-xs text-slate-500">
-        © 2026 ओवी आधार प्रिंट सर्विस. सर्वाधिकार सुरक्षित.
-    </footer>
+            thanas.forEach(th => {
+                let opt = document.createElement('option');
+                opt.value = th;
+                opt.innerHTML = th;
+                thanaSelect.appendChild(opt);
+            });
+        };
+    </script>
 </body>
 </html>
