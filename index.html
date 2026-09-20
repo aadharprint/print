@@ -97,7 +97,7 @@
             if(user && pass) {
                 currentUser = user;
                 document.getElementById('displayUser').innerText = user;
-                document.getElementById('displayCredits').innerText = "15"; // डेमो क्रेडिट (बैकएंड से सिंक होगा)
+                document.getElementById('displayCredits').innerText = "15"; 
                 
                 document.getElementById('loginSection').classList.add('hidden');
                 document.getElementById('dashboardSection').classList.remove('hidden');
@@ -156,6 +156,10 @@
                                 <input type="text" name="MNAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
                             </div>
                             <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">मकान नंबर (MN)</label>
+                                <input type="text" name="MN" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                            </div>
+                            <div>
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">मोहल्ला / क्षेत्र (Area)</label>
                                 <input type="text" name="AREA" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
                             </div>
@@ -179,7 +183,7 @@
                         </button>
                     </form>
                 `;
-                updateTehsilsAndThanas(); // लोड होते ही तहसील और थाने सेट करें
+                updateTehsilsAndThanas(); 
             } else if(serviceName === 'dob') {
                 container.innerHTML = `
                     <h3 class="text-lg font-bold text-slate-800 mb-4">जन्म प्रमाण पत्र (DOB) फॉर्म</h3>
@@ -291,7 +295,7 @@
             }
         }
 
-        // जिले के अनुसार तहसील और थाने ऑटोमैटिक लोड करने का फंक्शन
+        // जिले के अनुसार सही तहसीलों और थानों को लोड करने का फाइनल लॉजिक
         function updateTehsilsAndThanas() {
             const district = document.getElementById('districtSelect').value;
             const tehsilSelect = document.getElementById('tehsilSelect');
@@ -305,10 +309,10 @@
 
             if (district === 'BAGHPAT') {
                 tehsils = ['बड़ौत', 'खेकड़ा', 'बागपत'];
-                thanas = ['बड़ौत', 'खेकड़ा', 'बागपत कोतवाली', 'छपरोली', 'बिनौली'];
+                thanas = ['बड़ौत', 'खेकड़ा', 'बागपत', 'छपरोली', 'बिनौली', 'रमाला', 'दोघट', 'सिंघावली अहीर', 'बालैनी', 'चांदीनगर'];
             } else if (district === 'SHAMLI') {
                 tehsils = ['KAIRANA', 'OON', 'SHAMLI'];
-                thanas = ['कैराना', 'भवन', 'झिंझाना', 'शामली कोतवाली', 'बाबरी'];
+                thanas = ['थाना भवन', 'कैराना', 'भवन', 'झिंझाना', 'शामली', 'बाबरी'];
             } else if (district === 'MUZAFFARNAGAR') {
                 tehsils = ['BUDHANA', 'KHATOLI', 'JANSHATH', 'MUZAFFARNAGAR'];
                 thanas = ['बुढ़ाना', 'खतौली', 'जानसठ', 'मीरापुर', 'सिविल लाइन', 'कोतवाली नगर', 'नई मंडी'];
@@ -329,7 +333,6 @@
             });
         }
 
-        // फॉर्म सबमिट करने और सही बैकएंड यूआरएल पर भेजने का मुख्य फंक्शन
         function submitForm(event, serviceType) {
             event.preventDefault();
             
@@ -391,7 +394,7 @@
                 submitBtn.disabled = false;
 
                 if (result.success) {
-                    alert('डॉक्यूमेंट सफलतापूर्वक बन गया है और ड्राइव में सेव हो गया है!');
+                    alert('डॉक्यूमेंट सफलतापूर्वक बन गया है!');
                     if(result.remainingCredits !== undefined) {
                         document.getElementById('displayCredits').innerText = result.remainingCredits;
                     }
