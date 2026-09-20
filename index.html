@@ -76,20 +76,28 @@
         © 2026 ओवी आधार प्रिंट सर्विस. सर्वाधिकार सुरक्षित.
     </footer>
 
-    <!-- JavaScript Logic -->
+    <!-- JavaScript Logic & Backend Integration -->
     <script>
         let currentUser = null;
+
+        // आपके सभी 5 सर्विसेज के फाइनल Apps Script Web App URLs
+        const API_URLS = {
+            "BAGHPAT": "https://script.google.com/macros/s/AKfycbyA3916RXjuVRInvDPksOzbzczesTFAWo4gVzvjazGNfQl_REwC0YrYpTu03jlXwlb07w/exec",
+            "SHAMLI": "https://script.google.com/macros/s/AKfycbx14PgIaqdbvNCPQaoIT7gCEbOlEP3I7itkoCgLMTEg8jLBuZ7k490WSC01CkKPvsuP/exec",
+            "MUZAFFARNAGAR": "https://script.google.com/macros/s/AKfycby2FsD_wOd5ovuG4uVRldLBc8zMWKYoGXDPFPUoMKhx1k-KiAZcUa6MRe7TTW5VrfabLg/exec",
+            "DOB": "https://script.google.com/macros/s/AKfycbyncAUbXWLplC_uHgodCqhPCDLTWFiWEQVzxPAInLP7zedGUQRdRbvix_jdDBJrYMlc9w/exec",
+            "ANNEXURE": "https://script.google.com/macros/s/AKfycbxR94qLfbW5qQFp7f9DkdcvB1aiz9wcdhZUYYgiyVSBjHVebNvVo5e95EPE7mRGH18Z/exec"
+        };
 
         function handleLogin(event) {
             event.preventDefault();
             const user = document.getElementById('username').value.trim();
             const pass = document.getElementById('password').value.trim();
             
-            // अस्थायी फ्रंटएंड चेकिंग (बाद में इसे Google Apps Script बैकएंड से जोड़ा जाएगा)
             if(user && pass) {
                 currentUser = user;
                 document.getElementById('displayUser').innerText = user;
-                document.getElementById('displayCredits').innerText = "15"; // डेमो क्रेडिट
+                document.getElementById('displayCredits').innerText = "15"; // डेमो क्रेडिट (बैकएंड से सिंक होगा)
                 
                 document.getElementById('loginSection').classList.add('hidden');
                 document.getElementById('dashboardSection').classList.remove('hidden');
@@ -105,7 +113,6 @@
         }
 
         function switchService(serviceName) {
-            // टैब के रंग बदलना
             document.querySelectorAll('.service-tab').forEach(btn => {
                 btn.className = "service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50";
             });
@@ -120,7 +127,7 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">जिला (District)</label>
-                                <select name="DISTRICT" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white">
+                                <select id="districtSelect" name="DISTRICT" onchange="updateTehsilsAndThanas()" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white">
                                     <option value="BAGHPAT">बागपत (Baghpat)</option>
                                     <option value="SHAMLI">शामली (Shamli)</option>
                                     <option value="MUZAFFARNAGAR">मुजफ्फरनगर (Muzaffarnagar)</option>
@@ -128,7 +135,9 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">तहसील (Tehsil)</label>
-                                <input type="text" name="TAHSEEL" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                                <select id="tehsilSelect" name="TAHSEEL" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase">
+                                    <!-- ऑटोमैटिक भरेगा -->
+                                </select>
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">कस्टमर का नाम (Name)</label>
@@ -139,11 +148,11 @@
                                 <input type="text" name="HNAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm">
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पिता का नाम (F Name)</label>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पिता का नाम (Father Name)</label>
                                 <input type="text" name="FNAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">माता का नाम (M Name)</label>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">माता का नाम (Mother Name)</label>
                                 <input type="text" name="MNAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
                             </div>
                             <div>
@@ -151,8 +160,14 @@
                                 <input type="text" name="AREA" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase sm-1">ग्राम / वार्ड (Gram)</label>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">ग्राम / वार्ड (Gram)</label>
                                 <input type="text" name="GRAM" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">थाना (Thana)</label>
+                                <select id="thanaSelect" name="THANA" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase">
+                                    <!-- ऑटोमैटिक भरेगा -->
+                                </select>
                             </div>
                             <div class="md:col-span-2">
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">फोटो अपलोड करें (Photo)</label>
@@ -164,6 +179,7 @@
                         </button>
                     </form>
                 `;
+                updateTehsilsAndThanas(); // लोड होते ही तहसील और थाने सेट करें
             } else if(serviceName === 'dob') {
                 container.innerHTML = `
                     <h3 class="text-lg font-bold text-slate-800 mb-4">जन्म प्रमाण पत्र (DOB) फॉर्म</h3>
@@ -236,25 +252,8 @@
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">कितनी बार बदली? (Times)</label>
-                                <select name="TIMES" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase">
-                                    <option value="NEVER">NEVER</option>
-                                    <option value="ONCE">ONCE</option>
-                                    <option value="MORE THAN ONCE">MORE THAN ONCE</option>
-                                </select>
-                            </div>
-                            <div>
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पुरानी जन्मतिथि (Old DOB)</label>
                                 <input type="date" name="OLDDOB" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पुराना डॉक्यूमेंट (Old Document)</label>
-                                <select name="OLDDOCUMENT" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase">
-                                    <option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option>
-                                    <option value="MARKSHEET">MARKSHEET</option>
-                                    <option value="TRANSFER CERTIFICATE">TRANSFER CERTIFICATE</option>
-                                    <option value="LEAVING CERTIFICATE">LEAVING CERTIFICATE</option>
-                                </select>
                             </div>
                             <div class="md:col-span-2">
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पूरा पता (Address)</label>
@@ -279,13 +278,11 @@
                                     <th class="p-3 text-right">एक्शन</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-slate-200 text-sm text-slate-700" id="historyTableBody">
+                            <tbody class="divide-y divide-slate-200 text-sm text-slate-700">
                                 <tr>
-                                    <td class="p-3">Salman (user1) - 21-09-2026 11:30.pdf</td>
-                                    <td class="p-3">21-09-2026 11:30</td>
-                                    <td class="p-3 text-right">
-                                        <a href="#" class="text-blue-600 hover:underline font-medium">डाउनलोड</a>
-                                    </td>
+                                    <td class="p-3">Customer - Sample.pdf</td>
+                                    <td class="p-3">21-09-2026</td>
+                                    <td class="p-3 text-right"><span class="text-slate-400">उपलब्ध</span></td>
                                 </tr>
                             </tbody>
                         </table>
@@ -294,96 +291,122 @@
             }
         }
 
+        // जिले के अनुसार तहसील और थाने ऑटोमैटिक लोड करने का फंक्शन
+        function updateTehsilsAndThanas() {
+            const district = document.getElementById('districtSelect').value;
+            const tehsilSelect = document.getElementById('tehsilSelect');
+            const thanaSelect = document.getElementById('thanaSelect');
+            
+            tehsilSelect.innerHTML = '';
+            thanaSelect.innerHTML = '';
+
+            let tehsils = [];
+            let thanas = [];
+
+            if (district === 'BAGHPAT') {
+                tehsils = ['बड़ौत', 'खेकड़ा', 'बागपत'];
+                thanas = ['बड़ौत', 'खेकड़ा', 'बागपत कोतवाली', 'छपरोली', 'बिनौली'];
+            } else if (district === 'SHAMLI') {
+                tehsils = ['KAIRANA', 'OON', 'SHAMLI'];
+                thanas = ['कैराना', 'भवन', 'झिंझाना', 'शामली कोतवाली', 'बाबरी'];
+            } else if (district === 'MUZAFFARNAGAR') {
+                tehsils = ['BUDHANA', 'KHATOLI', 'JANSHATH', 'MUZAFFARNAGAR'];
+                thanas = ['बुढ़ाना', 'खतौली', 'जानसठ', 'मीरापुर', 'सिविल लाइन', 'कोतवाली नगर', 'नई मंडी'];
+            }
+
+            tehsils.forEach(t => {
+                let opt = document.createElement('option');
+                opt.value = t;
+                opt.innerHTML = t;
+                tehsilSelect.appendChild(opt);
+            });
+
+            thanas.forEach(th => {
+                let opt = document.createElement('option');
+                opt.value = th;
+                opt.innerHTML = th;
+                thanaSelect.appendChild(opt);
+            });
+        }
+
+        // फॉर्म सबमिट करने और सही बैकएंड यूआरएल पर भेजने का मुख्य फंक्शन
         function submitForm(event, serviceType) {
             event.preventDefault();
-            alert(serviceType + ' का डेटा सबमिट हो गया है! (इसे अगले चरण में Apps Script बैकएंड से जोड़ा जाएगा)');
-        }
-        // आपके सभी 5 सर्विसेज के फाइनल Apps Script Web App URLs
-const API_URLS = {
-    "BAGHPAT": "https://script.google.com/macros/s/AKfycbyA3916RXjuVRInvDPksOzbzczesTFAWo4gVzvjazGNfQl_REwC0YrYpTu03jlXwlb07w/exec",
-    "SHAMLI": "https://script.google.com/macros/s/AKfycbx14PgIaqdbvNCPQaoIT7gCEbOlEP3I7itkoCgLMTEg8jLBuZ7k490WSC01CkKPvsuP/exec",
-    "MUZAFFARNAGAR": "https://script.google.com/macros/s/AKfycby2FsD_wOd5ovuG4uVRldLBc8zMWKYoGXDPFPUoMKhx1k-KiAZcUa6MRe7TTW5VrfabLg/exec",
-    "DOB": "https://script.google.com/macros/s/AKfycbyncAUbXWLplC_uHgodCqhPCDLTWFiWEQVzxPAInLP7zedGUQRdRbvix_jdDBJrYMlc9w/exec",
-    "ANNEXURE": "https://script.google.com/macros/s/AKfycbxR94qLfbW5qQFp7f9DkdcvB1aiz9wcdhZUYYgiyVSBjHVebNvVo5e95EPE7mRGH18Z/exec"
-};
+            
+            const formElement = event.target;
+            const formData = new FormData(formElement);
+            
+            formData.append('USER_ID', currentUser);
+            formData.append('SERVICE_TYPE', serviceType);
 
-function submitForm(event, serviceType) {
-    event.preventDefault();
-    
-    const formElement = event.target;
-    const formData = new FormData(formElement);
-    
-    formData.append('USER_ID', currentUser);
-    formData.append('SERVICE_TYPE', serviceType);
+            let district = formData.get('DISTRICT');
+            let targetUrl = API_URLS["BAGHPAT"];
 
-    let district = formData.get('DISTRICT');
-    let targetUrl = API_URLS["BAGHPAT"]; // डिफ़ॉल्ट
-
-    if (serviceType === 'Domicile') {
-        if (district === 'SHAMLI') targetUrl = API_URLS["SHAMLI"];
-        else if (district === 'MUZAFFARNAGAR') targetUrl = API_URLS["MUZAFFARNAGAR"];
-        else targetUrl = API_URLS["BAGHPAT"];
-    } else if (serviceType === 'DOB') {
-        targetUrl = API_URLS["DOB"];
-    } else if (serviceType === 'Annexure') {
-        targetUrl = API_URLS["ANNEXURE"];
-    }
-
-    const submitBtn = formElement.querySelector('button[type="submit"]');
-    const originalBtnText = submitBtn.innerText;
-    submitBtn.innerText = 'डॉक्यूमेंट बन रहा है, कृपया प्रतीक्षा करें...';
-    submitBtn.disabled = true;
-
-    const photoInput = formElement.querySelector('input[type="file"]');
-    if (photoInput && photoInput.files[0]) {
-        const reader = new FileReader();
-        reader.readAsDataURL(photoInput.files[0]);
-        reader.onload = function () {
-            formData.set('PHOTO', reader.result);
-            sendDataToBackend(targetUrl, formData, submitBtn, originalBtnText);
-        };
-    } else {
-        sendDataToBackend(targetUrl, formData, submitBtn, originalBtnText);
-    }
-}
-
-function sendDataToBackend(url, formData, submitBtn, originalBtnText) {
-    if (!url) {
-        alert('एरर: इस सर्विस का बैकएंड यूआरएल सेट नहीं है!');
-        submitBtn.innerText = originalBtnText;
-        submitBtn.disabled = false;
-        return;
-    }
-
-    const dataObj = {};
-    formData.forEach((value, key) => { dataObj[key] = value; });
-
-    fetch(url, {
-        method: 'POST',
-        body: JSON.stringify(dataObj)
-    })
-    .then(response => response.json())
-    .then(result => {
-        submitBtn.innerText = originalBtnText;
-        submitBtn.disabled = false;
-
-        if (result.success) {
-            alert('डॉक्यूमेंट सफलतापूर्वक बन गया है और ड्राइव में सेव हो गया है!');
-            if(result.remainingCredits !== undefined) {
-                document.getElementById('displayCredits').innerText = result.remainingCredits;
+            if (serviceType === 'Domicile') {
+                if (district === 'SHAMLI') targetUrl = API_URLS["SHAMLI"];
+                else if (district === 'MUZAFFARNAGAR') targetUrl = API_URLS["MUZAFFARNAGAR"];
+                else targetUrl = API_URLS["BAGHPAT"];
+            } else if (serviceType === 'DOB') {
+                targetUrl = API_URLS["DOB"];
+            } else if (serviceType === 'Annexure') {
+                targetUrl = API_URLS["ANNEXURE"];
             }
-            window.open(`https://drive.google.com/file/d/${result.fileId}/view`, '_blank');
-        } else {
-            alert('एरर: ' + (result.error || 'कुछ गलत हो गया है।'));
+
+            const submitBtn = formElement.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.innerText;
+            submitBtn.innerText = 'डॉक्यूमेंट बन रहा है, कृपया प्रतीक्षा करें...';
+            submitBtn.disabled = true;
+
+            const photoInput = formElement.querySelector('input[type="file"]');
+            if (photoInput && photoInput.files[0]) {
+                const reader = new FileReader();
+                reader.readAsDataURL(photoInput.files[0]);
+                reader.onload = function () {
+                    formData.set('PHOTO', reader.result);
+                    sendDataToBackend(targetUrl, formData, submitBtn, originalBtnText);
+                };
+            } else {
+                sendDataToBackend(targetUrl, formData, submitBtn, originalBtnText);
+            }
         }
-    })
-    .catch(error => {
-        submitBtn.innerText = originalBtnText;
-        submitBtn.disabled = false;
-        console.error('Error:', error);
-        alert('कनेक्शन में समस्या आई है। कृपया दोबारा कोशिश करें।');
-    });
-}
+
+        function sendDataToBackend(url, formData, submitBtn, originalBtnText) {
+            if (!url) {
+                alert('एरर: इस सर्विस का बैकएंड यूआरएल सेट नहीं है!');
+                submitBtn.innerText = originalBtnText;
+                submitBtn.disabled = false;
+                return;
+            }
+
+            const dataObj = {};
+            formData.forEach((value, key) => { dataObj[key] = value; });
+
+            fetch(url, {
+                method: 'POST',
+                body: JSON.stringify(dataObj)
+            })
+            .then(response => response.json())
+            .then(result => {
+                submitBtn.innerText = originalBtnText;
+                submitBtn.disabled = false;
+
+                if (result.success) {
+                    alert('डॉक्यूमेंट सफलतापूर्वक बन गया है और ड्राइव में सेव हो गया है!');
+                    if(result.remainingCredits !== undefined) {
+                        document.getElementById('displayCredits').innerText = result.remainingCredits;
+                    }
+                    window.open(`https://drive.google.com/file/d/${result.fileId}/view`, '_blank');
+                } else {
+                    alert('एरर: ' + (result.error || 'कुछ गलत हो गया है।'));
+                }
+            })
+            .catch(error => {
+                submitBtn.innerText = originalBtnText;
+                submitBtn.disabled = false;
+                console.error('Error:', error);
+                alert('कनेक्शन में समस्या आई है। कृपया दोबारा कोशिश करें।');
+            });
+        }
     </script>
 </body>
 </html>
