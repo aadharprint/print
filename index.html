@@ -39,7 +39,7 @@
         };
         window.API_URLS = API_URLS;
 
-        // Login Handler
+        // Login Handler (Bound to window)
         window.handleLogin = async function(event) {
             event.preventDefault();
             const emailInput = document.getElementById('loginUsername').value.trim();
@@ -58,7 +58,7 @@
 
                 let userCredits = 10;
                 if (userDoc.exists()) {
-                    userCredits = userDoc.data().credits;
+                    userCredits = userDoc.data().credits || 10;
                 } else {
                     await setDoc(userDocRef, { email: email, username: emailInput, credits: 10, createdAt: new Date() });
                 }
@@ -88,7 +88,7 @@
             window.switchService('domicile');
         }
 
-        // Logout Handler
+        // Logout Handler (Bound to window)
         window.handleLogout = async function() {
             try {
                 await signOut(auth);
@@ -104,7 +104,7 @@
         // Admin: Create New User
         window.createNewUserByAdmin = async function(event) {
             event.preventDefault();
-            if (window.currentUserData.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+            if (!window.currentUserData || window.currentUserData.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
                 alert('आपके पास अनुमति नहीं है!');
                 return;
             }
@@ -155,7 +155,7 @@
             const creditsToAdd = parseInt(document.getElementById('creditsToAdd').value);
             const adminMsg = document.getElementById('adminMsg');
             adminMsg.classList.remove('hidden');
-            adminMsg.innerText = "क्रेडिट जोड़ा जा रहा है...";
+            adminMsg.innerText = "क्रेडिट जोड़ा जा रहा है...";
 
             try {
                 const usersRef = collection(db, "users");
@@ -294,6 +294,7 @@
 
         window.loadUserHistory = async function() {
             const historyContainer = document.getElementById('historyTableBody');
+            if (!historyContainer) return;
             historyContainer.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-slate-500">लोड हो रहा है...</td></tr>`;
 
             try {
@@ -325,108 +326,19 @@
                 historyContainer.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-500">हिस्ट्री लोड करने में असफल।</td></tr>`;
             }
         };
-    </script>
-</head>
-<body class="bg-slate-100 font-sans min-h-screen flex flex-col justify-between">
 
-    <!-- LOGIN SCREEN -->
-    <div id="loginSection" class="flex items-center justify-center flex-grow p-4">
-        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200">
-            <div class="text-center mb-6">
-                <h1 class="text-2xl font-bold text-slate-800">ओवी आधार प्रिंट सर्विस</h1>
-                <p class="text-sm text-slate-500 mt-1">कृपया अपने यूजर आईडी से लॉगिन करें</p>
-            </div>
-            
-            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">यूजर आईडी / ईमेल</label>
-                    <input type="text" id="loginUsername" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">पासवर्ड</label>
-                    <input type="password" id="loginPassword" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                </div>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition duration-200 shadow-md">
-                    लॉगिन करें
-                </button>
-            </form>
-            <div id="loginError" class="mt-4 text-center text-sm text-red-600 hidden"></div>
-        </div>
-    </div>
-
-    <!-- DASHBOARD SCREEN -->
-    <div id="dashboardSection" class="hidden flex-grow flex flex-col">
-        <header class="bg-white shadow-sm border-b border-slate-200 px-6 py-4 flex justify-between items-center">
-            <div>
-                <h2 class="text-xl font-bold text-slate-800">ओवी पोर्टल डैशबोर्ड</h2>
-                <p class="text-xs text-slate-500">यूजर: <span id="displayUser" class="font-semibold text-blue-600"></span></p>
-            </div>
-            <div class="flex items-center space-x-4">
-                <div class="bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg text-sm font-medium text-blue-800">
-                    क्रेडिट्स: <span id="displayCredits" class="font-bold text-blue-900">0</span>
-                </div>
-                <button onclick="handleLogout()" class="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-sm font-medium transition">
-                    लॉगआउट
-                </button>
-            </div>
-        </header>
-
-        <main class="max-w-4xl mx-auto w-full p-6 flex-grow">
-            
-            <!-- ADMIN SECTION -->
-            <div id="adminSection" class="hidden space-y-4 mb-6">
-                <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm">
-                    <h3 class="text-md font-bold text-amber-800 mb-2">👤 नया यूजर बनाएँ (Create User)</h3>
-                    <form id="adminCreateUserForm" onsubmit="createNewUserByAdmin(event)" class="grid grid-cols-1 md:grid-cols-4 gap-3">
-                        <input type="email" id="newAdminUserEmail" placeholder="नया ईमेल" required class="p-2 border border-amber-300 rounded-lg text-sm bg-white">
-                        <input type="password" id="newAdminUserPass" placeholder="पासवर्ड (कम से कम 6 अंक)" required minlength="6" class="p-2 border border-amber-300 rounded-lg text-sm bg-white">
-                        <input type="number" id="newAdminUserCredits" placeholder="शुरुआती क्रेडिट" required class="p-2 border border-amber-300 rounded-lg text-sm bg-white">
-                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-lg text-sm transition shadow-sm">
-                            यूजर बनाएँ
-                        </button>
-                    </form>
-                    <div id="adminCreateMsg" class="mt-2 text-xs hidden"></div>
-                </div>
-
-                <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 shadow-sm">
-                    <h3 class="text-md font-bold text-blue-800 mb-2">💰 यूजर को क्रेडिट्स दें (Add Credits)</h3>
-                    <form id="adminForm" onsubmit="addCreditsToUser(event)" class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <input type="text" id="targetUser" placeholder="यूजर ईमेल" required class="p-2 border border-blue-300 rounded-lg text-sm bg-white">
-                        <input type="number" id="creditsToAdd" placeholder="जोड़ने वाले क्रेडिट्स" required class="p-2 border border-blue-300 rounded-lg text-sm bg-white">
-                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-sm transition shadow-sm">
-                            क्रेडिट जोड़ें
-                        </button>
-                    </form>
-                    <div id="adminMsg" class="mt-2 text-xs hidden"></div>
-                </div>
-            </div>
-
-            <!-- Service Selector Tabs -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                <button onclick="switchService('domicile')" id="btn-domicile" class="service-tab bg-blue-600 text-white py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition">मूल निवास (Domicile)</button>
-                <button onclick="switchService('dob')" id="btn-dob" class="service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50">DOB सर्टिफिकेट</button>
-                <button onclick="switchService('annexure')" id="btn-annexure" class="service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50">Annexure 1</button>
-                <button onclick="switchService('history')" id="btn-history" class="service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50">मेरी हिस्ट्री (History)</button>
-            </div>
-
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <div id="formContainer"></div>
-            </div>
-        </main>
-    </div>
-
-    <footer class="bg-white border-t border-slate-200 text-center py-4 text-xs text-slate-500">
-        © 2026 ओवी आधार प्रिंट सर्विस. सर्वाधिकार सुरक्षित.
-    </footer>
-
-    <script>
+        // Service Switcher Function (Bound to window)
         window.switchService = function(serviceName) {
             document.querySelectorAll('.service-tab').forEach(btn => {
                 btn.className = "service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50";
             });
-            document.getElementById('btn-' + serviceName).className = "service-tab bg-blue-600 text-white py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition";
+            const activeBtn = document.getElementById('btn-' + serviceName);
+            if(activeBtn) {
+                activeBtn.className = "service-tab bg-blue-600 text-white py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition";
+            }
 
             const container = document.getElementById('formContainer');
+            if (!container) return;
             
             if(serviceName === 'domicile') {
                 container.innerHTML = `
@@ -449,7 +361,7 @@
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">रिश्ता (Relationship - REL)</label>
                                 <select name="REL" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase">
                                     <option value="पुत्र / पुत्री">पुत्र / पुत्री</option>
-                                    <option value="पत्नी">पत्नी</option>
+                                    <option value="पत्नी      `">पत्नी</option>
                                 </select>
                             </div>
                             <div>
@@ -602,10 +514,13 @@
         };
 
         window.updateTehsilsAndThanas = function() {
-            const district = document.getElementById('districtSelect').value;
+            const districtEl = document.getElementById('districtSelect');
+            if (!districtEl) return;
+            const district = districtEl.value;
             const tehsilSelect = document.getElementById('tehsilSelect');
             const thanaSelect = document.getElementById('thanaSelect');
             
+            if (!tehsilSelect || !thanaSelect) return;
             tehsilSelect.innerHTML = '';
             thanaSelect.innerHTML = '';
 
@@ -649,7 +564,7 @@
                 <p class="text-sm text-slate-500 mt-1">कृपया अपने यूजर आईडी से लॉगिन करें</p>
             </div>
             
-            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+            <form id="loginForm" onsubmit="window.handleLogin(event)" class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">यूजर आईडी / ईमेल</label>
                     <input type="text" id="loginUsername" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
@@ -677,7 +592,7 @@
                 <div class="bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg text-sm font-medium text-blue-800">
                     क्रेडिट्स: <span id="displayCredits" class="font-bold text-blue-900">0</span>
                 </div>
-                <button onclick="handleLogout()" class="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-sm font-medium transition">
+                <button onclick="window.handleLogout()" class="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-sm font-medium transition">
                     लॉगआउट
                 </button>
             </div>
@@ -689,7 +604,7 @@
             <div id="adminSection" class="hidden space-y-4 mb-6">
                 <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm">
                     <h3 class="text-md font-bold text-amber-800 mb-2">👤 नया यूजर बनाएँ (Create User)</h3>
-                    <form id="adminCreateUserForm" onsubmit="createNewUserByAdmin(event)" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <form id="adminCreateUserForm" onsubmit="window.createNewUserByAdmin(event)" class="grid grid-cols-1 md:grid-cols-4 gap-3">
                         <input type="email" id="newAdminUserEmail" placeholder="नया ईमेल" required class="p-2 border border-amber-300 rounded-lg text-sm bg-white">
                         <input type="password" id="newAdminUserPass" placeholder="पासवर्ड (कम से कम 6 अंक)" required minlength="6" class="p-2 border border-amber-300 rounded-lg text-sm bg-white">
                         <input type="number" id="newAdminUserCredits" placeholder="शुरुआती क्रेडिट" required class="p-2 border border-amber-300 rounded-lg text-sm bg-white">
@@ -702,7 +617,7 @@
 
                 <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 shadow-sm">
                     <h3 class="text-md font-bold text-blue-800 mb-2">💰 यूजर को क्रेडिट्स दें (Add Credits)</h3>
-                    <form id="adminForm" onsubmit="addCreditsToUser(event)" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <form id="adminForm" onsubmit="window.addCreditsToUser(event)" class="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <input type="text" id="targetUser" placeholder="यूजर ईमेल" required class="p-2 border border-blue-300 rounded-lg text-sm bg-white">
                         <input type="number" id="creditsToAdd" placeholder="जोड़ने वाले क्रेडिट्स" required class="p-2 border border-blue-300 rounded-lg text-sm bg-white">
                         <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-sm transition shadow-sm">
@@ -715,10 +630,10 @@
 
             <!-- Service Selector Tabs -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                <button onclick="switchService('domicile')" id="btn-domicile" class="service-tab bg-blue-600 text-white py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition">मूल निवास (Domicile)</button>
-                <button onclick="switchService('dob')" id="btn-dob" class="service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50">DOB सर्टिफिकेट</button>
-                <button onclick="switchService('annexure')" id="btn-annexure" class="service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50">Annexure 1</button>
-                <button onclick="switchService('history')" id="btn-history" class="service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50">मेरी हिस्ट्री (History)</button>
+                <button onclick="window.switchService('domicile')" id="btn-domicile" class="service-tab bg-blue-600 text-white py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition">मूल निवास (Domicile)</button>
+                <button onclick="window.switchService('dob')" id="btn-dob" class="service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50">DOB सर्टिफिकेट</button>
+                <button onclick="window.switchService('annexure')" id="btn-annexure" class="service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50">Annexure 1</button>
+                <button onclick="window.switchService('history')" id="btn-history" class="service-tab bg-white text-slate-700 border border-slate-200 py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow-sm transition hover:bg-slate-50">मेरी हिस्ट्री (History)</button>
             </div>
 
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
