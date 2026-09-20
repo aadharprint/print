@@ -298,6 +298,92 @@
             event.preventDefault();
             alert(serviceType + ' का डेटा सबमिट हो गया है! (इसे अगले चरण में Apps Script बैकएंड से जोड़ा जाएगा)');
         }
+        // आपके सभी 5 सर्विसेज के फाइनल Apps Script Web App URLs
+const API_URLS = {
+    "BAGHPAT": "https://script.google.com/macros/s/AKfycbyA3916RXjuVRInvDPksOzbzczesTFAWo4gVzvjazGNfQl_REwC0YrYpTu03jlXwlb07w/exec",
+    "SHAMLI": "https://script.google.com/macros/s/AKfycbx14PgIaqdbvNCPQaoIT7gCEbOlEP3I7itkoCgLMTEg8jLBuZ7k490WSC01CkKPvsuP/exec",
+    "MUZAFFARNAGAR": "https://script.google.com/macros/s/AKfycby2FsD_wOd5ovuG4uVRldLBc8zMWKYoGXDPFPUoMKhx1k-KiAZcUa6MRe7TTW5VrfabLg/exec",
+    "DOB": "https://script.google.com/macros/s/AKfycbyncAUbXWLplC_uHgodCqhPCDLTWFiWEQVzxPAInLP7zedGUQRdRbvix_jdDBJrYMlc9w/exec",
+    "ANNEXURE": "https://script.google.com/macros/s/AKfycbxR94qLfbW5qQFp7f9DkdcvB1aiz9wcdhZUYYgiyVSBjHVebNvVo5e95EPE7mRGH18Z/exec"
+};
+
+function submitForm(event, serviceType) {
+    event.preventDefault();
+    
+    const formElement = event.target;
+    const formData = new FormData(formElement);
+    
+    formData.append('USER_ID', currentUser);
+    formData.append('SERVICE_TYPE', serviceType);
+
+    let district = formData.get('DISTRICT');
+    let targetUrl = API_URLS["BAGHPAT"]; // डिफ़ॉल्ट
+
+    if (serviceType === 'Domicile') {
+        if (district === 'SHAMLI') targetUrl = API_URLS["SHAMLI"];
+        else if (district === 'MUZAFFARNAGAR') targetUrl = API_URLS["MUZAFFARNAGAR"];
+        else targetUrl = API_URLS["BAGHPAT"];
+    } else if (serviceType === 'DOB') {
+        targetUrl = API_URLS["DOB"];
+    } else if (serviceType === 'Annexure') {
+        targetUrl = API_URLS["ANNEXURE"];
+    }
+
+    const submitBtn = formElement.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn.innerText;
+    submitBtn.innerText = 'डॉक्यूमेंट बन रहा है, कृपया प्रतीक्षा करें...';
+    submitBtn.disabled = true;
+
+    const photoInput = formElement.querySelector('input[type="file"]');
+    if (photoInput && photoInput.files[0]) {
+        const reader = new FileReader();
+        reader.readAsDataURL(photoInput.files[0]);
+        reader.onload = function () {
+            formData.set('PHOTO', reader.result);
+            sendDataToBackend(targetUrl, formData, submitBtn, originalBtnText);
+        };
+    } else {
+        sendDataToBackend(targetUrl, formData, submitBtn, originalBtnText);
+    }
+}
+
+function sendDataToBackend(url, formData, submitBtn, originalBtnText) {
+    if (!url) {
+        alert('एरर: इस सर्विस का बैकएंड यूआरएल सेट नहीं है!');
+        submitBtn.innerText = originalBtnText;
+        submitBtn.disabled = false;
+        return;
+    }
+
+    const dataObj = {};
+    formData.forEach((value, key) => { dataObj[key] = value; });
+
+    fetch(url, {
+        method: 'POST',
+        body: JSON.stringify(dataObj)
+    })
+    .then(response => response.json())
+    .then(result => {
+        submitBtn.innerText = originalBtnText;
+        submitBtn.disabled = false;
+
+        if (result.success) {
+            alert('डॉक्यूमेंट सफलतापूर्वक बन गया है और ड्राइव में सेव हो गया है!');
+            if(result.remainingCredits !== undefined) {
+                document.getElementById('displayCredits').innerText = result.remainingCredits;
+            }
+            window.open(`https://drive.google.com/file/d/${result.fileId}/view`, '_blank');
+        } else {
+            alert('एरर: ' + (result.error || 'कुछ गलत हो गया है।'));
+        }
+    })
+    .catch(error => {
+        submitBtn.innerText = originalBtnText;
+        submitBtn.disabled = false;
+        console.error('Error:', error);
+        alert('कनेक्शन में समस्या आई है। कृपया दोबारा कोशिश करें।');
+    });
+}
     </script>
 </body>
 </html>
