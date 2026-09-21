@@ -456,62 +456,85 @@
                         </button>
                     </form>
                 `;
-            } else if(serviceName === 'annexure') {
+           } else if(serviceName === 'annexure') {
                 container.innerHTML = `
                     <h3 class="text-lg font-bold text-slate-800 mb-4">Annexure 1 for Adult फॉर्म</h3>
                     <form onsubmit="window.submitForm(event, 'Annexure')" class="space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">नाम (Name)</label>
-                                <input type="text" name="NAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पिता का नाम (Father)</label>
-                                <input type="text" name="FATHER" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">आधार नंबर (Aadhaar)</label>
-                                <input type="text" name="AADHAAR" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पुरानी जन्मतिथि (Old DOB)</label>
-                                <input type="date" name="OLDDOB" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">नई जन्मतिथि (New DOB)</label>
-                                <input type="date" name="NEWDOB" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पुराना डॉक्यूमेंट (Old Document)</label>
-                                <select name="OLDDOCUMENT" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase">
-                                    <option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option>
-                                    <option value="MARKSHEET">MARKSHEET</option>
-                                    <option value="PASSPORT">PASSPORT</option>
-                                    <option value="TRANSFER CERTIFICATE">TRANSFER CERTIFICATE</option>
-                                    <option value="LIVING CERTIFICATE">LIVING CERTIFICATE</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">नया डॉक्यूमेंट (New Document)</label>
-                                <select name="NEWDOCUMENT" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase">
-                                    <option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option>
-                                    <option value="MARKSHEET">MARKSHEET</option>
-                                    <option value="PASSPORT">PASSPORT</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">अपडेट कितनी बार हुआ (Times)</label>
-                                <select name="TIMES" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase">
-                                    <option value="NEVER">NEVER</option>
-                                    <option value="ONCE">ONCE</option>
-                                    <option value="MORE THAN ONCE">MORE THAN ONCE</option>
-                                </select>
-                            </div>
-                            <div class="md:col-span-2">
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पूरा पता (Address)</label>
-                                <textarea name="ADDRESS" rows="2" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase"></textarea>
+                        
+                        <!-- 1. कस्टमर की जानकारी -->
+                        <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                            <h4 class="text-sm font-bold text-slate-700 mb-3 border-b pb-2">1. कस्टमर की जानकारी (Customer Details)</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">नाम (Name)</label>
+                                    <input type="text" name="NAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पिता का नाम (Father)</label>
+                                    <input type="text" name="FATHER" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">आधार नंबर (Aadhar)</label>
+                                    <input type="text" name="AADHAR" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पूरा पता (Address)</label>
+                                    <textarea name="ADDRESS" rows="2" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase"></textarea>
+                                </div>
                             </div>
                         </div>
+
+                        <!-- 2. अपडेट की जानकारी -->
+                        <div class="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                            <h4 class="text-sm font-bold text-blue-800 mb-3 border-b border-blue-200 pb-2">2. अपडेट की जानकारी (Update Details)</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पुरानी जन्मतिथि (Old DOB)</label>
+                                    <input type="date" name="OLDDOB" required class="w-full p-2.5 border border-white rounded-lg text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">नई जन्मतिथि (New DOB)</label>
+                                    <input type="date" name="NEWDOB" required class="w-full p-2.5 border border-white rounded-lg text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पुराना डॉक्यूमेंट (Old Document)</label>
+                                    <select name="OLDDOCUMENT" class="w-full p-2.5 border border-white rounded-lg text-sm uppercase">
+                                        <option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option>
+                                        <option value="MARKSHEET">MARKSHEET</option>
+                                        <option value="PASSPORT">PASSPORT</option>
+                                        <option value="TRANSFER CERTIFICATE">TRANSFER CERTIFICATE</option>
+                                        <option value="LIVING CERTIFICATE">LIVING CERTIFICATE</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">नया डॉक्यूमेंट (New Document)</label>
+                                    <select name="NEWDOCUMENT" class="w-full p-2.5 border border-white rounded-lg text-sm uppercase">
+                                        <option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option>
+                                        <option value="MARKSHEET">MARKSHEET</option>
+                                        <option value="PASSPORT">PASSPORT</option>
+                                    </select>
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">अपडेट कितनी बार हुआ (Times)</label>
+                                    <select name="TIMES" class="w-full p-2.5 border border-white rounded-lg text-sm uppercase">
+                                        <option value="NEVER">NEVER</option>
+                                        <option value="ONCE">ONCE</option>
+                                        <option value="MORE THAN ONCE">MORE THAN ONCE</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3. एनरोलमेंट की तारीख (अलग सेक्शन) -->
+                        <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                            <h4 class="text-sm font-bold text-amber-800 mb-3 border-b border-amber-200 pb-2">3. फॉर्म जमा करने की तारीख (Enrollment Date)</h4>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">तारीख चुनें (Date)</label>
+                                <input type="date" name="DATE" required class="w-full p-2.5 border border-white rounded-lg text-sm font-medium focus:ring-2 focus:ring-amber-400">
+                                <p class="text-[10px] text-slate-500 mt-1">आप यहाँ आज की, कल की या कोई भी तारीख चुन सकते हैं। यही तारीख PDF में छपेगी।</p>
+                            </div>
+                        </div>
+
                         <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow-md transition mt-4">
                             Annexure 1 जनरेट करें (1 Credit)
                         </button>
