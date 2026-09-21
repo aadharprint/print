@@ -31,7 +31,6 @@
         window.currentUserData = null;
         const ADMIN_EMAIL = "hkosiun1221@gmail.com"; 
 
-        // आपके ओरिजिनल URLs (Domicile और DOB के पुराने वाले, और CASTE का नया मास्टर वाला)
         const API_URLS = {
             "BAGHPAT": "https://script.google.com/macros/s/AKfycbyA3916RXjuVRInvDPksOzbzczesTFAWo4gVzvjazGNfQl_REwC0YrYpTu03jlXwlb07w/exec",
             "SHAMLI": "https://script.google.com/macros/s/AKfycbzC1WjGvsvtXsMAhgaOtIBVLnQZ7COMaLl6-VCSvfENKtKJUJHfBYHayWr-orkGTIiQ/exec",
@@ -123,7 +122,6 @@
             formData.append('USER_ID', window.currentUserData.email);
             formData.append('SERVICE_TYPE', serviceType);
 
-            // ---> यहाँ पर ओरिजिनल URL राउटिंग को वापस लाया गया है <---
             let targetUrl = "";
             
             if (serviceType === 'Domicile') {
@@ -132,7 +130,7 @@
                 else if (district === 'MUZAFFARNAGAR') targetUrl = API_URLS["MUZAFFARNAGAR"];
                 else targetUrl = API_URLS["BAGHPAT"];
             } else if (serviceType === 'Caste') {
-                targetUrl = API_URLS["CASTE"]; // सिर्फ जाति प्रमाण पत्र मास्टर लिंक पर जाएगा
+                targetUrl = API_URLS["CASTE"];
             } else if (serviceType === 'DOB') {
                 targetUrl = API_URLS["DOB"];
             }
@@ -307,10 +305,6 @@
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">थाना (Thana)</label>
                                 <select id="thanaSelect" name="THANA" class="w-full p-2 border rounded-lg text-sm bg-white uppercase"></select>
                             </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">VLE का नाम</label>
-                                <input type="text" name="VLE" required class="w-full p-2 border rounded-lg text-sm uppercase">
-                            </div>
                             <div class="md:col-span-2">
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">फोटो अपलोड करें (Photo)</label>
                                 <input type="file" name="PHOTO" accept="image/*" required class="w-full p-2 border rounded-lg text-sm bg-slate-50">
@@ -426,10 +420,6 @@
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पिन कोड (Pin)</label>
                                 <input type="text" name="PIN" required class="w-full p-2 border rounded-lg text-sm uppercase">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">VLE का नाम</label>
-                                <input type="text" name="VLE" required class="w-full p-2 border rounded-lg text-sm uppercase">
                             </div>
                             <div class="md:col-span-2">
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पूरा पता (Address)</label>
