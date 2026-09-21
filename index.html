@@ -33,11 +33,11 @@
         const ADMIN_EMAIL = "hkosiun1221@gmail.com"; 
 
         const API_URLS = {
-            "BAGHPAT": "https://script.google.com/macros/s/AKfycbyA3916RXjuVRInvDPksOzbzczesTFAWo4gVzvjazGNfQl_REwC0YrYpTu03jlXwlb07w/exec",
-            "SHAMLI": "https://script.google.com/macros/s/AKfycbzC1WjGvsvtXsMAhgaOtIBVLnQZ7COMaLl6-VCSvfENKtKJUJHfBYHayWr-orkGTIiQ/exec",
-            "MUZAFFARNAGAR": "https://script.google.com/macros/s/AKfycby2FsD_wOd5ovuG4uVRldLBc8zMWKYoGXDPFPUoMKhx1k-KiAZcUa6MRe7TTW5VrfabLg/exec",
-            "DOB": "https://script.google.com/macros/s/AKfycbyncAUbXWLplC_uHgodCqhPCDLTWFiWEQVzxPAInLP7zedGUQRdRbvix_jdDBJrYMlc9w/exec",
-            "CASTE": "https://script.google.com/macros/s/AKfycbyA3916RXjuVRInvDPksOzbzczesTFAWo4gVzvjazGNfQl_REwC0YrYpTu03jlXwlb07w/exec"
+            "BAGHPAT": "https://script.google.com/macros/s/AKfycbyCdurjxGQqT_4DxP1uGhs4nzzY2HOs63SRBUkvStgyg4ZVox5KJhrsrhNfSuVMtQB6/exec",
+            "SHAMLI": "https://script.google.com/macros/s/AKfycbyCdurjxGQqT_4DxP1uGhs4nzzY2HOs63SRBUkvStgyg4ZVox5KJhrsrhNfSuVMtQB6/exec",
+            "MUZAFFARNAGAR": "https://script.google.com/macros/s/AKfycbyCdurjxGQqT_4DxP1uGhs4nzzY2HOs63SRBUkvStgyg4ZVox5KJhrsrhNfSuVMtQB6/exec",
+            "DOB": "https://script.google.com/macros/s/AKfycbyCdurjxGQqT_4DxP1uGhs4nzzY2HOs63SRBUkvStgyg4ZVox5KJhrsrhNfSuVMtQB6/exec",
+            "CASTE": "https://script.google.com/macros/s/AKfycbyCdurjxGQqT_4DxP1uGhs4nzzY2HOs63SRBUkvStgyg4ZVox5KJhrsrhNfSuVMtQB6/exec"
         };
         window.API_URLS = API_URLS;
 
@@ -128,16 +128,7 @@
             formData.append('USER_ID', window.currentUserData.email);
             formData.append('SERVICE_TYPE', serviceType);
 
-            let district = formData.get('DISTRICT');
-            let targetUrl = API_URLS["BAGHPAT"];
-
-            if (serviceType === 'Domicile' || serviceType === 'Caste') {
-                if (district === 'SHAMLI') targetUrl = API_URLS["SHAMLI"];
-                else if (district === 'MUZAFFARNAGAR') targetUrl = API_URLS["MUZAFFARNAGAR"];
-                else targetUrl = API_URLS["BAGHPAT"];
-            } else if (serviceType === 'DOB') {
-                targetUrl = API_URLS["DOB"];
-            }
+            let targetUrl = API_URLS["BAGHPAT"]; // All pointing to master URL
 
             const submitBtn = formElement.querySelector('button[type="submit"]');
             const originalBtnText = submitBtn.innerText;
@@ -314,6 +305,11 @@
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">थाना (Thana)</label>
                                 <select id="thanaSelect" name="THANA" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase"></select>
                             </div>
+                            <!-- VLE Field Add in Domicile -->
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">VLE का नाम</label>
+                                <input type="text" name="VLE" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                            </div>
                             <div class="md:col-span-2">
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">फोटो अपलोड करें (Photo)</label>
                                 <input type="file" name="PHOTO" accept="image/*" required class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-slate-50">
@@ -327,7 +323,7 @@
                 window.updateTehsilsAndThanas();
             } else if(serviceName === 'caste') {
                 container.innerHTML = `
-                    <h3 class="text-lg font-bold text-slate-800 mb-4">जाति प्रमाण पत्र coming soon (Caste Certificate) फॉर्म</h3>
+                    <h3 class="text-lg font-bold text-slate-800 mb-4">जाति प्रमाण पत्र (Caste Certificate) फॉर्म</h3>
                     <form onsubmit="window.submitForm(event, 'Caste')" class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
@@ -350,6 +346,16 @@
                                 </select>
                             </div>
                             <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">जाति (Caste)</label>
+                                <select name="CAST" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white uppercase">
+                                    <option value="GENERAL">सामान्य (GENERAL)</option>
+                                    <option value="OBC">पिछड़ा वर्ग (OBC)</option>
+                                    <option value="SC">अनुसूचित जाति (SC)</option>
+                                    <option value="ST">अनुसूचित जनजाति (ST)</option>
+                                    <option value="MINORITY">अल्पसंख्यक (MINORITY)</option>
+                                </select>
+                            </div>
+                            <div>
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">कस्टमर का नाम (Name)</label>
                                 <input type="text" name="NAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
                             </div>
@@ -365,10 +371,7 @@
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">माता का नाम (Mother Name)</label>
                                 <input type="text" name="MNAME" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
                             </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">मकान नंबर (MN)</label>
-                                <input type="text" name="MN" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
-                            </div>
+                            <!-- Caste certificate without MN and THANA, added VLE -->
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">मोहल्ला / क्षेत्र (Area)</label>
                                 <input type="text" name="AREA" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
@@ -377,7 +380,10 @@
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">ग्राम / वार्ड (Gram)</label>
                                 <input type="text" name="GRAM" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
                             </div>
-                            <!-- जाति प्रमाण पत्र में थाना (Thana) हटा दिया गया है -->
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">VLE का नाम</label>
+                                <input type="text" name="VLE" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                            </div>
                             <div class="md:col-span-2">
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">फोटो अपलोड करें (Photo)</label>
                                 <input type="file" name="PHOTO" accept="image/*" required class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-slate-50">
@@ -419,7 +425,12 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पिन कोड (Pin)</label>
-                                <input type="text" name="PINCODE" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                                <input type="text" name="PIN" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
+                            </div>
+                            <!-- VLE Field Add in DOB -->
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">VLE का नाम</label>
+                                <input type="text" name="VLE" required class="w-full p-2.5 border border-slate-300 rounded-lg text-sm uppercase">
                             </div>
                             <div class="md:col-span-2">
                                 <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">पूरा पता (Address)</label>
