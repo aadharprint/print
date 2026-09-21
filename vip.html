@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ओवी पोर्टल - VIP सेवाएं</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, updateDoc, collection, addDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBSiDAvDYyBG8hkmez7s900JHhlbenG2nU",
+            authDomain: "oaps-d2cce.firebaseapp.com",
+            projectId: "oaps-d2cce",
+            storageBucket: "oaps-d2cce.firebasestorage.app",
+            messagingSenderId: "619616461386",
+            appId: "1:619616461386:web:c3b9b36815369c6f5d7cb3",
+            measurementId: "G-5Y6RHLE2LK"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const ADMIN_EMAIL = "hkosiun1221@gmail.com";
+
+        window.currentUserData = null;
+        const API_URLS = {
+            "ANNEXURE": "https://script.google.com/macros/s/AKfycbyA3916RXjuVRInvDPksOzbzczesTFAWo4gVzvjazGNfQl_REwC0YrYpTu03jlXwlb07w/exec", // अपना एनेक्सचर URL यहाँ रखें
+            "AFFIDAVIT": "https://script.google.com/macros/s/AKfycbyA3916RXjuVRInvDPksOzbzczesTFAWo4gVzvjazGNfQl_REwC0YrYpTu03jlXwlb07w/exec"
+        };
+
+        onAuthStateChanged(auth, async (user) => {
+            if (!user) {
+                alert('कृपया पहले लॉगिन करें!');
+                window.location.href = "index.html";
+                return;
+            }
+            const userDoc = await getDoc(doc(db, "users", user.uid));
+            let isVip = false, credits = 10;
+            if (userDoc.exists()) {
+                isVip = userDoc.data().isVip || false;
+                credits = userDoc.data().credits || 10;
+            }
+
+            if (user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase() && !isVip) {
+                alert('यह सेक्शन केवल VIP यूज़र्स के लिए है!');
+                window.location.href = "index.html";
+            } else {
+                window.currentUserData = { uid: user.uid, email: user.email, credits: credits };
+                document.getElementById('displayUser').innerText = user.email.split('@')[0].toUpperCase();
+                document.getElementById('displayCredits').innerText = credits;
+                window.switchVipService('annexure1');
+            }
+        });
+
+        window.handleLogout = async function() {
+            await signOut(auth);
+            window.location.href = "index.html";
+        };
+
+        window.submitVipForm = async function(event, serviceType) {
+            event.preventDefault();
+            if (window.currentUserData.credits <= 0) {
+                alert('पर्याप्त क्रेडिट्स नहीं हैं!');
+                return;
+            }
+
+            const formElement = event.target;
+            const formData = new FormData(formElement);
+            formData.append('USER_ID', window.currentUserData.email);
+            formData.append('SERVICE_TYPE', serviceType);
+
+            const submitBtn = formElement.querySelector('button[type="submit"]');
+            const orig = submitBtn.innerText;
+            submitBtn.innerText = 'VIP डॉक्यूमेंट बन रहा है...';
+            submitBtn.disabled = true;
+
+            const dataObj = {};
+            formData.forEach((v, k) => { dataObj[k] = v; });
+
+            try {
+                const res = await fetch(API_URLS["ANNEXURE"], { method: 'POST', body: JSON.stringify(dataObj) });
+                const result = await res.json();
+                submitBtn.innerText = orig;
+                submitBtn.disabled = false;
+
+                if (result.success) {
+                    const newCreds = window.currentUserData.credits - 1;
+                    await updateDoc(doc(db, "users", window.currentUserData.uid), { credits: newCreds });
+                    window.currentUserData.credits = newCreds;
+                    document.getElementById('displayCredits').innerText = newCreds;
+
+                    await addDoc(collection(db, "history"), {
+                        userId: window.currentUserData.uid, fileName: `${dataObj.NAME || 'VIP Doc'} - ${serviceType}.pdf`,
+                        fileId: result.fileId, serviceType: serviceType, timestamp: new Date()
+                    });
+                    alert('VIP डॉक्यूमेंट सफलतापूर्व जनरेट हो गया!');
+                } else {
+                    alert('एरर: ' + result.error);
+                }
+            } catch(err) {
+                submitBtn.innerText = orig;
+                submitBtn.disabled = false;
+                alert('कनेक्शन एरर।');
+            }
+        };
+
+        window.switchVipService = function(type) {
+            document.querySelectorAll('.vip-tab').forEach(b => b.className = "vip-tab bg-white text-slate-700 border py-2.5 px-4 rounded-xl font-medium text-sm text-center");
+            document.getElementById('btn-' + type).className = "vip-tab bg-purple-600 text-white py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow";
+
+            const container = document.getElementById('vipFormContainer');
+            if (type === 'annexure1' || type === 'annexure1a' || type === 'annexure3') {
+                container.innerHTML = `
+                    <h3 class="text-lg font-bold text-purple-900 mb-4">${type.toUpperCase()} फॉर्म (VIP सर्विस)</h3>
+                    <form onsubmit="window.submitVipForm(event, '${type}')" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label class="block text-xs font-semibold uppercase mb-1">पूरा नाम</label><input type="text" name="NAME" required class="w-full p-2.5 border rounded-lg text-sm uppercase"></div>
+                            <div><label class="block text-xs font-semibold uppercase mb-1">पिता का नाम</label><input type="text" name="FATHER" required class="w-full p-2.5 border rounded-lg text-sm uppercase"></div>
+                            <div><label class="block text-xs font-semibold uppercase mb-1">आधार नंबर</label><input type="text" name="AADHAR" required class="w-full p-2.5 border rounded-lg text-sm uppercase"></div>
+                            <div><label class="block text-xs font-semibold uppercase mb-1">एनरोलमेंट तारीख</label><input type="date" name="DATE" required class="w-full p-2.5 border rounded-lg text-sm"></div>
+                            <div><label class="block text-xs font-semibold uppercase mb-1">पुरानी जन्मतिथि</label><input type="date" name="OLDDOB" required class="w-full p-2.5 border rounded-lg text-sm"></div>
+                            <div><label class="block text-xs font-semibold uppercase mb-1">नई जन्मतिथि</label><input type="date" name="NEWDOB" required class="w-full p-2.5 border rounded-lg text-sm"></div>
+                            <div><label class="block text-xs font-semibold uppercase mb-1">पुराना डॉक्यूमेंट</label><select name="OLDDOCUMENT" class="w-full p-2.5 border rounded-lg text-sm uppercase"><option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option><option value="MARKSHEET">MARKSHEET</option></select></div>
+                            <div><label class="block text-xs font-semibold uppercase mb-1">नया डॉक्यूमेंट</label><select name="NEWDOCUMENT" class="w-full p-2.5 border rounded-lg text-sm uppercase"><option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option><option value="MARKSHEET">MARKSHEET</option></select></div>
+                            <div class="md:col-span-2"><label class="block text-xs font-semibold uppercase mb-1">पूरा पता</label><textarea name="ADDRESS" rows="2" required class="w-full p-2.5 border rounded-lg text-sm uppercase"></textarea></div>
+                        </div>
+                        <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl shadow transition mt-4">${type.toUpperCase()} जनरेट करें (1 Credit)</button>
+                    </form>`;
+            } else if (type === 'affidavit') {
+                container.innerHTML = `
+                    <h3 class="text-lg font-bold text-purple-900 mb-4">सामान्य शपथ पत्र (Affidavit)</h3>
+                    <form onsubmit="window.submitVipForm(event, 'Affidavit')" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label class="block text-xs font-semibold uppercase mb-1">शपथकर्ता का नाम</label><input type="text" name="NAME" required class="w-full p-2.5 border rounded-lg text-sm uppercase"></div>
+                            <div><label class="block text-xs font-semibold uppercase mb-1">पिता/पति का नाम</label><input type="text" name="FATHER" required class="w-full p-2.5 border rounded-lg text-sm uppercase"></div>
+                            <div class="md:col-span-2"><label class="block text-xs font-semibold uppercase mb-1">शपथ का विवरण / कारण</label><textarea name="REASON" rows="3" required class="w-full p-2.5 border rounded-lg text-sm uppercase" placeholder="यहाँ शपथ का उद्देश्य लिखें..."></textarea></div>
+                        </div>
+                        <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl shadow transition mt-4">शपथ पत्र जनरेट करें (1 Credit)</button>
+                    </form>`;
+            }
+        };
+    </script>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col justify-between">
+    <header class="bg-white shadow-sm border-b px-6 py-4 flex justify-between items-center">
+        <div><h2 class="text-xl font-bold text-purple-950"><i class="fa-solid fa-crown text-purple-600 mr-2"></i> VIP पोर्टल</h2><p class="text-xs text-slate-500">यूजर: <span id="displayUser" class="font-semibold text-purple-700"></span></p></div>
+        <div class="flex items-center space-x-3">
+            <a href="index.html" class="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-semibold"><i class="fa-solid fa-house mr-1"></i> मुख्य पोर्टल</a>
+            <div class="bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-lg text-sm font-medium text-purple-800">क्रेडिट्स: <span id="displayCredits" class="font-bold">0</span></div>
+            <button onclick="window.handleLogout()" class="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-sm font-medium">लॉगआउट</button>
+        </div>
+    </header>
+    <main class="max-w-4xl mx-auto w-full p-6 flex-grow">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <button onclick="window.switchVipService('annexure1')" id="btn-annexure1" class="vip-tab bg-purple-600 text-white py-2.5 px-4 rounded-xl font-medium text-sm text-center shadow">Annexure 1</button>
+            <button onclick="window.switchVipService('annexure1a')" id="btn-annexure1a" class="vip-tab bg-white text-slate-700 border py-2.5 px-4 rounded-xl font-medium text-sm text-center">Annexure 1A</button>
+            <button onclick="window.switchVipService('annexure3')" id="btn-annexure3" class="vip-tab bg-white text-slate-700 border py-2.5 px-4 rounded-xl font-medium text-sm text-center">Annexure 3</button>
+            <button onclick="window.switchVipService('affidavit')" id="btn-affidavit" class="vip-tab bg-white text-slate-700 border py-2.5 px-4 rounded-xl font-medium text-sm text-center">Affidavit (शपथ पत्र)</button>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border p-6"><div id="vipFormContainer"></div></div>
+    </main>
+    <footer class="bg-white border-t text-center py-4 text-xs text-slate-500">© 2026 ओवी आधार प्रिंट सर्विस - VIP पोर्टल</footer>
+</body>
+</html>
