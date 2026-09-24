@@ -9,7 +9,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, updateDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBSiDAvDYyBG8hkmez7s900JHhlbenG2nU",
@@ -32,6 +32,7 @@
                 window.location.href = "index.html";
             } else {
                 document.getElementById('adminEmailDisplay').innerText = user.email;
+                document.getElementById('adminPanelContent').classList.remove('hidden');
             }
         });
 
@@ -46,11 +47,14 @@
             const newUserPass = document.getElementById('newAdminUserPass').value.trim();
             const initialCredits = parseInt(document.getElementById('newAdminUserCredits').value) || 10;
             const isVip = document.getElementById('newAdminUserVip').checked;
+            
             const msg = document.getElementById('adminCreateMsg');
-            msg.classList.remove('hidden');
-            msg.innerText = "नया यूजर बनाया जा रहा है...";
+            const btn = event.target.querySelector('button[type="submit"]');
+            btn.disabled = true; btn.innerText = "बनाया जा रहा है...";
+            msg.classList.remove('hidden'); msg.innerText = "नया यूजर रजिस्टर हो रहा है...";
 
             try {
+                // Firebase REST API to create user safely without logging admin out
                 const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: newUserEmail, password: newUserPass, returnSecureToken: true })
@@ -59,18 +63,21 @@
                 if (data.error) throw new Error(data.error.message);
 
                 await setDoc(doc(db, "users", data.localId), {
-                    email: newUserEmail, username: newUserEmail.split('@')[0], credits: initialCredits, isVip: isVip, createdAt: new Date()
+                    email: newUserEmail, 
+                    username: newUserEmail.split('@')[0], 
+                    credits: initialCredits, 
+                    isVip: isVip, 
+                    createdAt: new Date()
                 });
-                msg.className = "mt-2 text-xs text-green-600 font-bold";
-                msg.innerText = `सफलता! नया यूजर (${newUserEmail}) बन गया है (VIP: ${isVip ? 'हाँ' : 'ना'})।`;
                 
-                // सेफ रिसेट (एरर से बचाने के लिए)
-                const createForm = document.getElementById('adminCreateUserForm');
-                if (createForm) createForm.reset();
-
+                msg.className = "mt-3 p-2 bg-green-100 text-green-700 rounded-lg text-sm font-bold border border-green-300";
+                msg.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> सफलता! नया यूजर (${newUserEmail}) बन गया है।`;
+                event.target.reset();
             } catch(err) {
-                msg.className = "mt-2 text-xs text-red-600 font-bold";
-                msg.innerText = "एरर: " + err.message;
+                msg.className = "mt-3 p-2 bg-red-100 text-red-700 rounded-lg text-sm font-bold border border-red-300";
+                msg.innerHTML = `<i class="fa-solid fa-circle-xmark mr-1"></i> एरर: ${err.message}`;
+            } finally {
+                btn.disabled = false; btn.innerText = "यूजर रजिस्टर करें";
             }
         };
 
@@ -79,81 +86,107 @@
             const queryEmail = document.getElementById('targetUser').value.trim().toLowerCase();
             const addCreds = parseInt(document.getElementById('creditsToAdd').value) || 0;
             const makeVip = document.getElementById('toggleVipStatus').checked;
+            
             const msg = document.getElementById('adminMsg');
-            msg.classList.remove('hidden');
-            msg.innerText = "अपडेट किया जा रहा है...";
+            const btn = event.target.querySelector('button[type="submit"]');
+            btn.disabled = true; btn.innerText = "अपडेट हो रहा है...";
+            msg.classList.remove('hidden'); msg.innerText = "डेटाबेस में यूजर ढूंढा जा रहा है...";
 
             try {
                 const q = query(collection(db, "users"), where("email", "==", queryEmail));
                 const snap = await getDocs(q);
+                
                 if(snap.empty) {
-                    msg.className = "mt-2 text-xs text-red-600 font-medium";
-                    msg.innerText = "एरर: यह यूजर डेटाबेस में नहीं मिला!";
-                    return;
+                    throw new Error("यह ईमेल डेटाबेस में नहीं मिला! कृपया सही ईमेल दर्ज करें।");
                 }
+                
                 let uId, curCreds = 0;
                 snap.forEach(d => { uId = d.id; curCreds = d.data().credits || 0; });
 
+                const totalCredits = curCreds + addCreds;
+
                 await updateDoc(doc(db, "users", uId), {
-                    credits: curCreds + addCreds,
+                    credits: totalCredits,
                     isVip: makeVip
                 });
-                msg.className = "mt-2 text-xs text-green-600 font-bold";
-                msg.innerText = `सफलता! नए क्रेडिट्स: ${curCreds + addCreds}, VIP स्टेटस: ${makeVip ? 'एक्टिव' : 'हटाया गया'}`;
                 
-                // सेफ रिसेट (एरर से बचाने के लिए)
-                const adminForm = document.getElementById('adminForm');
-                if (adminForm) adminForm.reset();
-
+                msg.className = "mt-3 p-2 bg-green-100 text-green-700 rounded-lg text-sm font-bold border border-green-300";
+                msg.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> सफलता! यूजर के नए क्रेडिट्स: ${totalCredits} | VIP: ${makeVip ? 'हाँ' : 'ना'}`;
+                event.target.reset();
             } catch(err) {
-                msg.className = "mt-2 text-xs text-red-600 font-medium";
-                msg.innerText = "एरर: कुछ गलत हो गया है।";
+                msg.className = "mt-3 p-2 bg-red-100 text-red-700 rounded-lg text-sm font-bold border border-red-300";
+                msg.innerHTML = `<i class="fa-solid fa-circle-xmark mr-1"></i> एरर: ${err.message}`;
+            } finally {
+                btn.disabled = false; btn.innerText = "अपडेट करें";
             }
         };
     </script>
 </head>
-<body class="bg-slate-100 min-h-screen flex flex-col justify-between font-sans">
+<body class="bg-slate-100 min-h-screen flex flex-col font-sans">
     <header class="bg-white shadow-sm border-b px-6 py-4 flex justify-between items-center">
-        <div><h2 class="text-xl font-bold text-slate-800"><i class="fa-solid fa-shield-halved text-amber-600 mr-2"></i> एडमिन कंट्रोल पैनल</h2><p class="text-xs text-slate-500">लॉगिन: <span id="adminEmailDisplay" class="font-semibold text-amber-700"></span></p></div>
+        <div>
+            <h2 class="text-xl font-bold text-slate-800"><i class="fa-solid fa-shield-halved text-amber-600 mr-2"></i> सुपर एडमिन पैनल</h2>
+            <p class="text-xs text-slate-500 font-medium mt-1">लॉगिन: <span id="adminEmailDisplay" class="font-bold text-amber-700">चेक किया जा रहा है...</span></p>
+        </div>
         <div class="flex items-center space-x-3">
-            <a href="index.html" class="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-blue-100 transition"><i class="fa-solid fa-house mr-1"></i> मुख्य पोर्टल पर जाएं</a>
-            <button onclick="window.handleLogout()" class="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-xs font-semibold transition">लॉगआउट</button>
+            <a href="index.html" class="bg-slate-100 text-slate-700 border border-slate-300 px-3 py-2 rounded-lg text-xs font-bold hover:bg-slate-200 transition shadow-sm"><i class="fa-solid fa-house mr-1"></i> पोर्टल पर जाएं</a>
+            <button onclick="window.handleLogout()" class="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-2 rounded-lg text-xs font-bold transition shadow-sm border border-red-200"><i class="fa-solid fa-power-off mr-1"></i> लॉगआउट</button>
         </div>
     </header>
-    <main class="max-w-3xl mx-auto w-full p-6 space-y-6 flex-grow">
-        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm">
-            <h3 class="text-md font-bold text-amber-800 mb-3">👤 नया यूजर या VIP अकाउंट बनाएँ</h3>
-            <form id="adminCreateUserForm" onsubmit="window.createNewUserByAdmin(event)" class="space-y-3">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <input type="email" id="newAdminUserEmail" placeholder="यूजर ईमेल" required class="p-2 border border-amber-300 rounded-lg text-sm bg-white">
-                    <input type="password" id="newAdminUserPass" placeholder="पासवर्ड (कम से कम 6 अंक)" required minlength="6" class="p-2 border border-amber-300 rounded-lg text-sm bg-white">
-                    <input type="number" id="newAdminUserCredits" placeholder="शुरुआती क्रेडिट" required class="p-2 border border-amber-300 rounded-lg text-sm bg-white">
+
+    <!-- Content is hidden until Admin is verified -->
+    <main id="adminPanelContent" class="max-w-4xl mx-auto w-full p-4 md:p-6 space-y-6 flex-grow hidden">
+        
+        <!-- Create User Section -->
+        <div class="bg-white border-t-4 border-amber-500 rounded-2xl p-6 shadow-md">
+            <h3 class="text-lg font-bold text-slate-800 mb-4"><i class="fa-solid fa-user-plus text-amber-500 mr-2"></i> नया यूजर बनाएँ</h3>
+            <form id="adminCreateUserForm" onsubmit="window.createNewUserByAdmin(event)" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">यूजर ईमेल</label>
+                        <input type="email" id="newAdminUserEmail" placeholder="user@gmail.com" required class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-slate-50 focus:ring-2 focus:ring-amber-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">पासवर्ड</label>
+                        <input type="password" id="newAdminUserPass" placeholder="कम से कम 6 अंक" required minlength="6" class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-slate-50 focus:ring-2 focus:ring-amber-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">शुरुआती क्रेडिट्स</label>
+                        <input type="number" id="newAdminUserCredits" placeholder="जैसे: 10" required class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-slate-50 focus:ring-2 focus:ring-amber-500 outline-none">
+                    </div>
                 </div>
-                <div class="flex items-center space-x-2 pt-1">
-                    <input type="checkbox" id="newAdminUserVip" class="w-4 h-4 text-purple-600 rounded">
-                    <label for="newAdminUserVip" class="text-xs font-semibold text-slate-700">इस यूजर को VIP अधिकार दें (Annexure सेवाओं के लिए)</label>
+                <div class="flex items-center space-x-2 pt-2 bg-amber-50 p-3 rounded-lg border border-amber-100">
+                    <input type="checkbox" id="newAdminUserVip" class="w-5 h-5 text-amber-600 rounded">
+                    <label for="newAdminUserVip" class="text-sm font-bold text-amber-900 cursor-pointer">इस यूजर को VIP अधिकार (VIP Access) दें</label>
                 </div>
-                <button type="submit" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2.5 rounded-lg text-sm shadow transition">यूजर रजिस्टर करें</button>
+                <button type="submit" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-xl text-sm shadow-lg shadow-amber-200 transition">यूजर रजिस्टर करें</button>
             </form>
-            <div id="adminCreateMsg" class="mt-2 text-xs hidden"></div>
+            <div id="adminCreateMsg" class="hidden"></div>
         </div>
 
-        <div class="bg-blue-50 border border-blue-200 rounded-2xl p-5 shadow-sm">
-            <h3 class="text-md font-bold text-blue-800 mb-3">💰 क्रेडिट जोड़ें या VIP स्टेटस बदलें</h3>
-            <form id="adminForm" onsubmit="window.addCreditsOrToggleVip(event)" class="space-y-3">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <input type="text" id="targetUser" placeholder="यूजर ईमेल" required class="p-2 border border-blue-300 rounded-lg text-sm bg-white">
-                    <input type="number" id="creditsToAdd" placeholder="जोड़ने वाले क्रेडिट्स" required class="p-2 border border-blue-300 rounded-lg text-sm bg-white">
+        <!-- Add Credits Section -->
+        <div class="bg-white border-t-4 border-blue-500 rounded-2xl p-6 shadow-md">
+            <h3 class="text-lg font-bold text-slate-800 mb-4"><i class="fa-solid fa-coins text-blue-500 mr-2"></i> क्रेडिट्स जोड़ें या VIP स्टेटस बदलें</h3>
+            <form id="adminForm" onsubmit="window.addCreditsOrToggleVip(event)" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">मौजूदा यूजर का ईमेल</label>
+                        <input type="email" id="targetUser" placeholder="जिसके अकाउंट में क्रेडिट डालना है" required class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">कितने क्रेडिट्स जोड़ने हैं?</label>
+                        <input type="number" id="creditsToAdd" placeholder="जैसे: 50" required class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
                 </div>
-                <div class="flex items-center space-x-2 pt-1">
-                    <input type="checkbox" id="toggleVipStatus" class="w-4 h-4 text-purple-600 rounded">
-                    <label for="toggleVipStatus" class="text-xs font-semibold text-slate-700">VIP एक्सेस एनेबल करें</label>
+                <div class="flex items-center space-x-2 pt-2 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                    <input type="checkbox" id="toggleVipStatus" class="w-5 h-5 text-blue-600 rounded">
+                    <label for="toggleVipStatus" class="text-sm font-bold text-blue-900 cursor-pointer">इस यूजर का VIP स्टेटस ऑन (On) रखें</label>
                 </div>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg text-sm shadow transition">अपडेट करें</button>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-sm shadow-lg shadow-blue-200 transition">अपडेट करें</button>
             </form>
-            <div id="adminMsg" class="mt-2 text-xs hidden"></div>
+            <div id="adminMsg" class="hidden"></div>
         </div>
     </main>
-    <footer class="bg-white border-t text-center py-4 text-xs text-slate-500">© 2026 ओवी आधार प्रिंट सर्विस - एडमिन पैनल</footer>
+    <footer class="bg-white border-t text-center py-4 text-xs font-bold text-slate-500 mt-auto">© 2026 ओवी आधार प्रिंट सर्विस - सुरक्षित एडमिन पैनल</footer>
 </body>
 </html>
