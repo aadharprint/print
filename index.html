@@ -302,7 +302,7 @@
             });
         };
 
-        // English Translation of Locations
+        // HINDI DROPDOWN ARRAYS
         window.updateTehsilsAndThanas = function() {
             const districtEl = document.getElementById('districtSelect');
             const tehsilSelect = document.getElementById('tehsilSelect');
@@ -312,14 +312,14 @@
             let tehsils = []; let thanas = [];
             
             if (district === 'BAGHPAT') {
-                tehsils = ['Baraut', 'Khekra', 'Baghpat']; 
-                thanas = ['Baraut', 'Khekra', 'Baghpat', 'Chhaprauli', 'Binauli', 'Ramala', 'Doghat', 'Singhawali Ahir', 'Baleni', 'Chandinagar'];
+                tehsils = ['बड़ौत', 'खेकड़ा', 'बागपत']; 
+                thanas = ['बड़ौत', 'खेकड़ा', 'बागपत', 'छपरोली', 'बिनौली', 'रमाला', 'दोघट', 'सिंघावली अहीर', 'बालैनी', 'चांदीनगर'];
             } else if (district === 'SHAMLI') {
-                tehsils = ['Kairana', 'Oon', 'Shamli']; 
-                thanas = ['Thana Bhawan', 'Kairana', 'Jhinjhana', 'Shamli', 'Babri', 'Kandhla', 'Garhi Pukhta', 'Adarsh Mandi'];
+                tehsils = ['कैराना', 'ऊन', 'शामली']; 
+                thanas = ['थाना भवन', 'कैराना', 'झिंझाना', 'शामली', 'बाबरी', 'कांधला', 'गढ़ी पुख्ता', 'आदर्श मंडी'];
             } else if (district === 'MUZAFFARNAGAR') {
-                tehsils = ['Budhana', 'Khatauli', 'Jansath', 'Muzaffarnagar']; 
-                thanas = ['Budhana', 'Khatauli', 'Jansath', 'Mirapur', 'Civil Lines', 'Kotwali Nagar', 'Nai Mandi'];
+                tehsils = ['बुढ़ाना', 'खतौली', 'जानसठ', 'मुजफ्फरनगर']; 
+                thanas = ['बुढ़ाना', 'खतौली', 'जानसठ', 'मीरापुर', 'सिविल लाइन', 'कोतवाली नगर', 'नई मंडी'];
             }
             tehsilSelect.innerHTML = tehsils.map(t => `<option value="${t}">${t}</option>`).join('');
             if (thanaSelect) thanaSelect.innerHTML = thanas.map(t => `<option value="${t}">${t}</option>`).join('');
@@ -351,9 +351,9 @@
                     </div>
                     <form onsubmit="window.submitForm(event, 'Domicile')" class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">District</label><select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition uppercase"><option value="BAGHPAT">Baghpat</option><option value="SHAMLI">Shamli</option><option value="MUZAFFARNAGAR">Muzaffarnagar</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">District</label><select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition uppercase"><option value="BAGHPAT">बागपत</option><option value="SHAMLI">शामली</option><option value="MUZAFFARNAGAR">मुजफ्फरनगर</option></select></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Tehsil</label><select id="tehsilSelect" name="TAHSEEL" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></select></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Relation</label><select name="REL" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="पुत्र / पुत्री">Son / Daughter</option><option value="पत्नी      .">Wife</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Relation</label><select name="REL" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="पुत्र / पुत्री">पुत्र / पुत्री</option><option value="पत्नी      .">पत्नी</option></select></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Customer Name</label><input type="text" name="NAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Hindi Name (Optional)</label><input type="text" name="HNAME" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Father/Husband Name</label><input type="text" name="FNAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
@@ -377,10 +377,10 @@
                     </div>
                     <form onsubmit="window.submitForm(event, 'Caste')" class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">District</label><select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition uppercase"><option value="BAGHPAT">Baghpat</option><option value="SHAMLI">Shamli</option><option value="MUZAFFARNAGAR">Muzaffarnagar</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">District</label><select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition uppercase"><option value="BAGHPAT">बागपत</option><option value="SHAMLI">शामली</option><option value="MUZAFFARNAGAR">मुजफ्फरनगर</option></select></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Tehsil</label><select id="tehsilSelect" name="TAHSEEL" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></select></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Relation</label><select name="REL" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="पुत्र / पुत्री">Son / Daughter</option><option value="पत्नी      .">Wife</option></select></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Caste</label><select name="CAST" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition uppercase"><option value="जाट">Jat</option><option value="गुर्जर">Gurjar</option><option value="कश्यप">Kashyap</option><option value="अहीर">Ahir</option><option value="ब्राह्मण">Brahmin</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Relation</label><select name="REL" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="पुत्र / पुत्री">पुत्र / पुत्री</option><option value="पत्नी      .">पत्नी</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Caste</label><select name="CAST" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition uppercase"><option value="जाट">जाट</option><option value="गुर्जर">गुर्जर</option><option value="कश्यप">कश्यप</option><option value="अहीर">अहीर</option><option value="ब्राह्मण">ब्राह्मण</option></select></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Customer Name</label><input type="text" name="NAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Hindi Name (Optional)</label><input type="text" name="HNAME" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Father/Husband Name</label><input type="text" name="FNAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
@@ -427,10 +427,10 @@
                             <div class="flex-1 md:flex-none">
                                 <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Filter Type</label>
                                 <select onchange="window.renderHistory(this.value)" class="w-full md:w-48 p-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:ring-2 focus:ring-royal-400 font-semibold cursor-pointer outline-none">
-                                    <option value="ALL">All Documents</option>
-                                    <option value="Domicile">Domicile</option>
-                                    <option value="Caste">Caste</option>
-                                    <option value="DOB">DOB</option>
+                                    <option value="ALL">सभी डॉक्युमेंट्स</option>
+                                    <option value="Domicile">मूल निवास</option>
+                                    <option value="Caste">जाति प्रमाण पत्र</option>
+                                    <option value="DOB">जन्म प्रमाण पत्र</option>
                                 </select>
                             </div>
                             <div class="flex items-end h-full mt-4 md:mt-0">
