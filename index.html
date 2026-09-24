@@ -221,16 +221,24 @@
                     status: "Pending" // Credits are NOT added yet!
                 });
 
-                // 2. SEND WHATSAPP ALERT (CallMeBot API)
-                // ⚠️ अपना फ़ोन नंबर और API KEY यहाँ डालें ⚠️
-                const adminPhone = "+918279650137"; 
-                const apikey = "YOUR_API_KEY_HERE"; // <-- यहाँ अपनी API Key डालें
-                
-                const waMessage = `🚨 *New Payment Request!*%0A*User:* ${window.currentUserData.email}%0A*Amount:* ₹${amount}%0A*UTR:* ${utr}%0A%0A*Status:* Pending Approval. Check Admin Panel to Approve.`;
-                
-                fetch(`https://api.callmebot.com/whatsapp.php?phone=${adminPhone}&text=${waMessage}&apikey=${apikey}`)
-                    .then(response => console.log("WhatsApp alert sent!"))
-                    .catch(err => console.log("WhatsApp alert failed", err));
+                // 2. SEND TELEGRAM ALERT (100% Free & Reliable)
+// ⚠️ यहाँ अपना बॉट टोकन और चैट आईडी डालें ⚠️
+const botToken = "8586078140:AAG-ydpakzFDAwHFtJC8AUanxZAODpGZDOk"; 
+const chatId = "8942287807"; 
+
+const tgMessage = `🚨 *New Payment Request!*\n*User:* ${window.currentUserData.email}\n*Amount:* ₹${amount}\n*UTR:* ${utr}\n\n*Status:* Pending Approval. Check Admin Panel.`;
+
+fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        chat_id: chatId,
+        text: tgMessage,
+        parse_mode: 'Markdown'
+    })
+})
+.then(response => console.log("Telegram alert sent!"))
+.catch(err => console.log("Telegram alert failed", err));
 
                 // 3. SHOW SUCCESS MESSAGE TO USER
                 document.getElementById('walletMainUI').innerHTML = `
