@@ -27,10 +27,6 @@
         }
     </script>
 
-    <style>
-        .animate-spin-slow { animation: spin 4s linear infinite; }
-    </style>
-
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -64,7 +60,6 @@
         };
         window.API_URLS = API_URLS;
 
-        // ================= STRICT AUTHENTICATION CHECK =================
         onAuthStateChanged(auth, async (user) => {
             const loadingScreen = document.getElementById('loadingScreen');
             const loginSection = document.getElementById('loginSection');
@@ -88,21 +83,19 @@
                     };
                     
                     setupDashboard(window.currentUserData);
-                    loadingScreen.style.display = 'none'; // Fixed bug here
+                    loadingScreen.style.display = 'none'; 
                 } catch (err) {
                     console.error(err);
                     await signOut(auth);
                 }
             } else {
-                // STRICT LOGOUT STATE: Shows login, hides others forcefully
                 window.currentUserData = null;
                 loginSection.style.display = 'flex';
                 dashboardSection.style.display = 'none';
-                loadingScreen.style.display = 'none'; // Fixed bug here
+                loadingScreen.style.display = 'none';
             }
         });
 
-        // ================= STRICT LOGIN LOGIC =================
         window.handleLogin = async function(event) {
             event.preventDefault();
             const emailInput = document.getElementById('loginUsername').value.trim();
@@ -119,7 +112,6 @@
 
             try {
                 await signInWithEmailAndPassword(auth, email, passInput);
-                // onAuthStateChanged will handle the UI switch automatically
             } catch (error) {
                 errorDiv.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i> Your ID or Password are incorrect!';
                 errorDiv.style.display = 'block';
@@ -153,7 +145,7 @@
             window.location.reload();
         };
 
-        // ================= AUTOMATIC PAYMENT & WALLET SYSTEM (1 Rs = 1 Credit) =================
+        // ================= AUTOMATIC PAYMENT & WALLET SYSTEM =================
         window.calculateCredits = function() {
             const amount = parseFloat(document.getElementById('rupeeAmount').value) || 0;
             const credits = amount; 
@@ -164,7 +156,6 @@
             const amount = parseFloat(document.getElementById('rupeeAmount').value);
             if(!amount || amount < 10) return alert('Please enter a minimum amount of ₹10');
 
-            // ⚠️ YOUR ACTUAL UPI ID ⚠️
             const upiId = "8279650137@ptyes"; 
             const payeeName = "Ojas Print Service";
             const upiString = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${amount}&cu=INR`;
@@ -179,7 +170,11 @@
 
         window.submitPayment = async function() {
             const amount = parseFloat(document.getElementById('rupeeAmount').value);
-            const utr = document.getElementById('utrNumber').value.trim();
+            let rawUtr = document.getElementById('utrNumber').value;
+            
+            // 🔥 AUTO-CLEANER: Removes any spaces, hyphens or special characters pasted by mistake
+            const utr = rawUtr.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+            
             const creditsToAdd = amount;
 
             if(!utr || utr.length < 12) {
@@ -196,6 +191,7 @@
             document.getElementById('paymentErrorMsg').style.display = 'none';
 
             try {
+                // UTR DUPLICATE CHECK
                 const q = query(collection(db, "payments"), where("utrNumber", "==", utr));
                 const duplicateCheck = await getDocs(q);
                 if (!duplicateCheck.empty) {
@@ -236,7 +232,6 @@
                 btn.disabled = false;
             }
         };
-
 
         // ================= IN-APP PREVIEW =================
         window.openPdfViewer = function(fileId, fileName) {
@@ -548,7 +543,8 @@
                             
                             <div class="w-full pt-2">
                                 <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 text-center">Enter 12-Digit UTR / Ref Number</label>
-                                <input type="text" id="utrNumber" placeholder="Enter UTR after payment" maxlength="12" class="w-full p-4 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500 outline-none transition text-center tracking-widest">
+                                <!-- 🔥 AUTO-CLEANER input: Removed maxlength, added auto-uppercase -->
+                                <input type="text" id="utrNumber" placeholder="Enter UTR after payment" class="w-full p-4 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500 outline-none transition text-center tracking-widest uppercase">
                             </div>
                             
                             <button onclick="window.submitPayment()" id="btnSubmitPayment" class="w-full bg-green-600 hover:bg-green-700 text-white font-black py-4 rounded-xl shadow-md transition transform hover:-translate-y-0.5">Verify & Add Credits <i class="fa-solid fa-check-circle ml-1"></i></button>
