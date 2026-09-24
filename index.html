@@ -94,6 +94,32 @@
             window.location.reload();
         };
 
+        // ================= IN-APP PREVIEW & MANUAL DOWNLOAD (NEW) =================
+        window.openPdfViewer = function(fileId, fileName) {
+            document.getElementById('pdfViewerTitle').innerText = fileName;
+            document.getElementById('pdfLoadingSpinner').style.display = 'flex';
+            
+            // Preview link stops auto-download and forces web preview
+            const previewUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+            document.getElementById('pdfIframe').src = previewUrl;
+            
+            // Set the manual download button link
+            const downloadBtn = document.getElementById('modalDownloadBtn');
+            downloadBtn.onclick = function() {
+                window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank');
+            };
+
+            document.getElementById('pdfViewerModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden'; // Stop background scrolling
+        };
+
+        window.closePdfViewer = function() {
+            document.getElementById('pdfViewerModal').classList.add('hidden');
+            document.getElementById('pdfIframe').src = ''; 
+            document.body.style.overflow = 'auto'; // Restore background scrolling
+        };
+
+
         async function compressImage(file) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
@@ -138,7 +164,6 @@
             else if (serviceType === 'DOB') targetUrl = API_URLS["DOB"];
 
             try {
-                // Deduct Credit (Frontend update, Firestore rules will protect the backend)
                 const userDocRef = doc(db, "users", window.currentUserData.uid);
                 const newCredits = window.currentUserData.credits - 1;
                 await updateDoc(userDocRef, { credits: newCredits });
@@ -177,7 +202,6 @@
                     throw new Error('API Response Failed');
                 }
             } catch (error) {
-                // Refund credit on error
                 const userDocRef = doc(db, "users", window.currentUserData.uid);
                 const refundedCredits = window.currentUserData.credits + 1;
                 await updateDoc(userDocRef, { credits: refundedCredits });
@@ -208,7 +232,6 @@
                     window.historyData.push(docSnap.data());
                 });
 
-                // Sort: Newest First
                 window.historyData.sort((a, b) => b.timestamp.seconds - a.timestamp.seconds);
                 
                 window.renderHistory('ALL'); 
@@ -241,14 +264,15 @@
                         <td class="p-3"><span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">${data.serviceType}</span></td>
                         <td class="p-3 text-slate-500 text-xs whitespace-nowrap">${dateStr} <br/> ${timeStr}</td>
                         <td class="p-3 text-right whitespace-nowrap">
-                            <a href="https://drive.google.com/file/d/${data.fileId}/view" target="_blank" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow">डाउनलोड</a>
+                            <button onclick="window.openPdfViewer('${data.fileId}', '${data.fileName}')" class="inline-flex items-center gap-1 bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm">
+                                <i class="fa-solid fa-eye"></i> प्रीव्यू
+                            </button>
                         </td>
                     </tr>
                 `;
             });
         };
 
-        // YAHAN BUG THA JO FIX KAR DIYA GAYA HAI (let variables added)
         window.updateTehsilsAndThanas = function() {
             const districtEl = document.getElementById('districtSelect');
             const tehsilSelect = document.getElementById('tehsilSelect');
@@ -257,8 +281,6 @@
             if (!districtEl || !tehsilSelect) return;
             
             const district = districtEl.value;
-            
-            // Fix: 'let' keyword added to prevent Strict Mode ReferenceError
             let tehsils = []; 
             let thanas = [];
             
@@ -359,13 +381,13 @@
                         <h3 class="text-lg font-bold text-slate-800">मेरी हिस्ट्री</h3>
                         <div class="flex space-x-3 items-center">
                             <label class="text-sm font-semibold text-slate-600">फ़िल्टर:</label>
-                            <select onchange="window.renderHistory(this.value)" class="p-2 border rounded-lg text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500">
+                            <select onchange="window.renderHistory(this.value)" class="p-2 border rounded-lg text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none">
                                 <option value="ALL">सभी डॉक्युमेंट्स</option>
                                 <option value="Domicile">मूल निवास</option>
                                 <option value="Caste">जाति प्रमाण पत्र</option>
                                 <option value="DOB">जन्म प्रमाण पत्र</option>
                             </select>
-                            <button onclick="window.loadUserHistory()" class="bg-slate-100 p-2 rounded-lg text-blue-600 hover:bg-slate-200"><i class="fa-solid fa-rotate-right"></i></button>
+                            <button onclick="window.loadUserHistory()" class="bg-slate-100 p-2 rounded-lg text-blue-600 hover:bg-slate-200 transition"><i class="fa-solid fa-rotate-right"></i></button>
                         </div>
                     </div>
                     <div class="border rounded-xl overflow-x-auto shadow-sm">
@@ -383,6 +405,36 @@
     </script>
 </head>
 <body class="bg-slate-50 font-sans min-h-screen flex flex-col justify-between">
+    
+    <!-- FULL SCREEN PDF VIEWER MODAL (IN-APP) FOR USERS -->
+    <div id="pdfViewerModal" class="fixed inset-0 z-[100] hidden bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-2 md:p-6 transition-opacity">
+        <div class="bg-white w-full max-w-6xl h-full flex flex-col rounded-2xl shadow-2xl overflow-hidden">
+            
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center p-4 border-b border-slate-200 bg-slate-50 gap-3">
+                <div class="flex items-center gap-3 overflow-hidden w-full md:w-auto">
+                    <div class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center shrink-0"><i class="fa-solid fa-file-pdf"></i></div>
+                    <h3 id="pdfViewerTitle" class="font-bold text-slate-800 truncate">डॉक्यूमेंट प्रीव्यू</h3>
+                </div>
+                <div class="flex items-center gap-3 w-full md:w-auto justify-end">
+                    <!-- DEDICATED MANUAL DOWNLOAD BUTTON -->
+                    <button id="modalDownloadBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition shadow-md flex items-center gap-2">
+                        <i class="fa-solid fa-download"></i> डाउनलोड करें
+                    </button>
+                    <button onclick="window.closePdfViewer()" class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-200 text-slate-600 hover:bg-red-500 hover:text-white transition shadow-sm"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+            </div>
+
+            <div class="flex-grow bg-slate-300 relative">
+                <div id="pdfLoadingSpinner" class="absolute inset-0 flex flex-col items-center justify-center text-blue-600 bg-slate-100">
+                    <i class="fa-solid fa-spinner fa-spin text-4xl mb-3"></i>
+                    <p class="text-sm font-bold text-slate-600">प्रीव्यू लोड हो रहा है...</p>
+                </div>
+                <iframe id="pdfIframe" class="w-full h-full relative z-10 border-none" onload="document.getElementById('pdfLoadingSpinner').style.display='none'" src=""></iframe>
+            </div>
+        </div>
+    </div>
+
+
     <!-- LOGIN SCREEN -->
     <div id="loginSection" class="flex items-center justify-center flex-grow p-4">
         <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100">
