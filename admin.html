@@ -50,6 +50,7 @@
         window.allUsersMap = {}; 
         window.usersDataList = {}; 
         window.adminAllHistoryData = []; 
+        window.pendingPaymentsData = []; 
 
         const API_URLS = {
             "ANNEXURE": "https://script.google.com/macros/s/AKfycbyA3916RXjuVRInvDPksOzbzczesTFAWo4gVzvjazGNfQl_REwC0YrYpTu03jlXwlb07w/exec", 
@@ -66,7 +67,7 @@
                 document.getElementById('loadingScreen').classList.add('hidden');
                 
                 await window.loadAllUsersForDropdown(); 
-                window.switchAdminMainTab('users');
+                window.switchAdminMainTab('payments'); // Default to Payments tab
             }
         });
 
@@ -75,21 +76,100 @@
             window.location.href = "index.html";
         };
 
+        // ================= SECTION: PENDING PAYMENTS (NEW) =================
+        window.loadPendingPayments = async function() {
+            const tbody = document.getElementById('adminPaymentsTableBody');
+            tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400 font-bold"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2 text-royal-500"></i><br>Loading pending payments...</td></tr>`;
+
+            try {
+                // Fetch ONLY pending payments
+                const q = query(collection(db, "payments"), where("status", "==", "Pending"));
+                const querySnapshot = await getDocs(q);
+                
+                window.pendingPaymentsData = [];
+                querySnapshot.forEach((doc) => { window.pendingPaymentsData.push({ id: doc.id, ...doc.data() }); });
+                
+                // Sort Oldest first (First come first serve)
+                window.pendingPaymentsData.sort((a, b) => a.timestamp.seconds - b.timestamp.seconds);
+                window.renderPendingPayments();
+
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-red-500 font-bold">Error loading payments: ${err.message}</td></tr>`;
+            }
+        };
+
+        window.renderPendingPayments = function() {
+            const tbody = document.getElementById('adminPaymentsTableBody');
+            document.getElementById('pendingPaymentsCount').innerText = `Pending Requests: ${window.pendingPaymentsData.length}`;
+            tbody.innerHTML = '';
+
+            if(window.pendingPaymentsData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-10 text-center text-slate-400"><i class="fa-solid fa-check-double text-5xl mb-3 text-green-300"></i><br>All caught up! No pending payments.</td></tr>`;
+                return;
+            }
+
+            window.pendingPaymentsData.forEach(data => {
+                const dateObj = new Date(data.timestamp.seconds * 1000);
+                const dateStr = dateObj.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
+                const timeStr = dateObj.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+                
+                tbody.innerHTML += `
+                    <tr class="border-b border-slate-100 text-sm hover:bg-slate-50 transition duration-200">
+                        <td class="p-4 font-bold text-slate-700">${data.email}</td>
+                        <td class="p-4 font-black text-green-600">₹${data.amountPaid}</td>
+                        <td class="p-4 font-bold text-royal-600">+${data.creditsRequested} Credits</td>
+                        <td class="p-4 font-mono font-bold text-slate-800 tracking-wider">${data.utrNumber}</td>
+                        <td class="p-4 text-slate-500 text-xs font-medium">${dateStr} <br> ${timeStr}</td>
+                        <td class="p-4 text-right whitespace-nowrap">
+                            <button onclick="window.approvePayment('${data.id}', '${data.userId}', ${data.creditsRequested})" class="bg-green-100 hover:bg-green-600 text-green-700 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm mr-2 border border-green-200"><i class="fa-solid fa-check"></i> Approve</button>
+                            <button onclick="window.rejectPayment('${data.id}')" class="bg-red-50 hover:bg-red-600 text-red-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm border border-red-200"><i class="fa-solid fa-xmark"></i> Reject</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        };
+
+        window.approvePayment = async function(paymentDocId, userId, creditsToAdd) {
+            if(!confirm(`Are you sure you want to APPROVE this payment and add ${creditsToAdd} credits to the user?`)) return;
+
+            try {
+                // 1. Get current user credits
+                const userRef = doc(db, "users", userId);
+                const userSnap = await getDoc(userRef);
+                let currentCredits = 0;
+                if(userSnap.exists()) currentCredits = userSnap.data().credits || 0;
+
+                // 2. Add credits
+                const newCredits = currentCredits + creditsToAdd;
+                await updateDoc(userRef, { credits: newCredits });
+
+                // 3. Mark payment as Approved
+                await updateDoc(doc(db, "payments", paymentDocId), { status: "Approved" });
+
+                alert('Successfully Approved! Credits added to user wallet.');
+                window.loadPendingPayments(); // Refresh list
+
+            } catch (err) { alert('Error approving payment: ' + err.message); }
+        };
+
+        window.rejectPayment = async function(paymentDocId) {
+            if(!confirm(`Are you sure you want to REJECT this payment? The user will NOT get any credits.`)) return;
+
+            try {
+                // Mark payment as Rejected
+                await updateDoc(doc(db, "payments", paymentDocId), { status: "Rejected" });
+                window.loadPendingPayments(); // Refresh list
+            } catch (err) { alert('Error rejecting payment: ' + err.message); }
+        };
+
         // ================= IN-APP PREVIEW & MANUAL DOWNLOAD =================
         window.openPdfViewer = function(fileId, fileName) {
             document.getElementById('pdfViewerTitle').innerText = fileName;
             document.getElementById('pdfLoadingSpinner').style.display = 'flex';
-            
-            // Preview link stops auto-download and forces web preview
             const previewUrl = `https://drive.google.com/file/d/${fileId}/preview`;
             document.getElementById('pdfIframe').src = previewUrl;
-            
-            // Set the download button link
             const downloadBtn = document.getElementById('modalDownloadBtn');
-            downloadBtn.onclick = function() {
-                window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank');
-            };
-
+            downloadBtn.onclick = function() { window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank'); };
             document.getElementById('pdfViewerModal').classList.remove('hidden');
             document.body.style.overflow = 'hidden'; 
         };
@@ -230,25 +310,25 @@
             finally { submitBtn.innerHTML = originalBtnText; submitBtn.disabled = false; }
         };
 
-        // ================= SECTION 3: HISTORY & FILTERS =================
+        // ================= SECTION 3: HISTORY =================
         window.loadAdminHistory = async function() {
             const tbody = document.getElementById('adminHistoryTableBody');
             tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400 font-bold"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2 text-royal-500"></i><br>Loading records from database...</td></tr>`;
 
             try {
-                const usersSnap = await getDocs(collection(db, "users"));
                 const filterUserDropdown = document.getElementById('filterUser');
                 const currUserFilter = filterUserDropdown.value; 
                 
                 filterUserDropdown.innerHTML = '<option value="ALL">All Users</option>';
                 filterUserDropdown.innerHTML += `<option value="${window.currentUserData.uid}">👑 Harish Kumar (Admin)</option>`;
                 
-                usersSnap.forEach(doc => {
-                    window.allUsersMap[doc.id] = doc.data().email;
-                    if (doc.id !== window.currentUserData.uid) {
-                        filterUserDropdown.innerHTML += `<option value="${doc.id}">${doc.data().email}</option>`;
-                    }
-                });
+                // Use the loaded users list
+                for (const [uid, data] of Object.entries(window.usersDataList)) {
+                     window.allUsersMap[uid] = data.email;
+                     if (uid !== window.currentUserData.uid) {
+                         filterUserDropdown.innerHTML += `<option value="${uid}">${data.email}</option>`;
+                     }
+                }
                 filterUserDropdown.value = currUserFilter || 'ALL'; 
 
                 const historySnap = await getDocs(collection(db, "history"));
@@ -295,7 +375,6 @@
                         <td class="p-4"><span class="bg-slate-100 text-slate-600 border border-slate-200 px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wide">${data.serviceType}</span></td>
                         <td class="p-4 text-slate-500 text-xs font-medium">${dateStr} <br> ${timeStr}</td>
                         <td class="p-4 text-right whitespace-nowrap">
-                            <!-- PREVIEW BUTTON INSTEAD OF PRINT -->
                             <button onclick="window.openPdfViewer('${data.fileId}', '${data.fileName}')" class="inline-flex items-center gap-1 bg-royal-50 text-royal-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-royal-500 hover:text-white transition shadow-sm mr-2 border border-royal-200"><i class="fa-solid fa-eye"></i> Preview</button>
                             <button onclick="window.deleteHistoryRecord('${data.id}')" class="inline-flex items-center w-8 h-8 justify-center bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition shadow-sm border border-red-100" title="Delete"><i class="fa-solid fa-trash"></i></button>
                         </td>
@@ -334,28 +413,36 @@
 
         // ================= TABS & UI NAVIGATION =================
         window.switchAdminMainTab = function(tabName) {
-            const tabs = ['users', 'services', 'history'];
+            const tabs = ['payments', 'users', 'services', 'history']; // Added payments tab
             tabs.forEach(t => {
                 const btn = document.getElementById(`tab-${t}`);
-                btn.className = "flex-1 bg-white text-slate-500 font-bold py-3.5 px-2 rounded-xl hover:bg-slate-50 transition shadow-sm border border-slate-200 text-sm md:text-base flex justify-center items-center gap-2";
-                document.getElementById(`section-${t}`).classList.add('hidden');
+                if(btn) {
+                    btn.className = "flex-1 bg-white text-slate-500 font-bold py-3.5 px-2 rounded-xl hover:bg-slate-50 transition shadow-sm border border-slate-200 text-[11px] md:text-sm flex justify-center items-center gap-1.5 md:gap-2";
+                }
+                const section = document.getElementById(`section-${t}`);
+                if(section) section.classList.add('hidden');
             });
 
             const activeBtn = document.getElementById(`tab-${tabName}`);
-            activeBtn.className = "flex-1 bg-dark-900 text-royal-300 font-bold py-3.5 px-2 rounded-xl shadow-glow transition transform -translate-y-1 text-sm md:text-base flex justify-center items-center gap-2 border border-dark-800";
-            document.getElementById(`section-${tabName}`).classList.remove('hidden');
+            if(activeBtn) {
+                activeBtn.className = "flex-1 bg-dark-900 text-royal-300 font-bold py-3.5 px-2 rounded-xl shadow-glow transition transform -translate-y-1 text-[11px] md:text-sm flex justify-center items-center gap-1.5 md:gap-2 border border-dark-800";
+            }
+            
+            const activeSection = document.getElementById(`section-${tabName}`);
+            if(activeSection) activeSection.classList.remove('hidden');
 
+            if (tabName === 'payments') window.loadPendingPayments();
             if (tabName === 'services') window.switchPremiumService('annexure1');
             if (tabName === 'history') window.loadAdminHistory(); 
         };
 
         window.switchPremiumService = function(type) {
             document.querySelectorAll('.premium-tab').forEach(b => {
-                b.className = "bg-white text-slate-600 border border-slate-200 py-3 rounded-xl font-bold text-sm text-center transition hover:bg-royal-50 hover:text-royal-700 hover:border-royal-200 premium-tab";
+                b.className = "bg-white text-slate-600 border border-slate-200 py-3 rounded-xl font-bold text-[11px] md:text-sm text-center transition hover:bg-royal-50 hover:text-royal-700 hover:border-royal-200 premium-tab";
             });
             const activeBtn = document.getElementById('btn-' + type);
             if(activeBtn) {
-                activeBtn.className = "bg-gradient-to-br from-royal-400 to-royal-600 text-white py-3 rounded-xl font-bold text-sm text-center shadow-md transform scale-105 transition premium-tab ring-2 ring-royal-200";
+                activeBtn.className = "bg-gradient-to-br from-royal-400 to-royal-600 text-white py-3 rounded-xl font-bold text-[11px] md:text-sm text-center shadow-md transform scale-105 transition premium-tab ring-2 ring-royal-200";
             }
 
             const container = document.getElementById('premiumFormContainer');
@@ -419,7 +506,6 @@
                     <h3 id="pdfViewerTitle" class="font-bold text-slate-800 truncate">Document Preview</h3>
                 </div>
                 <div class="flex items-center gap-3 w-full md:w-auto justify-end">
-                    <!-- DEDICATED DOWNLOAD BUTTON -->
                     <button id="modalDownloadBtn" class="bg-royal-600 hover:bg-royal-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition shadow-md flex items-center gap-2">
                         <i class="fa-solid fa-download"></i> Download
                     </button>
@@ -430,7 +516,7 @@
             <div class="flex-grow bg-slate-300 relative">
                 <div id="pdfLoadingSpinner" class="absolute inset-0 flex flex-col items-center justify-center text-royal-600 bg-slate-100">
                     <i class="fa-solid fa-spinner fa-spin text-4xl mb-3"></i>
-                    <p class="text-sm font-bold text-slate-600">Loading Preview...</p>
+                    <p class="text-sm font-bold text-slate-600 mt-2">Loading Preview...</p>
                 </div>
                 <iframe id="pdfIframe" class="w-full h-full relative z-10 border-none" onload="document.getElementById('pdfLoadingSpinner').style.display='none'" src=""></iframe>
             </div>
@@ -456,13 +542,46 @@
         
         <!-- Main Navigation Tabs -->
         <div class="flex flex-col md:flex-row gap-3 md:gap-4 mb-8">
+            <!-- NEW PENDING PAYMENTS TAB -->
+            <button onclick="window.switchAdminMainTab('payments')" id="tab-payments" class="flex-1 relative"><i class="fa-solid fa-money-bill-transfer"></i> Pending Approvals <span class="absolute -top-2 -right-2 flex h-4 w-4"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span class="relative inline-flex rounded-full h-4 w-4 bg-red-500 text-[8px] text-white items-center justify-center font-bold">!</span></span></button>
             <button onclick="window.switchAdminMainTab('users')" id="tab-users" class="flex-1"><i class="fa-solid fa-users-gear"></i> User Management</button>
             <button onclick="window.switchAdminMainTab('services')" id="tab-services" class="flex-1"><i class="fa-solid fa-gem"></i> Premium Services</button>
             <button onclick="window.switchAdminMainTab('history')" id="tab-history" class="flex-1"><i class="fa-solid fa-database"></i> Database Records</button>
         </div>
 
+        <!-- ================= SECTION 0: PENDING PAYMENTS (NEW) ================= -->
+        <div id="section-payments" class="hidden">
+            <div class="bg-white rounded-3xl shadow-card border border-slate-100 p-6 md:p-8">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-6 mb-6">
+                    <div>
+                        <h3 class="text-2xl font-black text-dark-900 mb-1"><i class="fa-solid fa-money-bill-transfer text-green-500 mr-2"></i> Action Required: Pending Payments</h3>
+                        <p id="pendingPaymentsCount" class="text-sm font-bold text-slate-500">Pending Requests: 0</p>
+                    </div>
+                    <button onclick="window.loadPendingPayments()" class="h-[42px] bg-slate-100 text-slate-600 px-4 rounded-xl text-sm font-bold hover:bg-slate-200 transition shadow-sm" title="Refresh"><i class="fa-solid fa-rotate-right mr-1"></i> Refresh</button>
+                </div>
+                
+                <div class="overflow-x-auto border border-slate-100 rounded-2xl">
+                    <table class="w-full text-left border-collapse bg-white min-w-[800px]">
+                        <thead class="bg-slate-50 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                            <tr>
+                                <th class="p-4 rounded-tl-2xl">User Email</th>
+                                <th class="p-4">Amount Paid</th>
+                                <th class="p-4">Requested Credits</th>
+                                <th class="p-4">UTR Number</th>
+                                <th class="p-4">Date & Time</th>
+                                <th class="p-4 text-right rounded-tr-2xl">Action (Approve / Reject)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminPaymentsTableBody" class="text-sm">
+                            <!-- Loaded Dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- ================= SECTION 1: USER MANAGEMENT ================= -->
-        <div id="section-users" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div id="section-users" class="grid grid-cols-1 md:grid-cols-2 gap-6 hidden">
             <!-- Create User Card -->
             <div class="bg-white rounded-3xl p-6 md:p-8 shadow-card border border-slate-100 flex flex-col h-full">
                 <div class="mb-6 flex items-center gap-3">
@@ -480,11 +599,14 @@
                 <div id="adminCreateMsg" class="hidden"></div>
             </div>
 
-            <!-- Credit Management Card -->
+            <!-- Credit Management Card (Manual) -->
             <div class="bg-white rounded-3xl p-6 md:p-8 shadow-card border border-slate-100 flex flex-col h-full">
                 <div class="mb-6 flex items-center gap-3">
                     <div class="w-12 h-12 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center text-xl border border-green-100"><i class="fa-solid fa-wallet"></i></div>
-                    <div><h3 class="text-xl font-black text-dark-900">Manage Credits</h3></div>
+                    <div>
+                        <h3 class="text-xl font-black text-dark-900">Manage Credits Manually</h3>
+                        <p class="text-[10px] font-bold text-slate-500 uppercase">For adjustments</p>
+                    </div>
                 </div>
                 
                 <div class="space-y-4 flex-grow">
