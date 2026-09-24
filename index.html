@@ -12,7 +12,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, getDoc, updateDoc, collection, addDoc, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, updateDoc, collection, addDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBSiDAvDYyBG8hkmez7s900JHhlbenG2nU",
@@ -29,7 +29,7 @@
         const db = getFirestore(app);
 
         window.currentUserData = null;
-        window.historyData = []; // हिस्ट्री डेटा सेव रखने के लिए
+        window.historyData = []; 
         const ADMIN_EMAIL = "hkosiun1221@gmail.com"; 
 
         const API_URLS = {
@@ -94,7 +94,6 @@
             window.location.reload();
         };
 
-        // IMAGE COMPRESSION LOGIC (Base64 Security & Size reduction)
         async function compressImage(file) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
@@ -105,12 +104,12 @@
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
-                        const MAX_WIDTH = 500; // फोटो की चौड़ाई कम की गई
+                        const MAX_WIDTH = 500; 
                         const scaleSize = MAX_WIDTH / img.width;
                         canvas.width = MAX_WIDTH;
                         canvas.height = img.height * scaleSize;
                         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        resolve(canvas.toDataURL('image/jpeg', 0.6)); // 60% क्वालिटी, ताकि साइज़ छोटा रहे
+                        resolve(canvas.toDataURL('image/jpeg', 0.6)); 
                     };
                 };
             });
@@ -139,7 +138,7 @@
             else if (serviceType === 'DOB') targetUrl = API_URLS["DOB"];
 
             try {
-                // Deduct Credit FIRST (Security approach)
+                // Deduct Credit (Frontend update, Firestore rules will protect the backend)
                 const userDocRef = doc(db, "users", window.currentUserData.uid);
                 const newCredits = window.currentUserData.credits - 1;
                 await updateDoc(userDocRef, { credits: newCredits });
@@ -156,7 +155,6 @@
                 const dataObj = {};
                 formData.forEach((value, key) => { dataObj[key] = value; });
 
-                // CORS Fix applied here (text/plain)
                 const response = await fetch(targetUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -179,7 +177,7 @@
                     throw new Error('API Response Failed');
                 }
             } catch (error) {
-                // If failed, refund the credit
+                // Refund credit on error
                 const userDocRef = doc(db, "users", window.currentUserData.uid);
                 const refundedCredits = window.currentUserData.credits + 1;
                 await updateDoc(userDocRef, { credits: refundedCredits });
@@ -193,14 +191,12 @@
             }
         };
 
-        // ADVANCED HISTORY LOAD (Sorted & Filtered)
         window.loadUserHistory = async function() {
             const historyContainer = document.getElementById('historyTableBody');
             if (!historyContainer) return;
             historyContainer.innerHTML = `<tr><td colspan="4" class="p-4 text-center">लोड हो रहा है...</td></tr>`;
 
             try {
-                // Sort by timestamp descending (Latest first)
                 const q = query(
                     collection(db, "history"), 
                     where("userId", "==", window.currentUserData.uid)
@@ -212,10 +208,10 @@
                     window.historyData.push(docSnap.data());
                 });
 
-                // Javascript Sorting (सबसे नया सबसे ऊपर)
+                // Sort: Newest First
                 window.historyData.sort((a, b) => b.timestamp.seconds - a.timestamp.seconds);
                 
-                window.renderHistory('ALL'); // डिफ़ॉल्ट सभी दिखाएं
+                window.renderHistory('ALL'); 
             } catch (err) {
                 historyContainer.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-500">हिस्ट्री लोड करने में असफल।</td></tr>`;
             }
@@ -252,6 +248,37 @@
             });
         };
 
+        // YAHAN BUG THA JO FIX KAR DIYA GAYA HAI (let variables added)
+        window.updateTehsilsAndThanas = function() {
+            const districtEl = document.getElementById('districtSelect');
+            const tehsilSelect = document.getElementById('tehsilSelect');
+            const thanaSelect = document.getElementById('thanaSelect');
+            
+            if (!districtEl || !tehsilSelect) return;
+            
+            const district = districtEl.value;
+            
+            // Fix: 'let' keyword added to prevent Strict Mode ReferenceError
+            let tehsils = []; 
+            let thanas = [];
+            
+            if (district === 'BAGHPAT') {
+                tehsils = ['बड़ौत', 'खेकड़ा', 'बागपत'];
+                thanas = ['बड़ौत', 'खेकड़ा', 'बागपत', 'छपरोली', 'बिनौली', 'रमाला', 'दोघट', 'सिंघावली अहीर', 'बालैनी', 'चांदीनगर'];
+            } else if (district === 'SHAMLI') {
+                tehsils = ['KAIRANA', 'OON', 'SHAMLI'];
+                thanas = ['थाना भवन', 'कैराना', 'झिंझाना', 'शामली', 'बाबरी', 'कांधला', 'गढ़ी पुख्ता', 'आदर्श मंडी'];
+            } else if (district === 'MUZAFFARNAGAR') {
+                tehsils = ['BUDHANA', 'KHATOLI', 'JANSHATH', 'MUZAFFARNAGAR'];
+                thanas = ['बुढ़ाना', 'खतौली', 'जानसठ', 'मीरापुर', 'सिविल लाइन', 'कोतवाली नगर', 'नई मंडी'];
+            }
+
+            tehsilSelect.innerHTML = tehsils.map(t => `<option value="${t}">${t}</option>`).join('');
+            if (thanaSelect) {
+                thanaSelect.innerHTML = thanas.map(t => `<option value="${t}">${t}</option>`).join('');
+            }
+        };
+
         window.switchService = function(serviceName) {
             document.querySelectorAll('.service-tab').forEach(btn => {
                 btn.className = "service-tab bg-white text-slate-700 border border-slate-200 py-2 px-4 rounded-xl text-sm font-medium transition hover:bg-slate-50";
@@ -262,16 +289,15 @@
             const container = document.getElementById('formContainer');
             if (!container) return;
             
-            // Domicile Form
             if(serviceName === 'domicile') {
                 container.innerHTML = `
                     <h3 class="text-lg font-bold text-slate-800 mb-4 border-b pb-2">मूल निवास प्रमाण पत्र</h3>
                     <form onsubmit="window.submitForm(event, 'Domicile')" class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div><label class="block text-xs font-semibold text-slate-600 mb-1">जिला (District)</label>
-                            <select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-2 border rounded-lg text-sm"><option value="BAGHPAT">बागपत (Baghpat)</option><option value="SHAMLI">शामली (Shamli)</option><option value="MUZAFFARNAGAR">मुजफ्फरनगर (Muzaffarnagar)</option></select></div>
-                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">तहसील (Tehsil)</label><select id="tehsilSelect" name="TAHSEEL" class="w-full p-2 border rounded-lg text-sm"></select></div>
-                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">रिश्ता (REL)</label><select name="REL" class="w-full p-2 border rounded-lg text-sm"><option value="पुत्र / पुत्री">पुत्र / पुत्री</option><option value="पत्नी      .">पत्नी</option></select></div>
+                            <select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-2 border rounded-lg text-sm bg-white"><option value="BAGHPAT">बागपत (Baghpat)</option><option value="SHAMLI">शामली (Shamli)</option><option value="MUZAFFARNAGAR">मुजफ्फरनगर (Muzaffarnagar)</option></select></div>
+                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">तहसील (Tehsil)</label><select id="tehsilSelect" name="TAHSEEL" class="w-full p-2 border rounded-lg text-sm bg-white uppercase"></select></div>
+                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">रिश्ता (REL)</label><select name="REL" class="w-full p-2 border rounded-lg text-sm bg-white uppercase"><option value="पुत्र / पुत्री">पुत्र / पुत्री</option><option value="पत्नी      .">पत्नी</option></select></div>
                             <div><label class="block text-xs font-semibold text-slate-600 mb-1">कस्टमर का नाम (Name)</label><input type="text" name="NAME" required class="w-full p-2 border rounded-lg text-sm uppercase"></div>
                             <div><label class="block text-xs font-semibold text-slate-600 mb-1">हिंदी नाम (Optional)</label><input type="text" name="HNAME" class="w-full p-2 border rounded-lg text-sm"></div>
                             <div><label class="block text-xs font-semibold text-slate-600 mb-1">पिता/पति का नाम</label><input type="text" name="FNAME" required class="w-full p-2 border rounded-lg text-sm uppercase"></div>
@@ -279,7 +305,7 @@
                             <div><label class="block text-xs font-semibold text-slate-600 mb-1">मकान नंबर (MN)</label><input type="text" name="MN" required class="w-full p-2 border rounded-lg text-sm uppercase"></div>
                             <div><label class="block text-xs font-semibold text-slate-600 mb-1">मोहल्ला / क्षेत्र (Area)</label><input type="text" name="AREA" required class="w-full p-2 border rounded-lg text-sm uppercase"></div>
                             <div><label class="block text-xs font-semibold text-slate-600 mb-1">ग्राम / वार्ड (Gram)</label><input type="text" name="GRAM" required class="w-full p-2 border rounded-lg text-sm uppercase"></div>
-                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">थाना (Thana)</label><select id="thanaSelect" name="THANA" class="w-full p-2 border rounded-lg text-sm"></select></div>
+                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">थाना (Thana)</label><select id="thanaSelect" name="THANA" class="w-full p-2 border rounded-lg text-sm bg-white uppercase"></select></div>
                             <div class="md:col-span-2"><label class="block text-xs font-semibold text-slate-600 mb-1">फोटो अपलोड करें</label><input type="file" name="PHOTO" accept="image/*" required class="w-full p-2 border rounded-lg text-sm bg-slate-50"></div>
                         </div>
                         <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow-md transition mt-4"><i class="fa-solid fa-file-pdf mr-2"></i> डॉक्यूमेंट जनरेट करें (1 Credit)</button>
@@ -287,16 +313,15 @@
                 `;
                 window.updateTehsilsAndThanas();
             } 
-            // Caste Form
             else if(serviceName === 'caste') {
                 container.innerHTML = `
                     <h3 class="text-lg font-bold text-slate-800 mb-4 border-b pb-2">जाति प्रमाण पत्र</h3>
                     <form onsubmit="window.submitForm(event, 'Caste')" class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">जिला (District)</label><select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-2 border rounded-lg text-sm"><option value="BAGHPAT">बागपत</option><option value="SHAMLI">शामली</option><option value="MUZAFFARNAGAR">मुजफ्फरनगर</option></select></div>
-                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">तहसील (Tehsil)</label><select id="tehsilSelect" name="TAHSEEL" class="w-full p-2 border rounded-lg text-sm"></select></div>
-                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">रिश्ता (REL)</label><select name="REL" class="w-full p-2 border rounded-lg text-sm"><option value="पुत्र / पुत्री">पुत्र / पुत्री</option><option value="पत्नी      .">पत्नी</option></select></div>
-                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">जाति (Caste)</label><select name="CAST" required class="w-full p-2 border rounded-lg text-sm"><option value="जाट">जाट</option><option value="गुर्जर">गुर्जर</option><option value="कश्यप">कश्यप</option><option value="अहीर">अहीर</option><option value="ब्राह्मण">ब्राह्मण</option></select></div>
+                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">जिला (District)</label><select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-2 border rounded-lg text-sm bg-white"><option value="BAGHPAT">बागपत</option><option value="SHAMLI">शामली</option><option value="MUZAFFARNAGAR">मुजफ्फरनगर</option></select></div>
+                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">तहसील (Tehsil)</label><select id="tehsilSelect" name="TAHSEEL" class="w-full p-2 border rounded-lg text-sm bg-white uppercase"></select></div>
+                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">रिश्ता (REL)</label><select name="REL" class="w-full p-2 border rounded-lg text-sm bg-white uppercase"><option value="पुत्र / पुत्री">पुत्र / पुत्री</option><option value="पत्नी      .">पत्नी</option></select></div>
+                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">जाति (Caste)</label><select name="CAST" required class="w-full p-2 border rounded-lg text-sm bg-white"><option value="जाट">जाट</option><option value="गुर्जर">गुर्जर</option><option value="कश्यप">कश्यप</option><option value="अहीर">अहीर</option><option value="ब्राह्मण">ब्राह्मण</option></select></div>
                             <div><label class="block text-xs font-semibold text-slate-600 mb-1">कस्टमर का नाम</label><input type="text" name="NAME" required class="w-full p-2 border rounded-lg text-sm uppercase"></div>
                             <div><label class="block text-xs font-semibold text-slate-600 mb-1">हिंदी नाम (Optional)</label><input type="text" name="HNAME" class="w-full p-2 border rounded-lg text-sm"></div>
                             <div><label class="block text-xs font-semibold text-slate-600 mb-1">पिता/पति का नाम</label><input type="text" name="FNAME" required class="w-full p-2 border rounded-lg text-sm uppercase"></div>
@@ -311,14 +336,13 @@
                 `;
                 window.updateTehsilsAndThanas();
             }
-            // DOB Form
             else if(serviceName === 'dob') {
                 container.innerHTML = `
                     <h3 class="text-lg font-bold text-slate-800 mb-4 border-b pb-2">जन्म प्रमाण पत्र (DOB)</h3>
                     <form onsubmit="window.submitForm(event, 'DOB')" class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div><label class="block text-xs font-semibold text-slate-600 mb-1">नाम (Name)</label><input type="text" name="NAME" required class="w-full p-2 border rounded-lg text-sm uppercase"></div>
-                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">लिंग (Sex)</label><select name="SEX" class="w-full p-2 border rounded-lg text-sm"><option value="MALE">MALE</option><option value="FEMALE">FEMALE</option></select></div>
+                            <div><label class="block text-xs font-semibold text-slate-600 mb-1">लिंग (Sex)</label><select name="SEX" class="w-full p-2 border rounded-lg text-sm bg-white"><option value="MALE">MALE</option><option value="FEMALE">FEMALE</option></select></div>
                             <div><label class="block text-xs font-semibold text-slate-600 mb-1">जन्मतिथि (DOB)</label><input type="date" name="DOB" required class="w-full p-2 border rounded-lg text-sm"></div>
                             <div><label class="block text-xs font-semibold text-slate-600 mb-1">पिता का नाम</label><input type="text" name="FNAME" required class="w-full p-2 border rounded-lg text-sm uppercase"></div>
                             <div><label class="block text-xs font-semibold text-slate-600 mb-1">माता का नाम</label><input type="text" name="MNAME" required class="w-full p-2 border rounded-lg text-sm uppercase"></div>
@@ -329,7 +353,6 @@
                     </form>
                 `;
             }
-            // History Section (Categorized & Sorted)
             else if(serviceName === 'history') {
                 container.innerHTML = `
                     <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-3 border-b pb-3">
@@ -356,31 +379,6 @@
                 `;
                 window.loadUserHistory();
             }
-        };
-
-        window.updateTehsilsAndThanas = function() {
-            const districtEl = document.getElementById('districtSelect');
-            if (!districtEl) return;
-            const district = districtEl.value;
-            const tehsilSelect = document.getElementById('tehsilSelect');
-            const thanaSelect = document.getElementById('thanaSelect');
-            
-            if (!tehsilSelect) return;
-            tehsils = []; thanas = [];
-            
-            if (district === 'BAGHPAT') {
-                tehsils = ['बड़ौत', 'खेकड़ा', 'बागपत'];
-                thanas = ['बड़ौत', 'खेकड़ा', 'बागपत', 'छपरोली', 'बिनौली', 'रमाला', 'दोघट', 'सिंघावली अहीर', 'बालैनी', 'चांदीनगर'];
-            } else if (district === 'SHAMLI') {
-                tehsils = ['KAIRANA', 'OON', 'SHAMLI'];
-                thanas = ['थाना भवन', 'कैराना', 'झिंझाना', 'शामली', 'बाबरी', 'कांधला', 'गढ़ी पुख्ता', 'आदर्श मंडी'];
-            } else if (district === 'MUZAFFARNAGAR') {
-                tehsils = ['BUDHANA', 'KHATOLI', 'JANSHATH', 'MUZAFFARNAGAR'];
-                thanas = ['बुढ़ाना', 'खतौली', 'जानसठ', 'मीरापुर', 'सिविल लाइन', 'कोतवाली नगर', 'नई मंडी'];
-            }
-
-            tehsilSelect.innerHTML = tehsils.map(t => `<option value="${t}">${t}</option>`).join('');
-            if (thanaSelect) thanaSelect.innerHTML = thanas.map(t => `<option value="${t}">${t}</option>`).join('');
         };
     </script>
 </head>
