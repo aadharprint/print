@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ojas Print Service - Portal</title>
+    <title>Ojas Print Service - Secure Portal</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Royal Theme Config (Matching Admin Panel) -->
+    <!-- Royal Theme Config -->
     <script>
         tailwind.config = {
             theme: {
@@ -26,6 +26,10 @@
             }
         }
     </script>
+
+    <style>
+        .animate-spin-slow { animation: spin 4s linear infinite; }
+    </style>
 
     <!-- Firebase SDKs -->
     <script type="module">
@@ -60,27 +64,45 @@
         };
         window.API_URLS = API_URLS;
 
+        // ================= STRICT AUTHENTICATION CHECK =================
         onAuthStateChanged(auth, async (user) => {
+            const loadingScreen = document.getElementById('loadingScreen');
+            const loginSection = document.getElementById('loginSection');
+            const dashboardSection = document.getElementById('dashboardSection');
+
             if (user) {
-                const userDocRef = doc(db, "users", user.uid);
-                const userDoc = await getDoc(userDocRef);
-                let userCredits = 0;
-                let isVip = false;
-                if (userDoc.exists()) {
-                    userCredits = userDoc.data().credits || 0;
-                    isVip = userDoc.data().isVip || false;
+                try {
+                    const userDocRef = doc(db, "users", user.uid);
+                    const userDoc = await getDoc(userDocRef);
+                    let userCredits = 0;
+                    let isVip = false;
+                    if (userDoc.exists()) {
+                        userCredits = userDoc.data().credits || 0;
+                        isVip = userDoc.data().isVip || false;
+                    }
+                    
+                    const isAdmin = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
+                    
+                    window.currentUserData = { 
+                        uid: user.uid, email: user.email, credits: userCredits, isVip: isVip, isAdmin: isAdmin, username: user.email.split('@')[0] 
+                    };
+                    
+                    setupDashboard(window.currentUserData);
+                    loadingScreen.classList.add('hidden'); // Hide loader ONLY when auth is confirmed
+                } catch (err) {
+                    console.error(err);
+                    await signOut(auth);
                 }
-                
-                const isAdmin = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
-                
-                window.currentUserData = { 
-                    uid: user.uid, email: user.email, credits: userCredits, isVip: isVip, isAdmin: isAdmin, username: user.email.split('@')[0] 
-                };
-                
-                setupDashboard(window.currentUserData);
+            } else {
+                // STRICT LOGOUT STATE: Show login screen, hide dashboard
+                window.currentUserData = null;
+                loginSection.classList.remove('hidden');
+                dashboardSection.classList.add('hidden');
+                loadingScreen.classList.add('hidden');
             }
         });
 
+        // ================= STRICT LOGIN LOGIC =================
         window.handleLogin = async function(event) {
             event.preventDefault();
             const emailInput = document.getElementById('loginUsername').value.trim();
@@ -96,10 +118,18 @@
             const email = emailInput.includes('@') ? emailInput : `${emailInput.toLowerCase()}@ovportal.com`;
 
             try {
+                // If this fails, it will immediately jump to the catch block.
                 await signInWithEmailAndPassword(auth, email, passInput);
+                // On success, onAuthStateChanged will automatically switch the UI.
             } catch (error) {
-                errorDiv.innerText = "Login Failed: Invalid User ID or Password!";
+                // Failsafe exact error message as requested
+                errorDiv.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i> Your ID or Password are incorrect!';
                 errorDiv.classList.remove('hidden');
+                
+                // Clear password field for security
+                document.getElementById('loginPassword').value = '';
+                
+                // Reset Button
                 loginBtn.innerHTML = originalBtnHtml;
                 loginBtn.disabled = false;
             }
@@ -111,7 +141,6 @@
             const adminLink = document.getElementById('adminPanelLink');
             const creditDisplayBox = document.getElementById('creditDisplayBox');
 
-            // ADMIN LOGIC
             if (userData.isAdmin) {
                 adminLink.classList.remove('hidden');
                 creditDisplayBox.classList.add('hidden'); 
@@ -128,7 +157,6 @@
 
         window.handleLogout = async function() {
             await signOut(auth);
-            window.currentUserData = null;
             window.location.reload();
         };
 
@@ -182,7 +210,6 @@
 
             if (!window.currentUserData) return alert('Please login first!');
             
-            // Deduct 10 Credits per Document for Normal Users
             if (!window.currentUserData.isAdmin && window.currentUserData.credits < 10) {
                 return alert('Insufficient credits! You need 10 credits to generate a document.');
             }
@@ -302,7 +329,6 @@
             });
         };
 
-        // HINDI DROPDOWN ARRAYS
         window.updateTehsilsAndThanas = function() {
             const districtEl = document.getElementById('districtSelect');
             const tehsilSelect = document.getElementById('tehsilSelect');
@@ -351,9 +377,9 @@
                     </div>
                     <form onsubmit="window.submitForm(event, 'Domicile')" class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">District</label><select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition uppercase"><option value="BAGHPAT">बागपत</option><option value="SHAMLI">शामली</option><option value="MUZAFFARNAGAR">मुजफ्फरनगर</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">District</label><select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition uppercase"><option value="BAGHPAT">Baghpat</option><option value="SHAMLI">Shamli</option><option value="MUZAFFARNAGAR">Muzaffarnagar</option></select></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Tehsil</label><select id="tehsilSelect" name="TAHSEEL" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></select></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Relation</label><select name="REL" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="पुत्र / पुत्री">पुत्र / पुत्री</option><option value="पत्नी      .">पत्नी</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Relation</label><select name="REL" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="पुत्र / पुत्री">Son / Daughter</option><option value="पत्नी      .">Wife</option></select></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Customer Name</label><input type="text" name="NAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Hindi Name (Optional)</label><input type="text" name="HNAME" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Father/Husband Name</label><input type="text" name="FNAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
@@ -364,7 +390,7 @@
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Police Station (Thana)</label><select id="thanaSelect" name="THANA" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></select></div>
                             <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Upload Photo</label><input type="file" name="PHOTO" accept="image/*" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-royal-100 file:text-royal-700 hover:file:bg-royal-200 cursor-pointer"></div>
                         </div>
-                        <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-bold py-4 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-4 text-base">${submitBtnText}</button>
+                        <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-4 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-4 text-base">${submitBtnText}</button>
                     </form>
                 `;
                 window.updateTehsilsAndThanas();
@@ -377,9 +403,9 @@
                     </div>
                     <form onsubmit="window.submitForm(event, 'Caste')" class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">District</label><select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition uppercase"><option value="BAGHPAT">बागपत</option><option value="SHAMLI">शामली</option><option value="MUZAFFARNAGAR">मुजफ्फरनगर</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">District</label><select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition uppercase"><option value="BAGHPAT">Baghpat</option><option value="SHAMLI">Shamli</option><option value="MUZAFFARNAGAR">Muzaffarnagar</option></select></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Tehsil</label><select id="tehsilSelect" name="TAHSEEL" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></select></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Relation</label><select name="REL" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="पुत्र / पुत्री">पुत्र / पुत्री</option><option value="पत्नी      .">पत्नी</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Relation</label><select name="REL" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="पुत्र / पुत्री">Son / Daughter</option><option value="पत्नी      .">Wife</option></select></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Caste</label><select name="CAST" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition uppercase"><option value="जाट">जाट</option><option value="गुर्जर">गुर्जर</option><option value="कश्यप">कश्यप</option><option value="अहीर">अहीर</option><option value="ब्राह्मण">ब्राह्मण</option></select></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Customer Name</label><input type="text" name="NAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Hindi Name (Optional)</label><input type="text" name="HNAME" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
@@ -390,7 +416,7 @@
                             <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">VLE Name</label><input type="text" name="VLE" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
                             <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Upload Photo</label><input type="file" name="PHOTO" accept="image/*" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-royal-100 file:text-royal-700 hover:file:bg-royal-200 cursor-pointer"></div>
                         </div>
-                        <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-bold py-4 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-4 text-base">${submitBtnText}</button>
+                        <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-4 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-4 text-base">${submitBtnText}</button>
                     </form>
                 `;
                 window.updateTehsilsAndThanas();
@@ -411,7 +437,7 @@
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Pin Code</label><input type="text" name="PIN" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
                             <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Full Address</label><textarea name="ADDRESS" rows="2" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></textarea></div>
                         </div>
-                        <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-bold py-4 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-4 text-base">${submitBtnText}</button>
+                        <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-4 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-4 text-base">${submitBtnText}</button>
                     </form>
                 `;
             }
@@ -427,10 +453,10 @@
                             <div class="flex-1 md:flex-none">
                                 <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Filter Type</label>
                                 <select onchange="window.renderHistory(this.value)" class="w-full md:w-48 p-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:ring-2 focus:ring-royal-400 font-semibold cursor-pointer outline-none">
-                                    <option value="ALL">सभी डॉक्युमेंट्स</option>
-                                    <option value="Domicile">मूल निवास</option>
-                                    <option value="Caste">जाति प्रमाण पत्र</option>
-                                    <option value="DOB">जन्म प्रमाण पत्र</option>
+                                    <option value="ALL">All Documents</option>
+                                    <option value="Domicile">Domicile</option>
+                                    <option value="Caste">Caste</option>
+                                    <option value="DOB">DOB</option>
                                 </select>
                             </div>
                             <div class="flex items-end h-full mt-4 md:mt-0">
@@ -455,6 +481,13 @@
 </head>
 <body class="bg-slate-50 font-sans min-h-screen flex flex-col justify-between selection:bg-royal-300 selection:text-dark-900">
     
+    <!-- SECURITY LOADING SCREEN (PREVENTS UNAUTHORIZED DASHBOARD FLASH) -->
+    <div id="loadingScreen" class="fixed inset-0 bg-dark-900 z-[200] flex flex-col items-center justify-center">
+        <i class="fa-solid fa-sun text-7xl text-royal-400 mb-6 animate-spin-slow"></i>
+        <h2 class="text-2xl font-black text-white tracking-widest uppercase">Ojas Print Service</h2>
+        <p class="text-sm text-royal-300 mt-2 font-bold animate-pulse">Checking Security...</p>
+    </div>
+
     <!-- FULL SCREEN PDF VIEWER MODAL (IN-APP) FOR USERS -->
     <div id="pdfViewerModal" class="fixed inset-0 z-[100] hidden bg-dark-900/80 backdrop-blur-md flex items-center justify-center p-2 md:p-6 transition-opacity">
         <div class="bg-white w-full max-w-6xl h-full flex flex-col rounded-2xl shadow-2xl overflow-hidden">
@@ -465,6 +498,7 @@
                     <h3 id="pdfViewerTitle" class="font-bold text-slate-800 truncate">Document Preview</h3>
                 </div>
                 <div class="flex items-center gap-3 w-full md:w-auto justify-end">
+                    <!-- DEDICATED MANUAL DOWNLOAD BUTTON -->
                     <button id="modalDownloadBtn" class="bg-dark-900 hover:bg-black text-royal-300 px-4 py-2 rounded-xl text-sm font-bold transition shadow-glow flex items-center gap-2 border border-dark-800">
                         <i class="fa-solid fa-download"></i> Download
                     </button>
@@ -484,7 +518,7 @@
 
 
     <!-- LOGIN SCREEN -->
-    <div id="loginSection" class="flex items-center justify-center flex-grow p-4 min-h-screen bg-dark-900 relative overflow-hidden">
+    <div id="loginSection" class="hidden flex items-center justify-center flex-grow p-4 min-h-screen bg-dark-900 relative overflow-hidden">
         <!-- Decorative Background Glow -->
         <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-royal-500/20 rounded-full blur-[100px] pointer-events-none"></div>
         
