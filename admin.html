@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>सुपर एडमिन - आयुष कुमार</title>
+    <title>Super Admin - Ayush Kumar</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -58,7 +58,7 @@
 
         onAuthStateChanged(auth, async (user) => {
             if (!user || user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-                alert('अथॉरिटी नहीं है! केवल सुपर एडमिन ही इस पेज को खोल सकता है।');
+                alert('Not authorized! Only Super Admin can access this page.');
                 window.location.href = "index.html";
             } else {
                 window.currentUserData = { uid: user.uid, email: user.email };
@@ -80,7 +80,6 @@
             document.getElementById('pdfViewerTitle').innerText = fileName;
             document.getElementById('pdfLoadingSpinner').style.display = 'flex';
             
-            // "uc?export=view" गूगल ड्राइव का UI हटा देता है और ब्राउज़र का अपना (Native) PDF Viewer खोलता है
             const rawPdfUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
             
             document.getElementById('pdfIframe').src = rawPdfUrl;
@@ -99,7 +98,7 @@
             try {
                 const usersSnap = await getDocs(collection(db, "users"));
                 const select = document.getElementById('userSelectDropdown');
-                select.innerHTML = '<option value="">-- कृपया एक यूज़र चुनें --</option>';
+                select.innerHTML = '<option value="">-- Please select a user --</option>';
                 window.usersDataList = {}; 
                 
                 usersSnap.forEach(doc => {
@@ -107,7 +106,7 @@
                     window.usersDataList[doc.id] = data;
                     select.innerHTML += `<option value="${doc.id}">${data.email}</option>`;
                 });
-            } catch(err) { console.error("यूज़र्स लोड करने में एरर:", err); }
+            } catch(err) { console.error("Error loading users:", err); }
         };
 
         window.handleUserSelection = function() {
@@ -130,8 +129,8 @@
             const msg = document.getElementById('adminCreateMsg');
             const btn = event.target.querySelector('button[type="submit"]');
             
-            btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> बनाया जा रहा है...';
-            msg.classList.remove('hidden'); msg.innerText = "रजिस्टर हो रहा है...";
+            btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating...';
+            msg.classList.remove('hidden'); msg.innerText = "Registering user...";
 
             try {
                 const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`, {
@@ -146,21 +145,21 @@
                 });
                 
                 msg.className = "mt-3 p-3 bg-green-50 text-green-700 rounded-xl text-sm font-bold border border-green-200";
-                msg.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> सफलता! यूज़र बन गया है।`;
+                msg.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> Success! User created.`;
                 event.target.reset();
                 await window.loadAllUsersForDropdown();
             } catch(err) {
                 msg.className = "mt-3 p-3 bg-red-50 text-red-700 rounded-xl text-sm font-bold border border-red-200";
-                msg.innerHTML = `<i class="fa-solid fa-circle-xmark mr-1"></i> एरर: ${err.message}`;
-            } finally { btn.disabled = false; btn.innerText = "यूजर बनाएँ"; }
+                msg.innerHTML = `<i class="fa-solid fa-circle-xmark mr-1"></i> Error: ${err.message}`;
+            } finally { btn.disabled = false; btn.innerText = "Register User"; }
         };
 
         window.adjustCredits = async function(action) {
             const uid = document.getElementById('userSelectDropdown').value;
             const amount = parseInt(document.getElementById('creditAdjustmentAmount').value);
             
-            if(!uid) return alert('कृपया यूज़र चुनें!');
-            if(!amount || amount <= 0) return alert('सही अमाउंट दर्ज करें!');
+            if(!uid) return alert('Please select a user!');
+            if(!amount || amount <= 0) return alert('Please enter a valid amount!');
 
             const btnId = action === 'add' ? 'btnAdd' : 'btnSub';
             const btn = document.getElementById(btnId);
@@ -183,10 +182,10 @@
                 document.getElementById('creditAdjustmentAmount').value = ''; 
                 
                 msg.className = "mt-3 p-3 bg-green-50 text-green-700 rounded-xl text-sm font-bold border border-green-200";
-                msg.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> अपडेट सफल! नए क्रेडिट्स: <strong>${newCredits}</strong>`;
+                msg.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> Update successful! New Credits: <strong>${newCredits}</strong>`;
             } catch(err) {
                 msg.className = "mt-3 p-3 bg-red-50 text-red-700 rounded-xl text-sm font-bold border border-red-200";
-                msg.innerHTML = `<i class="fa-solid fa-circle-xmark mr-1"></i> एरर: ${err.message}`;
+                msg.innerHTML = `<i class="fa-solid fa-circle-xmark mr-1"></i> Error: ${err.message}`;
             } finally {
                 btn.innerHTML = origText; btn.disabled = false;
                 setTimeout(() => { msg.classList.add('hidden'); }, 3000);
@@ -199,7 +198,7 @@
             const formElement = event.target;
             const submitBtn = formElement.querySelector('button[type="submit"]');
             const originalBtnText = submitBtn.innerHTML;
-            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> जनरेट हो रहा है...';
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Generating...';
             submitBtn.disabled = true;
 
             const formData = new FormData(formElement);
@@ -217,25 +216,25 @@
                         userId: window.currentUserData.uid, fileName: `${dataObj.NAME || 'Premium Doc'} - ${serviceType}.pdf`,
                         fileId: result.fileId || result.id || 'N/A', serviceType: serviceType, timestamp: new Date()
                     });
-                    alert(`सफलता! डॉक्यूमेंट जनरेट हो गया है। आप इसे 'हिस्ट्री' में देख सकते हैं।`);
+                    alert(`Success! Document generated successfully. You can view it in 'Database Records'.`);
                     formElement.reset();
                 } else { throw new Error(result.error || 'API Response Failed'); }
-            } catch(err) { alert('तकनीकी समस्या आई है: ' + err.message); } 
+            } catch(err) { alert('Technical issue occurred: ' + err.message); } 
             finally { submitBtn.innerHTML = originalBtnText; submitBtn.disabled = false; }
         };
 
         // ================= SECTION 3: HISTORY & FILTERS =================
         window.loadAdminHistory = async function() {
             const tbody = document.getElementById('adminHistoryTableBody');
-            tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400 font-bold"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2 text-royal-500"></i><br>डेटाबेस से फाइलें लाई जा रही हैं...</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400 font-bold"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2 text-royal-500"></i><br>Loading records from database...</td></tr>`;
 
             try {
                 const usersSnap = await getDocs(collection(db, "users"));
                 const filterUserDropdown = document.getElementById('filterUser');
                 const currUserFilter = filterUserDropdown.value; 
                 
-                filterUserDropdown.innerHTML = '<option value="ALL">सभी यूज़र्स</option>';
-                filterUserDropdown.innerHTML += `<option value="${window.currentUserData.uid}">👑 आयुष कुमार (Admin)</option>`;
+                filterUserDropdown.innerHTML = '<option value="ALL">All Users</option>';
+                filterUserDropdown.innerHTML += `<option value="${window.currentUserData.uid}">👑 Ayush Kumar (Admin)</option>`;
                 
                 usersSnap.forEach(doc => {
                     window.allUsersMap[doc.id] = doc.data().email;
@@ -252,7 +251,7 @@
 
                 window.renderAdminHistory(); 
             } catch (err) {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500 font-bold">एरर: ${err.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500 font-bold">Error: ${err.message}</td></tr>`;
             }
         };
 
@@ -265,22 +264,21 @@
             if (fUser !== 'ALL') filteredData = filteredData.filter(item => item.userId === fUser);
             if (fType !== 'ALL') filteredData = filteredData.filter(item => item.serviceType === fType);
 
-            document.getElementById('historyCount').innerText = `कुल फाइलें: ${filteredData.length}`;
+            document.getElementById('historyCount').innerText = `Total Files: ${filteredData.length}`;
 
             tbody.innerHTML = '';
             if(filteredData.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-10 text-center text-slate-400"><i class="fa-regular fa-folder-open text-5xl mb-3 text-slate-300"></i><br>कोई रिकॉर्ड नहीं मिला।</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="p-10 text-center text-slate-400"><i class="fa-regular fa-folder-open text-5xl mb-3 text-slate-300"></i><br>No records found.</td></tr>`;
                 return;
             }
 
             filteredData.forEach(data => {
                 const dateObj = new Date(data.timestamp.seconds * 1000);
-                const dateStr = dateObj.toLocaleDateString('hi-IN', {day:'2-digit', month:'short', year:'numeric'});
-                const timeStr = dateObj.toLocaleTimeString('hi-IN', {hour:'2-digit', minute:'2-digit'});
+                const dateStr = dateObj.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
+                const timeStr = dateObj.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
                 
-                // Admin Recognition
                 const userEmail = (data.userId === window.currentUserData.uid) 
-                    ? '<span class="text-royal-600 font-bold bg-royal-50 px-2 py-1 rounded-md border border-royal-200"><i class="fa-solid fa-crown text-[10px]"></i> आयुष</span>' 
+                    ? '<span class="text-royal-600 font-bold bg-royal-50 px-2 py-1 rounded-md border border-royal-200"><i class="fa-solid fa-crown text-[10px]"></i> Ayush</span>' 
                     : `<span class="font-semibold text-slate-700">${window.allUsersMap[data.userId] || 'Unknown'}</span>`;
 
                 tbody.innerHTML += `
@@ -290,9 +288,8 @@
                         <td class="p-4"><span class="bg-slate-100 text-slate-600 border border-slate-200 px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wide">${data.serviceType}</span></td>
                         <td class="p-4 text-slate-500 text-xs font-medium">${dateStr} <br> ${timeStr}</td>
                         <td class="p-4 text-right whitespace-nowrap">
-                            <!-- DIRECT PRINT / PREVIEW BUTTON (NO GOOGLE DRIVE REDIRECT) -->
-                            <button onclick="window.openPdfViewer('${data.fileId}', '${data.fileName}')" class="inline-flex items-center gap-1 bg-royal-50 text-royal-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-royal-500 hover:text-white transition shadow-sm mr-2 border border-royal-200"><i class="fa-solid fa-print"></i> प्रिंट</button>
-                            <button onclick="window.deleteHistoryRecord('${data.id}')" class="inline-flex items-center w-8 h-8 justify-center bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition shadow-sm border border-red-100" title="डिलीट"><i class="fa-solid fa-trash"></i></button>
+                            <button onclick="window.openPdfViewer('${data.fileId}', '${data.fileName}')" class="inline-flex items-center gap-1 bg-royal-50 text-royal-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-royal-500 hover:text-white transition shadow-sm mr-2 border border-royal-200"><i class="fa-solid fa-print"></i> Print</button>
+                            <button onclick="window.deleteHistoryRecord('${data.id}')" class="inline-flex items-center w-8 h-8 justify-center bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition shadow-sm border border-red-100" title="Delete"><i class="fa-solid fa-trash"></i></button>
                         </td>
                     </tr>
                 `;
@@ -300,9 +297,9 @@
         };
 
         window.deleteHistoryRecord = async function(docId) {
-            if(!confirm('चेतावनी: क्या आप सच में इस फाइल को डिलीट करना चाहते हैं?')) return;
+            if(!confirm('Warning: Do you really want to permanently delete this file?')) return;
             try { await deleteDoc(doc(db, "history", docId)); window.loadAdminHistory(); } 
-            catch (err) { alert('डिलीट करने में समस्या: ' + err.message); }
+            catch (err) { alert('Error deleting: ' + err.message); }
         };
 
         window.bulkDeleteFilteredHistory = async function() {
@@ -312,18 +309,18 @@
             if (fUser !== 'ALL') filteredData = filteredData.filter(item => item.userId === fUser);
             if (fType !== 'ALL') filteredData = filteredData.filter(item => item.serviceType === fType);
 
-            if (filteredData.length === 0) return alert('डिलीट करने के लिए कोई फाइल नहीं है!');
-            if(!confirm(`चेतावनी!\nक्या आप सच में इन ${filteredData.length} फाइलों को डिलीट करना चाहते हैं?`)) return;
+            if (filteredData.length === 0) return alert('No files found to delete!');
+            if(!confirm(`Warning!\nDo you really want to delete these ${filteredData.length} files permanently?`)) return;
 
             const btn = document.getElementById('bulkDeleteBtn');
             const origHTML = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> डिलीट हो रहा है...'; btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Deleting...'; btn.disabled = true;
 
             try {
                 await Promise.all(filteredData.map(item => deleteDoc(doc(db, "history", item.id))));
-                alert(`सफलता! ${filteredData.length} फाइलें डिलीट कर दी गईं।`);
+                alert(`Success! ${filteredData.length} files deleted.`);
                 window.loadAdminHistory(); 
-            } catch (err) { alert('समस्या आई: ' + err.message); } 
+            } catch (err) { alert('Error occurred: ' + err.message); } 
             finally { btn.innerHTML = origHTML; btn.disabled = false; }
         };
 
@@ -363,33 +360,34 @@
                 container.innerHTML = `
                     <div class="mb-6 flex justify-between items-center border-b border-slate-100 pb-4">
                         <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-chess-knight text-royal-500 mr-2"></i> ${titleText}</h3>
+                        <span class="bg-green-100 text-green-700 px-3 py-1 rounded-md text-[10px] font-bold border border-green-200 uppercase tracking-widest">Admin Access</span>
                     </div>
                     <form onsubmit="window.submitPremiumForm(event, '${titleText}')" class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">पूरा नाम</label><input type="text" name="NAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">पिता/पति का नाम</label><input type="text" name="FATHER" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">आधार नंबर (12 अंक)</label><input type="text" name="AADHAR" required maxlength="12" pattern="\\d{12}" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">एनरोलमेंट तारीख</label><input type="date" name="DATE" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">पुरानी जन्मतिथि</label><input type="date" name="OLDDOB" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">नई जन्मतिथि</label><input type="date" name="NEWDOB" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">पुराना डॉक्यूमेंट</label><select name="OLDDOCUMENT" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option><option value="MARKSHEET">MARKSHEET</option></select></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">नया डॉक्यूमेंट</label><select name="NEWDOCUMENT" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option><option value="MARKSHEET">MARKSHEET</option></select></div>
-                            <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">पूरा पता</label><textarea name="ADDRESS" rows="2" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></textarea></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Full Name</label><input type="text" name="NAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Father/Husband Name</label><input type="text" name="FATHER" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Aadhaar Number (12 Digits)</label><input type="text" name="AADHAR" required maxlength="12" pattern="\\d{12}" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Enrollment Date</label><input type="date" name="DATE" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Old DOB</label><input type="date" name="OLDDOB" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">New DOB</label><input type="date" name="NEWDOB" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Old Document</label><select name="OLDDOCUMENT" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option><option value="MARKSHEET">MARKSHEET</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">New Document</label><select name="NEWDOCUMENT" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option><option value="MARKSHEET">MARKSHEET</option></select></div>
+                            <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Full Address</label><textarea name="ADDRESS" rows="2" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></textarea></div>
                         </div>
-                        <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-bold py-3.5 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-4">डॉक्यूमेंट जनरेट करें <i class="fa-solid fa-wand-magic-sparkles ml-1"></i></button>
+                        <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-bold py-3.5 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-4">Generate Document <i class="fa-solid fa-wand-magic-sparkles ml-1"></i></button>
                     </form>`;
             } else if (type === 'affidavit') {
                 container.innerHTML = `
                     <div class="mb-6 border-b border-slate-100 pb-4">
-                        <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-scale-balanced text-royal-500 mr-2"></i> सामान्य शपथ पत्र</h3>
+                        <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-scale-balanced text-royal-500 mr-2"></i> General Affidavit</h3>
                     </div>
                     <form onsubmit="window.submitPremiumForm(event, 'Affidavit')" class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">शपथकर्ता का नाम</label><input type="text" name="NAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">पिता/पति का नाम</label><input type="text" name="FATHER" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
-                            <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">शपथ का विवरण / कारण</label><textarea name="REASON" rows="4" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition" placeholder="यहाँ शपथ का उद्देश्य विस्तार से लिखें..."></textarea></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Deponent Name</label><input type="text" name="NAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Father/Husband Name</label><input type="text" name="FATHER" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Affidavit Details / Reason</label><textarea name="REASON" rows="4" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition" placeholder="Write the detailed purpose here..."></textarea></div>
                         </div>
-                        <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-bold py-3.5 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-4">शपथ पत्र जनरेट करें <i class="fa-solid fa-gavel ml-1"></i></button>
+                        <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-bold py-3.5 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-4">Generate Affidavit <i class="fa-solid fa-gavel ml-1"></i></button>
                     </form>`;
             }
         };
@@ -407,25 +405,22 @@
     <div id="pdfViewerModal" class="fixed inset-0 z-[100] hidden bg-dark-900/80 backdrop-blur-md flex items-center justify-center p-2 md:p-6 transition-opacity">
         <div class="bg-white w-full max-w-6xl h-full flex flex-col rounded-2xl shadow-2xl overflow-hidden">
             
-            <!-- Modal Header -->
             <div class="flex justify-between items-center p-4 border-b border-slate-200 bg-slate-50">
                 <div class="flex items-center gap-3 overflow-hidden">
                     <div class="w-8 h-8 bg-royal-100 text-royal-600 rounded-lg flex items-center justify-center shrink-0"><i class="fa-solid fa-file-pdf"></i></div>
                     <h3 id="pdfViewerTitle" class="font-bold text-slate-800 truncate">Document Print</h3>
                 </div>
                 <div class="flex items-center gap-3">
-                    <span class="hidden md:inline text-xs font-bold text-slate-500 bg-slate-200 px-3 py-1 rounded-full"><i class="fa-solid fa-print mr-1"></i> प्रिंट करने के लिए अंदर दाईं ओर दिए आइकॉन पर क्लिक करें</span>
+                    <span class="hidden md:inline text-xs font-bold text-slate-500 bg-slate-200 px-3 py-1 rounded-full"><i class="fa-solid fa-print mr-1"></i> Click the print icon inside on the top right to print</span>
                     <button onclick="window.closePdfViewer()" class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-200 text-slate-600 hover:bg-red-500 hover:text-white transition shadow-sm"><i class="fa-solid fa-xmark text-lg"></i></button>
                 </div>
             </div>
 
-            <!-- Iframe Container -->
             <div class="flex-grow bg-slate-300 relative">
                 <div id="pdfLoadingSpinner" class="absolute inset-0 flex flex-col items-center justify-center text-royal-600 bg-slate-100">
                     <i class="fa-solid fa-spinner fa-spin text-4xl mb-3"></i>
-                    <p class="text-sm font-bold text-slate-600">फ़ाइल कनेक्ट की जा रही है...</p>
+                    <p class="text-sm font-bold text-slate-600">Connecting to file...</p>
                 </div>
-                <!-- Native PDF Viewer Iframe -->
                 <iframe id="pdfIframe" class="w-full h-full relative z-10 border-none" onload="document.getElementById('pdfLoadingSpinner').style.display='none'" src=""></iframe>
             </div>
         </div>
@@ -437,12 +432,12 @@
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 bg-gradient-to-br from-royal-400 to-royal-600 text-white rounded-xl flex items-center justify-center shadow-inner"><i class="fa-solid fa-crown text-lg"></i></div>
             <div>
-                <h2 class="text-xl font-black text-white leading-tight">वेलकम, <span class="text-royal-400">आयुष कुमार</span></h2>
+                <h2 class="text-xl font-black text-white leading-tight">Welcome, <span class="text-royal-400">Ayush Kumar</span></h2>
             </div>
         </div>
         <div class="flex items-center gap-3">
-            <a href="index.html" class="hidden md:flex items-center gap-2 text-slate-300 hover:text-royal-300 transition font-bold text-sm bg-dark-800 border border-slate-700 px-4 py-2 rounded-xl"><i class="fa-solid fa-house"></i> होम पोर्टल</a>
-            <button onclick="window.handleLogout()" class="bg-red-500/10 hover:bg-red-500 hover:text-white text-red-400 border border-red-500/30 px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-2"><i class="fa-solid fa-power-off"></i> लॉगआउट</button>
+            <a href="index.html" class="hidden md:flex items-center gap-2 text-slate-300 hover:text-royal-300 transition font-bold text-sm bg-dark-800 border border-slate-700 px-4 py-2 rounded-xl"><i class="fa-solid fa-house"></i> Home Portal</a>
+            <button onclick="window.handleLogout()" class="bg-red-500/10 hover:bg-red-500 hover:text-white text-red-400 border border-red-500/30 px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-2"><i class="fa-solid fa-power-off"></i> Logout</button>
         </div>
     </header>
 
@@ -450,9 +445,9 @@
         
         <!-- Main Navigation Tabs -->
         <div class="flex flex-col md:flex-row gap-3 md:gap-4 mb-8">
-            <button onclick="window.switchAdminMainTab('users')" id="tab-users" class="flex-1"><i class="fa-solid fa-users-gear"></i> यूज़र मैनेजमेंट</button>
-            <button onclick="window.switchAdminMainTab('services')" id="tab-services" class="flex-1"><i class="fa-solid fa-gem"></i> प्रीमियम सेवाएं</button>
-            <button onclick="window.switchAdminMainTab('history')" id="tab-history" class="flex-1"><i class="fa-solid fa-database"></i> सभी डेटा रिकॉर्ड्स</button>
+            <button onclick="window.switchAdminMainTab('users')" id="tab-users" class="flex-1"><i class="fa-solid fa-users-gear"></i> User Management</button>
+            <button onclick="window.switchAdminMainTab('services')" id="tab-services" class="flex-1"><i class="fa-solid fa-gem"></i> Premium Services</button>
+            <button onclick="window.switchAdminMainTab('history')" id="tab-history" class="flex-1"><i class="fa-solid fa-database"></i> Database Records</button>
         </div>
 
         <!-- ================= SECTION 1: USER MANAGEMENT ================= -->
@@ -461,15 +456,15 @@
             <div class="bg-white rounded-3xl p-6 md:p-8 shadow-card border border-slate-100 flex flex-col h-full">
                 <div class="mb-6 flex items-center gap-3">
                     <div class="w-12 h-12 bg-royal-50 text-royal-600 rounded-2xl flex items-center justify-center text-xl border border-royal-100"><i class="fa-solid fa-user-plus"></i></div>
-                    <div><h3 class="text-xl font-black text-dark-900">नया यूज़र बनाएँ</h3></div>
+                    <div><h3 class="text-xl font-black text-dark-900">Create New User</h3></div>
                 </div>
                 <form id="adminCreateUserForm" onsubmit="window.createNewUserByAdmin(event)" class="space-y-4 flex-grow flex flex-col">
                     <div class="space-y-4 flex-grow">
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">ईमेल आईडी</label><input type="email" id="newAdminUserEmail" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">पासवर्ड</label><input type="password" id="newAdminUserPass" required minlength="6" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">प्रारंभिक क्रेडिट्स</label><input type="number" id="newAdminUserCredits" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Email ID</label><input type="email" id="newAdminUserEmail" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Password</label><input type="password" id="newAdminUserPass" required minlength="6" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Initial Credits</label><input type="number" id="newAdminUserCredits" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
                     </div>
-                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-bold py-3.5 rounded-xl text-sm shadow-glow transition mt-4">यूजर रजिस्टर करें</button>
+                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-bold py-3.5 rounded-xl text-sm shadow-glow transition mt-4">Register User</button>
                 </form>
                 <div id="adminCreateMsg" class="hidden"></div>
             </div>
@@ -478,30 +473,30 @@
             <div class="bg-white rounded-3xl p-6 md:p-8 shadow-card border border-slate-100 flex flex-col h-full">
                 <div class="mb-6 flex items-center gap-3">
                     <div class="w-12 h-12 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center text-xl border border-green-100"><i class="fa-solid fa-wallet"></i></div>
-                    <div><h3 class="text-xl font-black text-dark-900">क्रेडिट्स मैनेज करें</h3></div>
+                    <div><h3 class="text-xl font-black text-dark-900">Manage Credits</h3></div>
                 </div>
                 
                 <div class="space-y-4 flex-grow">
                     <div>
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">यूज़र चुनें</label>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Select User</label>
                         <select id="userSelectDropdown" onchange="window.handleUserSelection()" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition font-semibold text-slate-700 cursor-pointer">
-                            <option value="">-- यूज़र लोड हो रहे हैं... --</option>
+                            <option value="">-- Loading Users... --</option>
                         </select>
                     </div>
                     
                     <div class="p-4 bg-royal-50 rounded-xl flex justify-between items-center border border-royal-200">
-                        <span class="text-sm font-bold text-royal-800">मौजूदा बैलेंस:</span>
+                        <span class="text-sm font-bold text-royal-800">Current Balance:</span>
                         <span class="text-3xl font-black text-royal-600" id="currentUserCreditsDisplay">--</span>
                     </div>
 
                     <div>
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">क्रेडिट अमाउंट दर्ज करें</label>
-                        <input type="number" id="creditAdjustmentAmount" placeholder="जैसे: 50" min="1" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition">
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Enter Credit Amount</label>
+                        <input type="number" id="creditAdjustmentAmount" placeholder="e.g., 50" min="1" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition">
                     </div>
 
                     <div class="flex gap-3 pt-2">
-                        <button id="btnAdd" type="button" onclick="window.adjustCredits('add')" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl text-sm shadow-sm transition"><i class="fa-solid fa-plus mr-1"></i> ऐड करें</button>
-                        <button id="btnSub" type="button" onclick="window.adjustCredits('sub')" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl text-sm shadow-sm transition"><i class="fa-solid fa-minus mr-1"></i> माइनस करें</button>
+                        <button id="btnAdd" type="button" onclick="window.adjustCredits('add')" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl text-sm shadow-sm transition"><i class="fa-solid fa-plus mr-1"></i> Add</button>
+                        <button id="btnSub" type="button" onclick="window.adjustCredits('sub')" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl text-sm shadow-sm transition"><i class="fa-solid fa-minus mr-1"></i> Subtract</button>
                     </div>
                 </div>
                 <div id="adminMsg" class="hidden"></div>
@@ -518,7 +513,7 @@
                 <button onclick="window.switchPremiumService('annexurec')" id="btn-annexurec" class="premium-tab">Annexure C</button>
                 <button onclick="window.switchPremiumService('annexured')" id="btn-annexured" class="premium-tab">Annexure D</button>
                 <button onclick="window.switchPremiumService('annexuree')" id="btn-annexuree" class="premium-tab">Annexure E</button>
-                <button onclick="window.switchPremiumService('affidavit')" id="btn-affidavit" class="premium-tab">शपथ पत्र</button>
+                <button onclick="window.switchPremiumService('affidavit')" id="btn-affidavit" class="premium-tab">Affidavit</button>
             </div>
             <div class="bg-white rounded-3xl shadow-card border border-slate-100 p-6 md:p-8" id="premiumFormContainer"></div>
         </div>
@@ -529,24 +524,24 @@
                 
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-slate-100 pb-6 mb-6">
                     <div>
-                        <h3 class="text-2xl font-black text-dark-900 mb-1">डेटाबेस रिकॉर्ड्स</h3>
-                        <p id="historyCount" class="text-sm font-bold text-slate-500">कुल फाइलें: 0</p>
+                        <h3 class="text-2xl font-black text-dark-900 mb-1">Database Records</h3>
+                        <p id="historyCount" class="text-sm font-bold text-slate-500">Total Files: 0</p>
                     </div>
                     
                     <div class="flex flex-wrap md:flex-nowrap items-center gap-3 w-full md:w-auto">
                         <div class="flex-1 md:flex-none">
-                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">यूज़र फ़िल्टर</label>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">User Filter</label>
                             <select id="filterUser" onchange="window.renderAdminHistory()" class="w-full md:w-48 p-2 border border-slate-200 rounded-lg text-sm bg-slate-50 font-semibold cursor-pointer outline-none focus:border-royal-400">
-                                <option value="ALL">सभी यूज़र्स</option>
+                                <option value="ALL">All Users</option>
                             </select>
                         </div>
                         <div class="flex-1 md:flex-none">
-                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">डॉक्यूमेंट फ़िल्टर</label>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Document Filter</label>
                             <select id="filterType" onchange="window.renderAdminHistory()" class="w-full md:w-40 p-2 border border-slate-200 rounded-lg text-sm bg-slate-50 font-semibold cursor-pointer outline-none focus:border-royal-400">
-                                <option value="ALL">सभी डॉक्यूमेंट्स</option>
-                                <option value="Domicile">मूल निवास</option>
-                                <option value="Caste">जाति प्रमाण</option>
-                                <option value="DOB">जन्म प्रमाण</option>
+                                <option value="ALL">All Documents</option>
+                                <option value="Domicile">Domicile</option>
+                                <option value="Caste">Caste Certificate</option>
+                                <option value="DOB">Birth Certificate</option>
                                 <option value="Annexure 1">Annexure 1</option>
                                 <option value="Annexure 1A">Annexure 1A</option>
                                 <option value="Annexure 3">Annexure 3</option>
@@ -558,8 +553,8 @@
                             </select>
                         </div>
                         <div class="flex gap-2 mt-4 md:mt-0 items-end h-full">
-                            <button onclick="window.loadAdminHistory()" class="h-[38px] bg-slate-100 text-slate-600 px-4 rounded-lg text-sm font-bold hover:bg-slate-200 transition" title="रिफ्रेश करें"><i class="fa-solid fa-rotate-right"></i></button>
-                            <button id="bulkDeleteBtn" onclick="window.bulkDeleteFilteredHistory()" class="h-[38px] bg-red-50 text-red-600 border border-red-100 px-4 rounded-lg text-sm font-bold hover:bg-red-500 hover:text-white transition flex items-center gap-2"><i class="fa-solid fa-trash-can"></i> <span class="hidden md:inline">सभी डिलीट करें</span></button>
+                            <button onclick="window.loadAdminHistory()" class="h-[38px] bg-slate-100 text-slate-600 px-4 rounded-lg text-sm font-bold hover:bg-slate-200 transition" title="Refresh"><i class="fa-solid fa-rotate-right"></i></button>
+                            <button id="bulkDeleteBtn" onclick="window.bulkDeleteFilteredHistory()" class="h-[38px] bg-red-50 text-red-600 border border-red-100 px-4 rounded-lg text-sm font-bold hover:bg-red-500 hover:text-white transition flex items-center gap-2"><i class="fa-solid fa-trash-can"></i> <span class="hidden md:inline">Delete All Shown</span></button>
                         </div>
                     </div>
                 </div>
@@ -568,11 +563,11 @@
                     <table class="w-full text-left border-collapse bg-white min-w-[800px]">
                         <thead class="bg-slate-50 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                             <tr>
-                                <th class="p-4">यूज़र (Email)</th>
-                                <th class="p-4">फाइल का नाम</th>
-                                <th class="p-4">डॉक्यूमेंट प्रकार</th>
-                                <th class="p-4">तारीख व समय</th>
-                                <th class="p-4 text-right">एक्शन</th>
+                                <th class="p-4">User (Email)</th>
+                                <th class="p-4">File Name</th>
+                                <th class="p-4">Document Type</th>
+                                <th class="p-4">Date & Time</th>
+                                <th class="p-4 text-right">Action</th>
                             </tr>
                         </thead>
                         <tbody id="adminHistoryTableBody" class="text-sm">
