@@ -9,7 +9,7 @@
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Royal Theme Config (Ojas Print Service) -->
+    <!-- Royal Theme Config -->
     <script>
         tailwind.config = {
             theme: {
@@ -26,6 +26,10 @@
             }
         }
     </script>
+
+    <style>
+        .animate-spin-slow { animation: spin 4s linear infinite; }
+    </style>
 
     <!-- Firebase SDKs -->
     <script type="module">
@@ -49,6 +53,7 @@
 
         window.currentUserData = null;
         window.historyData = []; 
+        window.currentRechargeAmount = 0; 
         const ADMIN_EMAIL = "hkosiun1221@gmail.com"; 
 
         const API_URLS = {
@@ -145,16 +150,20 @@
             window.location.reload();
         };
 
-        // ================= AUTOMATIC PAYMENT & WALLET SYSTEM =================
+        // ================= AUTOMATIC PAYMENT & PENDING REQUEST SYSTEM =================
         window.calculateCredits = function() {
-            const amount = parseFloat(document.getElementById('rupeeAmount').value) || 0;
-            const credits = amount; 
-            document.getElementById('calculatedCredits').innerHTML = `${credits} <span class="text-sm">Credits</span>`;
+            const val = parseFloat(document.getElementById('rupeeAmount').value) || 0;
+            window.currentRechargeAmount = val;
+            document.getElementById('calculatedCredits').innerHTML = `${val} <span class="text-sm">Credits</span>`;
         };
 
         window.generateQR = function() {
-            const amount = parseFloat(document.getElementById('rupeeAmount').value);
-            if(!amount || amount < 10) return alert('Please enter a minimum amount of ₹10');
+            const amountInput = document.getElementById('rupeeAmount');
+            const amount = parseFloat(amountInput.value);
+            
+            if(!amount || amount < 10) return alert('कृपया कम से कम ₹10 की राशि दर्ज करें!');
+
+            window.currentRechargeAmount = amount; 
 
             const upiId = "8279650137@ptyes"; 
             const payeeName = "Ojas Print Service";
@@ -162,69 +171,78 @@
             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiString)}`;
 
             document.getElementById('upiQRCode').src = qrUrl;
-            
             document.getElementById('qrSection').style.display = 'flex';
-            document.getElementById('rupeeAmount').disabled = true; 
+            amountInput.disabled = true; 
             document.getElementById('btnGenerateQR').style.display = 'none'; 
         };
 
         window.submitPayment = async function() {
-            const amount = parseFloat(document.getElementById('rupeeAmount').value);
-            let rawUtr = document.getElementById('utrNumber').value;
-            
-            // 🔥 AUTO-CLEANER: Removes any spaces, hyphens or special characters pasted by mistake
+            const amount = window.currentRechargeAmount || parseFloat(document.getElementById('rupeeAmount').value) || 0;
+            const rawUtr = document.getElementById('utrNumber').value.trim();
+            const errorMsg = document.getElementById('paymentErrorMsg');
+
             const utr = rawUtr.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-            
             const creditsToAdd = amount;
 
-            if(!utr || utr.length < 12) {
-                const errorMsg = document.getElementById('paymentErrorMsg');
-                errorMsg.innerText = 'Invalid UTR! Please enter a valid 12-digit UTR or Reference number.';
+            if (!amount || amount < 10) {
+                errorMsg.innerText = 'अमाउंट सही नहीं है, कृपया दोबारा QR कोड जनरेट करें।';
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            if (!utr || utr.length < 10) {
+                errorMsg.innerText = 'गलत UTR नंबर! कृपया पेमेंट ऐप में दिखने वाला पूरा 12 अंकों का UTR / Ref No दर्ज करें।';
                 errorMsg.style.display = 'block';
                 return;
             }
 
             const btn = document.getElementById('btnSubmitPayment');
             const origHtml = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying Payment...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> सबमिट किया जा रहा है...';
             btn.disabled = true;
-            document.getElementById('paymentErrorMsg').style.display = 'none';
+            errorMsg.style.display = 'none';
 
             try {
-                // UTR DUPLICATE CHECK
+                // Duplicate UTR Check
                 const q = query(collection(db, "payments"), where("utrNumber", "==", utr));
                 const duplicateCheck = await getDocs(q);
                 if (!duplicateCheck.empty) {
-                    throw new Error("This UTR has already been used! Payment verification failed.");
+                    throw new Error("यह UTR नंबर पहले ही उपयोग किया जा चुका है!");
                 }
 
-                const userDocRef = doc(db, "users", window.currentUserData.uid);
-                const newCredits = window.currentUserData.credits + creditsToAdd;
-                await updateDoc(userDocRef, { credits: newCredits });
-                
+                // 1. SAVE TO FIRESTORE AS "PENDING"
                 await addDoc(collection(db, "payments"), {
                     userId: window.currentUserData.uid,
                     email: window.currentUserData.email,
                     amountPaid: amount,
-                    creditsAdded: creditsToAdd,
+                    creditsRequested: creditsToAdd,
                     utrNumber: utr,
                     timestamp: new Date(),
-                    status: "Auto-Approved"
+                    status: "Pending" // Credits are NOT added yet!
                 });
 
-                window.currentUserData.credits = newCredits;
-                document.getElementById('displayCredits').innerText = newCredits;
+                // 2. SEND WHATSAPP ALERT (CallMeBot API)
+                // ⚠️ अपना फ़ोन नंबर और API KEY यहाँ डालें ⚠️
+                const adminPhone = "+918279650137"; 
+                const apikey = "YOUR_API_KEY_HERE"; // <-- यहाँ अपनी API Key डालें
+                
+                const waMessage = `🚨 *New Payment Request!*%0A*User:* ${window.currentUserData.email}%0A*Amount:* ₹${amount}%0A*UTR:* ${utr}%0A%0A*Status:* Pending Approval. Check Admin Panel to Approve.`;
+                
+                fetch(`https://api.callmebot.com/whatsapp.php?phone=${adminPhone}&text=${waMessage}&apikey=${apikey}`)
+                    .then(response => console.log("WhatsApp alert sent!"))
+                    .catch(err => console.log("WhatsApp alert failed", err));
 
+                // 3. SHOW SUCCESS MESSAGE TO USER
                 document.getElementById('walletMainUI').innerHTML = `
-                    <div class="col-span-1 md:col-span-2 flex flex-col items-center justify-center p-10 bg-green-50 rounded-3xl border border-green-200 text-center animate-pulse">
-                        <i class="fa-solid fa-circle-check text-6xl text-green-500 mb-4"></i>
-                        <h2 class="text-3xl font-black text-green-800 tracking-tight">Payment Successful!</h2>
-                        <p class="text-lg font-bold text-green-700 mt-2">${creditsToAdd} Credits have been added to your wallet.</p>
-                        <button onclick="window.switchService('domicile')" class="mt-8 bg-green-600 hover:bg-green-700 text-white font-black py-4 px-8 rounded-xl shadow-glow transition transform hover:-translate-y-0.5">Go to Dashboard <i class="fa-solid fa-arrow-right ml-1"></i></button>
+                    <div class="col-span-1 md:col-span-2 flex flex-col items-center justify-center p-10 bg-amber-50 rounded-3xl border border-amber-200 text-center animate-pulse">
+                        <i class="fa-solid fa-clock-rotate-left text-6xl text-amber-500 mb-4"></i>
+                        <h2 class="text-3xl font-black text-amber-800 tracking-tight">वेरिफिकेशन पेंडिंग</h2>
+                        <p class="text-sm font-bold text-amber-700 mt-3 max-w-md mx-auto">आपकी UTR डिटेल एडमिन को भेज दी गई है। पेमेंट वेरीफाई होते ही ${creditsToAdd} क्रेडिट्स आपके वॉलेट में जोड़ दिए जाएंगे।</p>
+                        <button onclick="window.switchService('domicile')" class="mt-8 bg-amber-600 hover:bg-amber-700 text-white font-black py-4 px-8 rounded-xl shadow-glow transition transform hover:-translate-y-0.5">डैशबोर्ड पर जाएँ <i class="fa-solid fa-arrow-right ml-1"></i></button>
                     </div>
                 `;
             } catch(error) {
-                const errorMsg = document.getElementById('paymentErrorMsg');
+                console.error("Submission Error:", error);
                 errorMsg.innerText = error.message;
                 errorMsg.style.display = 'block';
             } finally {
@@ -233,15 +251,13 @@
             }
         };
 
-        // ================= IN-APP PREVIEW =================
+        // ================= IN-APP PREVIEW & DOCUMENTS =================
         window.openPdfViewer = function(fileId, fileName) {
             document.getElementById('pdfViewerTitle').innerText = fileName;
             document.getElementById('pdfLoadingSpinner').style.display = 'flex';
             document.getElementById('pdfIframe').src = `https://drive.google.com/file/d/${fileId}/preview`;
-            
             const downloadBtn = document.getElementById('modalDownloadBtn');
             downloadBtn.onclick = function() { window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank'); };
-            
             document.getElementById('pdfViewerModal').style.display = 'flex';
             document.body.style.overflow = 'hidden'; 
         };
@@ -273,12 +289,10 @@
             });
         }
 
-        // ================= FORM SUBMISSION LOGIC =================
         window.submitForm = async function(event, serviceType) {
             event.preventDefault();
 
             if (!window.currentUserData) return alert('Please login first!');
-            
             if (!window.currentUserData.isAdmin && window.currentUserData.credits < 10) {
                 return alert('Insufficient credits! You need 10 credits to generate a document. Please add credits from your wallet.');
             }
@@ -397,7 +411,7 @@
             });
         };
 
-        // HINDI DROPDOWNS AS REQUESTED
+        // HINDI DROPDOWNS
         window.updateTehsilsAndThanas = function() {
             const districtEl = document.getElementById('districtSelect');
             const tehsilSelect = document.getElementById('tehsilSelect');
@@ -511,19 +525,18 @@
                 `;
             }
             
-            // ================= NEW ADD CREDIT SECTION =================
+            // ================= PENDING WALLET SYSTEM UI =================
             else if(serviceName === 'add_credit') {
                 container.innerHTML = `
                     <div id="walletMainUI" class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <!-- Left: Calculator -->
                         <div class="space-y-4 bg-slate-50 p-6 rounded-3xl border border-slate-200">
                             <div class="mb-4">
                                 <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-wallet text-royal-500 mr-2"></i> Add Wallet Credits</h3>
-                                <p class="text-xs font-bold text-slate-500 mt-1">₹1 = 1 Credit | Auto Payment Verification</p>
+                                <p class="text-xs font-bold text-slate-500 mt-1">₹1 = 1 Credit | Secure Verification</p>
                             </div>
                             
                             <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide">Enter Amount (₹)</label>
-                            <input type="number" id="rupeeAmount" placeholder="e.g. 100" oninput="window.calculateCredits()" class="w-full p-4 border border-slate-200 rounded-xl text-lg font-black bg-white focus:ring-2 focus:ring-royal-500 outline-none transition text-center text-dark-900 shadow-inner">
+                            <input type="number" id="rupeeAmount" placeholder="e.g. 500" min="10" oninput="window.calculateCredits()" class="w-full p-4 border border-slate-200 rounded-xl text-lg font-black bg-white focus:ring-2 focus:ring-royal-500 outline-none transition text-center text-dark-900 shadow-inner">
                             
                             <div class="p-6 bg-white rounded-2xl border border-royal-200 text-center shadow-card mt-4">
                                 <p class="text-xs font-bold text-royal-600 uppercase mb-1 tracking-widest">You will get</p>
@@ -533,7 +546,6 @@
                             <button id="btnGenerateQR" onclick="window.generateQR()" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-4 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-2">Generate Payment QR</button>
                         </div>
 
-                        <!-- Right: QR Code & Submission -->
                         <div id="qrSection" style="display: none;" class="flex-col items-center justify-center space-y-5 bg-white p-6 rounded-3xl border-2 border-royal-400 shadow-card relative">
                             <h4 class="text-[11px] font-bold text-royal-700 uppercase tracking-widest text-center bg-royal-100 px-4 py-2 rounded-full"><i class="fa-solid fa-qrcode mr-1"></i> Scan & Pay using any UPI App</h4>
                             
@@ -543,12 +555,11 @@
                             
                             <div class="w-full pt-2">
                                 <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 text-center">Enter 12-Digit UTR / Ref Number</label>
-                                <!-- 🔥 AUTO-CLEANER input: Removed maxlength, added auto-uppercase -->
-                                <input type="text" id="utrNumber" placeholder="Enter UTR after payment" class="w-full p-4 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500 outline-none transition text-center tracking-widest uppercase">
+                                <input type="text" id="utrNumber" placeholder="Enter UTR after payment" class="w-full p-4 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-amber-500 outline-none transition text-center tracking-widest uppercase">
                             </div>
                             
-                            <button onclick="window.submitPayment()" id="btnSubmitPayment" class="w-full bg-green-600 hover:bg-green-700 text-white font-black py-4 rounded-xl shadow-md transition transform hover:-translate-y-0.5">Verify & Add Credits <i class="fa-solid fa-check-circle ml-1"></i></button>
-                            <p id="paymentErrorMsg" style="display: none;" class="text-xs font-bold text-red-500 text-center mt-2"></p>
+                            <button onclick="window.submitPayment()" id="btnSubmitPayment" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-4 rounded-xl shadow-md transition transform hover:-translate-y-0.5">Submit For Verification <i class="fa-solid fa-paper-plane ml-1"></i></button>
+                            <p id="paymentErrorMsg" style="display: none;" class="text-xs font-bold text-red-500 text-center mt-2 p-2 bg-red-50 rounded-lg border border-red-200"></p>
                         </div>
                     </div>
                 `;
@@ -626,7 +637,6 @@
         </div>
     </div>
 
-
     <!-- LOGIN SCREEN -->
     <div id="loginSection" style="display: none;" class="items-center justify-center flex-grow p-4 min-h-screen bg-dark-900 relative overflow-hidden">
         <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-royal-500/20 rounded-full blur-[100px] pointer-events-none"></div>
@@ -675,7 +685,7 @@
                 <button onclick="window.switchService('caste')" id="btn-caste" class="service-tab"><i class="fa-solid fa-users"></i> Caste Cert</button>
                 <button onclick="window.switchService('dob')" id="btn-dob" class="service-tab"><i class="fa-solid fa-cake-candles"></i> Birth (DOB)</button>
                 <button onclick="window.switchService('history')" id="btn-history" class="service-tab"><i class="fa-solid fa-clock-rotate-left"></i> My History</button>
-                <button onclick="window.switchService('add_credit')" id="btn-add_credit" class="service-tab col-span-2 md:col-span-1 !bg-green-50 !text-green-700 !border-green-200 hover:!bg-green-100"><i class="fa-solid fa-plus-circle"></i> Add Credit</button>
+                <button onclick="window.switchService('add_credit')" id="btn-add_credit" class="service-tab col-span-2 md:col-span-1 !bg-amber-50 !text-amber-700 !border-amber-200 hover:!bg-amber-100"><i class="fa-solid fa-plus-circle"></i> Add Credit</button>
             </div>
             
             <div class="bg-white rounded-3xl shadow-card border border-slate-100 p-6 md:p-8">
