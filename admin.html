@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Super Admin - Ayush Kumar</title>
+    <title>Super Admin - Harish Kumar</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -75,14 +75,21 @@
             window.location.href = "index.html";
         };
 
-        // ================= IN-APP RAW PDF VIEWER & DIRECT PRINT =================
+        // ================= IN-APP PREVIEW & MANUAL DOWNLOAD =================
         window.openPdfViewer = function(fileId, fileName) {
             document.getElementById('pdfViewerTitle').innerText = fileName;
             document.getElementById('pdfLoadingSpinner').style.display = 'flex';
             
-            const rawPdfUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
+            // Preview link stops auto-download and forces web preview
+            const previewUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+            document.getElementById('pdfIframe').src = previewUrl;
             
-            document.getElementById('pdfIframe').src = rawPdfUrl;
+            // Set the download button link
+            const downloadBtn = document.getElementById('modalDownloadBtn');
+            downloadBtn.onclick = function() {
+                window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank');
+            };
+
             document.getElementById('pdfViewerModal').classList.remove('hidden');
             document.body.style.overflow = 'hidden'; 
         };
@@ -234,7 +241,7 @@
                 const currUserFilter = filterUserDropdown.value; 
                 
                 filterUserDropdown.innerHTML = '<option value="ALL">All Users</option>';
-                filterUserDropdown.innerHTML += `<option value="${window.currentUserData.uid}">👑 Ayush Kumar (Admin)</option>`;
+                filterUserDropdown.innerHTML += `<option value="${window.currentUserData.uid}">👑 Harish Kumar (Admin)</option>`;
                 
                 usersSnap.forEach(doc => {
                     window.allUsersMap[doc.id] = doc.data().email;
@@ -278,7 +285,7 @@
                 const timeStr = dateObj.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
                 
                 const userEmail = (data.userId === window.currentUserData.uid) 
-                    ? '<span class="text-royal-600 font-bold bg-royal-50 px-2 py-1 rounded-md border border-royal-200"><i class="fa-solid fa-crown text-[10px]"></i> Ayush</span>' 
+                    ? '<span class="text-royal-600 font-bold bg-royal-50 px-2 py-1 rounded-md border border-royal-200"><i class="fa-solid fa-crown text-[10px]"></i> Harish</span>' 
                     : `<span class="font-semibold text-slate-700">${window.allUsersMap[data.userId] || 'Unknown'}</span>`;
 
                 tbody.innerHTML += `
@@ -288,7 +295,8 @@
                         <td class="p-4"><span class="bg-slate-100 text-slate-600 border border-slate-200 px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wide">${data.serviceType}</span></td>
                         <td class="p-4 text-slate-500 text-xs font-medium">${dateStr} <br> ${timeStr}</td>
                         <td class="p-4 text-right whitespace-nowrap">
-                            <button onclick="window.openPdfViewer('${data.fileId}', '${data.fileName}')" class="inline-flex items-center gap-1 bg-royal-50 text-royal-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-royal-500 hover:text-white transition shadow-sm mr-2 border border-royal-200"><i class="fa-solid fa-print"></i> Print</button>
+                            <!-- PREVIEW BUTTON INSTEAD OF PRINT -->
+                            <button onclick="window.openPdfViewer('${data.fileId}', '${data.fileName}')" class="inline-flex items-center gap-1 bg-royal-50 text-royal-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-royal-500 hover:text-white transition shadow-sm mr-2 border border-royal-200"><i class="fa-solid fa-eye"></i> Preview</button>
                             <button onclick="window.deleteHistoryRecord('${data.id}')" class="inline-flex items-center w-8 h-8 justify-center bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition shadow-sm border border-red-100" title="Delete"><i class="fa-solid fa-trash"></i></button>
                         </td>
                     </tr>
@@ -405,13 +413,16 @@
     <div id="pdfViewerModal" class="fixed inset-0 z-[100] hidden bg-dark-900/80 backdrop-blur-md flex items-center justify-center p-2 md:p-6 transition-opacity">
         <div class="bg-white w-full max-w-6xl h-full flex flex-col rounded-2xl shadow-2xl overflow-hidden">
             
-            <div class="flex justify-between items-center p-4 border-b border-slate-200 bg-slate-50">
-                <div class="flex items-center gap-3 overflow-hidden">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center p-4 border-b border-slate-200 bg-slate-50 gap-3">
+                <div class="flex items-center gap-3 overflow-hidden w-full md:w-auto">
                     <div class="w-8 h-8 bg-royal-100 text-royal-600 rounded-lg flex items-center justify-center shrink-0"><i class="fa-solid fa-file-pdf"></i></div>
-                    <h3 id="pdfViewerTitle" class="font-bold text-slate-800 truncate">Document Print</h3>
+                    <h3 id="pdfViewerTitle" class="font-bold text-slate-800 truncate">Document Preview</h3>
                 </div>
-                <div class="flex items-center gap-3">
-                    <span class="hidden md:inline text-xs font-bold text-slate-500 bg-slate-200 px-3 py-1 rounded-full"><i class="fa-solid fa-print mr-1"></i> Click the print icon inside on the top right to print</span>
+                <div class="flex items-center gap-3 w-full md:w-auto justify-end">
+                    <!-- DEDICATED DOWNLOAD BUTTON -->
+                    <button id="modalDownloadBtn" class="bg-royal-600 hover:bg-royal-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition shadow-md flex items-center gap-2">
+                        <i class="fa-solid fa-download"></i> Download
+                    </button>
                     <button onclick="window.closePdfViewer()" class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-200 text-slate-600 hover:bg-red-500 hover:text-white transition shadow-sm"><i class="fa-solid fa-xmark text-lg"></i></button>
                 </div>
             </div>
@@ -419,7 +430,7 @@
             <div class="flex-grow bg-slate-300 relative">
                 <div id="pdfLoadingSpinner" class="absolute inset-0 flex flex-col items-center justify-center text-royal-600 bg-slate-100">
                     <i class="fa-solid fa-spinner fa-spin text-4xl mb-3"></i>
-                    <p class="text-sm font-bold text-slate-600">Connecting to file...</p>
+                    <p class="text-sm font-bold text-slate-600">Loading Preview...</p>
                 </div>
                 <iframe id="pdfIframe" class="w-full h-full relative z-10 border-none" onload="document.getElementById('pdfLoadingSpinner').style.display='none'" src=""></iframe>
             </div>
@@ -432,7 +443,7 @@
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 bg-gradient-to-br from-royal-400 to-royal-600 text-white rounded-xl flex items-center justify-center shadow-inner"><i class="fa-solid fa-crown text-lg"></i></div>
             <div>
-                <h2 class="text-xl font-black text-white leading-tight">Welcome, <span class="text-royal-400">Ayush Kumar</span></h2>
+                <h2 class="text-xl font-black text-white leading-tight">Welcome, <span class="text-royal-400">Harish Kumar</span></h2>
             </div>
         </div>
         <div class="flex items-center gap-3">
