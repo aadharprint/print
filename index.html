@@ -213,7 +213,7 @@
             const now = Date.now();
             const diff = userData.vipExpiry - now;
 
-            // 🔥 जैसे ही काउंटडाउन 00:00:00 होगा -> VIP हट जाएगा और नॉर्मल यूजर पेज खुल जाएगा!
+            // जैसे ही काउंटडाउन 00:00:00 होगा -> VIP हट जाएगा और नॉर्मल यूजर पेज खुल जाएगा
             if (diff <= 0) {
                 clearInterval(window.vipCountdownInterval);
                 userData.isVip = false;
@@ -231,14 +231,12 @@
                 return;
             }
 
-            // दिन, घंटे, मिनट, सेकंड की गणना
             const totalDaysCeil = Math.ceil(diff / MS_PER_DAY);
             const days = Math.floor(diff / MS_PER_DAY);
             const hours = Math.floor((diff % MS_PER_DAY) / (1000 * 60 * 60));
             const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
-            // ऊपर कोने में साफ हिंदी में बचे हुए दिन दिखाएं
             if (timerBox && timerText) {
                 timerBox.style.display = 'flex';
                 if (totalDaysCeil <= 5) {
@@ -249,7 +247,7 @@
                 timerText.innerHTML = `<span class="text-yellow-300">VIP: ${totalDaysCeil} दिन बचे हैं</span> <span class="hidden sm:inline font-mono text-[11px] text-white opacity-90">(${days}d:${String(hours).padStart(2, '0')}h:${String(minutes).padStart(2, '0')}m:${String(seconds).padStart(2, '0')}s)</span>`;
             }
 
-            // 🔔 5 दिन या उससे कम (5, 4, 3, 2, 1 दिन) बचने पर कोने में अलर्ट दिखाएं
+            // 5 दिन या उससे कम बचने पर कोने में अलर्ट दिखाएं
             if (totalDaysCeil <= 5 && totalDaysCeil >= 1) {
                 if (!window.cornerAlertDismissed) {
                     cornerAlert.style.display = 'block';
@@ -528,7 +526,6 @@
                         </div>
                     </div>
                 `;
-                // Refresh embedded payment history table
                 window.loadUserPayments();
             } catch(error) {
                 errorMsg.innerText = error.message;
@@ -546,7 +543,6 @@
             tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400 font-bold"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2 text-royal-500"></i><br>आपकी पेमेंट हिस्ट्री लोड हो रही है...</td></tr>`;
 
             try {
-                // Reload latest user document to sync live credits & VIP expiry if admin just approved
                 const userDocRef = doc(db, "users", window.currentUserData.uid);
                 const userDoc = await getDoc(userDocRef);
                 if (userDoc.exists()) {
@@ -560,7 +556,6 @@
                     if (creditEl) creditEl.innerText = window.currentUserData.credits;
                 }
 
-                // Update Validity Banner inside Payment History
                 const validityCard = document.getElementById('userValidityInfoBox');
                 if (validityCard) {
                     const now = Date.now();
@@ -592,7 +587,7 @@
                                 <div>
                                     <span class="text-[10px] font-bold uppercase tracking-wider bg-slate-300 text-slate-800 px-2.5 py-0.5 rounded-full">Normal Account</span>
                                     <h4 class="text-base font-black text-slate-800 mt-1">अभी कोई VIP प्लान एक्टिव नहीं है (0 दिन)</h4>
-                                    <p class="text-xs text-slate-500 font-semibold">हर डॉक्यूमेंट पर 20% छूट और सारे Annexures व 18+ DOB के लिए VIP लें।</p>
+                                    <p class="text-xs text-slate-500 font-semibold">हर डॉक्यूमेंट पर 20% छूट और 18+ DOB पर 25% छूट के लिए VIP लें।</p>
                                 </div>
                                 <button onclick="window.jumpToVipUpgrade(30)" class="bg-dark-900 hover:bg-black text-royal-300 font-black px-4 py-2.5 rounded-xl text-xs shadow transition shrink-0">
                                     <i class="fa-solid fa-crown mr-1"></i> ₹100 में VIP लें
@@ -610,10 +605,8 @@
                     window.userPaymentsData.push({ id: docSnap.id, ...docSnap.data() });
                 });
 
-                // Sort newest first
                 window.userPaymentsData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
 
-                // Calculate Summary Totals
                 let totalTxns = window.userPaymentsData.length;
                 let approvedAmount = 0;
                 let pendingAmount = 0;
@@ -721,16 +714,20 @@
             });
         }
 
-        // ================= FORM SUBMISSION (20% OFF FOR VIP: 8 CREDITS VS 10 CREDITS) =================
+        // ================= FORM SUBMISSION (DOB = 15 CREDITS WITH 25% OFF | OTHERS = 8 OR 10 CREDITS) =================
         window.submitForm = async function(event, serviceType) {
             event.preventDefault();
 
             if (!window.currentUserData) return alert('Please login first!');
             
-            const docCost = window.currentUserData.isVip ? 8 : 10;
+            // DOB Certificate costs 15 Credits (25% off from 20). Other docs cost 8 Credits for VIP (20% off from 10) or 10 for Normal.
+            let docCost = window.currentUserData.isVip ? 8 : 10;
+            if (serviceType === 'DOB' || serviceType === 'DOB 18+') {
+                docCost = 15;
+            }
 
             if (!window.currentUserData.isAdmin && window.currentUserData.credits < docCost) {
-                return alert(`Insufficient credits! You need ${docCost} credits to generate this document. Please add credits from your wallet.`);
+                return alert(`Insufficient credits! You need ${docCost} credits to generate this ${serviceType} document. Please add credits from your wallet.`);
             }
 
             const formElement = event.target;
@@ -951,10 +948,11 @@
             const container = document.getElementById('formContainer');
             if (!container) return;
             
+            // Standard 20% Off Button Text (8 Credits for VIP, 10 for Normal)
             const submitBtnText = window.currentUserData && window.currentUserData.isAdmin 
                 ? 'Generate Document <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' 
                 : (window.currentUserData && window.currentUserData.isVip 
-                    ? 'Generate Document (8 Credits - 20% VIP Off) <i class="fa-solid fa-crown ml-1"></i>' 
+                    ? 'Generate Document (<del class="opacity-75 text-xs mr-1">10</del> 8 Credits - 20% VIP Off) <i class="fa-solid fa-crown ml-1"></i>' 
                     : 'Generate Document (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>');
                                 
             const statusTagHtml = window.currentUserData && window.currentUserData.isAdmin 
@@ -1015,14 +1013,31 @@
                 `;
                 window.updateTehsilsAndThanas();
             }
+            
+            // 🔥 DOB CERTIFICATE (18+ VIP): SPECIAL 15 CREDITS WITH 25% OFF FROM 20 CREDITS
             else if(serviceName === 'dob18') {
                 if (!window.currentUserData || !window.currentUserData.isVip) {
                     return window.switchService('domicile');
                 }
+
+                const dobSubmitBtnText = window.currentUserData && window.currentUserData.isAdmin 
+                    ? 'Generate DOB Certificate (Admin Free) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' 
+                    : 'Generate DOB Certificate (<del class="text-red-400 opacity-90 text-sm mr-1">20 Credits</del> 15 Credits - 25% VIP Off) <i class="fa-solid fa-crown ml-1"></i>';
+
+                const dobBadgeHtml = window.currentUserData && window.currentUserData.isAdmin
+                    ? statusTagHtml
+                    : `<div class="flex flex-wrap items-center gap-2">
+                        <span class="bg-slate-100 text-slate-500 px-2.5 py-1 rounded-md text-[11px] font-bold border border-slate-200">Normal Rate: <del class="text-red-500 font-black">20 Credits</del></span>
+                        <span class="bg-green-100 text-green-800 px-3 py-1 rounded-md text-xs font-black border border-green-300 uppercase tracking-wider shadow-sm"><i class="fa-solid fa-tags text-green-600 mr-1"></i>25% VIP छूट: सिर्फ 15 Credits</span>
+                       </div>`;
+
                 container.innerHTML = `
-                    <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
-                        <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-cake-candles text-royal-500 mr-2"></i> Date of Birth Certificate (18+ VIP)</h3>
-                        ${statusTagHtml}
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-100 pb-4 mb-6">
+                        <div>
+                            <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-cake-candles text-royal-500 mr-2"></i> Date of Birth Certificate (18+ VIP)</h3>
+                            <p class="text-xs font-bold text-green-600 mt-0.5"><i class="fa-solid fa-circle-check mr-1"></i>बधाई हो! VIP मेंबर होने के नाते आपको इस सर्टिफिकेट पर सीधा 25% (5 Credits) की छूट मिल रही है।</p>
+                        </div>
+                        ${dobBadgeHtml}
                     </div>
                     <form onsubmit="window.submitForm(event, 'DOB 18+')" class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -1034,7 +1049,7 @@
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Pin Code</label><input type="text" name="PIN" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
                             <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Full Address</label><textarea name="ADDRESS" rows="2" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></textarea></div>
                         </div>
-                        <button type="submit" class="w-full bg-gradient-to-r from-dark-900 via-dark-800 to-dark-900 hover:bg-black text-royal-300 font-black py-4 rounded-xl shadow-vip-glow transition transform hover:-translate-y-0.5 mt-4 text-base border border-royal-500/40">${submitBtnText}</button>
+                        <button type="submit" class="w-full bg-gradient-to-r from-dark-900 via-dark-800 to-dark-900 hover:bg-black text-royal-300 font-black py-4 rounded-xl shadow-vip-glow transition transform hover:-translate-y-0.5 mt-4 text-base border border-royal-500/40">${dobSubmitBtnText}</button>
                     </form>
                 `;
             }
@@ -1082,7 +1097,7 @@
                 const isAlreadyVip = window.currentUserData && window.currentUserData.isVip;
                 const vipHeaderNote = isAlreadyVip 
                     ? `<span class="text-[11px] text-green-400 font-bold"><i class="fa-solid fa-circle-check mr-1"></i>आपका VIP एक्टिव है! नया प्लान चुनने पर बचे हुए दिनों में ही नए दिन जुड़ जाएंगे।</span>`
-                    : `<span class="text-[11px] text-slate-300 font-semibold">हर डॉक्यूमेंट पर <strong>20% छूट</strong> + <strong>18+ DOB और सारे Annexures</strong> अनलॉक करें!</span>`;
+                    : `<span class="text-[11px] text-slate-300 font-semibold">हर डॉक्यूमेंट पर <strong>20% छूट</strong> + <strong>18+ DOB पर 25% छूट (सिर्फ 15 Cr)</strong> व सारे Annexures अनलॉक करें!</span>`;
 
                 container.innerHTML = `
                     <div id="walletMainUI" class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10 pb-8 border-b border-slate-200">
@@ -1353,7 +1368,7 @@
                 <div class="flex flex-wrap items-center gap-2">
                     <h2 id="portalHeaderTitle" class="text-lg md:text-xl font-black text-white leading-tight">Ojas <span class="text-royal-400">Portal</span></h2>
                     <span id="vipStatusBadge" style="display: none;" class="items-center gap-1 bg-gradient-to-r from-yellow-300 via-royal-400 to-amber-500 text-dark-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-widest shadow-vip-glow">
-                        <i class="fa-solid fa-crown text-[9px]"></i> VIP 20% OFF
+                        <i class="fa-solid fa-crown text-[9px]"></i> VIP 20%-25% OFF
                     </span>
                 </div>
             </div>
@@ -1384,14 +1399,15 @@
                 <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 relative z-10">
                     <div class="space-y-1.5">
                         <div class="inline-flex items-center gap-2 bg-gradient-to-r from-yellow-300 to-amber-500 text-dark-950 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider shadow">
-                            <i class="fa-solid fa-crown animate-bounce"></i> VIP धमाका ऑफर — हर ट्रांजैक्शन पर 20% की छूट!
+                            <i class="fa-solid fa-crown animate-bounce"></i> VIP धमाका ऑफर — हर ट्रांजैक्शन पर 20% से 25% की छूट!
                         </div>
                         <h3 class="text-lg md:text-xl font-black text-royal-300">
                             अपना VIP Portal अनलॉक करें — 18+ DOB और सारे Annexures बनाएं!
                         </h3>
                         <ul class="text-xs md:text-sm text-slate-200 font-semibold space-y-1 pt-1">
-                            <li><i class="fa-solid fa-circle-check text-green-400 mr-1.5"></i> <strong>20% OFF:</strong> हर डॉक्यूमेंट 10 की जगह सिर्फ <strong>8 क्रेडिट</strong> में बनाएं!</li>
-                            <li><i class="fa-solid fa-circle-check text-green-400 mr-1.5"></i> <strong>18+ जन्म प्रमाण पत्र (DOB)</strong> और <strong>सारे Annexures (1, 1A, 3, 3A, B, C, D, E)</strong> तुरंत निकालें!</li>
+                            <li><i class="fa-solid fa-circle-check text-green-400 mr-1.5"></i> <strong>20% OFF:</strong> सामान्य डॉक्यूमेंट 10 की जगह सिर्फ <strong>8 क्रेडिट</strong> में बनाएं!</li>
+                            <li><i class="fa-solid fa-circle-check text-green-400 mr-1.5"></i> <strong>25% Special OFF:</strong> <strong>18+ जन्म प्रमाण पत्र (DOB)</strong> <del class="text-red-400">20</del> की जगह सिर्फ <strong>15 क्रेडिट</strong> में बनाएं!</li>
+                            <li><i class="fa-solid fa-circle-check text-green-400 mr-1.5"></i> <strong>सारे Annexures (1, 1A, 3, 3A, B, C, D, E)</strong> सीधे टाइप करके तुरंत निकालें!</li>
                         </ul>
                     </div>
                     <div class="grid grid-cols-3 gap-2.5 w-full lg:w-auto shrink-0">
@@ -1428,14 +1444,14 @@
             <div id="vipServicesBar" style="display: none;" class="mb-8 p-5 rounded-3xl bg-gradient-to-r from-dark-950 via-dark-900 to-dark-950 border-2 border-royal-400 shadow-vip-glow">
                 <div class="flex flex-wrap items-center justify-between mb-3 border-b border-slate-800 pb-2.5 gap-2">
                     <span class="text-xs font-black uppercase tracking-widest text-royal-300 flex items-center gap-2">
-                        <i class="fa-solid fa-crown text-royal-400 animate-bounce"></i> VIP Exclusive Services (20% Discount Active)
+                        <i class="fa-solid fa-crown text-royal-400 animate-bounce"></i> VIP Exclusive Services (DOB 25% Off | Annexures 20% Off)
                     </span>
                     <button onclick="window.jumpToVipUpgrade(30)" class="text-[11px] bg-royal-500/20 hover:bg-royal-500 hover:text-dark-950 text-royal-300 border border-royal-400/40 px-3 py-1 rounded-full font-bold transition">
                         <i class="fa-solid fa-plus-circle mr-1"></i> Extend VIP Time (+30 / +60 / +90 Days)
                     </button>
                 </div>
                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
-                    <button onclick="window.switchService('dob18')" id="btn-dob18" class="vip-tab"><i class="fa-solid fa-cake-candles"></i> DOB (18+)</button>
+                    <button onclick="window.switchService('dob18')" id="btn-dob18" class="vip-tab"><i class="fa-solid fa-cake-candles"></i> DOB 18+ (15 Cr)</button>
                     <button onclick="window.switchService('annexure1')" id="btn-annexure1" class="vip-tab"><i class="fa-solid fa-file-signature"></i> Annexure 1</button>
                     <button onclick="window.switchService('annexure1a')" id="btn-annexure1a" class="vip-tab"><i class="fa-solid fa-file-signature"></i> Annexure 1A</button>
                     <button onclick="window.switchService('annexure3')" id="btn-annexure3" class="vip-tab"><i class="fa-solid fa-file-signature"></i> Annexure 3</button>
