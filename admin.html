@@ -306,17 +306,24 @@
             }
         };
 
+        // 🔥 CREATE NEW USER: DEFAULT 30 CREDITS + 2 DAYS VIP TRIAL
         window.createNewUserByAdmin = async function(event) {
             event.preventDefault();
             const newUserEmail = document.getElementById('newAdminUserEmail').value.trim().toLowerCase();
             const newUserPass = document.getElementById('newAdminUserPass').value.trim();
-            const initialCredits = parseInt(document.getElementById('newAdminUserCredits').value) || 10;
-            const initialVipDays = parseInt(document.getElementById('newAdminUserVipDays').value) || 0;
+            
+            // Default 30 Credits & 2 Days VIP if left untouched
+            const creditsInputVal = parseInt(document.getElementById('newAdminUserCredits').value);
+            const initialCredits = isNaN(creditsInputVal) ? 30 : creditsInputVal;
+            
+            const vipDaysInputVal = parseInt(document.getElementById('newAdminUserVipDays').value);
+            const initialVipDays = isNaN(vipDaysInputVal) ? 2 : vipDaysInputVal;
+
             const msg = document.getElementById('adminCreateMsg');
             const btn = event.target.querySelector('button[type="submit"]');
             
             btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating...';
-            msg.classList.remove('hidden'); msg.innerText = "Registering user...";
+            msg.classList.remove('hidden'); msg.innerText = "Registering user with 30 Credits & 2 Days VIP...";
 
             try {
                 const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`, {
@@ -338,14 +345,19 @@
                     createdAt: new Date()
                 });
                 
-                msg.className = "mt-3 p-3 bg-green-50 text-green-700 rounded-xl text-sm font-bold border border-green-200";
-                msg.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> Success! User created ${isVip ? `with +${initialVipDays} Days VIP 👑` : '(Normal User)'}.`;
+                msg.className = "mt-3 p-3 bg-green-50 text-green-800 rounded-xl text-sm font-bold border border-green-300";
+                msg.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> User Created! <strong>${initialCredits} Credits</strong> & <strong>${isVip ? `+${initialVipDays} Days VIP Access 👑` : 'Normal Access'}</strong> activated.`;
+                
+                // Reset form and keep 30 Credits + 2 Days VIP as default
                 event.target.reset();
+                document.getElementById('newAdminUserCredits').value = 30;
+                document.getElementById('newAdminUserVipDays').value = "2";
+                
                 await window.loadAllUsersForDropdown();
             } catch(err) {
                 msg.className = "mt-3 p-3 bg-red-50 text-red-700 rounded-xl text-sm font-bold border border-red-200";
                 msg.innerHTML = `<i class="fa-solid fa-circle-xmark mr-1"></i> Error: ${err.message}`;
-            } finally { btn.disabled = false; btn.innerText = "Register User"; }
+            } finally { btn.disabled = false; btn.innerText = "Register User (30 Credits + 2d VIP)"; }
         };
 
         window.adjustCredits = async function(action) {
@@ -676,39 +688,56 @@
 
         <!-- ================= SECTION 1: USER & VIP VALIDITY MANAGEMENT ================= -->
         <div id="section-users" class="grid grid-cols-1 md:grid-cols-2 gap-6 hidden">
-            <!-- Create User Card -->
+            <!-- Create User Card (Pre-loaded with 30 Credits + 2 Days VIP Trial) -->
             <div class="bg-white rounded-3xl p-6 md:p-8 shadow-card border border-slate-100 flex flex-col h-full">
-                <div class="mb-6 flex items-center gap-3">
-                    <div class="w-12 h-12 bg-royal-50 text-royal-600 rounded-2xl flex items-center justify-center text-xl border border-royal-100"><i class="fa-solid fa-user-plus"></i></div>
-                    <div><h3 class="text-xl font-black text-dark-900">Create New User</h3></div>
+                <div class="mb-5 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 bg-royal-50 text-royal-600 rounded-2xl flex items-center justify-center text-xl border border-royal-100"><i class="fa-solid fa-user-plus"></i></div>
+                        <div>
+                            <h3 class="text-xl font-black text-dark-900">Create New User</h3>
+                            <p class="text-[10px] font-bold text-green-600 uppercase">Default: 30 Credits + 2 Days VIP Trial</p>
+                        </div>
+                    </div>
                 </div>
                 <form id="adminCreateUserForm" onsubmit="window.createNewUserByAdmin(event)" class="space-y-4 flex-grow flex flex-col">
                     <div class="space-y-4 flex-grow">
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Email ID</label><input type="email" id="newAdminUserEmail" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Password</label><input type="password" id="newAdminUserPass" required minlength="6" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Initial Credits</label><input type="number" id="newAdminUserCredits" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
                         <div>
-                            <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Initial VIP Plan (Optional)</label>
-                            <select id="newAdminUserVipDays" class="w-full p-3.5 border border-amber-300 rounded-xl text-sm bg-amber-50 font-bold text-amber-900 outline-none">
-                                <option value="0">Normal User (No VIP)</option>
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Email ID</label>
+                            <input type="email" id="newAdminUserEmail" placeholder="user@ovportal.com" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Password</label>
+                            <input type="password" id="newAdminUserPass" placeholder="Minimum 6 characters" required minlength="6" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Initial Welcome Credits (Default: 30)</label>
+                            <input type="number" id="newAdminUserCredits" value="30" required class="w-full p-3.5 border border-green-300 rounded-xl text-sm bg-green-50 font-black text-green-900 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Initial VIP Access (Default: 2 Days Trial)</label>
+                            <select id="newAdminUserVipDays" class="w-full p-3.5 border border-amber-300 rounded-xl text-sm bg-amber-50 font-black text-amber-900 outline-none cursor-pointer">
+                                <option value="2" selected>🎁 2 Days Free VIP Trial (Default)</option>
                                 <option value="30">👑 1 Month VIP (+30 Days)</option>
                                 <option value="60">👑 2 Months VIP (+60 Days)</option>
                                 <option value="90">👑 3 Months VIP (+90 Days)</option>
+                                <option value="0">Normal User (0 Days VIP)</option>
                             </select>
                         </div>
                     </div>
-                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-bold py-3.5 rounded-xl text-sm shadow-glow transition mt-4">Register User</button>
+                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl text-sm shadow-glow transition mt-4">
+                        Register User (30 Credits + 2d VIP)
+                    </button>
                 </form>
                 <div id="adminCreateMsg" class="hidden"></div>
             </div>
 
-            <!-- Credit & +30/+60/+90 Days VIP Validity Card -->
+            <!-- Credit & +2/+30/+60/+90 Days VIP Validity Card -->
             <div class="bg-white rounded-3xl p-6 md:p-8 shadow-card border border-slate-100 flex flex-col h-full">
                 <div class="mb-5 flex items-center gap-3">
                     <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-xl border border-amber-200"><i class="fa-solid fa-crown"></i></div>
                     <div>
                         <h3 class="text-xl font-black text-dark-900">Credits & VIP Validity</h3>
-                        <p class="text-[10px] font-bold text-slate-500 uppercase">Add +30 / +60 / +90 Days or Adjust Credits</p>
+                        <p class="text-[10px] font-bold text-slate-500 uppercase">Add +2 / +30 / +60 / +90 Days or Adjust Credits</p>
                     </div>
                 </div>
                 
@@ -731,22 +760,25 @@
                         </div>
                     </div>
 
-                    <!-- 👑 +30, +60, +90 DAYS VIP STACKING BUTTONS -->
+                    <!-- 👑 +2, +30, +60, +90 DAYS VIP STACKING BUTTONS -->
                     <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
                         <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider">Add VIP Validity Days (Stacks on Existing Days)</label>
-                        <div class="grid grid-cols-3 gap-2">
-                            <button type="button" onclick="window.adminUpdateVipDays(30)" class="bg-amber-500 hover:bg-amber-600 text-white font-black py-2.5 px-2 rounded-xl text-xs shadow transition">
-                                +30 Days<br><span class="text-[10px] font-normal opacity-90">(1 Month)</span>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button type="button" onclick="window.adminUpdateVipDays(2)" class="bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-black py-2.5 px-1 rounded-xl text-xs shadow-sm transition">
+                                +2 Days<br><span class="text-[9px] font-bold">(Trial)</span>
                             </button>
-                            <button type="button" onclick="window.adminUpdateVipDays(60)" class="bg-amber-600 hover:bg-amber-700 text-white font-black py-2.5 px-2 rounded-xl text-xs shadow transition">
-                                +60 Days<br><span class="text-[10px] font-normal opacity-90">(2 Months)</span>
+                            <button type="button" onclick="window.adminUpdateVipDays(30)" class="bg-amber-500 hover:bg-amber-600 text-white font-black py-2.5 px-1 rounded-xl text-xs shadow transition">
+                                +30 Days<br><span class="text-[9px] font-normal opacity-90">(1 Month)</span>
                             </button>
-                            <button type="button" onclick="window.adminUpdateVipDays(90)" class="bg-dark-900 hover:bg-black text-royal-300 font-black py-2.5 px-2 rounded-xl text-xs shadow transition">
-                                +90 Days<br><span class="text-[10px] font-normal opacity-90">(3 Months)</span>
+                            <button type="button" onclick="window.adminUpdateVipDays(60)" class="bg-amber-600 hover:bg-amber-700 text-white font-black py-2.5 px-1 rounded-xl text-xs shadow transition">
+                                +60 Days<br><span class="text-[9px] font-normal opacity-90">(2 Months)</span>
+                            </button>
+                            <button type="button" onclick="window.adminUpdateVipDays(90)" class="bg-dark-900 hover:bg-black text-royal-300 font-black py-2.5 px-1 rounded-xl text-xs shadow transition">
+                                +90 Days<br><span class="text-[9px] font-normal opacity-90">(3 Months)</span>
                             </button>
                         </div>
                         <button type="button" onclick="window.adminUpdateVipDays(0)" class="w-full bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 font-bold py-2 rounded-xl text-xs transition">
-                            <i class="fa-solid fa-user-xmark mr-1"></i> Remove VIP (Make Normal User)
+                            <i class="fa-solid fa-user-xmark mr-1"></i> Remove VIP Immediately (Make Normal User)
                         </button>
                     </div>
 
