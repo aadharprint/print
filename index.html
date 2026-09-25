@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,9 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Direct html2canvas & jsPDF for Zero-Cutoff Full A4 PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- html2pdf.js for Single-Page A4 PDF Download -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     
     <!-- Royal Theme Config -->
     <script>
@@ -54,33 +53,26 @@
             animation: slideInRight 0.4s ease-out forwards;
         }
 
-        /* फिक्स सिंगल-पेज A4 लेआउट (794px x 1122px) बिना किसी auto-margin के ताकि बायां हिस्सा कभी न कटे */
+        /* फिक्स सिंगल-पेज A4 लेआउट (794px x 1122px) बिना किसी अंडरलाइन के */
         .affidavit-paper {
             font-family: 'Times New Roman', Times, serif;
-            width: 794px !important;
-            min-width: 794px !important;
-            max-width: 794px !important;
-            height: 1122px !important;
-            min-height: 1122px !important;
-            max-height: 1122px !important;
-            padding: 48px 64px !important;
-            margin: 0 !important;
-            background: #ffffff !important;
-            color: #000000 !important;
-            font-size: 15px !important;
-            line-height: 1.55 !important;
-            box-sizing: border-box !important;
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: space-between !important;
-            overflow: hidden !important;
-            text-align: left;
+            width: 794px;
+            height: 1122px;
+            padding: 48px 64px;
+            background: #ffffff;
+            color: #000000;
+            font-size: 15.5px;
+            line-height: 1.6;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            margin: 0 auto;
+            overflow: hidden;
         }
-        .fill-blank {
-            display: inline;
-            border-bottom: 1px solid #000000;
-            padding: 0 10px;
+        .filled-val {
             font-weight: bold;
+            color: #000000;
         }
     </style>
 
@@ -113,6 +105,7 @@
         window.currentActiveTab = 'domicile';
         window.vipCountdownInterval = null;
 
+        // Payment State Variables
         window.currentRechargeCredits = 0; 
         window.currentTotalPayable = 0;
         window.currentWantsVip = false;
@@ -195,7 +188,7 @@
             
             errorDiv.style.display = 'none';
             const originalBtnHtml = loginBtn.innerHTML;
-            loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> लॉगिन हो रहा है...';
+            loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...';
             loginBtn.disabled = true;
 
             const email = emailInput.includes('@') ? emailInput : `${emailInput.toLowerCase()}@ovportal.com`;
@@ -203,7 +196,7 @@
             try {
                 await signInWithEmailAndPassword(auth, email, passInput);
             } catch (error) {
-                errorDiv.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i> आपकी आईडी या पासवर्ड गलत है!';
+                errorDiv.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i> Your ID or Password are incorrect!';
                 errorDiv.style.display = 'block';
                 document.getElementById('loginPassword').value = '';
                 loginBtn.innerHTML = originalBtnHtml;
@@ -704,39 +697,32 @@
             }
         };
 
-        // ================= ANNEXURE E SINGLE-PAGE A4 HTML BUILDER =================
+        // ================= ANNEXURE E SINGLE-PAGE A4 HTML BUILDER (NO UNDERLINES / NO LINES THROUGH NAMES) =================
         window.buildAnnexureEHtmlString = function(d = {}, withShadow = true) {
-            const padText = (val, minSpaces = 8) => {
-                if (!val || String(val).trim() === '') {
-                    return '&nbsp;'.repeat(minSpaces * 2);
-                }
-                return `&nbsp;&nbsp;${String(val).trim()}&nbsp;&nbsp;`;
-            };
-
-            const title = d.title || 'Shri/Smt./Ms.';
-            const appName = padText(d.applicantName, 12);
-            const rel = d.rel || 'S/o, D/o, W/o';
-            const relName = padText(d.relativeName, 12);
-            const address = padText(d.address, 18);
-            const idNum = padText(d.idNumber, 14);
-            const rec1 = padText(d.recorded1, 12);
-            const rec2 = padText(d.recorded2, 12);
-            const retain = padText(d.retainName, 12);
-            const remove = padText(d.removeName, 12);
-            const place = padText(d.place, 8);
-            const day = padText(d.day, 4);
-            const monthYear = padText(d.monthYear, 10);
+            const title = d.title || 'Shri';
+            const appName = d.applicantName || '';
+            const rel = d.rel || 'S/o';
+            const relName = d.relativeName || '';
+            const address = d.address || '';
+            const idNum = d.idNumber || '';
+            const rec1 = d.recorded1 || '';
+            const rec2 = d.recorded2 || '';
+            const retain = d.retainName || '';
+            const remove = d.removeName || '';
+            const place = d.place || '';
+            const day = d.day || '';
+            const monthYear = d.monthYear || '';
             const shadowClass = withShadow ? 'shadow-2xl' : '';
 
             return `
                 <div class="affidavit-paper ${shadowClass}">
                     <div>
-                        <div style="display: flex; justify-content: space-between; font-family: Arial, sans-serif; font-size: 11px; color: #000000; margin-bottom: 18px;">
+                        <div style="display: flex; justify-content: space-between; font-family: Arial, sans-serif; font-size: 11px; color: #222; margin-bottom: 20px;">
                             <span>HQ-16024/4/2020-EU-I-HQ</span>
                             <span>I/58751/2026</span>
                         </div>
 
-                        <div style="text-align: right; font-weight: bold; font-size: 16px; margin-bottom: 10px;">
+                        <div style="text-align: right; font-weight: bold; font-size: 16px; margin-bottom: 12px;">
                             Annexure E (for adults)
                         </div>
 
@@ -744,43 +730,43 @@
                             AFFIDAVIT
                         </div>
 
-                        <div style="text-align: center; font-size: 14.5px; line-height: 1.4; margin-bottom: 10px; padding: 0 8px;">
+                        <div style="text-align: center; font-size: 14.5px; line-height: 1.4; margin-bottom: 10px; padding: 0 10px;">
                             (Applicable where the name is recorded in Aadhaar with “urf” or “alias” and the Aadhaar<br>
                             number holder seeks to retain one of the names)
                         </div>
 
                         <div style="text-align: center; font-size: 14.5px; margin-bottom: 22px;">
-                            (To be printed on Non-Judicial Stamp Paper of minimum value of ₹10)
+                            (To be printed on Non-Judicial Stamp Paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)
                         </div>
 
-                        <div style="text-align: justify; line-height: 1.85; margin-bottom: 16px;">
-                            I, <span>${title}</span> <span class="fill-blank">${appName}</span>, 
-                            <span>${rel}</span> <span class="fill-blank">${relName}</span>, 
-                            resident of <span class="fill-blank">${address}</span>, do hereby solemnly affirm and declare as under:
+                        <div style="text-align: justify; line-height: 1.75; margin-bottom: 16px;">
+                            I, <span>${title}</span> <span class="filled-val">${appName}</span>, 
+                            <span>${rel}</span> <span class="filled-val">${relName}</span>, 
+                            resident of <span class="filled-val">${address}</span>, do hereby solemnly affirm and declare as under:
                         </div>
 
-                        <ol style="list-style-type: decimal; padding-left: 26px; margin-bottom: 18px; text-align: justify;">
-                            <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.7;">
-                                That I am the holder of Aadhaar Number <span class="fill-blank">${idNum}</span>.
+                        <ol style="list-style-type: decimal; padding-left: 26px; margin-bottom: 20px; text-align: justify;">
+                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
+                                That I am the holder of Aadhaar Number <span class="filled-val">${idNum}</span>.
                             </li>
-                            <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.75;">
-                                That my name is presently recorded/used as <span class="fill-blank">${rec1}</span> urf or alias <span class="fill-blank">${rec2}</span> in my Aadhaar, both names referring to one and the same person, i.e. myself.
+                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
+                                That my name is presently recorded/used as <span class="filled-val">${rec1}</span> urf or alias <span class="filled-val">${rec2}</span> in my Aadhaar, both names referring to one and the same person, i.e. myself.
                             </li>
-                            <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.75;">
-                                That I intend to retain the name <span class="fill-blank">${retain}</span> and discontinue the use of <span class="fill-blank">${remove}</span> as an alias/urf.
+                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
+                                That I intend to retain the name <span class="filled-val">${retain}</span> and discontinue the use of <span class="filled-val">${remove}</span> as an alias/urf.
                             </li>
-                            <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.5;">
+                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
                                 That the requested update is limited to removal of the “urf or alias” and retention of the aforesaid name and does not amount to a change of identity or adoption of a different name.
                             </li>
-                            <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.5;">
+                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
                                 That I am submitting the prescribed supporting document(s) in support of the name sought to be retained.
                             </li>
-                            <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.5;">
+                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
                                 That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of my Aadhaar number and prosecution under the applicable laws.
                             </li>
                         </ol>
 
-                        <div style="text-align: right; font-weight: normal; margin-top: 28px; margin-bottom: 14px;">
+                        <div style="text-align: right; font-weight: bold; margin-top: 30px; margin-bottom: 16px;">
                             Deponent
                         </div>
 
@@ -788,15 +774,15 @@
                             Verification:
                         </div>
 
-                        <div style="text-align: justify; line-height: 1.75; margin-bottom: 32px;">
-                            Verified at <span class="fill-blank">${place}</span> on this <span class="fill-blank">${day}</span> day of <span class="fill-blank">${monthYear}</span> that the contents of this affidavit are true and correct to the best of my knowledge and belief, and nothing material has been concealed therefrom.
+                        <div style="text-align: justify; line-height: 1.7; margin-bottom: 34px;">
+                            Verified at <span class="filled-val">${place}</span> on this <span class="filled-val">${day}</span> day of <span class="filled-val">${monthYear}</span> that the contents of this affidavit are true and correct to the best of my knowledge and belief, and nothing material has been concealed therefrom.
                         </div>
 
-                        <div style="text-align: right; font-weight: normal; margin-bottom: 22px;">
+                        <div style="text-align: right; font-weight: bold; margin-bottom: 22px;">
                             Deponent
                         </div>
 
-                        <div style="text-align: center; font-size: 14.5px; line-height: 1.45;">
+                        <div style="text-align: center; font-size: 14.5px; line-height: 1.4;">
                             (This affidavit may be signed and attested in presence of a Judicial Magistrate or Executive<br>
                             Magistrate/Notary Public)
                         </div>
@@ -809,6 +795,7 @@
             `;
         };
 
+        // Helpers for Annexure E Form
         window.getOrdinalDay = function(n) {
             const s = ["th", "st", "nd", "rd"];
             const v = n % 100;
@@ -849,70 +836,57 @@
             removeInput.value = temp;
         };
 
-        // 🔥 100% ZERO-CUTOFF DIRECT html2canvas + jsPDF A4 ENGINE (WORKS ON MOBILE & DESKTOP)
+        // ZERO-CLIPPING SINGLE-PAGE A4 PDF DOWNLOADER
         window.downloadHtmlDocAsPdf = async function(formDataObj, fileName) {
             const btn = document.getElementById('modalDownloadBtn');
             const origHtml = btn ? btn.innerHTML : '';
             if (btn) {
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> डाउनलोड हो रहा है...';
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Downloading...';
                 btn.disabled = true;
             }
 
-            // स्क्रीन के बाएं कोने (0,0) पर बिना किसी मार्जिन या फ्लेक्स के 794x1122 स्टेज बनाएं
-            const stage = document.createElement('div');
-            stage.id = 'pdfExportStage';
-            stage.style.cssText = 'position:fixed; left:0; top:0; width:794px; height:1122px; margin:0; padding:0; background:#ffffff; z-index:-9999; overflow:hidden;';
-            stage.innerHTML = window.buildAnnexureEHtmlString(formDataObj, false);
-            document.body.appendChild(stage);
+            const tempWrapper = document.createElement('div');
+            tempWrapper.style.position = 'fixed';
+            tempWrapper.style.left = '0';
+            tempWrapper.style.top = '0';
+            tempWrapper.style.width = '794px';
+            tempWrapper.style.height = '1122px';
+            tempWrapper.style.zIndex = '-9999';
+            tempWrapper.style.background = '#ffffff';
+            tempWrapper.style.overflow = 'hidden';
+            tempWrapper.innerHTML = window.buildAnnexureEHtmlString(formDataObj, false);
+            document.body.appendChild(tempWrapper);
 
-            const targetEl = stage.querySelector('.affidavit-paper');
+            const targetEl = tempWrapper.querySelector('.affidavit-paper');
 
             try {
-                const canvas = await window.html2canvas(targetEl, {
-                    scale: 2,
-                    useCORS: true,
-                    backgroundColor: '#ffffff',
-                    x: 0,
-                    y: 0,
-                    scrollX: 0,
-                    scrollY: 0,
-                    width: 794,
-                    height: 1122,
-                    windowWidth: 1200,
-                    windowHeight: 1400,
-                    onclone: (clonedDoc) => {
-                        clonedDoc.body.style.margin = '0';
-                        clonedDoc.body.style.padding = '0';
-                        clonedDoc.body.style.display = 'block';
-                        const clonedStage = clonedDoc.getElementById('pdfExportStage');
-                        if (clonedStage) {
-                            clonedStage.style.position = 'static';
-                            clonedStage.style.margin = '0';
-                            clonedStage.style.padding = '0';
-                            clonedStage.style.width = '794px';
-                            clonedStage.style.height = '1122px';
-                        }
+                const opt = {
+                    margin: 0,
+                    filename: fileName,
+                    image: { type: 'jpeg', quality: 1.0 },
+                    html2canvas: {
+                        scale: 2,
+                        useCORS: true,
+                        scrollY: 0,
+                        scrollX: 0,
+                        width: 794,
+                        height: 1122,
+                        windowWidth: 794,
+                        windowHeight: 1122
+                    },
+                    jsPDF: {
+                        unit: 'px',
+                        format: [794, 1122],
+                        orientation: 'portrait',
+                        hotfixes: ['px_scaling']
                     }
-                });
-
-                const imgData = canvas.toDataURL('image/jpeg', 0.98);
-                const { jsPDF } = window.jspdf;
-                const pdf = new jsPDF({
-                    orientation: 'portrait',
-                    unit: 'mm',
-                    format: 'a4'
-                });
-
-                // पूरे 794x1122 पेज को A4 (210mm x 297mm) पर (0,0) से पूरा फिट करें
-                pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-                pdf.save(fileName);
+                };
+                await html2pdf().set(opt).from(targetEl).save();
             } catch (err) {
                 console.error("PDF Download Error:", err);
-                alert("पीडीएफ डाउनलोड करने में समस्या आई: " + err.message);
+                alert("PDF डाउनलोड करने में समस्या आई।");
             } finally {
-                if (stage && stage.parentNode) {
-                    stage.parentNode.removeChild(stage);
-                }
+                document.body.removeChild(tempWrapper);
                 if (btn) {
                     btn.innerHTML = origHtml;
                     btn.disabled = false;
@@ -927,7 +901,7 @@
             if (!window.currentUserData) return alert('Please login first!');
             if (!window.currentUserData.isVip) return alert('यह सर्विस केवल VIP यूज़र्स के लिए है!');
 
-            const docCost = 8; // 20% VIP Discount (8 Credits)
+            const docCost = 8;
             if (!window.currentUserData.isAdmin && window.currentUserData.credits < docCost) {
                 return alert(`Insufficient credits! You need ${docCost} credits to generate Annexure E. Please add credits from your wallet.`);
             }
@@ -974,7 +948,7 @@
                     timestamp: new Date()
                 });
 
-                alert('आपका डॉक्यूमेंट (Annexure E) जनरेट हो चुका है! अब आप अपनी हिस्ट्री (Documents) से इसे Preview और Download कर सकते हैं।');
+                alert('आपका डॉक्यूमेंट (Annexure E) सफलतापूर्वक जनरेट हो चुका है! अब आप अपनी हिस्ट्री (Documents) से इसे Preview और Download कर सकते हैं।');
                 event.target.reset();
                 window.switchService('history');
             } catch (err) {
@@ -1002,7 +976,7 @@
                 spinner.style.display = 'none';
                 iframe.style.display = 'none';
                 htmlPreviewContainer.style.display = 'flex';
-                htmlPreviewContainer.innerHTML = `<div class="mx-auto">${window.buildAnnexureEHtmlString(fData, true)}</div>`;
+                htmlPreviewContainer.innerHTML = window.buildAnnexureEHtmlString(fData, true);
 
                 downloadBtn.onclick = async function() {
                     await window.downloadHtmlDocAsPdf(fData, fileName);
@@ -1386,7 +1360,7 @@
                 `;
             }
 
-            // 🔥 VIP EXCLUSIVE: ANNEXURE E (CLEAN FORM -> GENERATES & SAVES TO HISTORY)
+            // VIP EXCLUSIVE: ANNEXURE E (CLEAN FORM ONLY -> GENERATES & SAVES TO HISTORY)
             else if(serviceName === 'annexuree') {
                 if (!window.currentUserData || !window.currentUserData.isVip) {
                     return window.switchService('domicile');
@@ -1429,7 +1403,7 @@
                                 </div>
                                 <div class="col-span-2">
                                     <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पिता / पति का नाम (Father/Husband)</label>
-                                    <input type="text" id="inpRelativeName" placeholder="e.g. SURESH KUMAR" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none">
+                                    <input type="text" id="inpRelativeName" placeholder="e.g. SURESH CHAND" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none">
                                 </div>
                             </div>
 
@@ -1455,7 +1429,7 @@
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div>
                                         <label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">पहला नाम (Recorded Name 1)</label>
-                                        <input type="text" id="inpRecorded1" oninput="window.syncAnnexureENames()" placeholder="e.g. RAMESH KUMAR" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-white">
+                                        <input type="text" id="inpRecorded1" oninput="window.syncAnnexureENames()" placeholder="e.g. RAMESH" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-white">
                                     </div>
                                     <div>
                                         <label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">उर्फ़ के बाद का नाम (Alias Name 2)</label>
@@ -1469,7 +1443,7 @@
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div>
                                         <label class="block text-[10px] font-bold text-green-800 uppercase mb-1">रखने वाला नाम (Retain Name)</label>
-                                        <input type="text" id="inpRetainName" placeholder="e.g. RAMESH KUMAR" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-white">
+                                        <input type="text" id="inpRetainName" placeholder="e.g. RAMESH" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-white">
                                     </div>
                                     <div>
                                         <label class="block text-[10px] font-bold text-red-700 uppercase mb-1">हटाने वाला नाम (Discontinue)</label>
@@ -1492,7 +1466,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">महीना व वर्ष (Month & Year)</label>
-                                    <input type="text" id="inpMonthYear" placeholder="e.g. SEPTEMBER, 2026" required class="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold uppercase bg-white">
+                                    <input type="text" id="inpMonthYear" placeholder="e.g. SEPTEMBER 2026" required class="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold uppercase bg-white">
                                 </div>
                             </div>
                         </div>
@@ -1744,7 +1718,7 @@
         <p class="text-sm text-royal-300 mt-2 font-bold animate-pulse">Checking Security...</p>
     </div>
 
-    <!-- 🔔 FLOATING CORNER ALERT WHEN 5 DAYS OR LESS REMAINING IN VIP -->
+    <!-- FLOATING CORNER ALERT WHEN 5 DAYS OR LESS REMAINING IN VIP -->
     <div id="vipCornerAlert" style="display: none;" class="fixed bottom-5 right-5 z-[150] w-80 md:w-96 bg-amber-50 border-l-8 border-amber-500 rounded-2xl p-4 shadow-2xl text-slate-800 corner-alert-anim">
         <div class="flex justify-between items-start mb-1.5">
             <h4 class="text-sm font-black text-amber-900 flex items-center gap-1.5">
@@ -1783,7 +1757,7 @@
                     <p class="text-sm font-bold text-slate-600 mt-2">Loading Preview...</p>
                 </div>
                 <iframe id="pdfIframe" class="w-full h-full relative z-10 border-none" onload="document.getElementById('pdfLoadingSpinner').style.display='none'" src=""></iframe>
-                <div id="htmlDocPreviewContainer" style="display: none;" class="w-full min-h-full p-4 md:p-8 justify-start md:justify-center items-start relative z-20 bg-slate-300 overflow-x-auto"></div>
+                <div id="htmlDocPreviewContainer" style="display: none;" class="w-full min-h-full p-4 md:p-8 justify-center items-start relative z-20 bg-slate-300 overflow-x-auto"></div>
             </div>
         </div>
     </div>
@@ -1823,7 +1797,6 @@
                 </div>
             </div>
 
-            <!-- TOP RIGHT CORNER: VIP DAYS REMAINING + CREDITS + LOGOUT -->
             <div class="flex flex-wrap items-center gap-2.5 md:gap-3">
                 <div id="vipHeaderTimerBox" style="display: none;" onclick="window.switchService('payments_history')" title="अपनी VIP वैलिडिटी और पेमेंट हिस्ट्री देखें" class="cursor-pointer items-center gap-2 bg-amber-400/20 border-2 border-royal-400 text-royal-300 px-3.5 py-1.5 rounded-xl text-xs font-black shadow-sm hover:bg-amber-400/30 transition">
                     <i class="fa-solid fa-crown text-yellow-400 animate-bounce"></i>
@@ -1843,7 +1816,7 @@
 
         <main class="max-w-6xl mx-auto w-full p-4 md:p-8 flex-grow">
             
-            <!-- ✨ SHINY VIP PROMO BANNER WITH 3 PLANS FOR NORMAL USERS ✨ -->
+            <!-- SHINY VIP PROMO BANNER WITH 3 PLANS FOR NORMAL USERS -->
             <div id="normalUserVipPromo" style="display: none;" class="mb-6 rounded-3xl vip-promo-shine border-2 border-royal-400 p-5 text-white shadow-vip-glow relative overflow-hidden">
                 <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 relative z-10">
                     <div class="space-y-1.5">
@@ -1889,7 +1862,7 @@
                 <button onclick="window.switchService('add_credit')" id="btn-add_credit" class="service-tab !bg-amber-50 !text-amber-700 !border-amber-200 hover:!bg-amber-100"><i class="fa-solid fa-plus-circle"></i> Add Credit / VIP</button>
             </div>
 
-            <!-- 👑 VIP EXCLUSIVE SERVICES PANEL -->
+            <!-- VIP EXCLUSIVE SERVICES PANEL -->
             <div id="vipServicesBar" style="display: none;" class="mb-8 p-5 rounded-3xl bg-gradient-to-r from-dark-950 via-dark-900 to-dark-950 border-2 border-royal-400 shadow-vip-glow">
                 <div class="flex flex-wrap items-center justify-between mb-3 border-b border-slate-800 pb-2.5 gap-2">
                     <span class="text-xs font-black uppercase tracking-widest text-royal-300 flex items-center gap-2">
