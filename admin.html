@@ -56,7 +56,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBSiDAvDYyBG8hkmez7s900JHhlbenG2nU",
@@ -78,7 +78,10 @@
         window.allUsersMap = {}; 
         window.usersDataList = {}; 
         window.adminAllHistoryData = []; 
-        window.pendingPaymentsData = []; 
+        
+        // Payment History & Filter State
+        window.allPaymentsData = []; 
+        window.currentPaymentFilter = 'Pending'; // 'Pending' | 'Approved' | 'Rejected' | 'ALL'
 
         onAuthStateChanged(auth, async (user) => {
             if (!user || user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
@@ -99,7 +102,7 @@
             window.location.href = "index.html";
         };
 
-        // UTR कॉपी करने का फंक्शन (मोबाइल के लिए बेहद उपयोगी)
+        // UTR कॉपी करने का फंक्शन
         window.copyUtrText = function(utr, btnEl) {
             navigator.clipboard.writeText(utr);
             const orig = btnEl.innerHTML;
@@ -107,53 +110,129 @@
             setTimeout(() => { btnEl.innerHTML = orig; }, 1500);
         };
 
-        // ================= SECTION 1: MOBILE-FRIENDLY PENDING PAYMENTS & VIP APPROVALS =================
-        window.loadPendingPayments = async function() {
+        // ================= SECTION 1: COMPLETE PAYMENT NOTIFICATIONS, HISTORY & RESOLUTION =================
+        window.loadAllPayments = async function() {
             const container = document.getElementById('adminPaymentsCardsContainer');
             container.innerHTML = `
                 <div class="col-span-1 md:col-span-2 p-10 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100">
-                    <i class="fa-solid fa-spinner fa-spin text-3xl mb-2 text-royal-500"></i><br>पेमेंट रिक्वेस्ट लोड हो रही हैं...
+                    <i class="fa-solid fa-spinner fa-spin text-3xl mb-2 text-royal-500"></i><br>सभी पेमेंट और हिस्ट्री लोड हो रही हैं...
                 </div>`;
 
             try {
-                const q = query(collection(db, "payments"), where("status", "==", "Pending"));
-                const querySnapshot = await getDocs(q);
+                // सभी पेमेंट्स लोड करें (Pending, Approved, Rejected) ताकि पूरी हिस्ट्री रहे
+                const querySnapshot = await getDocs(collection(db, "payments"));
                 
-                window.pendingPaymentsData = [];
-                querySnapshot.forEach((docSnap) => { window.pendingPaymentsData.push({ id: docSnap.id, ...docSnap.data() }); });
-                window.pendingPaymentsData.sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
-                window.renderPendingPayments();
+                window.allPaymentsData = [];
+                querySnapshot.forEach((docSnap) => {
+                    window.allPaymentsData.push({ id: docSnap.id, ...docSnap.data() });
+                });
+
+                // सबसे नई पेमेंट सबसे ऊपर (Newest First)
+                window.allPaymentsData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+                
+                window.updatePaymentStatsAndBadges();
+                window.renderPaymentsByFilter();
             } catch (err) {
                 container.innerHTML = `<div class="col-span-1 md:col-span-2 p-6 text-center text-red-500 font-bold bg-white rounded-2xl">Error: ${err.message}</div>`;
             }
         };
 
-        window.renderPendingPayments = function() {
-            const container = document.getElementById('adminPaymentsCardsContainer');
-            const count = window.pendingPaymentsData.length;
-            
-            document.getElementById('pendingPaymentsCount').innerText = `${count} Pending`;
+        window.updatePaymentStatsAndBadges = function() {
+            let pendingCount = 0, pendingAmt = 0;
+            let approvedCount = 0, approvedAmt = 0;
+            let rejectedCount = 0, rejectedAmt = 0;
+
+            window.allPaymentsData.forEach(item => {
+                const amt = parseFloat(item.amountPaid) || 0;
+                const st = (item.status || 'Pending');
+                if (st === 'Pending') {
+                    pendingCount++;
+                    pendingAmt += amt;
+                } else if (st === 'Approved' || st === 'Auto-Approved') {
+                    approvedCount++;
+                    approvedAmt += amt;
+                } else if (st === 'Rejected') {
+                    rejectedCount++;
+                    rejectedAmt += amt;
+                }
+            });
+
+            // Update Top Summary Cards
+            document.getElementById('statPendingCount').innerText = `${pendingCount} Requests`;
+            document.getElementById('statPendingAmt').innerText = `₹${pendingAmt}`;
+            document.getElementById('statApprovedCount').innerText = `${approvedCount} Txns`;
+            document.getElementById('statApprovedAmt').innerText = `₹${approvedAmt}`;
+            document.getElementById('statRejectedCount').innerText = `${rejectedCount} Txns`;
+            document.getElementById('statRejectedAmt').innerText = `₹${rejectedAmt}`;
+
+            // Update Filter Pill Counts
+            document.getElementById('pillCountPending').innerText = pendingCount;
+            document.getElementById('pillCountApproved').innerText = approvedCount;
+            document.getElementById('pillCountRejected').innerText = rejectedCount;
+            document.getElementById('pillCountAll').innerText = window.allPaymentsData.length;
+
+            // Update Main Navbar Red Badge
             const navBadge = document.getElementById('navPendingBadge');
             if (navBadge) {
-                navBadge.innerText = count;
-                navBadge.style.display = count > 0 ? 'inline-flex' : 'none';
+                navBadge.innerText = pendingCount;
+                navBadge.style.display = pendingCount > 0 ? 'inline-flex' : 'none';
             }
+        };
+
+        window.setPaymentFilter = function(filterStatus) {
+            window.currentPaymentFilter = filterStatus;
+
+            // Style Filter Pills
+            const filters = ['Pending', 'Approved', 'Rejected', 'ALL'];
+            filters.forEach(f => {
+                const btn = document.getElementById(`filterPill-${f}`);
+                if (!btn) return;
+                if (f === filterStatus) {
+                    btn.className = "px-3 py-2 rounded-xl text-xs font-black bg-dark-900 text-royal-300 shadow-sm transition flex items-center justify-center gap-1.5 border border-royal-500/40";
+                } else {
+                    btn.className = "px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition flex items-center justify-center gap-1.5 border border-slate-200";
+                }
+            });
+
+            window.renderPaymentsByFilter();
+        };
+
+        window.renderPaymentsByFilter = function() {
+            const container = document.getElementById('adminPaymentsCardsContainer');
+            const searchQuery = (document.getElementById('paymentSearchInput')?.value || '').trim().toLowerCase();
+            const activeFilter = window.currentPaymentFilter;
+
+            let list = window.allPaymentsData.filter(item => {
+                const st = (item.status || 'Pending');
+                if (activeFilter === 'Pending' && st !== 'Pending') return false;
+                if (activeFilter === 'Approved' && st !== 'Approved' && st !== 'Auto-Approved') return false;
+                if (activeFilter === 'Rejected' && st !== 'Rejected') return false;
+
+                if (searchQuery) {
+                    const emailMatch = (item.email || '').toLowerCase().includes(searchQuery);
+                    const utrMatch = (item.utrNumber || '').toLowerCase().includes(searchQuery);
+                    const amtMatch = String(item.amountPaid || '').includes(searchQuery);
+                    return emailMatch || utrMatch || amtMatch;
+                }
+                return true;
+            });
 
             container.innerHTML = '';
 
-            if(count === 0) {
+            if(list.length === 0) {
+                const emptyTitle = activeFilter === 'Pending' ? 'कोई पेंडिंग पेमेंट नहीं है!' : 'इस फिल्टर में कोई पेमेंट रिकॉर्ड नहीं मिला!';
                 container.innerHTML = `
-                    <div class="col-span-1 md:col-span-2 p-12 text-center bg-white rounded-3xl border border-slate-100 shadow-card">
-                        <div class="w-16 h-16 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto mb-3 text-3xl">
-                            <i class="fa-solid fa-check-double"></i>
+                    <div class="col-span-1 md:col-span-2 p-10 text-center bg-white rounded-3xl border border-slate-100 shadow-card">
+                        <div class="w-14 h-14 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
+                            <i class="fa-solid fa-receipt"></i>
                         </div>
-                        <h4 class="text-base font-black text-slate-800">कोई पेंडिंग पेमेंट नहीं है!</h4>
-                        <p class="text-xs text-slate-400 font-semibold mt-1">सभी पेमेंट और VIP रिक्वेस्ट क्लियर हो चुकी हैं।</p>
+                        <h4 class="text-sm font-black text-slate-700">${emptyTitle}</h4>
+                        <p class="text-xs text-slate-400 font-semibold mt-1">आप ऊपर दिए गए टैब्स से Approved, Rejected या All History देख सकते हैं।</p>
                     </div>`;
                 return;
             }
 
-            window.pendingPaymentsData.forEach(data => {
+            list.forEach(data => {
                 const sec = data.timestamp?.seconds || Math.floor(Date.now() / 1000);
                 const dateObj = new Date(sec * 1000);
                 const dateStr = dateObj.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
@@ -161,28 +240,83 @@
                 
                 const vipDays = data.vipDaysRequested || (data.wantsVip ? 30 : 0);
                 const vipFee = data.vipPlanFee || (data.wantsVip ? 100 : 0);
-                const creditsReq = data.creditsRequested || 0;
+                const creditsReq = data.creditsRequested !== undefined ? data.creditsRequested : (data.creditsAdded || 0);
+                const status = data.status || 'Pending';
+
+                // Status Badge
+                let statusBadge = '';
+                let cardBorder = 'border-slate-200';
+                if (status === 'Pending') {
+                    statusBadge = `<span class="bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 rounded-full text-[10px] font-black animate-pulse"><i class="fa-solid fa-clock mr-1"></i>Pending</span>`;
+                    cardBorder = 'border-amber-300';
+                } else if (status === 'Approved' || status === 'Auto-Approved') {
+                    statusBadge = `<span class="bg-green-100 text-green-800 border border-green-300 px-2.5 py-0.5 rounded-full text-[10px] font-black"><i class="fa-solid fa-check-circle mr-1"></i>Approved</span>`;
+                    cardBorder = 'border-green-200';
+                } else {
+                    statusBadge = `<span class="bg-red-100 text-red-700 border border-red-300 px-2.5 py-0.5 rounded-full text-[10px] font-black"><i class="fa-solid fa-circle-xmark mr-1"></i>Rejected</span>`;
+                    cardBorder = 'border-red-200';
+                }
 
                 const vipBanner = vipDays > 0 
-                    ? `<div class="flex items-center justify-between bg-amber-50 border border-amber-300 px-3 py-2 rounded-xl">
-                        <span class="text-xs font-black text-amber-900 flex items-center gap-1.5"><i class="fa-solid fa-crown text-amber-500"></i> VIP Plan Request</span>
-                        <span class="bg-amber-400 text-dark-950 text-xs font-black px-2.5 py-0.5 rounded-full">+${vipDays} Days (₹${vipFee})</span>
+                    ? `<div class="flex items-center justify-between bg-amber-50 border border-amber-300 px-3 py-1.5 rounded-xl">
+                        <span class="text-[11px] font-black text-amber-900"><i class="fa-solid fa-crown text-amber-500 mr-1"></i> VIP Plan</span>
+                        <span class="bg-amber-400 text-dark-950 text-[11px] font-black px-2 py-0.5 rounded-full">+${vipDays} Days (₹${vipFee})</span>
                        </div>` 
                     : `<div class="flex items-center justify-between bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
-                        <span class="text-[11px] font-bold text-slate-500">Request Type</span>
+                        <span class="text-[11px] font-bold text-slate-500">Plan Type</span>
                         <span class="text-[11px] font-bold text-slate-700">Normal Credit Recharge</span>
                        </div>`;
 
+                // Action / Resolution Buttons based on status
+                let actionButtonsHtml = '';
+                if (status === 'Pending') {
+                    actionButtonsHtml = `
+                        <div class="grid grid-cols-2 gap-2 pt-1">
+                            <button onclick="window.approvePayment('${data.id}', '${data.userId}', ${creditsReq}, ${vipDays}, false)" class="bg-green-600 hover:bg-green-700 active:scale-95 text-white py-2.5 rounded-xl text-xs font-black shadow-sm transition flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-check-circle"></i> Approve
+                            </button>
+                            <button onclick="window.rejectPayment('${data.id}')" class="bg-red-50 hover:bg-red-600 active:scale-95 text-red-600 hover:text-white border border-red-200 py-2.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-circle-xmark"></i> Reject
+                            </button>
+                        </div>
+                    `;
+                } else if (status === 'Rejected') {
+                    // Resolution Feature: Allow Admin to Approve a previously Rejected payment if resolved later!
+                    actionButtonsHtml = `
+                        <div class="flex items-center gap-2 pt-1">
+                            <button onclick="window.approvePayment('${data.id}', '${data.userId}', ${creditsReq}, ${vipDays}, true)" class="flex-1 bg-amber-500 hover:bg-amber-600 active:scale-95 text-dark-950 py-2.5 px-3 rounded-xl text-xs font-black shadow-sm transition flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> Resolve & Approve Now (+${creditsReq} Cr)
+                            </button>
+                            <button onclick="window.deletePaymentRecord('${data.id}')" class="w-9 h-9 bg-slate-100 hover:bg-red-500 text-slate-500 hover:text-white rounded-xl text-xs transition flex items-center justify-center" title="Delete Record">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    // Approved Status
+                    actionButtonsHtml = `
+                        <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px] text-green-700 font-bold">
+                            <span><i class="fa-solid fa-circle-check mr-1"></i> क्रेडिट्स और प्लान यूज़र को मिल चुके हैं</span>
+                            <button onclick="window.deletePaymentRecord('${data.id}')" class="text-slate-400 hover:text-red-600 px-2 py-1 rounded transition" title="Delete History Record">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    `;
+                }
+
                 container.innerHTML += `
-                    <div class="bg-white rounded-2xl p-4 md:p-5 shadow-card border-2 border-slate-100 hover:border-royal-400 transition flex flex-col justify-between space-y-3.5">
-                        <!-- Top: User & Amount -->
-                        <div class="flex justify-between items-start gap-2 border-b border-slate-100 pb-3">
+                    <div class="bg-white rounded-2xl p-4 shadow-card border-2 ${cardBorder} transition flex flex-col justify-between space-y-3">
+                        <!-- Top: User, Date & Amount -->
+                        <div class="flex justify-between items-start gap-2 border-b border-slate-100 pb-2.5">
                             <div class="overflow-hidden">
+                                <div class="flex items-center gap-1.5 mb-1">
+                                    ${statusBadge}
+                                    <span class="text-[11px] font-semibold text-slate-400">${dateStr} • ${timeStr}</span>
+                                </div>
                                 <p class="text-xs md:text-sm font-black text-dark-900 truncate"><i class="fa-solid fa-user text-royal-500 mr-1"></i> ${data.email}</p>
-                                <p class="text-[11px] font-semibold text-slate-400 mt-0.5"><i class="fa-regular fa-clock mr-1"></i> ${dateStr} • ${timeStr}</p>
                             </div>
                             <div class="text-right shrink-0">
-                                <span class="bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-xl text-lg font-black block">₹${data.amountPaid}</span>
+                                <span class="bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-xl text-base md:text-lg font-black block">₹${data.amountPaid || 0}</span>
                             </div>
                         </div>
 
@@ -190,40 +324,34 @@
                         <div class="space-y-2">
                             <div class="flex items-center justify-between bg-slate-100 px-3 py-2 rounded-xl border border-slate-200">
                                 <div>
-                                    <span class="text-[10px] font-bold text-slate-400 uppercase block">UTR / Ref Number</span>
-                                    <span class="font-mono font-black text-sm text-slate-900 tracking-wider">${data.utrNumber}</span>
+                                    <span class="text-[9px] font-bold text-slate-400 uppercase block">UTR / Ref Number</span>
+                                    <span class="font-mono font-black text-xs md:text-sm text-slate-900 tracking-wider">${data.utrNumber || 'N/A'}</span>
                                 </div>
-                                <button onclick="window.copyUtrText('${data.utrNumber}', this)" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition">
+                                <button onclick="window.copyUtrText('${data.utrNumber || ''}', this)" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-2.5 py-1 rounded-lg text-[11px] font-bold shadow-sm transition">
                                     <i class="fa-regular fa-copy mr-1"></i> Copy
                                 </button>
                             </div>
 
-                            <div class="flex items-center justify-between bg-royal-50/60 border border-royal-200 px-3 py-2 rounded-xl">
-                                <span class="text-xs font-bold text-royal-900">Credits to Add:</span>
-                                <span class="text-sm font-black text-royal-600">+${creditsReq} Credits</span>
+                            <div class="flex items-center justify-between bg-royal-50/60 border border-royal-200 px-3 py-1.5 rounded-xl">
+                                <span class="text-[11px] font-bold text-royal-900">Credits Requested:</span>
+                                <span class="text-xs font-black text-royal-600">+${creditsReq} Credits</span>
                             </div>
 
                             ${vipBanner}
                         </div>
 
-                        <!-- Bottom: Thumb-Friendly Approve / Reject Buttons -->
-                        <div class="grid grid-cols-2 gap-2.5 pt-1">
-                            <button onclick="window.approvePayment('${data.id}', '${data.userId}', ${creditsReq}, ${vipDays})" class="bg-green-600 hover:bg-green-700 active:scale-95 text-white py-3 rounded-xl text-xs md:text-sm font-black shadow-sm transition flex items-center justify-center gap-1.5">
-                                <i class="fa-solid fa-check-circle"></i> Approve
-                            </button>
-                            <button onclick="window.rejectPayment('${data.id}')" class="bg-red-50 hover:bg-red-600 active:scale-95 text-red-600 hover:text-white border border-red-200 py-3 rounded-xl text-xs md:text-sm font-black transition flex items-center justify-center gap-1.5">
-                                <i class="fa-solid fa-circle-xmark"></i> Reject
-                            </button>
-                        </div>
+                        <!-- Bottom: Action / Resolution Controls -->
+                        ${actionButtonsHtml}
                     </div>
                 `;
             });
         };
 
-        window.approvePayment = async function(paymentDocId, userId, creditsToAdd, vipDaysToAdd) {
+        window.approvePayment = async function(paymentDocId, userId, creditsToAdd, vipDaysToAdd, isResolution = false) {
+            const titleText = isResolution ? `Resolve & Approve Rejected Payment:` : `Approve Payment:`;
             const confirmMsg = vipDaysToAdd > 0 
-                ? `Approve Payment:\n• Add +${creditsToAdd} Credits\n• Add +${vipDaysToAdd} Days VIP Access\n\nक्या आप कन्फर्म हैं?`
-                : `Approve Payment and add +${creditsToAdd} Credits to this user?`;
+                ? `${titleText}\n• Add +${creditsToAdd} Credits\n• Add +${vipDaysToAdd} Days VIP Access\n\nक्या आप कन्फर्म हैं?`
+                : `${titleText}\n• Add +${creditsToAdd} Credits to this user?\n\nक्या आप कन्फर्म हैं?`;
             
             if(!confirm(confirmMsg)) return;
 
@@ -251,23 +379,34 @@
                 }
 
                 await updateDoc(userRef, updatePayload);
-                await updateDoc(doc(db, "payments", paymentDocId), { status: "Approved" });
+                await updateDoc(doc(db, "payments", paymentDocId), { 
+                    status: "Approved",
+                    resolvedAt: new Date()
+                });
 
                 alert(vipDaysToAdd > 0 
-                    ? `Approved! +${creditsToAdd} Credits और +${vipDaysToAdd} Days VIP वैलिडिटी जोड़ दी गई है!` 
-                    : `Approved! +${creditsToAdd} Credits यूज़र के वॉलेट में जोड़ दिए गए हैं।`);
+                    ? `सफलतापूर्वक अप्रूव हो गया! +${creditsToAdd} Credits और +${vipDaysToAdd} Days VIP वैलिडिटी जोड़ दी गई है!` 
+                    : `सफलतापूर्वक अप्रूव हो गया! +${creditsToAdd} Credits यूज़र के वॉलेट में जोड़ दिए गए हैं।`);
                 
                 await window.loadAllUsersForDropdown();
-                window.loadPendingPayments();
+                window.loadAllPayments();
             } catch (err) { alert('Error approving payment: ' + err.message); }
         };
 
         window.rejectPayment = async function(paymentDocId) {
-            if(!confirm(`क्या आप वाकई इस पेमेंट रिक्वेस्ट को REJECT करना चाहते हैं?`)) return;
+            if(!confirm(`क्या आप इस पेमेंट को REJECT करना चाहते हैं?\n(यह आपकी Rejected History में सेव रहेगा, जिसे आप बाद में चाहें तो Resolve भी कर सकते हैं)`)) return;
             try {
                 await updateDoc(doc(db, "payments", paymentDocId), { status: "Rejected" });
-                window.loadPendingPayments();
+                window.loadAllPayments();
             } catch (err) { alert('Error rejecting payment: ' + err.message); }
+        };
+
+        window.deletePaymentRecord = async function(paymentDocId) {
+            if(!confirm(`क्या आप इस पेमेंट हिस्ट्री रिकॉर्ड को हमेशा के लिए डिलीट करना चाहते हैं?`)) return;
+            try {
+                await deleteDoc(doc(db, "payments", paymentDocId));
+                window.loadAllPayments();
+            } catch (err) { alert('Error deleting payment record: ' + err.message); }
         };
 
         // ================= SECTION 2: USER & VIP VALIDITY MANAGEMENT =================
@@ -990,7 +1129,7 @@
             const activeSection = document.getElementById(`section-${tabName}`);
             if(activeSection) activeSection.classList.remove('hidden');
 
-            if (tabName === 'payments') window.loadPendingPayments();
+            if (tabName === 'payments') window.loadAllPayments();
             if (tabName === 'history') window.loadAdminHistory(); 
         };
     </script>
@@ -1037,7 +1176,7 @@
             </div>
             <div>
                 <h2 class="text-sm md:text-lg font-black text-white leading-tight">Admin <span class="text-royal-400">Harish Kumar</span></h2>
-                <p class="text-[10px] font-bold text-slate-400">Payment & VIP Control Panel</p>
+                <p class="text-[10px] font-bold text-slate-400">Payment History & VIP Control</p>
             </div>
         </div>
         <div class="flex items-center gap-2">
@@ -1053,10 +1192,10 @@
     <main id="adminPanelContent" class="max-w-5xl mx-auto w-full p-3 md:p-6 flex-grow hidden">
         
         <!-- Clean 3-Tab Navigation Bar -->
-        <div class="grid grid-cols-3 gap-2 md:gap-3 mb-5 sticky top-[61px] z-30 bg-slate-100/95 backdrop-blur py-1.5">
+        <div class="grid grid-cols-3 gap-2 md:gap-3 mb-4 sticky top-[61px] z-30 bg-slate-100/95 backdrop-blur py-1.5">
             <button onclick="window.switchAdminMainTab('payments')" id="tab-payments">
-                <i class="fa-solid fa-bolt text-amber-400"></i>
-                <span>Approvals</span>
+                <i class="fa-solid fa-money-bill-transfer text-amber-400"></i>
+                <span>Payments</span>
                 <span id="navPendingBadge" style="display: none;" class="bg-red-600 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">0</span>
             </button>
             <button onclick="window.switchAdminMainTab('users')" id="tab-users">
@@ -1065,32 +1204,75 @@
             </button>
             <button onclick="window.switchAdminMainTab('history')" id="tab-history">
                 <i class="fa-solid fa-folder-tree"></i>
-                <span>Records</span>
+                <span>Doc Records</span>
             </button>
         </div>
 
-        <!-- ================= SECTION 1: MOBILE-FIRST PENDING PAYMENTS ================= -->
+        <!-- ================= SECTION 1: COMPLETE PAYMENTS, HISTORY & RESOLUTION ================= -->
         <div id="section-payments" class="space-y-4">
-            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex justify-between items-center">
-                <div>
-                    <h3 class="text-base md:text-lg font-black text-dark-900 flex items-center gap-2">
-                        <i class="fa-solid fa-money-bill-transfer text-green-600"></i> Payment & VIP Approvals
-                    </h3>
-                    <p id="pendingPaymentsCount" class="text-xs font-bold text-amber-600">0 Pending</p>
+            
+            <!-- 3 Summary Cards (Pending, Approved Collection, Rejected) -->
+            <div class="grid grid-cols-3 gap-2 md:gap-4">
+                <div onclick="window.setPaymentFilter('Pending')" class="cursor-pointer bg-amber-50 border border-amber-200 p-3 rounded-2xl shadow-sm hover:border-amber-400 transition">
+                    <span class="text-[10px] font-black text-amber-800 uppercase block">⏳ Pending</span>
+                    <span id="statPendingAmt" class="text-base md:text-2xl font-black text-amber-600 block mt-0.5">₹0</span>
+                    <span id="statPendingCount" class="text-[10px] font-bold text-amber-700">0 Requests</span>
                 </div>
-                <button onclick="window.loadPendingPayments()" class="bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-rotate-right"></i> Refresh
-                </button>
+                <div onclick="window.setPaymentFilter('Approved')" class="cursor-pointer bg-green-50 border border-green-200 p-3 rounded-2xl shadow-sm hover:border-green-400 transition">
+                    <span class="text-[10px] font-black text-green-800 uppercase block">✅ Approved</span>
+                    <span id="statApprovedAmt" class="text-base md:text-2xl font-black text-green-700 block mt-0.5">₹0</span>
+                    <span id="statApprovedCount" class="text-[10px] font-bold text-green-700">0 Txns</span>
+                </div>
+                <div onclick="window.setPaymentFilter('Rejected')" class="cursor-pointer bg-red-50 border border-red-200 p-3 rounded-2xl shadow-sm hover:border-red-400 transition">
+                    <span class="text-[10px] font-black text-red-800 uppercase block">❌ Rejected</span>
+                    <span id="statRejectedAmt" class="text-base md:text-2xl font-black text-red-600 block mt-0.5">₹0</span>
+                    <span id="statRejectedCount" class="text-[10px] font-bold text-red-700">0 Txns</span>
+                </div>
+            </div>
+
+            <!-- Filter Pills + UTR/User Search Bar -->
+            <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200 space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 w-full sm:w-auto flex-1">
+                        <button id="filterPill-Pending" onclick="window.setPaymentFilter('Pending')" class="px-3 py-2 rounded-xl text-xs font-black bg-dark-900 text-royal-300 shadow-sm transition flex items-center justify-center gap-1.5 border border-royal-500/40">
+                            <span>Pending</span>
+                            <span id="pillCountPending" class="bg-amber-400 text-dark-950 px-1.5 py-0.2 rounded-full text-[10px]">0</span>
+                        </button>
+                        <button id="filterPill-Approved" onclick="window.setPaymentFilter('Approved')" class="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition flex items-center justify-center gap-1.5 border border-slate-200">
+                            <span>Approved</span>
+                            <span id="pillCountApproved" class="bg-green-200 text-green-900 px-1.5 py-0.2 rounded-full text-[10px]">0</span>
+                        </button>
+                        <button id="filterPill-Rejected" onclick="window.setPaymentFilter('Rejected')" class="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition flex items-center justify-center gap-1.5 border border-slate-200">
+                            <span>Rejected</span>
+                            <span id="pillCountRejected" class="bg-red-200 text-red-900 px-1.5 py-0.2 rounded-full text-[10px]">0</span>
+                        </button>
+                        <button id="filterPill-ALL" onclick="window.setPaymentFilter('ALL')" class="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition flex items-center justify-center gap-1.5 border border-slate-200">
+                            <span>All History</span>
+                            <span id="pillCountAll" class="bg-slate-300 text-slate-800 px-1.5 py-0.2 rounded-full text-[10px]">0</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Search by UTR or Email + Refresh -->
+                <div class="flex gap-2">
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+                        <input type="text" id="paymentSearchInput" oninput="window.renderPaymentsByFilter()" placeholder="UTR नंबर, यूज़र Email या अमाउंट से खोजें..." class="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white focus:border-royal-400 outline-none">
+                    </div>
+                    <button onclick="window.loadAllPayments()" class="bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center gap-1.5 shrink-0">
+                        <i class="fa-solid fa-rotate-right"></i> <span class="hidden sm:inline">Refresh</span>
+                    </button>
+                </div>
             </div>
             
-            <!-- Mobile-Friendly Cards Grid (No Horizontal Scroll) -->
+            <!-- Mobile-Friendly Payment Cards Grid -->
             <div id="adminPaymentsCardsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3.5"></div>
         </div>
 
         <!-- ================= SECTION 2: USER & VIP VALIDITY MANAGEMENT ================= -->
         <div id="section-users" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
             
-            <!-- Manage Existing User Credits & VIP Validity (Placed First for Quick Mobile Access) -->
+            <!-- Manage Existing User Credits & VIP Validity -->
             <div class="bg-white rounded-2xl p-4 md:p-6 shadow-card border border-slate-200 flex flex-col justify-between">
                 <div class="space-y-4">
                     <div class="flex items-center gap-2.5 border-b border-slate-100 pb-3">
