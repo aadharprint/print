@@ -15,11 +15,12 @@
             theme: {
                 extend: {
                     colors: { 
-                        royal: { 50: '#fffbeb', 100: '#fef3c7', 300: '#fcd34d', 500: '#f59e0b', 600: '#d97706', 900: '#78350f' },
-                        dark: { 800: '#1e293b', 900: '#0f172a' }
+                        royal: { 50: '#fffbeb', 100: '#fef3c7', 300: '#fcd34d', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 900: '#78350f' },
+                        dark: { 700: '#334155', 800: '#1e293b', 900: '#0f172a', 950: '#020617' }
                     },
                     boxShadow: {
                         'glow': '0 0 20px rgba(245, 158, 11, 0.4)',
+                        'vip-glow': '0 0 30px rgba(251, 191, 36, 0.5)',
                         'card': '0 10px 30px -5px rgba(0,0,0,0.08)'
                     }
                 }
@@ -29,12 +30,16 @@
 
     <style>
         .animate-spin-slow { animation: spin 4s linear infinite; }
+        .vip-body-bg {
+            background: radial-gradient(circle at top, #1e293b 0%, #0f172a 50%, #020617 100%);
+            color: #f8fafc;
+        }
     </style>
 
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, doc, getDoc, updateDoc, collection, addDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -61,7 +66,8 @@
             "SHAMLI": "https://script.google.com/macros/s/AKfycbzC1WjGvsvtXsMAhgaOtIBVLnQZ7COMaLl6-VCSvfENKtKJUJHfBYHayWr-orkGTIiQ/exec",
             "MUZAFFARNAGAR": "https://script.google.com/macros/s/AKfycby2FsD_wOd5ovuG4uVRldLBc8zMWKYoGXDPFPUoMKhx1k-KiAZcUa6MRe7TTW5VrfabLg/exec",
             "DOB": "https://script.google.com/macros/s/AKfycbyncAUbXWLplC_uHgodCqhPCDLTWFiWEQVzxPAInLP7zedGUQRdRbvix_jdDBJrYMlc9w/exec",
-            "CASTE": "https://script.google.com/macros/s/AKfycbzUs_e_ga3Ly3SQ9qq5inqHgfC23-jzav8sjUES7XnPw7cyUn3DHhVEBFdgxqUejU5Y/exec"
+            "CASTE": "https://script.google.com/macros/s/AKfycbzUs_e_ga3Ly3SQ9qq5inqHgfC23-jzav8sjUES7XnPw7cyUn3DHhVEBFdgxqUejU5Y/exec",
+            "ANNEXURE": "https://script.google.com/macros/s/AKfycbyA3916RXjuVRInvDPksOzbzczesTFAWo4gVzvjazGNfQl_REwC0YrYpTu03jlXwlb07w/exec"
         };
         window.API_URLS = API_URLS;
 
@@ -83,8 +89,14 @@
                     
                     const isAdmin = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
                     
+                    // Admin automatically gets VIP view capabilities
                     window.currentUserData = { 
-                        uid: user.uid, email: user.email, credits: userCredits, isVip: isVip, isAdmin: isAdmin, username: user.email.split('@')[0] 
+                        uid: user.uid, 
+                        email: user.email, 
+                        credits: userCredits, 
+                        isVip: isVip || isAdmin, 
+                        isAdmin: isAdmin, 
+                        username: user.email.split('@')[0] 
                     };
                     
                     setupDashboard(window.currentUserData);
@@ -95,6 +107,7 @@
                 }
             } else {
                 window.currentUserData = null;
+                document.body.classList.remove('vip-body-bg');
                 loginSection.style.display = 'flex';
                 dashboardSection.style.display = 'none';
                 loadingScreen.style.display = 'none';
@@ -126,10 +139,16 @@
             }
         };
 
+        // ================= SETUP DASHBOARD (NORMAL VS VIP LOOK) =================
         function setupDashboard(userData) {
             document.getElementById('displayUser').innerText = userData.username.toUpperCase();
             const adminLink = document.getElementById('adminPanelLink');
             const creditDisplayBox = document.getElementById('creditDisplayBox');
+            const vipServicesBar = document.getElementById('vipServicesBar');
+            const portalTitle = document.getElementById('portalHeaderTitle');
+            const portalIcon = document.getElementById('portalHeaderIcon');
+            const vipBadge = document.getElementById('vipStatusBadge');
+            const mainFormCard = document.getElementById('mainFormCard');
 
             if (userData.isAdmin) {
                 adminLink.style.display = 'flex';
@@ -140,6 +159,25 @@
                 document.getElementById('displayCredits').innerText = userData.credits;
             }
 
+            // APPLY VIP PORTAL TRANSFORMATION IF USER IS VIP
+            if (userData.isVip) {
+                document.body.classList.add('vip-body-bg');
+                portalTitle.innerHTML = `Ojas <span class="text-royal-400 drop-shadow">VIP Portal</span>`;
+                portalIcon.innerHTML = `<i class="fa-solid fa-crown text-lg animate-pulse"></i>`;
+                portalIcon.className = "w-10 h-10 bg-gradient-to-br from-yellow-300 via-royal-500 to-amber-700 text-dark-950 rounded-xl flex items-center justify-center shadow-vip-glow border border-yellow-200";
+                vipBadge.style.display = 'inline-flex';
+                vipServicesBar.style.display = 'block';
+                mainFormCard.className = "bg-white text-slate-800 rounded-3xl shadow-vip-glow border-2 border-royal-400 p-6 md:p-8";
+            } else {
+                document.body.classList.remove('vip-body-bg');
+                portalTitle.innerHTML = `Ojas <span class="text-royal-400">Portal</span>`;
+                portalIcon.innerHTML = `<i class="fa-solid fa-sun text-lg"></i>`;
+                portalIcon.className = "w-10 h-10 bg-gradient-to-br from-royal-400 to-royal-600 text-white rounded-xl flex items-center justify-center shadow-inner";
+                vipBadge.style.display = 'none';
+                vipServicesBar.style.display = 'none';
+                mainFormCard.className = "bg-white text-slate-800 rounded-3xl shadow-card border border-slate-100 p-6 md:p-8";
+            }
+
             document.getElementById('loginSection').style.display = 'none';
             document.getElementById('dashboardSection').style.display = 'flex';
             window.switchService('domicile');
@@ -148,6 +186,60 @@
         window.handleLogout = async function() {
             await signOut(auth);
             window.location.reload();
+        };
+
+        // ================= PASSWORD CHANGE LOGIC =================
+        window.handleChangePassword = async function(event) {
+            event.preventDefault();
+            const currentPass = document.getElementById('currentPassword').value;
+            const newPass = document.getElementById('newPassword').value;
+            const confirmPass = document.getElementById('confirmPassword').value;
+            const msgBox = document.getElementById('passwordMsgBox');
+            const btn = document.getElementById('btnChangePass');
+
+            msgBox.style.display = 'none';
+
+            if (newPass.length < 6) {
+                msgBox.className = "p-4 rounded-xl text-sm font-bold bg-red-50 text-red-600 border border-red-200 text-center";
+                msgBox.innerText = "नया पासवर्ड कम से कम 6 अक्षरों (Characters) का होना चाहिए!";
+                msgBox.style.display = 'block';
+                return;
+            }
+
+            if (newPass !== confirmPass) {
+                msgBox.className = "p-4 rounded-xl text-sm font-bold bg-red-50 text-red-600 border border-red-200 text-center";
+                msgBox.innerText = "नया पासवर्ड और कन्फर्म पासवर्ड आपस में मैच नहीं कर रहे हैं!";
+                msgBox.style.display = 'block';
+                return;
+            }
+
+            const origText = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> पासवर्ड बदला जा रहा है...';
+            btn.disabled = true;
+
+            try {
+                const user = auth.currentUser;
+                const credential = EmailAuthProvider.credential(user.email, currentPass);
+                
+                // Re-authenticate user first
+                await reauthenticateWithCredential(user, credential);
+                
+                // Update to new password
+                await updatePassword(user, newPass);
+
+                msgBox.className = "p-4 rounded-xl text-sm font-bold bg-green-50 text-green-700 border border-green-200 text-center";
+                msgBox.innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i> बधाई हो! आपका पासवर्ड सफलतापूर्वक बदल दिया गया है।';
+                msgBox.style.display = 'block';
+                event.target.reset();
+            } catch (err) {
+                console.error(err);
+                msgBox.className = "p-4 rounded-xl text-sm font-bold bg-red-50 text-red-600 border border-red-200 text-center";
+                msgBox.innerText = "आपका पुराना पासवर्ड गलत है! कृपया सही पुराना पासवर्ड डालें।";
+                msgBox.style.display = 'block';
+            } finally {
+                btn.innerHTML = origText;
+                btn.disabled = false;
+            }
         };
 
         // ================= AUTOMATIC PAYMENT & PENDING REQUEST SYSTEM =================
@@ -203,14 +295,12 @@
             errorMsg.style.display = 'none';
 
             try {
-                // Duplicate UTR Check
                 const q = query(collection(db, "payments"), where("utrNumber", "==", utr));
                 const duplicateCheck = await getDocs(q);
                 if (!duplicateCheck.empty) {
                     throw new Error("यह UTR नंबर पहले ही उपयोग किया जा चुका है!");
                 }
 
-                // 1. SAVE TO FIRESTORE AS "PENDING"
                 await addDoc(collection(db, "payments"), {
                     userId: window.currentUserData.uid,
                     email: window.currentUserData.email,
@@ -218,39 +308,32 @@
                     creditsRequested: creditsToAdd,
                     utrNumber: utr,
                     timestamp: new Date(),
-                    status: "Pending" // Credits are NOT added yet!
+                    status: "Pending"
                 });
 
-                // 2. SEND TELEGRAM ALERT (100% Free & Reliable)
-// ⚠️ यहाँ अपना बॉट टोकन और चैट आईडी डालें ⚠️
-const botToken = "8586078140:AAG-ydpakzFDAwHFtJC8AUanxZAODpGZDOk"; 
-const chatId = "8942287807"; 
+                const botToken = "8586078140:AAG-ydpakzFDAwHFtJC8AUanxZAODpGZDOk"; 
+                const chatId = "8942287807"; 
+                const tgMessage = `🚨 *New Payment Request!*\n*User:* ${window.currentUserData.email}\n*Amount:* ₹${amount}\n*UTR:* ${utr}\n\n*Status:* Pending Approval. Check Admin Panel.`;
 
-const tgMessage = `🚨 *New Payment Request!*\n*User:* ${window.currentUserData.email}\n*Amount:* ₹${amount}\n*UTR:* ${utr}\n\n*Status:* Pending Approval. Check Admin Panel.`;
+                fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: chatId,
+                        text: tgMessage,
+                        parse_mode: 'Markdown'
+                    })
+                }).catch(err => console.log("Telegram alert failed", err));
 
-fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-        chat_id: chatId,
-        text: tgMessage,
-        parse_mode: 'Markdown'
-    })
-})
-.then(response => console.log("Telegram alert sent!"))
-.catch(err => console.log("Telegram alert failed", err));
-
-                // 3. SHOW SUCCESS MESSAGE TO USER
                 document.getElementById('walletMainUI').innerHTML = `
                     <div class="col-span-1 md:col-span-2 flex flex-col items-center justify-center p-10 bg-amber-50 rounded-3xl border border-amber-200 text-center animate-pulse">
                         <i class="fa-solid fa-clock-rotate-left text-6xl text-amber-500 mb-4"></i>
                         <h2 class="text-3xl font-black text-amber-800 tracking-tight">वेरिफिकेशन पेंडिंग</h2>
-                        <p class="text-sm font-bold text-amber-700 mt-3 max-w-md mx-auto">आपकी UTR डिटेल एडमिन को भेज दी गई है। पेमेंट वेरीफाई होते ही ${creditsToAdd} क्रेडिट्स आपके वॉलेट में जोड़ दिए जाएंगे।</p>
+                        <p class="text-sm font-bold text-amber-700 mt-3 max-w-md mx-auto">आपकी UTR डिटेल एडमिन को भेज दी गई है। पेमेंट वेरीफाई होते ही ${creditsToAdd} क्रेडिट्स आपके वॉलेट में जोड़ दिए जाएंगे।</p>
                         <button onclick="window.switchService('domicile')" class="mt-8 bg-amber-600 hover:bg-amber-700 text-white font-black py-4 px-8 rounded-xl shadow-glow transition transform hover:-translate-y-0.5">डैशबोर्ड पर जाएँ <i class="fa-solid fa-arrow-right ml-1"></i></button>
                     </div>
                 `;
             } catch(error) {
-                console.error("Submission Error:", error);
                 errorMsg.innerText = error.message;
                 errorMsg.style.display = 'block';
             } finally {
@@ -318,7 +401,8 @@ fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
             let targetUrl = "";
             if (serviceType === 'Domicile') targetUrl = API_URLS[formData.get('DISTRICT')] || API_URLS["BAGHPAT"];
             else if (serviceType === 'Caste') targetUrl = API_URLS["CASTE"];
-            else if (serviceType === 'DOB') targetUrl = API_URLS["DOB"];
+            else if (serviceType === 'DOB' || serviceType === 'DOB 18+') targetUrl = API_URLS["DOB"];
+            else if (serviceType.toLowerCase().includes('annexure')) targetUrl = API_URLS["ANNEXURE"];
 
             try {
                 if (!window.currentUserData.isAdmin) {
@@ -442,12 +526,25 @@ fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
             if (thanaSelect) thanaSelect.innerHTML = thanas.map(t => `<option value="${t}">${t}</option>`).join('');
         };
 
+        // ================= MAIN SERVICE SWITCHER =================
         window.switchService = function(serviceName) {
+            // Reset regular tabs
             document.querySelectorAll('.service-tab').forEach(btn => {
                 btn.className = "service-tab bg-white text-slate-600 font-bold py-3.5 px-2 rounded-xl hover:bg-slate-50 transition shadow-sm border border-slate-200 text-[11px] md:text-sm flex-1 flex justify-center items-center gap-1.5 md:gap-2";
             });
+            // Reset VIP tabs
+            document.querySelectorAll('.vip-tab').forEach(btn => {
+                btn.className = "vip-tab bg-dark-800 text-royal-300 border border-royal-500/30 font-bold py-2.5 px-3 rounded-xl hover:bg-royal-500 hover:text-dark-950 transition text-xs flex items-center justify-center gap-1.5 shadow-sm";
+            });
+
             const activeBtn = document.getElementById('btn-' + serviceName);
-            if(activeBtn) activeBtn.className = "service-tab bg-dark-900 text-royal-300 font-bold py-3.5 px-2 rounded-xl shadow-glow transition transform -translate-y-1 text-[11px] md:text-sm flex-1 flex justify-center items-center gap-1.5 md:gap-2 border border-dark-800";
+            if(activeBtn) {
+                if (activeBtn.classList.contains('vip-tab')) {
+                    activeBtn.className = "vip-tab bg-gradient-to-r from-yellow-300 via-royal-400 to-amber-500 text-dark-950 font-black py-2.5 px-3 rounded-xl shadow-vip-glow transform -translate-y-0.5 transition text-xs flex items-center justify-center gap-1.5 border border-yellow-200";
+                } else {
+                    activeBtn.className = "service-tab bg-dark-900 text-royal-300 font-bold py-3.5 px-2 rounded-xl shadow-glow transition transform -translate-y-1 text-[11px] md:text-sm flex-1 flex justify-center items-center gap-1.5 md:gap-2 border border-royal-500/50";
+                }
+            }
 
             const container = document.getElementById('formContainer');
             if (!container) return;
@@ -456,15 +553,18 @@ fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
                                 ? 'Generate Document <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' 
                                 : 'Generate Document (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>';
                                 
-            const adminTagHtml = window.currentUserData && window.currentUserData.isAdmin 
+            const statusTagHtml = window.currentUserData && window.currentUserData.isAdmin 
                                 ? '<span class="bg-green-100 text-green-700 px-3 py-1 rounded-md text-[10px] font-bold border border-green-200 uppercase tracking-widest">Admin Free Access</span>' 
-                                : '';
+                                : (window.currentUserData && window.currentUserData.isVip 
+                                    ? '<span class="bg-amber-100 text-amber-800 px-3 py-1 rounded-md text-[10px] font-black border border-amber-300 uppercase tracking-widest"><i class="fa-solid fa-crown mr-1"></i>VIP Member</span>' 
+                                    : '');
 
+            // 1. DOMICILE (Normal + VIP)
             if(serviceName === 'domicile') {
                 container.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
                         <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-house-chimney text-royal-500 mr-2"></i> Domicile Certificate</h3>
-                        ${adminTagHtml}
+                        ${statusTagHtml}
                     </div>
                     <form onsubmit="window.submitForm(event, 'Domicile')" class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -486,11 +586,12 @@ fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
                 `;
                 window.updateTehsilsAndThanas();
             } 
+            // 2. CASTE CERTIFICATE (Normal + VIP)
             else if(serviceName === 'caste') {
                 container.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
                         <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-users text-royal-500 mr-2"></i> Caste Certificate</h3>
-                        ${adminTagHtml}
+                        ${statusTagHtml}
                     </div>
                     <form onsubmit="window.submitForm(event, 'Caste')" class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -512,28 +613,73 @@ fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
                 `;
                 window.updateTehsilsAndThanas();
             }
-            else if(serviceName === 'dob') {
+
+            // 3. VIP EXCLUSIVE: BIRTH CERTIFICATE FOR 18+ (DOB)
+            else if(serviceName === 'dob18') {
+                if (!window.currentUserData || !window.currentUserData.isVip) {
+                    return alert('यह सर्विस केवल VIP मेंबर्स के लिए उपलब्ध है!');
+                }
                 container.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
-                        <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-cake-candles text-royal-500 mr-2"></i> Birth Certificate (DOB)</h3>
-                        ${adminTagHtml}
+                        <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-cake-candles text-royal-500 mr-2"></i> Date of Birth Certificate (18+ VIP)</h3>
+                        ${statusTagHtml}
                     </div>
-                    <form onsubmit="window.submitForm(event, 'DOB')" class="space-y-4">
+                    <form onsubmit="window.submitForm(event, 'DOB 18+')" class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Name</label><input type="text" name="NAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Sex</label><select name="SEX" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="MALE">MALE</option><option value="FEMALE">FEMALE</option></select></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Date of Birth</label><input type="date" name="DOB" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Full Name</label><input type="text" name="NAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Sex / Gender</label><select name="SEX" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="MALE">MALE</option><option value="FEMALE">FEMALE</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Date of Birth (18+)</label><input type="date" name="DOB" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Father Name</label><input type="text" name="FNAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Mother Name</label><input type="text" name="MNAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Pin Code</label><input type="text" name="PIN" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
                             <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Full Address</label><textarea name="ADDRESS" rows="2" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></textarea></div>
                         </div>
-                        <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-4 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-4 text-base">${submitBtnText}</button>
+                        <button type="submit" class="w-full bg-gradient-to-r from-dark-900 via-dark-800 to-dark-900 hover:bg-black text-royal-300 font-black py-4 rounded-xl shadow-vip-glow transition transform hover:-translate-y-0.5 mt-4 text-base border border-royal-500/40">${submitBtnText}</button>
+                    </form>
+                `;
+            }
+
+            // 4. VIP EXCLUSIVE: ANNEXURE FORMS (1, 1A, 3, 3A, B, C, D, E)
+            else if(serviceName.startsWith('annexure')) {
+                if (!window.currentUserData || !window.currentUserData.isVip) {
+                    return alert('यह सर्विस केवल VIP मेंबर्स के लिए उपलब्ध है!');
+                }
+
+                const annexureNames = {
+                    'annexure1': 'Annexure 1',
+                    'annexure1a': 'Annexure 1A',
+                    'annexure3': 'Annexure 3',
+                    'annexure3a': 'Annexure 3A',
+                    'annexureb': 'Annexure B',
+                    'annexurec': 'Annexure C',
+                    'annexured': 'Annexure D',
+                    'annexuree': 'Annexure E'
+                };
+                const titleText = annexureNames[serviceName] || 'Annexure Form';
+
+                container.innerHTML = `
+                    <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
+                        <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-crown text-royal-500 mr-2"></i> ${titleText} (VIP Format)</h3>
+                        ${statusTagHtml}
+                    </div>
+                    <form onsubmit="window.submitForm(event, '${titleText}')" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Full Name</label><input type="text" name="NAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Father/Husband Name</label><input type="text" name="FATHER" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">ID Number (12 Digits)</label><input type="text" name="AADHAR" placeholder="Enter 12-digit number" required maxlength="12" pattern="\\d{12}" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Date</label><input type="date" name="DATE" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Old DOB</label><input type="date" name="OLDDOB" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">New DOB</label><input type="date" name="NEWDOB" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Old Document</label><select name="OLDDOCUMENT" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option><option value="MARKSHEET">MARKSHEET</option><option value="PAN CARD">PAN CARD</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">New Document</label><select name="NEWDOCUMENT" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option><option value="MARKSHEET">MARKSHEET</option><option value="PAN CARD">PAN CARD</option></select></div>
+                            <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Full Address</label><textarea name="ADDRESS" rows="2" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></textarea></div>
+                        </div>
+                        <button type="submit" class="w-full bg-gradient-to-r from-dark-900 via-dark-800 to-dark-900 hover:bg-black text-royal-300 font-black py-4 rounded-xl shadow-vip-glow transition transform hover:-translate-y-0.5 mt-4 text-base border border-royal-500/40">${submitBtnText}</button>
                     </form>
                 `;
             }
             
-            // ================= PENDING WALLET SYSTEM UI =================
+            // 5. ADD WALLET CREDITS
             else if(serviceName === 'add_credit') {
                 container.innerHTML = `
                     <div id="walletMainUI" class="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -572,8 +718,56 @@ fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
                     </div>
                 `;
             }
+
+            // 6. CHANGE PASSWORD SECTION (NEW)
+            else if(serviceName === 'password') {
+                container.innerHTML = `
+                    <div class="max-w-md mx-auto py-4">
+                        <div class="text-center mb-6">
+                            <div class="w-16 h-16 bg-royal-100 text-royal-600 rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl shadow-sm border border-royal-200">
+                                <i class="fa-solid fa-key"></i>
+                            </div>
+                            <h3 class="text-2xl font-black text-dark-900">Change Your Password</h3>
+                            <p class="text-xs font-bold text-slate-400 mt-1">अपना पुराना पासवर्ड डालकर नया पासवर्ड सेट करें</p>
+                        </div>
+
+                        <form onsubmit="window.handleChangePassword(event)" class="space-y-4 bg-slate-50 p-6 rounded-3xl border border-slate-200">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Current Password (पुराना पासवर्ड)</label>
+                                <input type="password" id="currentPassword" required placeholder="Enter current password" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-royal-400 outline-none transition font-semibold">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">New Password (नया पासवर्ड)</label>
+                                <input type="password" id="newPassword" required minlength="6" placeholder="Minimum 6 characters" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-royal-400 outline-none transition font-semibold">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Confirm New Password (दोबारा लिखें)</label>
+                                <input type="password" id="confirmPassword" required minlength="6" placeholder="Re-enter new password" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-royal-400 outline-none transition font-semibold">
+                            </div>
+                            <div id="passwordMsgBox" style="display: none;"></div>
+                            <button type="submit" id="btnChangePass" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-4 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-2">
+                                Update Password <i class="fa-solid fa-lock ml-1"></i>
+                            </button>
+                        </form>
+                    </div>
+                `;
+            }
             
+            // 7. MY HISTORY
             else if(serviceName === 'history') {
+                const isVipUser = window.currentUserData && window.currentUserData.isVip;
+                const vipFilterOptions = isVipUser ? `
+                    <option value="DOB 18+">जन्म प्रमाण पत्र (18+)</option>
+                    <option value="Annexure 1">Annexure 1</option>
+                    <option value="Annexure 1A">Annexure 1A</option>
+                    <option value="Annexure 3">Annexure 3</option>
+                    <option value="Annexure 3A">Annexure 3A</option>
+                    <option value="Annexure B">Annexure B</option>
+                    <option value="Annexure C">Annexure C</option>
+                    <option value="Annexure D">Annexure D</option>
+                    <option value="Annexure E">Annexure E</option>
+                ` : '';
+
                 container.innerHTML = `
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-slate-100 pb-6 mb-6">
                         <div>
@@ -584,11 +778,11 @@ fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
                         <div class="flex items-center gap-3 w-full md:w-auto">
                             <div class="flex-1 md:flex-none">
                                 <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Filter Type</label>
-                                <select onchange="window.renderHistory(this.value)" class="w-full md:w-48 p-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:ring-2 focus:ring-royal-400 font-semibold cursor-pointer outline-none">
+                                <select onchange="window.renderHistory(this.value)" class="w-full md:w-52 p-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:ring-2 focus:ring-royal-400 font-semibold cursor-pointer outline-none">
                                     <option value="ALL">All Documents</option>
                                     <option value="Domicile">मूल निवास</option>
                                     <option value="Caste">जाति प्रमाण पत्र</option>
-                                    <option value="DOB">जन्म प्रमाण पत्र</option>
+                                    ${vipFilterOptions}
                                 </select>
                             </div>
                             <div class="flex items-end h-full mt-4 md:mt-0">
@@ -611,7 +805,7 @@ fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         };
     </script>
 </head>
-<body class="bg-slate-50 font-sans min-h-screen flex flex-col justify-between selection:bg-royal-300 selection:text-dark-900">
+<body class="bg-slate-50 font-sans min-h-screen flex flex-col justify-between selection:bg-royal-300 selection:text-dark-900 transition-colors duration-300">
     
     <!-- SECURITY LOADING SCREEN -->
     <div id="loadingScreen" style="display: flex;" class="fixed inset-0 bg-dark-900 z-[200] flex-col items-center justify-center">
@@ -620,7 +814,7 @@ fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         <p class="text-sm text-royal-300 mt-2 font-bold animate-pulse">Checking Security...</p>
     </div>
 
-    <!-- FULL SCREEN PDF VIEWER MODAL (IN-APP) FOR USERS -->
+    <!-- FULL SCREEN PDF VIEWER MODAL -->
     <div id="pdfViewerModal" style="display: none;" class="fixed inset-0 z-[100] bg-dark-900/80 backdrop-blur-md items-center justify-center p-2 md:p-6 transition-opacity">
         <div class="bg-white w-full max-w-6xl h-full flex flex-col rounded-2xl shadow-2xl overflow-hidden">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center p-4 border-b border-slate-200 bg-slate-50 gap-3">
@@ -648,7 +842,7 @@ fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     <!-- LOGIN SCREEN -->
     <div id="loginSection" style="display: none;" class="items-center justify-center flex-grow p-4 min-h-screen bg-dark-900 relative overflow-hidden">
         <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-royal-500/20 rounded-full blur-[100px] pointer-events-none"></div>
-        <div class="bg-white p-8 md:p-10 rounded-3xl shadow-[0_0_40px_rgba(245,158,11,0.15)] border-t-4 border-royal-500 w-full max-w-md relative z-10">
+        <div class="bg-white p-8 md:p-10 rounded-3xl shadow-[0_0_40px_rgba(245,158,11,0.15)] border-t-4 border-royal-500 w-full max-w-md relative z-10 text-slate-800">
             <div class="text-center mb-8">
                 <div class="w-20 h-20 bg-gradient-to-br from-royal-300 to-royal-600 text-white rounded-full flex items-center justify-center mx-auto mb-5 text-4xl shadow-glow">
                     <i class="fa-solid fa-sun"></i>
@@ -667,11 +861,16 @@ fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
 
     <!-- DASHBOARD SCREEN -->
     <div id="dashboardSection" style="display: none;" class="flex-grow flex-col">
-        <header class="bg-dark-900 shadow-xl px-4 md:px-8 py-4 flex justify-between items-center sticky top-0 z-40 border-b-2 border-royal-500">
+        <header class="bg-dark-950 shadow-2xl px-4 md:px-8 py-4 flex justify-between items-center sticky top-0 z-40 border-b-2 border-royal-500">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-gradient-to-br from-royal-400 to-royal-600 text-white rounded-xl flex items-center justify-center shadow-inner"><i class="fa-solid fa-sun text-lg"></i></div>
-                <div>
-                    <h2 class="text-lg md:text-xl font-black text-white leading-tight">Ojas <span class="text-royal-400">Portal</span></h2>
+                <div id="portalHeaderIcon" class="w-10 h-10 bg-gradient-to-br from-royal-400 to-royal-600 text-white rounded-xl flex items-center justify-center shadow-inner">
+                    <i class="fa-solid fa-sun text-lg"></i>
+                </div>
+                <div class="flex items-center gap-2.5">
+                    <h2 id="portalHeaderTitle" class="text-lg md:text-xl font-black text-white leading-tight">Ojas <span class="text-royal-400">Portal</span></h2>
+                    <span id="vipStatusBadge" style="display: none;" class="items-center gap-1 bg-gradient-to-r from-yellow-300 via-royal-400 to-amber-500 text-dark-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-widest shadow-vip-glow">
+                        <i class="fa-solid fa-crown text-[9px]"></i> VIP ACCESS
+                    </span>
                 </div>
             </div>
             <div class="flex items-center gap-3 md:gap-4">
@@ -687,22 +886,44 @@ fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         </header>
 
         <main class="max-w-6xl mx-auto w-full p-4 md:p-8 flex-grow">
-            <!-- Navigation Grid -->
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-8">
+            <!-- Standard Navigation Grid (Normal Users see ONLY Domicile & Caste here, NO DOB) -->
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-6">
                 <button onclick="window.switchService('domicile')" id="btn-domicile" class="service-tab"><i class="fa-solid fa-house-chimney"></i> Domicile</button>
                 <button onclick="window.switchService('caste')" id="btn-caste" class="service-tab"><i class="fa-solid fa-users"></i> Caste Cert</button>
-                <button onclick="window.switchService('dob')" id="btn-dob" class="service-tab"><i class="fa-solid fa-cake-candles"></i> Birth (DOB)</button>
                 <button onclick="window.switchService('history')" id="btn-history" class="service-tab"><i class="fa-solid fa-clock-rotate-left"></i> My History</button>
+                <button onclick="window.switchService('password')" id="btn-password" class="service-tab"><i class="fa-solid fa-key"></i> Password</button>
                 <button onclick="window.switchService('add_credit')" id="btn-add_credit" class="service-tab col-span-2 md:col-span-1 !bg-amber-50 !text-amber-700 !border-amber-200 hover:!bg-amber-100"><i class="fa-solid fa-plus-circle"></i> Add Credit</button>
             </div>
+
+            <!-- 👑 VIP EXCLUSIVE SERVICES PANEL (Visible ONLY when isVip == true) -->
+            <div id="vipServicesBar" style="display: none;" class="mb-8 p-5 rounded-3xl bg-gradient-to-r from-dark-950 via-dark-900 to-dark-950 border-2 border-royal-400 shadow-vip-glow">
+                <div class="flex items-center justify-between mb-3 border-b border-slate-800 pb-2.5">
+                    <span class="text-xs font-black uppercase tracking-widest text-royal-300 flex items-center gap-2">
+                        <i class="fa-solid fa-crown text-royal-400 animate-bounce"></i> VIP Exclusive Services (18+ DOB & All Annexures)
+                    </span>
+                    <span class="text-[10px] font-bold text-slate-400 hidden sm:inline">Premium Unlocked</span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+                    <button onclick="window.switchService('dob18')" id="btn-dob18" class="vip-tab"><i class="fa-solid fa-cake-candles"></i> DOB (18+)</button>
+                    <button onclick="window.switchService('annexure1')" id="btn-annexure1" class="vip-tab"><i class="fa-solid fa-file-signature"></i> Annexure 1</button>
+                    <button onclick="window.switchService('annexure1a')" id="btn-annexure1a" class="vip-tab"><i class="fa-solid fa-file-signature"></i> Annexure 1A</button>
+                    <button onclick="window.switchService('annexure3')" id="btn-annexure3" class="vip-tab"><i class="fa-solid fa-file-signature"></i> Annexure 3</button>
+                    <button onclick="window.switchService('annexure3a')" id="btn-annexure3a" class="vip-tab"><i class="fa-solid fa-file-signature"></i> Annexure 3A</button>
+                    <button onclick="window.switchService('annexureb')" id="btn-annexureb" class="vip-tab"><i class="fa-solid fa-file-contract"></i> Annexure B</button>
+                    <button onclick="window.switchService('annexurec')" id="btn-annexurec" class="vip-tab"><i class="fa-solid fa-file-contract"></i> Annexure C</button>
+                    <button onclick="window.switchService('annexured')" id="btn-annexured" class="vip-tab"><i class="fa-solid fa-file-contract"></i> Annexure D</button>
+                    <button onclick="window.switchService('annexuree')" id="btn-annexuree" class="vip-tab"><i class="fa-solid fa-file-contract"></i> Annexure E</button>
+                </div>
+            </div>
             
-            <div class="bg-white rounded-3xl shadow-card border border-slate-100 p-6 md:p-8">
+            <!-- Dynamic Form Container -->
+            <div id="mainFormCard" class="bg-white text-slate-800 rounded-3xl shadow-card border border-slate-100 p-6 md:p-8">
                 <div id="formContainer"></div>
             </div>
         </main>
     </div>
     
-    <footer class="bg-slate-100 border-t border-slate-200 text-center py-5 text-[11px] font-bold text-slate-400 mt-auto uppercase tracking-widest">
+    <footer class="bg-dark-950 border-t border-slate-800 text-center py-5 text-[11px] font-bold text-slate-400 mt-auto uppercase tracking-widest">
         © 2026 Ojas Print Service | Secure Portal
     </footer>
 </body>
