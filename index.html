@@ -1636,44 +1636,33 @@
             }
             
             // DOB CERTIFICATE (18+ VIP): 15 CREDITS WITH 25% OFF FROM 20 CREDITS
-       
+              else if(serviceName === 'dob18') {
+                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService('domicile');
 
-                // DOB CERTIFICATE (18+ VIP): LOCKED STATE
-            else if(serviceName === 'dob18') {
+                const dobSubmitBtnText = window.currentUserData && window.currentUserData.isAdmin 
+                    ? 'Generate DOB Certificate (Admin Free)' 
+                    : 'Generate DOB Certificate (<del class="text-red-400 opacity-90 text-xs mr-1">20 Cr</del> 15 Credits - 25% VIP Off)';
+
                 container.innerHTML = `
-                    <div class="relative">
-                        <!-- Lock Overlay -->
-                        <div class="absolute inset-0 z-10 bg-white/70 backdrop-blur-[3px] flex flex-col items-center justify-center rounded-2xl border border-slate-200 p-6 text-center select-none">
-                            <div class="w-14 h-14 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-3 shadow-sm">
-                                <i class="fa-solid fa-lock text-2xl"></i>
-                            </div>
-                            <h4 class="text-lg font-black text-dark-900 uppercase">Service Locked</h4>
-                            <p class="text-xs font-bold text-slate-600 mt-1 max-w-xs">यह सर्विस अभी अस्थायी रूप से बंद (Locked) है। कृपया कुछ समय बाद प्रयास करें।</p>
+                    <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3 mb-4">
+                        <div>
+                            <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-cake-candles text-royal-500 mr-1.5"></i> Date of Birth Certificate (18+ VIP)</h3>
+                            <p class="text-[11px] font-bold text-green-600">25% VIP डिस्काउंट: <del class="text-red-500">20 Credits</del> की जगह सिर्फ 15 Credits!</p>
                         </div>
-
-                        <!-- Blurred Form Background -->
-                        <div class="opacity-40 pointer-events-none select-none">
-                            <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3 mb-4">
-                                <div>
-                                    <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-cake-candles text-royal-500 mr-1.5"></i> Date of Birth Certificate (18+ VIP)</h3>
-                                    <p class="text-[11px] font-bold text-green-600">25% VIP डिस्काउंट: <del class="text-red-500">20 Credits</del> की जगह सिर्फ 15 Credits!</p>
-                                </div>
-                                <span class="bg-red-100 text-red-800 px-2.5 py-1 rounded-md text-[10px] font-black border border-red-300 uppercase"><i class="fa-solid fa-lock mr-1"></i> Locked</span>
-                            </div>
-                            <form class="space-y-3.5">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                                    <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Full Name</label><input type="text" disabled class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50"></div>
-                                    <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Sex / Gender</label><select disabled class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50"><option>MALE</option></select></div>
-                                    <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Date of Birth (18+)</label><input type="date" disabled class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50"></div>
-                                    <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Father Name</label><input type="text" disabled class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50"></div>
-                                    <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Mother Name</label><input type="text" disabled class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50"></div>
-                                    <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Pin Code</label><input type="text" disabled class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50"></div>
-                                    <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Full Address</label><textarea rows="2" disabled class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50"></textarea></div>
-                                </div>
-                                <button type="button" disabled class="w-full bg-slate-400 text-white font-black py-3.5 rounded-xl text-sm md:text-base cursor-not-allowed"><i class="fa-solid fa-lock mr-1.5"></i> Service Locked</button>
-                            </form>
-                        </div>
+                        <span class="bg-green-100 text-green-800 px-2.5 py-1 rounded-md text-[10px] font-black border border-green-300 uppercase">25% OFF (15 Cr)</span>
                     </div>
+                    <form onsubmit="window.submitForm(event, 'DOB 18+')" class="space-y-3.5">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Full Name</label><input type="text" name="NAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Sex / Gender</label><select name="SEX" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"><option value="MALE">MALE</option><option value="FEMALE">FEMALE</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Date of Birth (18+)</label><input type="date" name="DOB" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Father Name</label><input type="text" name="FNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Mother Name</label><input type="text" name="MNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Pin Code</label><input type="text" name="PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
+                            <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Full Address</label><textarea name="ADDRESS" rows="2" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></textarea></div>
+                        </div>
+                        <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base">${dobSubmitBtnText}</button>
+                    </form>
                 `;
             }
 
