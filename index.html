@@ -20,7 +20,7 @@
                     },
                     boxShadow: {
                         'glow': '0 0 20px rgba(245, 158, 11, 0.4)',
-                        'vip-glow': '0 0 30px rgba(251, 191, 36, 0.5)',
+                        'vip-glow': '0 0 30px rgba(251, 191, 36, 0.6)',
                         'card': '0 10px 30px -5px rgba(0,0,0,0.08)'
                     }
                 }
@@ -33,6 +33,15 @@
         .vip-body-bg {
             background: radial-gradient(circle at top, #1e293b 0%, #0f172a 50%, #020617 100%);
             color: #f8fafc;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .vip-promo-shine {
+            background: linear-gradient(90deg, #0f172a 0%, #1e293b 40%, #78350f 50%, #1e293b 60%, #0f172a 100%);
+            background-size: 200% 100%;
+            animation: shimmer 5s infinite linear;
         }
     </style>
 
@@ -58,7 +67,9 @@
 
         window.currentUserData = null;
         window.historyData = []; 
-        window.currentRechargeAmount = 0; 
+        window.currentRechargeCredits = 0; 
+        window.currentTotalPayable = 0;
+        window.currentWantsVip = false;
         const ADMIN_EMAIL = "hkosiun1221@gmail.com"; 
 
         const API_URLS = {
@@ -89,7 +100,6 @@
                     
                     const isAdmin = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
                     
-                    // Admin automatically gets VIP view capabilities
                     window.currentUserData = { 
                         uid: user.uid, 
                         email: user.email, 
@@ -145,6 +155,7 @@
             const adminLink = document.getElementById('adminPanelLink');
             const creditDisplayBox = document.getElementById('creditDisplayBox');
             const vipServicesBar = document.getElementById('vipServicesBar');
+            const normalUserVipPromo = document.getElementById('normalUserVipPromo');
             const portalTitle = document.getElementById('portalHeaderTitle');
             const portalIcon = document.getElementById('portalHeaderIcon');
             const vipBadge = document.getElementById('vipStatusBadge');
@@ -159,7 +170,6 @@
                 document.getElementById('displayCredits').innerText = userData.credits;
             }
 
-            // APPLY VIP PORTAL TRANSFORMATION IF USER IS VIP
             if (userData.isVip) {
                 document.body.classList.add('vip-body-bg');
                 portalTitle.innerHTML = `Ojas <span class="text-royal-400 drop-shadow">VIP Portal</span>`;
@@ -167,6 +177,7 @@
                 portalIcon.className = "w-10 h-10 bg-gradient-to-br from-yellow-300 via-royal-500 to-amber-700 text-dark-950 rounded-xl flex items-center justify-center shadow-vip-glow border border-yellow-200";
                 vipBadge.style.display = 'inline-flex';
                 vipServicesBar.style.display = 'block';
+                normalUserVipPromo.style.display = 'none'; // Hide promo for VIPs
                 mainFormCard.className = "bg-white text-slate-800 rounded-3xl shadow-vip-glow border-2 border-royal-400 p-6 md:p-8";
             } else {
                 document.body.classList.remove('vip-body-bg');
@@ -175,6 +186,7 @@
                 portalIcon.className = "w-10 h-10 bg-gradient-to-br from-royal-400 to-royal-600 text-white rounded-xl flex items-center justify-center shadow-inner";
                 vipBadge.style.display = 'none';
                 vipServicesBar.style.display = 'none';
+                normalUserVipPromo.style.display = 'block'; // Show glowing VIP offer to Normal Users
                 mainFormCard.className = "bg-white text-slate-800 rounded-3xl shadow-card border border-slate-100 p-6 md:p-8";
             }
 
@@ -186,6 +198,18 @@
         window.handleLogout = async function() {
             await signOut(auth);
             window.location.reload();
+        };
+
+        // Jump directly to Add Credit with VIP checked
+        window.jumpToVipUpgrade = function() {
+            window.switchService('add_credit');
+            setTimeout(() => {
+                const vipCheckbox = document.getElementById('vipUpgradeCheckbox');
+                if (vipCheckbox) {
+                    vipCheckbox.checked = true;
+                    window.calculateCredits();
+                }
+            }, 50);
         };
 
         // ================= PASSWORD CHANGE LOGIC =================
@@ -201,7 +225,7 @@
 
             if (newPass.length < 6) {
                 msgBox.className = "p-4 rounded-xl text-sm font-bold bg-red-50 text-red-600 border border-red-200 text-center";
-                msgBox.innerText = "नया पासवर्ड कम से कम 6 अक्षरों (Characters) का होना चाहिए!";
+                msgBox.innerText = "नया पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!";
                 msgBox.style.display = 'block';
                 return;
             }
@@ -220,11 +244,7 @@
             try {
                 const user = auth.currentUser;
                 const credential = EmailAuthProvider.credential(user.email, currentPass);
-                
-                // Re-authenticate user first
                 await reauthenticateWithCredential(user, credential);
-                
-                // Update to new password
                 await updatePassword(user, newPass);
 
                 msgBox.className = "p-4 rounded-xl text-sm font-bold bg-green-50 text-green-700 border border-green-200 text-center";
@@ -232,7 +252,6 @@
                 msgBox.style.display = 'block';
                 event.target.reset();
             } catch (err) {
-                console.error(err);
                 msgBox.className = "p-4 rounded-xl text-sm font-bold bg-red-50 text-red-600 border border-red-200 text-center";
                 msgBox.innerText = "आपका पुराना पासवर्ड गलत है! कृपया सही पुराना पासवर्ड डालें।";
                 msgBox.style.display = 'block';
@@ -242,41 +261,69 @@
             }
         };
 
-        // ================= AUTOMATIC PAYMENT & PENDING REQUEST SYSTEM =================
+        // ================= AUTOMATIC PAYMENT & VIP UPGRADE CALCULATOR =================
         window.calculateCredits = function() {
-            const val = parseFloat(document.getElementById('rupeeAmount').value) || 0;
-            window.currentRechargeAmount = val;
-            document.getElementById('calculatedCredits').innerHTML = `${val} <span class="text-sm">Credits</span>`;
+            const creditAmt = parseFloat(document.getElementById('rupeeAmount')?.value) || 0;
+            const vipCheckbox = document.getElementById('vipUpgradeCheckbox');
+            const wantsVip = vipCheckbox ? vipCheckbox.checked : false;
+            const vipFee = wantsVip ? 100 : 0;
+            const totalPayable = creditAmt + vipFee;
+
+            window.currentRechargeCredits = creditAmt;
+            window.currentWantsVip = wantsVip;
+            window.currentTotalPayable = totalPayable;
+
+            document.getElementById('calculatedCredits').innerHTML = `${creditAmt} <span class="text-sm font-bold text-slate-400">Credits</span>`;
+            
+            const vipSummaryBadge = document.getElementById('vipSummaryBadge');
+            if (vipSummaryBadge) {
+                vipSummaryBadge.style.display = wantsVip ? 'inline-block' : 'none';
+            }
+
+            const totalPayableDisplay = document.getElementById('totalPayableDisplay');
+            if (totalPayableDisplay) {
+                totalPayableDisplay.innerText = `₹${totalPayable}`;
+            }
         };
 
         window.generateQR = function() {
-            const amountInput = document.getElementById('rupeeAmount');
-            const amount = parseFloat(amountInput.value);
+            window.calculateCredits();
+            const creditAmt = window.currentRechargeCredits;
+            const wantsVip = window.currentWantsVip;
+            const totalPayable = window.currentTotalPayable;
             
-            if(!amount || amount < 10) return alert('कृपया कम से कम ₹10 की राशि दर्ज करें!');
-
-            window.currentRechargeAmount = amount; 
+            if (!wantsVip && creditAmt < 10) {
+                return alert('कृपया कम से कम ₹10 के क्रेडिट दर्ज करें या ₹100 वाला VIP Access चुनें!');
+            }
+            if (totalPayable < 10) {
+                return alert('कुल पेमेंट राशि कम से कम ₹10 होनी चाहिए!');
+            }
 
             const upiId = "8279650137@ptyes"; 
             const payeeName = "Ojas Print Service";
-            const upiString = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${amount}&cu=INR`;
+            const upiString = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${totalPayable}&cu=INR`;
             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiString)}`;
 
             document.getElementById('upiQRCode').src = qrUrl;
+            document.getElementById('qrPayableAmountText').innerText = `Pay Exactly ₹${totalPayable}`;
             document.getElementById('qrSection').style.display = 'flex';
-            amountInput.disabled = true; 
+            
+            document.getElementById('rupeeAmount').disabled = true; 
+            const vipCheckbox = document.getElementById('vipUpgradeCheckbox');
+            if (vipCheckbox) vipCheckbox.disabled = true;
             document.getElementById('btnGenerateQR').style.display = 'none'; 
         };
 
         window.submitPayment = async function() {
-            const amount = window.currentRechargeAmount || parseFloat(document.getElementById('rupeeAmount').value) || 0;
+            const totalPaid = window.currentTotalPayable;
+            const creditsToAdd = window.currentRechargeCredits;
+            const wantsVip = window.currentWantsVip;
             const rawUtr = document.getElementById('utrNumber').value.trim();
             const errorMsg = document.getElementById('paymentErrorMsg');
 
             const utr = rawUtr.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-            const creditsToAdd = amount;
 
-            if (!amount || amount < 10) {
+            if (!totalPaid || totalPaid < 10) {
                 errorMsg.innerText = 'अमाउंट सही नहीं है, कृपया दोबारा QR कोड जनरेट करें।';
                 errorMsg.style.display = 'block';
                 return;
@@ -301,19 +348,24 @@
                     throw new Error("यह UTR नंबर पहले ही उपयोग किया जा चुका है!");
                 }
 
+                // Save payment with VIP flag
                 await addDoc(collection(db, "payments"), {
                     userId: window.currentUserData.uid,
                     email: window.currentUserData.email,
-                    amountPaid: amount,
+                    amountPaid: totalPaid,
                     creditsRequested: creditsToAdd,
+                    wantsVip: wantsVip,
                     utrNumber: utr,
                     timestamp: new Date(),
                     status: "Pending"
                 });
 
+                // Send Telegram Alert with VIP Status
                 const botToken = "8586078140:AAG-ydpakzFDAwHFtJC8AUanxZAODpGZDOk"; 
                 const chatId = "8942287807"; 
-                const tgMessage = `🚨 *New Payment Request!*\n*User:* ${window.currentUserData.email}\n*Amount:* ₹${amount}\n*UTR:* ${utr}\n\n*Status:* Pending Approval. Check Admin Panel.`;
+                const vipAlertLine = wantsVip ? `\n👑 *VIP ACCESS REQUEST:* YES (+₹100 Included for 1 Month)` : `\n👤 *VIP Request:* No (Normal Recharge)`;
+                
+                const tgMessage = `🚨 *New Payment Request!*\n*User:* ${window.currentUserData.email}\n*Total Paid:* ₹${totalPaid}\n*Credits to Add:* ${creditsToAdd} Credits${vipAlertLine}\n*UTR:* \`${utr}\`\n\n*Status:* Pending Approval. Check Admin Panel.`;
 
                 fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
                     method: 'POST',
@@ -325,11 +377,15 @@
                     })
                 }).catch(err => console.log("Telegram alert failed", err));
 
+                const successSubText = wantsVip 
+                    ? `आपकी UTR डिटेल और <strong>👑 VIP Access (1 Month)</strong> की रिक्वेस्ट एडमिन को भेज दी गई है। वेरीफाई होते ही आपका VIP पोर्टल और ${creditsToAdd} क्रेडिट्स एक्टिवेट हो जाएंगे!`
+                    : `आपकी UTR डिटेल एडमिन को भेज दी गई है। पेमेंट वेरीफाई होते ही ${creditsToAdd} क्रेडिट्स आपके वॉलेट में जोड़ दिए जाएंगे।`;
+
                 document.getElementById('walletMainUI').innerHTML = `
                     <div class="col-span-1 md:col-span-2 flex flex-col items-center justify-center p-10 bg-amber-50 rounded-3xl border border-amber-200 text-center animate-pulse">
                         <i class="fa-solid fa-clock-rotate-left text-6xl text-amber-500 mb-4"></i>
                         <h2 class="text-3xl font-black text-amber-800 tracking-tight">वेरिफिकेशन पेंडिंग</h2>
-                        <p class="text-sm font-bold text-amber-700 mt-3 max-w-md mx-auto">आपकी UTR डिटेल एडमिन को भेज दी गई है। पेमेंट वेरीफाई होते ही ${creditsToAdd} क्रेडिट्स आपके वॉलेट में जोड़ दिए जाएंगे।</p>
+                        <p class="text-sm font-bold text-amber-700 mt-3 max-w-md mx-auto">${successSubText}</p>
                         <button onclick="window.switchService('domicile')" class="mt-8 bg-amber-600 hover:bg-amber-700 text-white font-black py-4 px-8 rounded-xl shadow-glow transition transform hover:-translate-y-0.5">डैशबोर्ड पर जाएँ <i class="fa-solid fa-arrow-right ml-1"></i></button>
                     </div>
                 `;
@@ -380,12 +436,17 @@
             });
         }
 
+        // ================= FORM SUBMISSION (20% OFF FOR VIP: 8 CREDITS VS 10 CREDITS) =================
         window.submitForm = async function(event, serviceType) {
             event.preventDefault();
 
             if (!window.currentUserData) return alert('Please login first!');
-            if (!window.currentUserData.isAdmin && window.currentUserData.credits < 10) {
-                return alert('Insufficient credits! You need 10 credits to generate a document. Please add credits from your wallet.');
+            
+            // 20% OFF FOR VIP USERS: 8 Credits instead of 10
+            const docCost = window.currentUserData.isVip ? 8 : 10;
+
+            if (!window.currentUserData.isAdmin && window.currentUserData.credits < docCost) {
+                return alert(`Insufficient credits! You need ${docCost} credits to generate this document. Please add credits from your wallet.`);
             }
 
             const formElement = event.target;
@@ -407,7 +468,7 @@
             try {
                 if (!window.currentUserData.isAdmin) {
                     const userDocRef = doc(db, "users", window.currentUserData.uid);
-                    const newCredits = window.currentUserData.credits - 10;
+                    const newCredits = window.currentUserData.credits - docCost;
                     await updateDoc(userDocRef, { credits: newCredits });
                     window.currentUserData.credits = newCredits;
                     document.getElementById('displayCredits').innerText = newCredits;
@@ -444,7 +505,7 @@
             } catch (error) {
                 if (!window.currentUserData.isAdmin) {
                     const userDocRef = doc(db, "users", window.currentUserData.uid);
-                    const refundedCredits = window.currentUserData.credits + 10;
+                    const refundedCredits = window.currentUserData.credits + docCost;
                     await updateDoc(userDocRef, { credits: refundedCredits });
                     window.currentUserData.credits = refundedCredits;
                     document.getElementById('displayCredits').innerText = refundedCredits;
@@ -528,11 +589,9 @@
 
         // ================= MAIN SERVICE SWITCHER =================
         window.switchService = function(serviceName) {
-            // Reset regular tabs
             document.querySelectorAll('.service-tab').forEach(btn => {
                 btn.className = "service-tab bg-white text-slate-600 font-bold py-3.5 px-2 rounded-xl hover:bg-slate-50 transition shadow-sm border border-slate-200 text-[11px] md:text-sm flex-1 flex justify-center items-center gap-1.5 md:gap-2";
             });
-            // Reset VIP tabs
             document.querySelectorAll('.vip-tab').forEach(btn => {
                 btn.className = "vip-tab bg-dark-800 text-royal-300 border border-royal-500/30 font-bold py-2.5 px-3 rounded-xl hover:bg-royal-500 hover:text-dark-950 transition text-xs flex items-center justify-center gap-1.5 shadow-sm";
             });
@@ -549,17 +608,19 @@
             const container = document.getElementById('formContainer');
             if (!container) return;
             
+            // Dynamic Button Text with 20% VIP Discount (8 Credits for VIP, 10 for Normal)
             const submitBtnText = window.currentUserData && window.currentUserData.isAdmin 
-                                ? 'Generate Document <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' 
-                                : 'Generate Document (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>';
+                ? 'Generate Document <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' 
+                : (window.currentUserData && window.currentUserData.isVip 
+                    ? 'Generate Document (8 Credits - 20% VIP Off) <i class="fa-solid fa-crown ml-1"></i>' 
+                    : 'Generate Document (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>');
                                 
             const statusTagHtml = window.currentUserData && window.currentUserData.isAdmin 
-                                ? '<span class="bg-green-100 text-green-700 px-3 py-1 rounded-md text-[10px] font-bold border border-green-200 uppercase tracking-widest">Admin Free Access</span>' 
-                                : (window.currentUserData && window.currentUserData.isVip 
-                                    ? '<span class="bg-amber-100 text-amber-800 px-3 py-1 rounded-md text-[10px] font-black border border-amber-300 uppercase tracking-widest"><i class="fa-solid fa-crown mr-1"></i>VIP Member</span>' 
-                                    : '');
+                ? '<span class="bg-green-100 text-green-700 px-3 py-1 rounded-md text-[10px] font-bold border border-green-200 uppercase tracking-widest">Admin Free Access</span>' 
+                : (window.currentUserData && window.currentUserData.isVip 
+                    ? '<span class="bg-amber-100 text-amber-800 px-3 py-1 rounded-md text-[10px] font-black border border-amber-300 uppercase tracking-widest"><i class="fa-solid fa-crown mr-1"></i>VIP 20% OFF ACTIVE</span>' 
+                    : '<span onclick="window.jumpToVipUpgrade()" class="cursor-pointer bg-royal-100 hover:bg-royal-200 text-royal-900 px-3 py-1 rounded-md text-[10px] font-black border border-royal-300 uppercase tracking-wider transition"><i class="fa-solid fa-bolt text-amber-600 mr-1"></i>VIP लें: 20% बचाएं</span>');
 
-            // 1. DOMICILE (Normal + VIP)
             if(serviceName === 'domicile') {
                 container.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
@@ -586,7 +647,6 @@
                 `;
                 window.updateTehsilsAndThanas();
             } 
-            // 2. CASTE CERTIFICATE (Normal + VIP)
             else if(serviceName === 'caste') {
                 container.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
@@ -613,8 +673,6 @@
                 `;
                 window.updateTehsilsAndThanas();
             }
-
-            // 3. VIP EXCLUSIVE: BIRTH CERTIFICATE FOR 18+ (DOB)
             else if(serviceName === 'dob18') {
                 if (!window.currentUserData || !window.currentUserData.isVip) {
                     return alert('यह सर्विस केवल VIP मेंबर्स के लिए उपलब्ध है!');
@@ -638,8 +696,6 @@
                     </form>
                 `;
             }
-
-            // 4. VIP EXCLUSIVE: ANNEXURE FORMS (1, 1A, 3, 3A, B, C, D, E)
             else if(serviceName.startsWith('annexure')) {
                 if (!window.currentUserData || !window.currentUserData.isVip) {
                     return alert('यह सर्विस केवल VIP मेंबर्स के लिए उपलब्ध है!');
@@ -679,35 +735,70 @@
                 `;
             }
             
-            // 5. ADD WALLET CREDITS
+            // ADD WALLET CREDITS + ₹100 VIP CHECKBOX
             else if(serviceName === 'add_credit') {
+                const isAlreadyVip = window.currentUserData && window.currentUserData.isVip;
+                const vipOptionHtml = !isAlreadyVip ? `
+                    <label for="vipUpgradeCheckbox" class="mt-4 flex items-start gap-3 p-4 rounded-2xl bg-gradient-to-r from-dark-900 via-dark-800 to-dark-900 text-white border-2 border-royal-400 shadow-vip-glow cursor-pointer transition transform hover:scale-[1.01]">
+                        <input type="checkbox" id="vipUpgradeCheckbox" onchange="window.calculateCredits()" class="mt-1 w-5 h-5 accent-amber-400 rounded cursor-pointer">
+                        <div class="flex-1">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-black text-royal-300 flex items-center gap-1.5"><i class="fa-solid fa-crown text-yellow-400 animate-bounce"></i> 1 महीने का VIP Access जोड़ें</span>
+                                <span class="bg-royal-500 text-dark-950 font-black text-xs px-2.5 py-0.5 rounded-full">+ ₹100</span>
+                            </div>
+                            <p class="text-[11px] text-slate-300 font-semibold mt-1 leading-relaxed">
+                                • हर डॉक्यूमेंट पर <strong>20% की छूट</strong> (10 की जगह 8 क्रेडिट)<br>
+                                • <strong>18+ जन्म प्रमाण पत्र (DOB)</strong> और <strong>सारे Annexures (1, 1A, 3, B, C, D, E)</strong> अनलॉक करें!
+                            </p>
+                        </div>
+                    </label>
+                ` : `
+                    <div class="mt-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold text-center">
+                        <i class="fa-solid fa-crown text-amber-500 mr-1"></i> आपके पास पहले से ही VIP Access एक्टिव है!
+                    </div>
+                `;
+
                 container.innerHTML = `
                     <div id="walletMainUI" class="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div class="space-y-4 bg-slate-50 p-6 rounded-3xl border border-slate-200">
-                            <div class="mb-4">
-                                <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-wallet text-royal-500 mr-2"></i> Add Wallet Credits</h3>
-                                <p class="text-xs font-bold text-slate-500 mt-1">₹1 = 1 Credit | Secure Verification</p>
+                            <div class="mb-2">
+                                <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-wallet text-royal-500 mr-2"></i> Add Credits & VIP Access</h3>
+                                <p class="text-xs font-bold text-slate-500 mt-1">₹1 = 1 Credit | Instant Admin Verification</p>
                             </div>
                             
-                            <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide">Enter Amount (₹)</label>
-                            <input type="number" id="rupeeAmount" placeholder="e.g. 500" min="10" oninput="window.calculateCredits()" class="w-full p-4 border border-slate-200 rounded-xl text-lg font-black bg-white focus:ring-2 focus:ring-royal-500 outline-none transition text-center text-dark-900 shadow-inner">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Enter Credit Amount (₹)</label>
+                                <input type="number" id="rupeeAmount" placeholder="e.g. 200 (या सिर्फ VIP के लिए 0 छोड़ें)" min="0" oninput="window.calculateCredits()" class="w-full p-4 border border-slate-200 rounded-xl text-lg font-black bg-white focus:ring-2 focus:ring-royal-500 outline-none transition text-center text-dark-900 shadow-inner">
+                            </div>
+
+                            <!-- VIP +100 Option -->
+                            ${vipOptionHtml}
                             
-                            <div class="p-6 bg-white rounded-2xl border border-royal-200 text-center shadow-card mt-4">
-                                <p class="text-xs font-bold text-royal-600 uppercase mb-1 tracking-widest">You will get</p>
-                                <p class="text-4xl font-black text-dark-900" id="calculatedCredits">0 <span class="text-sm font-bold text-slate-400">Credits</span></p>
+                            <div class="p-5 bg-white rounded-2xl border border-royal-200 text-center shadow-card mt-4 space-y-2">
+                                <p class="text-xs font-bold text-royal-600 uppercase tracking-widest">You will get</p>
+                                <p class="text-3xl font-black text-dark-900" id="calculatedCredits">0 <span class="text-sm font-bold text-slate-400">Credits</span></p>
+                                <div id="vipSummaryBadge" style="display: none;" class="bg-gradient-to-r from-yellow-300 to-amber-500 text-dark-950 text-xs font-black px-3 py-1 rounded-full shadow-sm">
+                                    <i class="fa-solid fa-crown mr-1"></i> + 1 Month VIP Portal Access (₹100)
+                                </div>
+                                <div class="border-t border-slate-100 pt-2 mt-2 flex justify-between items-center px-2">
+                                    <span class="text-xs font-bold text-slate-500 uppercase">कुल पेमेंट (Total Payable):</span>
+                                    <span id="totalPayableDisplay" class="text-2xl font-black text-green-600">₹0</span>
+                                </div>
                             </div>
                             
-                            <button id="btnGenerateQR" onclick="window.generateQR()" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-4 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-2">Generate Payment QR</button>
+                            <button id="btnGenerateQR" onclick="window.generateQR()" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-4 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-2">Generate Payment QR <i class="fa-solid fa-qrcode ml-1"></i></button>
                         </div>
 
-                        <div id="qrSection" style="display: none;" class="flex-col items-center justify-center space-y-5 bg-white p-6 rounded-3xl border-2 border-royal-400 shadow-card relative">
+                        <div id="qrSection" style="display: none;" class="flex-col items-center justify-center space-y-4 bg-white p-6 rounded-3xl border-2 border-royal-400 shadow-card relative">
                             <h4 class="text-[11px] font-bold text-royal-700 uppercase tracking-widest text-center bg-royal-100 px-4 py-2 rounded-full"><i class="fa-solid fa-qrcode mr-1"></i> Scan & Pay using any UPI App</h4>
                             
+                            <p id="qrPayableAmountText" class="text-xl font-black text-green-600 bg-green-50 px-4 py-1 rounded-xl border border-green-200">Pay ₹0</p>
+
                             <div class="p-3 border border-slate-200 rounded-2xl bg-white shadow-sm">
-                                <img id="upiQRCode" src="" alt="UPI QR Code" class="w-48 h-48 md:w-56 md:h-56 object-contain">
+                                <img id="upiQRCode" src="" alt="UPI QR Code" class="w-48 h-48 md:w-52 md:h-52 object-contain">
                             </div>
                             
-                            <div class="w-full pt-2">
+                            <div class="w-full pt-1">
                                 <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 text-center">Enter 12-Digit UTR / Ref Number</label>
                                 <input type="text" id="utrNumber" placeholder="Enter UTR after payment" class="w-full p-4 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-amber-500 outline-none transition text-center tracking-widest uppercase">
                             </div>
@@ -719,7 +810,6 @@
                 `;
             }
 
-            // 6. CHANGE PASSWORD SECTION (NEW)
             else if(serviceName === 'password') {
                 container.innerHTML = `
                     <div class="max-w-md mx-auto py-4">
@@ -753,7 +843,6 @@
                 `;
             }
             
-            // 7. MY HISTORY
             else if(serviceName === 'history') {
                 const isVipUser = window.currentUserData && window.currentUserData.isVip;
                 const vipFilterOptions = isVipUser ? `
@@ -869,7 +958,7 @@
                 <div class="flex items-center gap-2.5">
                     <h2 id="portalHeaderTitle" class="text-lg md:text-xl font-black text-white leading-tight">Ojas <span class="text-royal-400">Portal</span></h2>
                     <span id="vipStatusBadge" style="display: none;" class="items-center gap-1 bg-gradient-to-r from-yellow-300 via-royal-400 to-amber-500 text-dark-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-widest shadow-vip-glow">
-                        <i class="fa-solid fa-crown text-[9px]"></i> VIP ACCESS
+                        <i class="fa-solid fa-crown text-[9px]"></i> VIP ACCESS (20% OFF)
                     </span>
                 </div>
             </div>
@@ -886,22 +975,45 @@
         </header>
 
         <main class="max-w-6xl mx-auto w-full p-4 md:p-8 flex-grow">
-            <!-- Standard Navigation Grid (Normal Users see ONLY Domicile & Caste here, NO DOB) -->
+            
+            <!-- ✨ SHINY VIP PROMO NOTIFICATION BANNER FOR NORMAL USERS ✨ -->
+            <div id="normalUserVipPromo" style="display: none;" class="mb-6 rounded-3xl vip-promo-shine border-2 border-royal-400 p-5 text-white shadow-vip-glow relative overflow-hidden">
+                <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative z-10">
+                    <div class="space-y-1.5">
+                        <div class="inline-flex items-center gap-2 bg-gradient-to-r from-yellow-300 to-amber-500 text-dark-950 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider shadow">
+                            <i class="fa-solid fa-crown animate-bounce"></i> VIP धमाका ऑफर — हर ट्रांजैक्शन पर 20% की छूट!
+                        </div>
+                        <h3 class="text-lg md:text-xl font-black text-royal-300">
+                            सिर्फ ₹100 / महीने में अपना VIP Admin Portal अनलॉक करें!
+                        </h3>
+                        <ul class="text-xs md:text-sm text-slate-200 font-semibold space-y-1 pt-1">
+                            <li><i class="fa-solid fa-circle-check text-green-400 mr-1.5"></i> <strong>20% OFF:</strong> हर डॉक्यूमेंट 10 की जगह सिर्फ <strong>8 क्रेडिट</strong> में बनाएं!</li>
+                            <li><i class="fa-solid fa-circle-check text-green-400 mr-1.5"></i> <strong>18+ जन्म प्रमाण पत्र (DOB Certificate)</strong> तुरंत बनाएं।</li>
+                            <li><i class="fa-solid fa-circle-check text-green-400 mr-1.5"></i> <strong>सारे Annexures (Annexure 1, 1A, 3, 3A, B, C, D, E)</strong> सीधे टाइप करके तुरंत PDF निकालें!</li>
+                        </ul>
+                    </div>
+                    <button onclick="window.jumpToVipUpgrade()" class="w-full md:w-auto shrink-0 bg-gradient-to-r from-yellow-300 via-royal-400 to-amber-500 hover:from-yellow-400 hover:to-amber-600 text-dark-950 font-black py-3.5 px-6 rounded-2xl shadow-vip-glow transform hover:scale-105 transition text-sm flex items-center justify-center gap-2 border border-yellow-100">
+                        <i class="fa-solid fa-bolt"></i> ₹100 में VIP Access लें <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Standard Navigation Grid -->
             <div class="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-6">
                 <button onclick="window.switchService('domicile')" id="btn-domicile" class="service-tab"><i class="fa-solid fa-house-chimney"></i> Domicile</button>
                 <button onclick="window.switchService('caste')" id="btn-caste" class="service-tab"><i class="fa-solid fa-users"></i> Caste Cert</button>
                 <button onclick="window.switchService('history')" id="btn-history" class="service-tab"><i class="fa-solid fa-clock-rotate-left"></i> My History</button>
                 <button onclick="window.switchService('password')" id="btn-password" class="service-tab"><i class="fa-solid fa-key"></i> Password</button>
-                <button onclick="window.switchService('add_credit')" id="btn-add_credit" class="service-tab col-span-2 md:col-span-1 !bg-amber-50 !text-amber-700 !border-amber-200 hover:!bg-amber-100"><i class="fa-solid fa-plus-circle"></i> Add Credit</button>
+                <button onclick="window.switchService('add_credit')" id="btn-add_credit" class="service-tab col-span-2 md:col-span-1 !bg-amber-50 !text-amber-700 !border-amber-200 hover:!bg-amber-100"><i class="fa-solid fa-plus-circle"></i> Add Credit / VIP</button>
             </div>
 
             <!-- 👑 VIP EXCLUSIVE SERVICES PANEL (Visible ONLY when isVip == true) -->
             <div id="vipServicesBar" style="display: none;" class="mb-8 p-5 rounded-3xl bg-gradient-to-r from-dark-950 via-dark-900 to-dark-950 border-2 border-royal-400 shadow-vip-glow">
                 <div class="flex items-center justify-between mb-3 border-b border-slate-800 pb-2.5">
                     <span class="text-xs font-black uppercase tracking-widest text-royal-300 flex items-center gap-2">
-                        <i class="fa-solid fa-crown text-royal-400 animate-bounce"></i> VIP Exclusive Services (18+ DOB & All Annexures)
+                        <i class="fa-solid fa-crown text-royal-400 animate-bounce"></i> VIP Exclusive Services (20% Discount Active)
                     </span>
-                    <span class="text-[10px] font-bold text-slate-400 hidden sm:inline">Premium Unlocked</span>
+                    <span class="text-[10px] font-bold text-green-400 hidden sm:inline"><i class="fa-solid fa-check-circle mr-1"></i>All Annexures & 18+ DOB Unlocked</span>
                 </div>
                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
                     <button onclick="window.switchService('dob18')" id="btn-dob18" class="vip-tab"><i class="fa-solid fa-cake-candles"></i> DOB (18+)</button>
