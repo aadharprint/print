@@ -77,6 +77,7 @@
 
         window.currentUserData = null;
         window.historyData = []; 
+        window.userPaymentsData = [];
         window.currentActiveTab = 'domicile';
         window.vipCountdownInterval = null;
 
@@ -180,7 +181,7 @@
             }
         };
 
-        // ================= LIVE VIP COUNTDOWN & AUTO REVERT TO NORMAL USER =================
+        // ================= LIVE VIP COUNTDOWN & HEADER DAYS LEFT DISPLAY =================
         function startVipCountdownLoop() {
             if (window.vipCountdownInterval) clearInterval(window.vipCountdownInterval);
             updateVipTimerAndAlerts();
@@ -200,11 +201,10 @@
                 return;
             }
 
-            // अगर एडमिन ने बिना एक्सपायरी टाइम के सीधा VIP किया था, तो कोई काउंटडाउन नहीं रुकेगा
             if (!userData.vipExpiry || userData.vipExpiry <= 0) {
                 if (timerBox) {
                     timerBox.style.display = 'flex';
-                    timerText.innerText = 'VIP Active';
+                    timerText.innerHTML = `👑 VIP अनलिमिटेड`;
                 }
                 if (cornerAlert) cornerAlert.style.display = 'none';
                 return;
@@ -226,29 +226,34 @@
                 if (timerBox) timerBox.style.display = 'none';
                 if (cornerAlert) cornerAlert.style.display = 'none';
 
-                // तुरंत पूरा पेज नॉर्मल यूजर पोर्टल में बदल दें (बिना किसी ताले के)
                 setupDashboard(userData);
                 alert('आपकी VIP वैलिडिटी समाप्त हो गई है। आपका अकाउंट अब Normal User पोर्टल में बदल दिया गया है।');
                 return;
             }
 
-            // काउंटडाउन गणना (Days, Hours, Minutes, Seconds)
+            // दिन, घंटे, मिनट, सेकंड की गणना
+            const totalDaysCeil = Math.ceil(diff / MS_PER_DAY);
             const days = Math.floor(diff / MS_PER_DAY);
             const hours = Math.floor((diff % MS_PER_DAY) / (1000 * 60 * 60));
             const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
+            // ऊपर कोने में साफ हिंदी में बचे हुए दिन दिखाएं
             if (timerBox && timerText) {
                 timerBox.style.display = 'flex';
-                timerText.innerText = `${days}d : ${String(hours).padStart(2, '0')}h : ${String(minutes).padStart(2, '0')}m : ${String(seconds).padStart(2, '0')}s`;
+                if (totalDaysCeil <= 5) {
+                    timerBox.className = "cursor-pointer items-center gap-2 bg-red-600 text-white border-2 border-yellow-300 px-3.5 py-1.5 rounded-xl text-xs font-black shadow-vip-glow animate-pulse transition";
+                } else {
+                    timerBox.className = "cursor-pointer items-center gap-2 bg-amber-400/20 border-2 border-royal-400 text-royal-300 px-3.5 py-1.5 rounded-xl text-xs font-black shadow-sm hover:bg-amber-400/30 transition";
+                }
+                timerText.innerHTML = `<span class="text-yellow-300">VIP: ${totalDaysCeil} दिन बचे हैं</span> <span class="hidden sm:inline font-mono text-[11px] text-white opacity-90">(${days}d:${String(hours).padStart(2, '0')}h:${String(minutes).padStart(2, '0')}m:${String(seconds).padStart(2, '0')}s)</span>`;
             }
 
             // 🔔 5 दिन या उससे कम (5, 4, 3, 2, 1 दिन) बचने पर कोने में अलर्ट दिखाएं
-            const remainingDaysCeil = Math.ceil(diff / MS_PER_DAY);
-            if (remainingDaysCeil <= 5 && remainingDaysCeil >= 1) {
+            if (totalDaysCeil <= 5 && totalDaysCeil >= 1) {
                 if (!window.cornerAlertDismissed) {
                     cornerAlert.style.display = 'block';
-                    cornerAlertDaysText.innerHTML = `आपके VIP एक्सेस खत्म होने में सिर्फ <strong class="text-red-600 underline">${remainingDaysCeil} दिन</strong> बचे हैं! क्या आप फिर से VIP एक्सेस बढ़ाना चाहते हैं?`;
+                    cornerAlertDaysText.innerHTML = `आपके VIP एक्सेस खत्म होने में सिर्फ <strong class="text-red-600 underline text-sm">${totalDaysCeil} दिन</strong> बचे हुए हैं! क्या आप फिर से VIP एक्सेस बढ़ाना चाहते हैं?`;
                 }
             } else {
                 cornerAlert.style.display = 'none';
@@ -311,7 +316,6 @@
             window.location.reload();
         };
 
-        // Jump directly to Add Credit with a specific VIP Plan selected (default 30 days)
         window.jumpToVipUpgrade = function(days = 30) {
             window.switchService('add_credit');
             setTimeout(() => {
@@ -478,7 +482,6 @@
                     throw new Error("यह UTR नंबर पहले ही उपयोग किया जा चुका है!");
                 }
 
-                // Save payment with complete VIP plan details
                 await addDoc(collection(db, "payments"), {
                     userId: window.currentUserData.uid,
                     email: window.currentUserData.email,
@@ -492,7 +495,6 @@
                     status: "Pending"
                 });
 
-                // Send Detailed Telegram Alert to Admin
                 const botToken = "8586078140:AAG-ydpakzFDAwHFtJC8AUanxZAODpGZDOk"; 
                 const chatId = "8942287807"; 
                 const vipAlertLine = wantsVip 
@@ -512,23 +514,172 @@
                 }).catch(err => console.log("Telegram alert failed", err));
 
                 const successSubText = wantsVip 
-                    ? `आपकी UTR डिटेल और <strong>👑 +${vipDays} Days VIP Access</strong> की रिक्वेस्ट एडमिन को भेज दी गई है। अप्रूव होते ही आपकी VIP वैलिडिटी (+${vipDays} दिन) और ${creditsToAdd} क्रेडिट्स जुड़ जाएंगे!`
+                    ? `आपकी UTR डिटेल और <strong>👑 +${vipDays} Days VIP Access</strong> की रिक्वेस्ट एडमिन को भेज दी गई है। आप नीचे अपनी पेमेंट हिस्ट्री में लाइव स्टेटस देख सकते हैं!`
                     : `आपकी UTR डिटेल एडमिन को भेज दी गई है। पेमेंट वेरीफाई होते ही ${creditsToAdd} क्रेडिट्स आपके वॉलेट में जोड़ दिए जाएंगे।`;
 
                 document.getElementById('walletMainUI').innerHTML = `
-                    <div class="col-span-1 md:col-span-2 flex flex-col items-center justify-center p-10 bg-amber-50 rounded-3xl border border-amber-200 text-center animate-pulse">
-                        <i class="fa-solid fa-clock-rotate-left text-6xl text-amber-500 mb-4"></i>
-                        <h2 class="text-3xl font-black text-amber-800 tracking-tight">वेरिफिकेशन पेंडिंग</h2>
+                    <div class="col-span-1 md:col-span-2 flex flex-col items-center justify-center p-10 bg-amber-50 rounded-3xl border border-amber-200 text-center">
+                        <i class="fa-solid fa-clock-rotate-left text-6xl text-amber-500 mb-4 animate-pulse"></i>
+                        <h2 class="text-3xl font-black text-amber-800 tracking-tight">वेरिफिकेशन पेंडिंग (Pending)</h2>
                         <p class="text-sm font-bold text-amber-700 mt-3 max-w-md mx-auto">${successSubText}</p>
-                        <button onclick="window.switchService('domicile')" class="mt-8 bg-amber-600 hover:bg-amber-700 text-white font-black py-4 px-8 rounded-xl shadow-glow transition transform hover:-translate-y-0.5">डैशबोर्ड पर जाएँ <i class="fa-solid fa-arrow-right ml-1"></i></button>
+                        <div class="flex flex-wrap gap-3 justify-center mt-8">
+                            <button onclick="window.switchService('payments_history')" class="bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 px-6 rounded-xl shadow-glow transition">पेमेंट स्टेटस देखें <i class="fa-solid fa-receipt ml-1"></i></button>
+                            <button onclick="window.switchService('domicile')" class="bg-amber-600 hover:bg-amber-700 text-white font-black py-3.5 px-6 rounded-xl shadow transition">डैशबोर्ड पर जाएँ <i class="fa-solid fa-arrow-right ml-1"></i></button>
+                        </div>
                     </div>
                 `;
+                // Refresh embedded payment history table
+                window.loadUserPayments();
             } catch(error) {
                 errorMsg.innerText = error.message;
                 errorMsg.style.display = 'block';
             } finally {
                 btn.innerHTML = origHtml;
                 btn.disabled = false;
+            }
+        };
+
+        // ================= USER PAYMENT HISTORY & LIVE STATUS LOADER =================
+        window.loadUserPayments = async function() {
+            const tbody = document.getElementById('userPaymentsTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400 font-bold"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2 text-royal-500"></i><br>आपकी पेमेंट हिस्ट्री लोड हो रही है...</td></tr>`;
+
+            try {
+                // Reload latest user document to sync live credits & VIP expiry if admin just approved
+                const userDocRef = doc(db, "users", window.currentUserData.uid);
+                const userDoc = await getDoc(userDocRef);
+                if (userDoc.exists()) {
+                    const uData = userDoc.data();
+                    window.currentUserData.credits = uData.credits || 0;
+                    window.currentUserData.vipExpiry = uData.vipExpiry || 0;
+                    const isAdmin = (window.currentUserData.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
+                    const isNowVip = (uData.isVip && (!uData.vipExpiry || uData.vipExpiry > Date.now())) || isAdmin;
+                    window.currentUserData.isVip = isNowVip;
+                    const creditEl = document.getElementById('displayCredits');
+                    if (creditEl) creditEl.innerText = window.currentUserData.credits;
+                }
+
+                // Update Validity Banner inside Payment History
+                const validityCard = document.getElementById('userValidityInfoBox');
+                if (validityCard) {
+                    const now = Date.now();
+                    const exp = window.currentUserData.vipExpiry || 0;
+                    if (window.currentUserData.isVip && exp > now) {
+                        const daysLeft = Math.ceil((exp - now) / MS_PER_DAY);
+                        const expDateStr = new Date(exp).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                        validityCard.innerHTML = `
+                            <div class="p-4 rounded-2xl bg-gradient-to-r from-dark-950 via-dark-900 to-dark-800 text-white border-2 border-royal-400 shadow-md flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                                <div>
+                                    <span class="text-[10px] font-black uppercase tracking-widest bg-amber-400 text-dark-950 px-2.5 py-0.5 rounded-full"><i class="fa-solid fa-crown mr-1"></i>VIP ACCESS ACTIVE</span>
+                                    <h4 class="text-lg font-black text-royal-300 mt-1">आपकी VIP वैलिडिटी: <span class="text-white underline">${daysLeft} दिन बाकी हैं</span></h4>
+                                    <p class="text-xs text-slate-300 font-semibold">समाप्ति तिथि (Expiry Date): ${expDateStr}</p>
+                                </div>
+                                <button onclick="window.jumpToVipUpgrade(30)" class="bg-royal-500 hover:bg-royal-400 text-dark-950 font-black px-4 py-2.5 rounded-xl text-xs shadow transition shrink-0">
+                                    <i class="fa-solid fa-plus-circle mr-1"></i> वैलिडिटी और बढ़ाएं
+                                </button>
+                            </div>
+                        `;
+                    } else if (window.currentUserData.isVip) {
+                        validityCard.innerHTML = `
+                            <div class="p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 font-bold text-sm">
+                                <i class="fa-solid fa-crown text-amber-500 mr-1"></i> आपका VIP Access एक्टिव है!
+                            </div>
+                        `;
+                    } else {
+                        validityCard.innerHTML = `
+                            <div class="p-4 rounded-2xl bg-slate-100 border border-slate-200 text-slate-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                                <div>
+                                    <span class="text-[10px] font-bold uppercase tracking-wider bg-slate-300 text-slate-800 px-2.5 py-0.5 rounded-full">Normal Account</span>
+                                    <h4 class="text-base font-black text-slate-800 mt-1">अभी कोई VIP प्लान एक्टिव नहीं है (0 दिन)</h4>
+                                    <p class="text-xs text-slate-500 font-semibold">हर डॉक्यूमेंट पर 20% छूट और सारे Annexures व 18+ DOB के लिए VIP लें।</p>
+                                </div>
+                                <button onclick="window.jumpToVipUpgrade(30)" class="bg-dark-900 hover:bg-black text-royal-300 font-black px-4 py-2.5 rounded-xl text-xs shadow transition shrink-0">
+                                    <i class="fa-solid fa-crown mr-1"></i> ₹100 में VIP लें
+                                </button>
+                            </div>
+                        `;
+                    }
+                }
+
+                const q = query(collection(db, "payments"), where("userId", "==", window.currentUserData.uid));
+                const snap = await getDocs(q);
+
+                window.userPaymentsData = [];
+                snap.forEach(docSnap => {
+                    window.userPaymentsData.push({ id: docSnap.id, ...docSnap.data() });
+                });
+
+                // Sort newest first
+                window.userPaymentsData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+
+                // Calculate Summary Totals
+                let totalTxns = window.userPaymentsData.length;
+                let approvedAmount = 0;
+                let pendingAmount = 0;
+                let pendingCount = 0;
+
+                window.userPaymentsData.forEach(item => {
+                    const amt = parseFloat(item.amountPaid) || 0;
+                    const st = (item.status || 'Pending').toLowerCase();
+                    if (st === 'approved' || st === 'auto-approved') {
+                        approvedAmount += amt;
+                    } else if (st === 'pending') {
+                        pendingAmount += amt;
+                        pendingCount++;
+                    }
+                });
+
+                const elTotalTxns = document.getElementById('sumTotalTxns');
+                const elApprovedAmt = document.getElementById('sumApprovedAmt');
+                const elPendingAmt = document.getElementById('sumPendingAmt');
+                if (elTotalTxns) elTotalTxns.innerText = totalTxns;
+                if (elApprovedAmt) elApprovedAmt.innerText = `₹${approvedAmount}`;
+                if (elPendingAmt) elPendingAmt.innerText = `₹${pendingAmount} (${pendingCount})`;
+
+                if (window.userPaymentsData.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="p-10 text-center text-slate-400 font-bold"><i class="fa-solid fa-receipt text-4xl mb-2 text-slate-300"></i><br>अभी तक कोई पेमेंट रिकॉर्ड नहीं मिला।</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                window.userPaymentsData.forEach(item => {
+                    const sec = item.timestamp?.seconds || Math.floor(Date.now() / 1000);
+                    const dateObj = new Date(sec * 1000);
+                    const dateStr = dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+                    const timeStr = dateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+                    const creditsReq = item.creditsRequested !== undefined ? item.creditsRequested : (item.creditsAdded || 0);
+                    const vipDays = item.vipDaysRequested || (item.wantsVip ? 30 : 0);
+
+                    let detailsHtml = `<span class="font-bold text-slate-800">+${creditsReq} Credits</span>`;
+                    if (vipDays > 0) {
+                        detailsHtml += `<br><span class="inline-flex items-center gap-1 bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full text-[10px] font-black mt-1"><i class="fa-solid fa-crown text-amber-500"></i> +${vipDays} Days VIP</span>`;
+                    }
+
+                    const rawStatus = (item.status || 'Pending');
+                    let statusBadgeHtml = '';
+                    if (rawStatus === 'Approved' || rawStatus === 'Auto-Approved') {
+                        statusBadgeHtml = `<span class="inline-flex items-center gap-1 bg-green-100 text-green-800 border border-green-300 px-3 py-1 rounded-full text-xs font-black"><i class="fa-solid fa-circle-check text-green-600"></i> सफल (Approved)</span>`;
+                    } else if (rawStatus === 'Rejected') {
+                        statusBadgeHtml = `<span class="inline-flex items-center gap-1 bg-red-100 text-red-700 border border-red-300 px-3 py-1 rounded-full text-xs font-black"><i class="fa-solid fa-circle-xmark text-red-600"></i> रद्द / फेल्ड (Rejected)</span>`;
+                    } else {
+                        statusBadgeHtml = `<span class="inline-flex items-center gap-1 bg-amber-100 text-amber-800 border border-amber-300 px-3 py-1 rounded-full text-xs font-black animate-pulse"><i class="fa-solid fa-clock text-amber-600"></i> पेंडिंग (Pending)</span>`;
+                    }
+
+                    tbody.innerHTML += `
+                        <tr class="border-b border-slate-100 text-sm hover:bg-slate-50 transition">
+                            <td class="p-4 text-slate-600 text-xs font-bold">${dateStr}<br><span class="text-slate-400 font-medium">${timeStr}</span></td>
+                            <td class="p-4 font-black text-base text-slate-900">₹${item.amountPaid || 0}</td>
+                            <td class="p-4">${detailsHtml}</td>
+                            <td class="p-4 font-mono text-xs font-bold text-slate-700 tracking-wider">${item.utrNumber || 'N/A'}</td>
+                            <td class="p-4 text-right whitespace-nowrap">${statusBadgeHtml}</td>
+                        </tr>
+                    `;
+                });
+            } catch (err) {
+                console.error("Error loading user payments:", err);
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500 font-bold">पेमेंट हिस्ट्री लोड करने में समस्या आई।</td></tr>`;
             }
         };
 
@@ -720,6 +871,63 @@
             if (thanaSelect) thanaSelect.innerHTML = thanas.map(t => `<option value="${t}">${t}</option>`).join('');
         };
 
+        // Reusable HTML block for Payment History & Summary Cards
+        function getPaymentHistorySectionHtml() {
+            return `
+                <div class="space-y-6">
+                    <!-- VIP Validity Status Banner -->
+                    <div id="userValidityInfoBox"></div>
+
+                    <!-- 3 Summary Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                            <div>
+                                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">कुल ट्रांजैक्शन (Total)</p>
+                                <p id="sumTotalTxns" class="text-2xl font-black text-dark-900 mt-0.5">0</p>
+                            </div>
+                            <div class="w-11 h-11 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center text-lg"><i class="fa-solid fa-list-ol"></i></div>
+                        </div>
+                        <div class="p-4 rounded-2xl bg-green-50 border border-green-200 flex items-center justify-between">
+                            <div>
+                                <p class="text-[11px] font-bold text-green-700 uppercase tracking-wider">सफल पेमेंट (Approved)</p>
+                                <p id="sumApprovedAmt" class="text-2xl font-black text-green-700 mt-0.5">₹0</p>
+                            </div>
+                            <div class="w-11 h-11 rounded-xl bg-green-200 text-green-800 flex items-center justify-center text-lg"><i class="fa-solid fa-circle-check"></i></div>
+                        </div>
+                        <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between">
+                            <div>
+                                <p class="text-[11px] font-bold text-amber-800 uppercase tracking-wider">पेंडिंग स्टेटस (Pending)</p>
+                                <p id="sumPendingAmt" class="text-2xl font-black text-amber-700 mt-0.5">₹0 (0)</p>
+                            </div>
+                            <div class="w-11 h-11 rounded-xl bg-amber-200 text-amber-800 flex items-center justify-center text-lg"><i class="fa-solid fa-clock"></i></div>
+                        </div>
+                    </div>
+
+                    <!-- Payment History Table -->
+                    <div>
+                        <div class="flex justify-between items-center mb-3">
+                            <h4 class="text-lg font-black text-dark-900"><i class="fa-solid fa-receipt text-royal-500 mr-2"></i> आपकी पेमेंट और VIP हिस्ट्री (Payment Status Log)</h4>
+                            <button onclick="window.loadUserPayments()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-sm"><i class="fa-solid fa-rotate-right mr-1"></i> Refresh Status</button>
+                        </div>
+                        <div class="overflow-x-auto border border-slate-200 rounded-2xl">
+                            <table class="w-full text-left border-collapse bg-white min-w-[650px]">
+                                <thead class="bg-slate-50 border-b border-slate-200 text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                                    <tr>
+                                        <th class="p-4">तारीख और समय (Date)</th>
+                                        <th class="p-4">राशि (Amount)</th>
+                                        <th class="p-4">क्रेडिट्स / VIP प्लान</th>
+                                        <th class="p-4">UTR / Ref No.</th>
+                                        <th class="p-4 text-right">स्टेटस (Live Status)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="userPaymentsTableBody" class="text-sm text-slate-700"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
         // ================= MAIN SERVICE SWITCHER =================
         window.switchService = function(serviceName) {
             window.currentActiveTab = serviceName;
@@ -856,7 +1064,7 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Full Name</label><input type="text" name="NAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Father/Husband Name</label><input type="text" name="FATHER" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">ID Number (12 Digits)</label><input type="text" name="AADHAR" placeholder="Enter 12-digit number" required maxlength="12" pattern="\\d{12}" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">12-Digit ID Number</label><input type="text" name="AADHAR" placeholder="Enter 12-digit number" required maxlength="12" pattern="\\d{12}" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Date</label><input type="date" name="DATE" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Old DOB</label><input type="date" name="OLDDOB" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">New DOB</label><input type="date" name="NEWDOB" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
@@ -869,7 +1077,7 @@
                 `;
             }
             
-            // ADD WALLET CREDITS + 3 VIP PLANS (₹100/30d, ₹180/60d, ₹250/90d)
+            // ADD WALLET CREDITS + 3 VIP PLANS + EMBEDDED PAYMENT HISTORY
             else if(serviceName === 'add_credit') {
                 const isAlreadyVip = window.currentUserData && window.currentUserData.isVip;
                 const vipHeaderNote = isAlreadyVip 
@@ -877,7 +1085,7 @@
                     : `<span class="text-[11px] text-slate-300 font-semibold">हर डॉक्यूमेंट पर <strong>20% छूट</strong> + <strong>18+ DOB और सारे Annexures</strong> अनलॉक करें!</span>`;
 
                 container.innerHTML = `
-                    <div id="walletMainUI" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div id="walletMainUI" class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10 pb-8 border-b border-slate-200">
                         <div class="space-y-4 bg-slate-50 p-6 rounded-3xl border border-slate-200">
                             <div class="mb-2">
                                 <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-wallet text-royal-500 mr-2"></i> Add Credits & VIP Plans</h3>
@@ -899,7 +1107,6 @@
                                 <div>${vipHeaderNote}</div>
 
                                 <div class="grid grid-cols-2 gap-2.5 pt-1">
-                                    <!-- No VIP -->
                                     <label class="flex items-center gap-2 p-2.5 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-slate-500 transition">
                                         <input type="radio" name="vipPlanOption" value="0" data-price="0" checked onchange="window.calculateCredits()" class="w-4 h-4 accent-amber-400">
                                         <div class="text-left">
@@ -908,7 +1115,6 @@
                                         </div>
                                     </label>
 
-                                    <!-- 1 Month: ₹100 (+30 Days) -->
                                     <label class="flex items-center gap-2 p-2.5 rounded-xl bg-dark-800 border border-royal-500/40 cursor-pointer hover:border-royal-400 transition">
                                         <input type="radio" name="vipPlanOption" value="30" data-price="100" onchange="window.calculateCredits()" class="w-4 h-4 accent-amber-400">
                                         <div class="text-left">
@@ -917,7 +1123,6 @@
                                         </div>
                                     </label>
 
-                                    <!-- 2 Months: ₹180 (+60 Days) -->
                                     <label class="flex items-center gap-2 p-2.5 rounded-xl bg-dark-800 border border-royal-500/40 cursor-pointer hover:border-royal-400 transition">
                                         <input type="radio" name="vipPlanOption" value="60" data-price="180" onchange="window.calculateCredits()" class="w-4 h-4 accent-amber-400">
                                         <div class="text-left">
@@ -926,7 +1131,6 @@
                                         </div>
                                     </label>
 
-                                    <!-- 3 Months: ₹250 (+90 Days) -->
                                     <label class="flex items-center gap-2 p-2.5 rounded-xl bg-dark-800 border border-royal-500/40 cursor-pointer hover:border-royal-400 transition">
                                         <input type="radio" name="vipPlanOption" value="90" data-price="250" onchange="window.calculateCredits()" class="w-4 h-4 accent-amber-400">
                                         <div class="text-left">
@@ -970,7 +1174,17 @@
                             <p id="paymentErrorMsg" style="display: none;" class="text-xs font-bold text-red-500 text-center mt-2 p-2 bg-red-50 rounded-lg border border-red-200"></p>
                         </div>
                     </div>
+
+                    <!-- Embedded Payment History below Add Credit -->
+                    ${getPaymentHistorySectionHtml()}
                 `;
+                window.loadUserPayments();
+            }
+
+            // DEDICATED PAYMENT HISTORY & VALIDITY TAB
+            else if(serviceName === 'payments_history') {
+                container.innerHTML = getPaymentHistorySectionHtml();
+                window.loadUserPayments();
             }
 
             else if(serviceName === 'password') {
@@ -1023,7 +1237,7 @@
                 container.innerHTML = `
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-slate-100 pb-6 mb-6">
                         <div>
-                            <h3 class="text-2xl font-black text-dark-900 mb-1"><i class="fa-solid fa-folder-open text-royal-500 mr-2"></i> My History</h3>
+                            <h3 class="text-2xl font-black text-dark-900 mb-1"><i class="fa-solid fa-folder-open text-royal-500 mr-2"></i> My Generated Documents</h3>
                             <p id="userHistoryCount" class="text-sm font-bold text-royal-600 bg-royal-50 border border-royal-200 px-3 py-1 rounded-full inline-block">Total Files: 0</p>
                         </div>
                         
@@ -1066,7 +1280,7 @@
         <p class="text-sm text-royal-300 mt-2 font-bold animate-pulse">Checking Security...</p>
     </div>
 
-    <!-- 🔔 FLOATING CORNER ALERT WHEN <= 5 DAYS REMAINING IN VIP -->
+    <!-- 🔔 FLOATING CORNER ALERT WHEN 5 DAYS OR LESS REMAINING IN VIP -->
     <div id="vipCornerAlert" style="display: none;" class="fixed bottom-5 right-5 z-[150] w-80 md:w-96 bg-amber-50 border-l-8 border-amber-500 rounded-2xl p-4 shadow-2xl text-slate-800 corner-alert-anim">
         <div class="flex justify-between items-start mb-1.5">
             <h4 class="text-sm font-black text-amber-900 flex items-center gap-1.5">
@@ -1141,15 +1355,18 @@
                     <span id="vipStatusBadge" style="display: none;" class="items-center gap-1 bg-gradient-to-r from-yellow-300 via-royal-400 to-amber-500 text-dark-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-widest shadow-vip-glow">
                         <i class="fa-solid fa-crown text-[9px]"></i> VIP 20% OFF
                     </span>
-                    <!-- ⏳ LIVE VIP COUNTDOWN BADGE IN HEADER -->
-                    <div id="vipHeaderTimerBox" style="display: none;" onclick="window.jumpToVipUpgrade(30)" title="Click to extend VIP validity" class="cursor-pointer items-center gap-1.5 bg-dark-800 border border-royal-400/50 text-royal-300 px-3 py-1 rounded-full text-xs font-mono font-bold shadow-sm hover:bg-dark-700 transition">
-                        <i class="fa-regular fa-clock text-yellow-400 animate-pulse"></i>
-                        <span id="vipHeaderTimerText">00d : 00h : 00m : 00s</span>
-                    </div>
                 </div>
             </div>
-            <div class="flex items-center gap-3 md:gap-4">
-                <p class="text-xs text-slate-400 font-bold hidden lg:block">Welcome, <span id="displayUser" class="text-white"></span></p>
+
+            <!-- TOP RIGHT CORNER: VIP DAYS REMAINING + CREDITS + LOGOUT -->
+            <div class="flex flex-wrap items-center gap-2.5 md:gap-3">
+                <!-- ⏳ PROMINENT VIP DAYS REMAINING IN TOP CORNER -->
+                <div id="vipHeaderTimerBox" style="display: none;" onclick="window.switchService('payments_history')" title="अपनी VIP वैलिडिटी और पेमेंट हिस्ट्री देखें" class="cursor-pointer items-center gap-2 bg-amber-400/20 border-2 border-royal-400 text-royal-300 px-3.5 py-1.5 rounded-xl text-xs font-black shadow-sm hover:bg-amber-400/30 transition">
+                    <i class="fa-solid fa-crown text-yellow-400 animate-bounce"></i>
+                    <span id="vipHeaderTimerText">VIP: -- दिन बचे हैं</span>
+                </div>
+
+                <p class="text-xs text-slate-400 font-bold hidden xl:block">Welcome, <span id="displayUser" class="text-white"></span></p>
                 <a href="admin.html" id="adminPanelLink" style="display: none;" class="bg-dark-800 border border-slate-700 text-royal-300 hover:text-white px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-sm font-bold shadow-sm transition"><i class="fa-solid fa-shield-halved mr-1"></i> <span class="hidden md:inline">Admin Panel</span></a>
                 
                 <div id="creditDisplayBox" style="display: none;" class="bg-royal-500/10 border border-royal-500/30 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-sm font-bold text-royal-400 shadow-sm items-center cursor-pointer hover:bg-royal-500/20 transition" onclick="window.switchService('add_credit')" title="Add Credits">
@@ -1177,7 +1394,6 @@
                             <li><i class="fa-solid fa-circle-check text-green-400 mr-1.5"></i> <strong>18+ जन्म प्रमाण पत्र (DOB)</strong> और <strong>सारे Annexures (1, 1A, 3, 3A, B, C, D, E)</strong> तुरंत निकालें!</li>
                         </ul>
                     </div>
-                    <!-- 3 Quick Plan Buttons -->
                     <div class="grid grid-cols-3 gap-2.5 w-full lg:w-auto shrink-0">
                         <button onclick="window.jumpToVipUpgrade(30)" class="bg-dark-900/90 hover:bg-royal-500 hover:text-dark-950 text-white border border-royal-400 p-3 rounded-2xl text-center transition transform hover:scale-105 shadow-md">
                             <div class="text-[10px] font-bold uppercase text-royal-300">1 Month</div>
@@ -1198,13 +1414,14 @@
                 </div>
             </div>
 
-            <!-- Standard Navigation Grid -->
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-6">
+            <!-- Standard Navigation Grid (Includes Payment History Tab) -->
+            <div class="grid grid-cols-2 md:grid-cols-6 gap-2.5 md:gap-3 mb-6">
                 <button onclick="window.switchService('domicile')" id="btn-domicile" class="service-tab"><i class="fa-solid fa-house-chimney"></i> Domicile</button>
                 <button onclick="window.switchService('caste')" id="btn-caste" class="service-tab"><i class="fa-solid fa-users"></i> Caste Cert</button>
-                <button onclick="window.switchService('history')" id="btn-history" class="service-tab"><i class="fa-solid fa-clock-rotate-left"></i> My History</button>
+                <button onclick="window.switchService('history')" id="btn-history" class="service-tab"><i class="fa-solid fa-folder-open"></i> Documents</button>
+                <button onclick="window.switchService('payments_history')" id="btn-payments_history" class="service-tab"><i class="fa-solid fa-receipt"></i> Payment Status</button>
                 <button onclick="window.switchService('password')" id="btn-password" class="service-tab"><i class="fa-solid fa-key"></i> Password</button>
-                <button onclick="window.switchService('add_credit')" id="btn-add_credit" class="service-tab col-span-2 md:col-span-1 !bg-amber-50 !text-amber-700 !border-amber-200 hover:!bg-amber-100"><i class="fa-solid fa-plus-circle"></i> Add Credit / VIP</button>
+                <button onclick="window.switchService('add_credit')" id="btn-add_credit" class="service-tab !bg-amber-50 !text-amber-700 !border-amber-200 hover:!bg-amber-100"><i class="fa-solid fa-plus-circle"></i> Add Credit / VIP</button>
             </div>
 
             <!-- 👑 VIP EXCLUSIVE SERVICES PANEL (Visible ONLY when VIP is Active) -->
