@@ -1,248 +1,1244 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VIP Access & Admin Validity System</title>
-  <style>
-    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    body { background: #f1f5f9; margin: 0; padding: 20px; color: #1e293b; }
-    .container { max-width: 900px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    @media (max-width: 768px) { .container { grid-template-columns: 1fr; } }
-
-    .card { background: #ffffff; border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; }
-    h2 { margin-top: 0; font-size: 1.25rem; color: #0f172a; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; }
-
-    /* Status & Countdown Box */
-    .vip-status-box { background: linear-gradient(135deg, #1e1b4b, #312e81); color: white; padding: 18px; border-radius: 10px; text-align: center; margin-bottom: 20px; }
-    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; margin-bottom: 8px; }
-    .badge.active { background: #22c55e; color: #fff; }
-    .badge.expired { background: #ef4444; color: #fff; }
-    .countdown-timer { font-size: 1.5rem; font-weight: 700; letter-spacing: 1px; margin: 10px 0; color: #facc15; }
-    .expiry-date { font-size: 0.85rem; color: #cbd5e1; }
-
-    /* VIP Plans */
-    .plans-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-    .plan-card { border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px; text-align: center; cursor: pointer; transition: 0.2s; background: #f8fafc; }
-    .plan-card:hover { border-color: #4f46e5; background: #eef2ff; transform: translateY(-2px); }
-    .plan-card h3 { margin: 5px 0; font-size: 1rem; color: #334155; }
-    .plan-price { font-size: 1.3rem; font-weight: 800; color: #4f46e5; margin: 5px 0; }
-    .plan-days { font-size: 0.8rem; color: #64748b; margin-bottom: 10px; }
-    .btn { background: #4f46e5; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; width: 100%; transition: 0.2s; }
-    .btn:hover { background: #4338ca; }
-
-    /* Admin Buttons */
-    .admin-btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
-    .btn-admin { background: #0f766e; padding: 11px; font-size: 0.95rem; }
-    .btn-admin:hover { background: #115e59; }
-    .btn-test { background: #d97706; }
-    .btn-test:hover { background: #b45309; }
-    .btn-reset { background: #dc2626; }
-    .btn-reset:hover { background: #b91c1c; }
-
-    /* Corner Expiry Alert (5 Days or Less) */
-    .corner-alert {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      width: 330px;
-      background: #fffbeb;
-      border-left: 6px solid #f59e0b;
-      border-radius: 10px;
-      padding: 16px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.18);
-      display: none;
-      z-index: 9999;
-      animation: slideIn 0.4s ease-out;
-    }
-    @keyframes slideIn { from { transform: translateX(120%); } to { transform: translateX(0); } }
-    .corner-alert h4 { margin: 0 0 6px 0; color: #b45309; font-size: 1rem; display: flex; align-items: center; justify-content: space-between; }
-    .corner-alert p { margin: 0 0 12px 0; font-size: 0.88rem; color: #78350f; line-height: 1.4; }
-    .corner-alert .btn-renew { background: #f59e0b; color: #fff; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; }
-    .corner-alert .btn-renew:hover { background: #d97706; }
-  </style>
-</head>
-<body>
-
-<div class="container">
-  <!-- USER DASHBOARD -->
-  <div class="card" id="plansSection">
-    <h2>👤 यूजर VIP डैशबोर्ड (User View)</h2>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ojas Print Service - Portal</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <div class="vip-status-box">
-      <span id="vipBadge" class="badge expired">VIP INACTIVE</span>
-      <div class="countdown-timer" id="countdownDisplay">00d : 00h : 00m : 00s</div>
-      <div class="expiry-date" id="expiryDateDisplay">कोई एक्टिव प्लान नहीं है</div>
+    <!-- Royal Theme Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { 
+                        royal: { 50: '#fffbeb', 100: '#fef3c7', 300: '#fcd34d', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 900: '#78350f' },
+                        dark: { 700: '#334155', 800: '#1e293b', 900: '#0f172a', 950: '#020617' }
+                    },
+                    boxShadow: {
+                        'glow': '0 0 20px rgba(245, 158, 11, 0.4)',
+                        'vip-glow': '0 0 30px rgba(251, 191, 36, 0.6)',
+                        'card': '0 10px 30px -5px rgba(0,0,0,0.08)'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        .animate-spin-slow { animation: spin 4s linear infinite; }
+        .vip-body-bg {
+            background: radial-gradient(circle at top, #1e293b 0%, #0f172a 50%, #020617 100%);
+            color: #f8fafc;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .vip-promo-shine {
+            background: linear-gradient(90deg, #0f172a 0%, #1e293b 40%, #78350f 50%, #1e293b 60%, #0f172a 100%);
+            background-size: 200% 100%;
+            animation: shimmer 5s infinite linear;
+        }
+        @keyframes slideInRight {
+            from { transform: translateX(120%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .corner-alert-anim {
+            animation: slideInRight 0.4s ease-out forwards;
+        }
+    </style>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, updateDoc, collection, addDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBSiDAvDYyBG8hkmez7s900JHhlbenG2nU",
+            authDomain: "oaps-d2cce.firebaseapp.com",
+            projectId: "oaps-d2cce",
+            storageBucket: "oaps-d2cce.firebasestorage.app",
+            messagingSenderId: "619616461386",
+            appId: "1:619616461386:web:c3b9b36815369c6f5d7cb3",
+            measurementId: "G-5Y6RHLE2LK"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const ADMIN_EMAIL = "hkosiun1221@gmail.com"; 
+        const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+        window.currentUserData = null;
+        window.historyData = []; 
+        window.currentActiveTab = 'domicile';
+        window.vipCountdownInterval = null;
+
+        // Payment State Variables
+        window.currentRechargeCredits = 0; 
+        window.currentTotalPayable = 0;
+        window.currentWantsVip = false;
+        window.currentVipDays = 0;
+        window.currentVipPlanFee = 0;
+
+        const API_URLS = {
+            "BAGHPAT": "https://script.google.com/macros/s/AKfycbyA3916RXjuVRInvDPksOzbzczesTFAWo4gVzvjazGNfQl_REwC0YrYpTu03jlXwlb07w/exec",
+            "SHAMLI": "https://script.google.com/macros/s/AKfycbzC1WjGvsvtXsMAhgaOtIBVLnQZ7COMaLl6-VCSvfENKtKJUJHfBYHayWr-orkGTIiQ/exec",
+            "MUZAFFARNAGAR": "https://script.google.com/macros/s/AKfycby2FsD_wOd5ovuG4uVRldLBc8zMWKYoGXDPFPUoMKhx1k-KiAZcUa6MRe7TTW5VrfabLg/exec",
+            "DOB": "https://script.google.com/macros/s/AKfycbyncAUbXWLplC_uHgodCqhPCDLTWFiWEQVzxPAInLP7zedGUQRdRbvix_jdDBJrYMlc9w/exec",
+            "CASTE": "https://script.google.com/macros/s/AKfycbzUs_e_ga3Ly3SQ9qq5inqHgfC23-jzav8sjUES7XnPw7cyUn3DHhVEBFdgxqUejU5Y/exec",
+            "ANNEXURE": "https://script.google.com/macros/s/AKfycbyA3916RXjuVRInvDPksOzbzczesTFAWo4gVzvjazGNfQl_REwC0YrYpTu03jlXwlb07w/exec"
+        };
+        window.API_URLS = API_URLS;
+
+        onAuthStateChanged(auth, async (user) => {
+            const loadingScreen = document.getElementById('loadingScreen');
+            const loginSection = document.getElementById('loginSection');
+            const dashboardSection = document.getElementById('dashboardSection');
+
+            if (user) {
+                try {
+                    const userDocRef = doc(db, "users", user.uid);
+                    const userDoc = await getDoc(userDocRef);
+                    let userCredits = 0;
+                    let isVip = false;
+                    let vipExpiry = 0;
+
+                    if (userDoc.exists()) {
+                        const data = userDoc.data();
+                        userCredits = data.credits || 0;
+                        isVip = data.isVip || false;
+                        vipExpiry = data.vipExpiry || 0;
+                    }
+                    
+                    const isAdmin = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
+                    const now = Date.now();
+
+                    // अगर यूजर एडमिन नहीं है और उसका VIP समय खत्म हो चुका है, तो उसे तुरंत नॉर्मल यूजर बना दें
+                    if (!isAdmin && isVip && vipExpiry > 0 && vipExpiry <= now) {
+                        isVip = false;
+                        vipExpiry = 0;
+                        await updateDoc(userDocRef, { isVip: false, vipExpiry: 0 });
+                    }
+                    
+                    window.currentUserData = { 
+                        uid: user.uid, 
+                        email: user.email, 
+                        credits: userCredits, 
+                        isVip: isVip || isAdmin, 
+                        vipExpiry: vipExpiry,
+                        isAdmin: isAdmin, 
+                        username: user.email.split('@')[0] 
+                    };
+                    
+                    setupDashboard(window.currentUserData);
+                    startVipCountdownLoop();
+                    loadingScreen.style.display = 'none'; 
+                } catch (err) {
+                    console.error(err);
+                    await signOut(auth);
+                }
+            } else {
+                if (window.vipCountdownInterval) clearInterval(window.vipCountdownInterval);
+                window.currentUserData = null;
+                document.body.classList.remove('vip-body-bg');
+                document.getElementById('vipCornerAlert').style.display = 'none';
+                loginSection.style.display = 'flex';
+                dashboardSection.style.display = 'none';
+                loadingScreen.style.display = 'none';
+            }
+        });
+
+        window.handleLogin = async function(event) {
+            event.preventDefault();
+            const emailInput = document.getElementById('loginUsername').value.trim();
+            const passInput = document.getElementById('loginPassword').value.trim();
+            const errorDiv = document.getElementById('loginError');
+            const loginBtn = event.target.querySelector('button[type="submit"]');
+            
+            errorDiv.style.display = 'none';
+            const originalBtnHtml = loginBtn.innerHTML;
+            loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...';
+            loginBtn.disabled = true;
+
+            const email = emailInput.includes('@') ? emailInput : `${emailInput.toLowerCase()}@ovportal.com`;
+
+            try {
+                await signInWithEmailAndPassword(auth, email, passInput);
+            } catch (error) {
+                errorDiv.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i> Your ID or Password are incorrect!';
+                errorDiv.style.display = 'block';
+                document.getElementById('loginPassword').value = '';
+                loginBtn.innerHTML = originalBtnHtml;
+                loginBtn.disabled = false;
+            }
+        };
+
+        // ================= LIVE VIP COUNTDOWN & AUTO REVERT TO NORMAL USER =================
+        function startVipCountdownLoop() {
+            if (window.vipCountdownInterval) clearInterval(window.vipCountdownInterval);
+            updateVipTimerAndAlerts();
+            window.vipCountdownInterval = setInterval(updateVipTimerAndAlerts, 1000);
+        }
+
+        async function updateVipTimerAndAlerts() {
+            const userData = window.currentUserData;
+            const timerBox = document.getElementById('vipHeaderTimerBox');
+            const timerText = document.getElementById('vipHeaderTimerText');
+            const cornerAlert = document.getElementById('vipCornerAlert');
+            const cornerAlertDaysText = document.getElementById('cornerAlertDaysText');
+
+            if (!userData || !userData.isVip || userData.isAdmin) {
+                if (timerBox) timerBox.style.display = 'none';
+                if (cornerAlert) cornerAlert.style.display = 'none';
+                return;
+            }
+
+            // अगर एडमिन ने बिना एक्सपायरी टाइम के सीधा VIP किया था, तो कोई काउंटडाउन नहीं रुकेगा
+            if (!userData.vipExpiry || userData.vipExpiry <= 0) {
+                if (timerBox) {
+                    timerBox.style.display = 'flex';
+                    timerText.innerText = 'VIP Active';
+                }
+                if (cornerAlert) cornerAlert.style.display = 'none';
+                return;
+            }
+
+            const now = Date.now();
+            const diff = userData.vipExpiry - now;
+
+            // 🔥 जैसे ही काउंटडाउन 00:00:00 होगा -> VIP हट जाएगा और नॉर्मल यूजर पेज खुल जाएगा!
+            if (diff <= 0) {
+                clearInterval(window.vipCountdownInterval);
+                userData.isVip = false;
+                userData.vipExpiry = 0;
+
+                try {
+                    await updateDoc(doc(db, "users", userData.uid), { isVip: false, vipExpiry: 0 });
+                } catch (e) { console.error("Auto downgrade update error:", e); }
+
+                if (timerBox) timerBox.style.display = 'none';
+                if (cornerAlert) cornerAlert.style.display = 'none';
+
+                // तुरंत पूरा पेज नॉर्मल यूजर पोर्टल में बदल दें (बिना किसी ताले के)
+                setupDashboard(userData);
+                alert('आपकी VIP वैलिडिटी समाप्त हो गई है। आपका अकाउंट अब Normal User पोर्टल में बदल दिया गया है।');
+                return;
+            }
+
+            // काउंटडाउन गणना (Days, Hours, Minutes, Seconds)
+            const days = Math.floor(diff / MS_PER_DAY);
+            const hours = Math.floor((diff % MS_PER_DAY) / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+            if (timerBox && timerText) {
+                timerBox.style.display = 'flex';
+                timerText.innerText = `${days}d : ${String(hours).padStart(2, '0')}h : ${String(minutes).padStart(2, '0')}m : ${String(seconds).padStart(2, '0')}s`;
+            }
+
+            // 🔔 5 दिन या उससे कम (5, 4, 3, 2, 1 दिन) बचने पर कोने में अलर्ट दिखाएं
+            const remainingDaysCeil = Math.ceil(diff / MS_PER_DAY);
+            if (remainingDaysCeil <= 5 && remainingDaysCeil >= 1) {
+                if (!window.cornerAlertDismissed) {
+                    cornerAlert.style.display = 'block';
+                    cornerAlertDaysText.innerHTML = `आपके VIP एक्सेस खत्म होने में सिर्फ <strong class="text-red-600 underline">${remainingDaysCeil} दिन</strong> बचे हैं! क्या आप फिर से VIP एक्सेस बढ़ाना चाहते हैं?`;
+                }
+            } else {
+                cornerAlert.style.display = 'none';
+            }
+        }
+
+        window.dismissCornerAlert = function() {
+            window.cornerAlertDismissed = true;
+            document.getElementById('vipCornerAlert').style.display = 'none';
+        };
+
+        // ================= SETUP DASHBOARD (NORMAL VS VIP LOOK) =================
+        function setupDashboard(userData) {
+            document.getElementById('displayUser').innerText = userData.username.toUpperCase();
+            const adminLink = document.getElementById('adminPanelLink');
+            const creditDisplayBox = document.getElementById('creditDisplayBox');
+            const vipServicesBar = document.getElementById('vipServicesBar');
+            const normalUserVipPromo = document.getElementById('normalUserVipPromo');
+            const portalTitle = document.getElementById('portalHeaderTitle');
+            const portalIcon = document.getElementById('portalHeaderIcon');
+            const vipBadge = document.getElementById('vipStatusBadge');
+            const mainFormCard = document.getElementById('mainFormCard');
+
+            if (userData.isAdmin) {
+                adminLink.style.display = 'flex';
+                creditDisplayBox.style.display = 'none'; 
+            } else {
+                adminLink.style.display = 'none';
+                creditDisplayBox.style.display = 'flex'; 
+                document.getElementById('displayCredits').innerText = userData.credits;
+            }
+
+            if (userData.isVip) {
+                document.body.classList.add('vip-body-bg');
+                portalTitle.innerHTML = `Ojas <span class="text-royal-400 drop-shadow">VIP Portal</span>`;
+                portalIcon.innerHTML = `<i class="fa-solid fa-crown text-lg animate-pulse"></i>`;
+                portalIcon.className = "w-10 h-10 bg-gradient-to-br from-yellow-300 via-royal-500 to-amber-700 text-dark-950 rounded-xl flex items-center justify-center shadow-vip-glow border border-yellow-200";
+                vipBadge.style.display = 'inline-flex';
+                vipServicesBar.style.display = 'block';
+                normalUserVipPromo.style.display = 'none';
+                mainFormCard.className = "bg-white text-slate-800 rounded-3xl shadow-vip-glow border-2 border-royal-400 p-6 md:p-8";
+            } else {
+                document.body.classList.remove('vip-body-bg');
+                portalTitle.innerHTML = `Ojas <span class="text-royal-400">Portal</span>`;
+                portalIcon.innerHTML = `<i class="fa-solid fa-sun text-lg"></i>`;
+                portalIcon.className = "w-10 h-10 bg-gradient-to-br from-royal-400 to-royal-600 text-white rounded-xl flex items-center justify-center shadow-inner";
+                vipBadge.style.display = 'none';
+                vipServicesBar.style.display = 'none';
+                normalUserVipPromo.style.display = 'block';
+                mainFormCard.className = "bg-white text-slate-800 rounded-3xl shadow-card border border-slate-100 p-6 md:p-8";
+            }
+
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('dashboardSection').style.display = 'flex';
+            window.switchService('domicile');
+        }
+
+        window.handleLogout = async function() {
+            await signOut(auth);
+            window.location.reload();
+        };
+
+        // Jump directly to Add Credit with a specific VIP Plan selected (default 30 days)
+        window.jumpToVipUpgrade = function(days = 30) {
+            window.switchService('add_credit');
+            setTimeout(() => {
+                const planRadio = document.querySelector(`input[name="vipPlanOption"][value="${days}"]`);
+                if (planRadio) {
+                    planRadio.checked = true;
+                    window.calculateCredits();
+                }
+            }, 60);
+        };
+
+        // ================= PASSWORD CHANGE LOGIC =================
+        window.handleChangePassword = async function(event) {
+            event.preventDefault();
+            const currentPass = document.getElementById('currentPassword').value;
+            const newPass = document.getElementById('newPassword').value;
+            const confirmPass = document.getElementById('confirmPassword').value;
+            const msgBox = document.getElementById('passwordMsgBox');
+            const btn = document.getElementById('btnChangePass');
+
+            msgBox.style.display = 'none';
+
+            if (newPass.length < 6) {
+                msgBox.className = "p-4 rounded-xl text-sm font-bold bg-red-50 text-red-600 border border-red-200 text-center";
+                msgBox.innerText = "नया पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!";
+                msgBox.style.display = 'block';
+                return;
+            }
+
+            if (newPass !== confirmPass) {
+                msgBox.className = "p-4 rounded-xl text-sm font-bold bg-red-50 text-red-600 border border-red-200 text-center";
+                msgBox.innerText = "नया पासवर्ड और कन्फर्म पासवर्ड आपस में मैच नहीं कर रहे हैं!";
+                msgBox.style.display = 'block';
+                return;
+            }
+
+            const origText = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> पासवर्ड बदला जा रहा है...';
+            btn.disabled = true;
+
+            try {
+                const user = auth.currentUser;
+                const credential = EmailAuthProvider.credential(user.email, currentPass);
+                await reauthenticateWithCredential(user, credential);
+                await updatePassword(user, newPass);
+
+                msgBox.className = "p-4 rounded-xl text-sm font-bold bg-green-50 text-green-700 border border-green-200 text-center";
+                msgBox.innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i> बधाई हो! आपका पासवर्ड सफलतापूर्वक बदल दिया गया है।';
+                msgBox.style.display = 'block';
+                event.target.reset();
+            } catch (err) {
+                msgBox.className = "p-4 rounded-xl text-sm font-bold bg-red-50 text-red-600 border border-red-200 text-center";
+                msgBox.innerText = "आपका पुराना पासवर्ड गलत है! कृपया सही पुराना पासवर्ड डालें।";
+                msgBox.style.display = 'block';
+            } finally {
+                btn.innerHTML = origText;
+                btn.disabled = false;
+            }
+        };
+
+        // ================= AUTOMATIC PAYMENT & 3 VIP PLANS CALCULATOR =================
+        window.calculateCredits = function() {
+            const creditAmt = parseFloat(document.getElementById('rupeeAmount')?.value) || 0;
+            const selectedPlanEl = document.querySelector('input[name="vipPlanOption"]:checked');
+            
+            let vipDays = 0;
+            let vipFee = 0;
+            if (selectedPlanEl) {
+                vipDays = parseInt(selectedPlanEl.value) || 0;
+                vipFee = parseInt(selectedPlanEl.getAttribute('data-price')) || 0;
+            }
+
+            const wantsVip = vipDays > 0;
+            const totalPayable = creditAmt + vipFee;
+
+            window.currentRechargeCredits = creditAmt;
+            window.currentWantsVip = wantsVip;
+            window.currentVipDays = vipDays;
+            window.currentVipPlanFee = vipFee;
+            window.currentTotalPayable = totalPayable;
+
+            const calcCreditsEl = document.getElementById('calculatedCredits');
+            if (calcCreditsEl) {
+                calcCreditsEl.innerHTML = `${creditAmt} <span class="text-sm font-bold text-slate-400">Credits</span>`;
+            }
+            
+            const vipSummaryBadge = document.getElementById('vipSummaryBadge');
+            if (vipSummaryBadge) {
+                if (wantsVip) {
+                    vipSummaryBadge.style.display = 'inline-block';
+                    vipSummaryBadge.innerHTML = `<i class="fa-solid fa-crown mr-1"></i> + ${vipDays} Days VIP Access (₹${vipFee})`;
+                } else {
+                    vipSummaryBadge.style.display = 'none';
+                }
+            }
+
+            const totalPayableDisplay = document.getElementById('totalPayableDisplay');
+            if (totalPayableDisplay) {
+                totalPayableDisplay.innerText = `₹${totalPayable}`;
+            }
+        };
+
+        window.generateQR = function() {
+            window.calculateCredits();
+            const creditAmt = window.currentRechargeCredits;
+            const wantsVip = window.currentWantsVip;
+            const totalPayable = window.currentTotalPayable;
+            
+            if (!wantsVip && creditAmt < 10) {
+                return alert('कृपया कम से कम ₹10 के क्रेडिट दर्ज करें या कोई VIP प्लान चुनें!');
+            }
+            if (totalPayable < 10) {
+                return alert('कुल पेमेंट राशि कम से कम ₹10 होनी चाहिए!');
+            }
+
+            const upiId = "8279650137@ptyes"; 
+            const payeeName = "Ojas Print Service";
+            const upiString = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${totalPayable}&cu=INR`;
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiString)}`;
+
+            document.getElementById('upiQRCode').src = qrUrl;
+            document.getElementById('qrPayableAmountText').innerText = `Pay Exactly ₹${totalPayable}`;
+            document.getElementById('qrSection').style.display = 'flex';
+            
+            document.getElementById('rupeeAmount').disabled = true; 
+            document.querySelectorAll('input[name="vipPlanOption"]').forEach(el => el.disabled = true);
+            document.getElementById('btnGenerateQR').style.display = 'none'; 
+        };
+
+        window.submitPayment = async function() {
+            const totalPaid = window.currentTotalPayable;
+            const creditsToAdd = window.currentRechargeCredits;
+            const wantsVip = window.currentWantsVip;
+            const vipDays = window.currentVipDays;
+            const vipFee = window.currentVipPlanFee;
+
+            const rawUtr = document.getElementById('utrNumber').value.trim();
+            const errorMsg = document.getElementById('paymentErrorMsg');
+
+            const utr = rawUtr.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+
+            if (!totalPaid || totalPaid < 10) {
+                errorMsg.innerText = 'अमाउंट सही नहीं है, कृपया दोबारा QR कोड जनरेट करें।';
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            if (!utr || utr.length < 10) {
+                errorMsg.innerText = 'गलत UTR नंबर! कृपया पेमेंट ऐप में दिखने वाला पूरा 12 अंकों का UTR / Ref No दर्ज करें।';
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            const btn = document.getElementById('btnSubmitPayment');
+            const origHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> सबमिट किया जा रहा है...';
+            btn.disabled = true;
+            errorMsg.style.display = 'none';
+
+            try {
+                const q = query(collection(db, "payments"), where("utrNumber", "==", utr));
+                const duplicateCheck = await getDocs(q);
+                if (!duplicateCheck.empty) {
+                    throw new Error("यह UTR नंबर पहले ही उपयोग किया जा चुका है!");
+                }
+
+                // Save payment with complete VIP plan details
+                await addDoc(collection(db, "payments"), {
+                    userId: window.currentUserData.uid,
+                    email: window.currentUserData.email,
+                    amountPaid: totalPaid,
+                    creditsRequested: creditsToAdd,
+                    wantsVip: wantsVip,
+                    vipDaysRequested: vipDays,
+                    vipPlanFee: vipFee,
+                    utrNumber: utr,
+                    timestamp: new Date(),
+                    status: "Pending"
+                });
+
+                // Send Detailed Telegram Alert to Admin
+                const botToken = "8586078140:AAG-ydpakzFDAwHFtJC8AUanxZAODpGZDOk"; 
+                const chatId = "8942287807"; 
+                const vipAlertLine = wantsVip 
+                    ? `\n👑 *VIP PLAN:* +${vipDays} Days (₹${vipFee} Included)` 
+                    : `\n👤 *Request Type:* Normal Credit Recharge`;
+                
+                const tgMessage = `🚨 *New Payment Request!*\n*User:* ${window.currentUserData.email}\n*Total Paid:* ₹${totalPaid}\n*Credits to Add:* +${creditsToAdd} Credits${vipAlertLine}\n*UTR:* \`${utr}\`\n\n*Status:* Pending Approval in Admin Panel.`;
+
+                fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: chatId,
+                        text: tgMessage,
+                        parse_mode: 'Markdown'
+                    })
+                }).catch(err => console.log("Telegram alert failed", err));
+
+                const successSubText = wantsVip 
+                    ? `आपकी UTR डिटेल और <strong>👑 +${vipDays} Days VIP Access</strong> की रिक्वेस्ट एडमिन को भेज दी गई है। अप्रूव होते ही आपकी VIP वैलिडिटी (+${vipDays} दिन) और ${creditsToAdd} क्रेडिट्स जुड़ जाएंगे!`
+                    : `आपकी UTR डिटेल एडमिन को भेज दी गई है। पेमेंट वेरीफाई होते ही ${creditsToAdd} क्रेडिट्स आपके वॉलेट में जोड़ दिए जाएंगे।`;
+
+                document.getElementById('walletMainUI').innerHTML = `
+                    <div class="col-span-1 md:col-span-2 flex flex-col items-center justify-center p-10 bg-amber-50 rounded-3xl border border-amber-200 text-center animate-pulse">
+                        <i class="fa-solid fa-clock-rotate-left text-6xl text-amber-500 mb-4"></i>
+                        <h2 class="text-3xl font-black text-amber-800 tracking-tight">वेरिफिकेशन पेंडिंग</h2>
+                        <p class="text-sm font-bold text-amber-700 mt-3 max-w-md mx-auto">${successSubText}</p>
+                        <button onclick="window.switchService('domicile')" class="mt-8 bg-amber-600 hover:bg-amber-700 text-white font-black py-4 px-8 rounded-xl shadow-glow transition transform hover:-translate-y-0.5">डैशबोर्ड पर जाएँ <i class="fa-solid fa-arrow-right ml-1"></i></button>
+                    </div>
+                `;
+            } catch(error) {
+                errorMsg.innerText = error.message;
+                errorMsg.style.display = 'block';
+            } finally {
+                btn.innerHTML = origHtml;
+                btn.disabled = false;
+            }
+        };
+
+        // ================= IN-APP PREVIEW & DOCUMENTS =================
+        window.openPdfViewer = function(fileId, fileName) {
+            document.getElementById('pdfViewerTitle').innerText = fileName;
+            document.getElementById('pdfLoadingSpinner').style.display = 'flex';
+            document.getElementById('pdfIframe').src = `https://drive.google.com/file/d/${fileId}/preview`;
+            const downloadBtn = document.getElementById('modalDownloadBtn');
+            downloadBtn.onclick = function() { window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank'); };
+            document.getElementById('pdfViewerModal').style.display = 'flex';
+            document.body.style.overflow = 'hidden'; 
+        };
+
+        window.closePdfViewer = function() {
+            document.getElementById('pdfViewerModal').style.display = 'none';
+            document.getElementById('pdfIframe').src = ''; 
+            document.body.style.overflow = 'auto'; 
+        };
+
+        async function compressImage(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        const MAX_WIDTH = 500; 
+                        const scaleSize = MAX_WIDTH / img.width;
+                        canvas.width = MAX_WIDTH;
+                        canvas.height = img.height * scaleSize;
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        resolve(canvas.toDataURL('image/jpeg', 0.6)); 
+                    };
+                };
+            });
+        }
+
+        // ================= FORM SUBMISSION (20% OFF FOR VIP: 8 CREDITS VS 10 CREDITS) =================
+        window.submitForm = async function(event, serviceType) {
+            event.preventDefault();
+
+            if (!window.currentUserData) return alert('Please login first!');
+            
+            const docCost = window.currentUserData.isVip ? 8 : 10;
+
+            if (!window.currentUserData.isAdmin && window.currentUserData.credits < docCost) {
+                return alert(`Insufficient credits! You need ${docCost} credits to generate this document. Please add credits from your wallet.`);
+            }
+
+            const formElement = event.target;
+            const submitBtn = formElement.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Processing...';
+            submitBtn.disabled = true;
+
+            const formData = new FormData(formElement);
+            formData.append('USER_ID', window.currentUserData.email);
+            formData.append('SERVICE_TYPE', serviceType);
+
+            let targetUrl = "";
+            if (serviceType === 'Domicile') targetUrl = API_URLS[formData.get('DISTRICT')] || API_URLS["BAGHPAT"];
+            else if (serviceType === 'Caste') targetUrl = API_URLS["CASTE"];
+            else if (serviceType === 'DOB' || serviceType === 'DOB 18+') targetUrl = API_URLS["DOB"];
+            else if (serviceType.toLowerCase().includes('annexure')) targetUrl = API_URLS["ANNEXURE"];
+
+            try {
+                if (!window.currentUserData.isAdmin) {
+                    const userDocRef = doc(db, "users", window.currentUserData.uid);
+                    const newCredits = window.currentUserData.credits - docCost;
+                    await updateDoc(userDocRef, { credits: newCredits });
+                    window.currentUserData.credits = newCredits;
+                    document.getElementById('displayCredits').innerText = newCredits;
+                }
+
+                const photoInput = formElement.querySelector('input[type="file"]');
+                let base64Photo = "";
+                if (photoInput && photoInput.files[0]) {
+                    base64Photo = await compressImage(photoInput.files[0]);
+                    formData.set('PHOTO', base64Photo);
+                }
+
+                const dataObj = {}; formData.forEach((v, k) => { dataObj[k] = v; });
+
+                const response = await fetch(targetUrl, {
+                    method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(dataObj)
+                });
+                
+                const result = await response.json();
+
+                if (result.success || result.fileId) {
+                    await addDoc(collection(db, "history"), {
+                        userId: window.currentUserData.uid,
+                        fileName: `${dataObj.NAME || 'Document'} - ${serviceType}.pdf`,
+                        fileId: result.fileId || result.id || 'N/A',
+                        serviceType: serviceType,
+                        timestamp: new Date()
+                    });
+                    alert('Success! Document generated successfully.');
+                    window.switchService('history');
+                    formElement.reset();
+                } else { throw new Error('API Response Failed'); }
+            } catch (error) {
+                if (!window.currentUserData.isAdmin) {
+                    const userDocRef = doc(db, "users", window.currentUserData.uid);
+                    const refundedCredits = window.currentUserData.credits + docCost;
+                    await updateDoc(userDocRef, { credits: refundedCredits });
+                    window.currentUserData.credits = refundedCredits;
+                    document.getElementById('displayCredits').innerText = refundedCredits;
+                }
+                alert('Technical error occurred. Your credits have been refunded.');
+            } finally {
+                submitBtn.innerHTML = originalBtnText; submitBtn.disabled = false;
+            }
+        };
+
+        window.loadUserHistory = async function() {
+            const historyContainer = document.getElementById('historyTableBody');
+            if (!historyContainer) return;
+            historyContainer.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-400 font-bold"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2 text-royal-500"></i><br>Loading records...</td></tr>`;
+
+            try {
+                const q = query(collection(db, "history"), where("userId", "==", window.currentUserData.uid));
+                const querySnapshot = await getDocs(q);
+
+                window.historyData = [];
+                querySnapshot.forEach((docSnap) => { window.historyData.push(docSnap.data()); });
+                window.historyData.sort((a, b) => b.timestamp.seconds - a.timestamp.seconds);
+                window.renderHistory('ALL'); 
+            } catch (err) { historyContainer.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-500">Failed to load history.</td></tr>`; }
+        };
+
+        window.renderHistory = function(filterType) {
+            const historyContainer = document.getElementById('historyTableBody');
+            historyContainer.innerHTML = '';
+
+            const filteredData = filterType === 'ALL' ? window.historyData : window.historyData.filter(item => item.serviceType === filterType);
+            document.getElementById('userHistoryCount').innerText = `Total Files: ${filteredData.length}`;
+
+            if (filteredData.length === 0) {
+                historyContainer.innerHTML = `<tr><td colspan="4" class="p-10 text-center text-slate-400"><i class="fa-regular fa-folder-open text-5xl mb-3 text-slate-300"></i><br>No records found.</td></tr>`;
+                return;
+            }
+
+            filteredData.forEach((data) => {
+                const dateObj = new Date(data.timestamp.seconds * 1000);
+                const dateStr = dateObj.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
+                const timeStr = dateObj.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+                
+                historyContainer.innerHTML += `
+                    <tr class="border-b border-slate-100 text-sm hover:bg-slate-50 transition duration-200">
+                        <td class="p-4 font-bold text-slate-800">${data.fileName}</td>
+                        <td class="p-4"><span class="bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">${data.serviceType}</span></td>
+                        <td class="p-4 text-slate-500 text-xs font-medium">${dateStr} <br> ${timeStr}</td>
+                        <td class="p-4 text-right whitespace-nowrap">
+                            <button onclick="window.openPdfViewer('${data.fileId}', '${data.fileName}')" class="inline-flex items-center gap-1 bg-royal-50 text-royal-700 border border-royal-200 hover:bg-royal-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm">
+                                <i class="fa-solid fa-eye"></i> Preview
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        };
+
+        // HINDI DROPDOWNS
+        window.updateTehsilsAndThanas = function() {
+            const districtEl = document.getElementById('districtSelect');
+            const tehsilSelect = document.getElementById('tehsilSelect');
+            const thanaSelect = document.getElementById('thanaSelect');
+            if (!districtEl || !tehsilSelect) return;
+            const district = districtEl.value;
+            let tehsils = []; let thanas = [];
+            
+            if (district === 'BAGHPAT') {
+                tehsils = ['बड़ौत', 'खेकड़ा', 'बागपत']; 
+                thanas = ['बड़ौत', 'खेकड़ा', 'बागपत', 'छपरोली', 'बिनौली', 'रमाला', 'दोघट', 'सिंघावली अहीर', 'बालैनी', 'चांदीनगर'];
+            } else if (district === 'SHAMLI') {
+                tehsils = ['कैराना', 'ऊन', 'शामली']; 
+                thanas = ['थाना भवन', 'कैराना', 'झिंझाना', 'शामली', 'बाबरी', 'कांधला', 'गढ़ी पुख्ता', 'आदर्श मंडी'];
+            } else if (district === 'MUZAFFARNAGAR') {
+                tehsils = ['बुढ़ाना', 'खतौली', 'जानसठ', 'मुजफ्फरनगर']; 
+                thanas = ['बुढ़ाना', 'खतौली', 'जानसठ', 'मीरापुर', 'सिविल लाइन', 'कोतवाली नगर', 'नई मंडी'];
+            }
+            tehsilSelect.innerHTML = tehsils.map(t => `<option value="${t}">${t}</option>`).join('');
+            if (thanaSelect) thanaSelect.innerHTML = thanas.map(t => `<option value="${t}">${t}</option>`).join('');
+        };
+
+        // ================= MAIN SERVICE SWITCHER =================
+        window.switchService = function(serviceName) {
+            window.currentActiveTab = serviceName;
+
+            document.querySelectorAll('.service-tab').forEach(btn => {
+                btn.className = "service-tab bg-white text-slate-600 font-bold py-3.5 px-2 rounded-xl hover:bg-slate-50 transition shadow-sm border border-slate-200 text-[11px] md:text-sm flex-1 flex justify-center items-center gap-1.5 md:gap-2";
+            });
+            document.querySelectorAll('.vip-tab').forEach(btn => {
+                btn.className = "vip-tab bg-dark-800 text-royal-300 border border-royal-500/30 font-bold py-2.5 px-3 rounded-xl hover:bg-royal-500 hover:text-dark-950 transition text-xs flex items-center justify-center gap-1.5 shadow-sm";
+            });
+
+            const activeBtn = document.getElementById('btn-' + serviceName);
+            if(activeBtn) {
+                if (activeBtn.classList.contains('vip-tab')) {
+                    activeBtn.className = "vip-tab bg-gradient-to-r from-yellow-300 via-royal-400 to-amber-500 text-dark-950 font-black py-2.5 px-3 rounded-xl shadow-vip-glow transform -translate-y-0.5 transition text-xs flex items-center justify-center gap-1.5 border border-yellow-200";
+                } else {
+                    activeBtn.className = "service-tab bg-dark-900 text-royal-300 font-bold py-3.5 px-2 rounded-xl shadow-glow transition transform -translate-y-1 text-[11px] md:text-sm flex-1 flex justify-center items-center gap-1.5 md:gap-2 border border-royal-500/50";
+                }
+            }
+
+            const container = document.getElementById('formContainer');
+            if (!container) return;
+            
+            const submitBtnText = window.currentUserData && window.currentUserData.isAdmin 
+                ? 'Generate Document <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' 
+                : (window.currentUserData && window.currentUserData.isVip 
+                    ? 'Generate Document (8 Credits - 20% VIP Off) <i class="fa-solid fa-crown ml-1"></i>' 
+                    : 'Generate Document (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>');
+                                
+            const statusTagHtml = window.currentUserData && window.currentUserData.isAdmin 
+                ? '<span class="bg-green-100 text-green-700 px-3 py-1 rounded-md text-[10px] font-bold border border-green-200 uppercase tracking-widest">Admin Free Access</span>' 
+                : (window.currentUserData && window.currentUserData.isVip 
+                    ? '<span class="bg-amber-100 text-amber-800 px-3 py-1 rounded-md text-[10px] font-black border border-amber-300 uppercase tracking-widest"><i class="fa-solid fa-crown mr-1"></i>VIP 20% OFF ACTIVE</span>' 
+                    : '<span onclick="window.jumpToVipUpgrade(30)" class="cursor-pointer bg-royal-100 hover:bg-royal-200 text-royal-900 px-3 py-1 rounded-md text-[10px] font-black border border-royal-300 uppercase tracking-wider transition"><i class="fa-solid fa-bolt text-amber-600 mr-1"></i>VIP लें: 20% बचाएं</span>');
+
+            if(serviceName === 'domicile') {
+                container.innerHTML = `
+                    <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
+                        <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-house-chimney text-royal-500 mr-2"></i> Domicile Certificate</h3>
+                        ${statusTagHtml}
+                    </div>
+                    <form onsubmit="window.submitForm(event, 'Domicile')" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">District</label><select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition uppercase"><option value="BAGHPAT">बागपत</option><option value="SHAMLI">शामली</option><option value="MUZAFFARNAGAR">मुजफ्फरनगर</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Tehsil</label><select id="tehsilSelect" name="TAHSEEL" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Relation</label><select name="REL" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="पुत्र / पुत्री">पुत्र / पुत्री</option><option value="पत्नी      .">पत्नी</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Customer Name</label><input type="text" name="NAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Hindi Name (Optional)</label><input type="text" name="HNAME" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Father/Husband Name</label><input type="text" name="FNAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Mother Name</label><input type="text" name="MNAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">House Number (MN)</label><input type="text" name="MN" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Area / Locality</label><input type="text" name="AREA" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Village / Ward</label><input type="text" name="GRAM" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Police Station (Thana)</label><select id="thanaSelect" name="THANA" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></select></div>
+                            <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Upload Photo</label><input type="file" name="PHOTO" accept="image/*" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-royal-100 file:text-royal-700 hover:file:bg-royal-200 cursor-pointer"></div>
+                        </div>
+                        <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-4 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-4 text-base">${submitBtnText}</button>
+                    </form>
+                `;
+                window.updateTehsilsAndThanas();
+            } 
+            else if(serviceName === 'caste') {
+                container.innerHTML = `
+                    <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
+                        <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-users text-royal-500 mr-2"></i> Caste Certificate</h3>
+                        ${statusTagHtml}
+                    </div>
+                    <form onsubmit="window.submitForm(event, 'Caste')" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">District</label><select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition uppercase"><option value="BAGHPAT">बागपत</option><option value="SHAMLI">शामली</option><option value="MUZAFFARNAGAR">मुजफ्फरनगर</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Tehsil</label><select id="tehsilSelect" name="TAHSEEL" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Relation</label><select name="REL" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="पुत्र / पुत्री">पुत्र / पुत्री</option><option value="पत्नी      .">पत्नी</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Caste</label><select name="CAST" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition uppercase"><option value="जाट">जाट</option><option value="गुर्जर">गुर्जर</option><option value="कश्यप">कश्यप</option><option value="अहीर">अहीर</option><option value="ब्राह्मण">ब्राह्मण</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Customer Name</label><input type="text" name="NAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Hindi Name (Optional)</label><input type="text" name="HNAME" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Father/Husband Name</label><input type="text" name="FNAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Mother Name</label><input type="text" name="MNAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Area / Locality</label><input type="text" name="AREA" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Village / Ward</label><input type="text" name="GRAM" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">VLE Name</label><input type="text" name="VLE" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Upload Photo</label><input type="file" name="PHOTO" accept="image/*" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-royal-100 file:text-royal-700 hover:file:bg-royal-200 cursor-pointer"></div>
+                        </div>
+                        <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-4 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-4 text-base">${submitBtnText}</button>
+                    </form>
+                `;
+                window.updateTehsilsAndThanas();
+            }
+            else if(serviceName === 'dob18') {
+                if (!window.currentUserData || !window.currentUserData.isVip) {
+                    return window.switchService('domicile');
+                }
+                container.innerHTML = `
+                    <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
+                        <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-cake-candles text-royal-500 mr-2"></i> Date of Birth Certificate (18+ VIP)</h3>
+                        ${statusTagHtml}
+                    </div>
+                    <form onsubmit="window.submitForm(event, 'DOB 18+')" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Full Name</label><input type="text" name="NAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Sex / Gender</label><select name="SEX" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="MALE">MALE</option><option value="FEMALE">FEMALE</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Date of Birth (18+)</label><input type="date" name="DOB" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Father Name</label><input type="text" name="FNAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Mother Name</label><input type="text" name="MNAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Pin Code</label><input type="text" name="PIN" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Full Address</label><textarea name="ADDRESS" rows="2" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></textarea></div>
+                        </div>
+                        <button type="submit" class="w-full bg-gradient-to-r from-dark-900 via-dark-800 to-dark-900 hover:bg-black text-royal-300 font-black py-4 rounded-xl shadow-vip-glow transition transform hover:-translate-y-0.5 mt-4 text-base border border-royal-500/40">${submitBtnText}</button>
+                    </form>
+                `;
+            }
+            else if(serviceName.startsWith('annexure')) {
+                if (!window.currentUserData || !window.currentUserData.isVip) {
+                    return window.switchService('domicile');
+                }
+
+                const annexureNames = {
+                    'annexure1': 'Annexure 1',
+                    'annexure1a': 'Annexure 1A',
+                    'annexure3': 'Annexure 3',
+                    'annexure3a': 'Annexure 3A',
+                    'annexureb': 'Annexure B',
+                    'annexurec': 'Annexure C',
+                    'annexured': 'Annexure D',
+                    'annexuree': 'Annexure E'
+                };
+                const titleText = annexureNames[serviceName] || 'Annexure Form';
+
+                container.innerHTML = `
+                    <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
+                        <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-crown text-royal-500 mr-2"></i> ${titleText} (VIP Format)</h3>
+                        ${statusTagHtml}
+                    </div>
+                    <form onsubmit="window.submitForm(event, '${titleText}')" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Full Name</label><input type="text" name="NAME" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Father/Husband Name</label><input type="text" name="FATHER" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">ID Number (12 Digits)</label><input type="text" name="AADHAR" placeholder="Enter 12-digit number" required maxlength="12" pattern="\\d{12}" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Date</label><input type="date" name="DATE" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Old DOB</label><input type="date" name="OLDDOB" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">New DOB</label><input type="date" name="NEWDOB" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Old Document</label><select name="OLDDOCUMENT" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option><option value="MARKSHEET">MARKSHEET</option><option value="PAN CARD">PAN CARD</option></select></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">New Document</label><select name="NEWDOCUMENT" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option><option value="MARKSHEET">MARKSHEET</option><option value="PAN CARD">PAN CARD</option></select></div>
+                            <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Full Address</label><textarea name="ADDRESS" rows="2" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></textarea></div>
+                        </div>
+                        <button type="submit" class="w-full bg-gradient-to-r from-dark-900 via-dark-800 to-dark-900 hover:bg-black text-royal-300 font-black py-4 rounded-xl shadow-vip-glow transition transform hover:-translate-y-0.5 mt-4 text-base border border-royal-500/40">${submitBtnText}</button>
+                    </form>
+                `;
+            }
+            
+            // ADD WALLET CREDITS + 3 VIP PLANS (₹100/30d, ₹180/60d, ₹250/90d)
+            else if(serviceName === 'add_credit') {
+                const isAlreadyVip = window.currentUserData && window.currentUserData.isVip;
+                const vipHeaderNote = isAlreadyVip 
+                    ? `<span class="text-[11px] text-green-400 font-bold"><i class="fa-solid fa-circle-check mr-1"></i>आपका VIP एक्टिव है! नया प्लान चुनने पर बचे हुए दिनों में ही नए दिन जुड़ जाएंगे।</span>`
+                    : `<span class="text-[11px] text-slate-300 font-semibold">हर डॉक्यूमेंट पर <strong>20% छूट</strong> + <strong>18+ DOB और सारे Annexures</strong> अनलॉक करें!</span>`;
+
+                container.innerHTML = `
+                    <div id="walletMainUI" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="space-y-4 bg-slate-50 p-6 rounded-3xl border border-slate-200">
+                            <div class="mb-2">
+                                <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-wallet text-royal-500 mr-2"></i> Add Credits & VIP Plans</h3>
+                                <p class="text-xs font-bold text-slate-500 mt-1">₹1 = 1 Credit | Instant Admin Verification</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Enter Credit Amount (₹)</label>
+                                <input type="number" id="rupeeAmount" placeholder="e.g. 200 (या सिर्फ VIP के लिए 0 छोड़ें)" min="0" oninput="window.calculateCredits()" class="w-full p-4 border border-slate-200 rounded-xl text-lg font-black bg-white focus:ring-2 focus:ring-royal-500 outline-none transition text-center text-dark-900 shadow-inner">
+                            </div>
+
+                            <!-- 👑 3 VIP PLANS SELECTION BOX -->
+                            <div class="p-4 rounded-2xl bg-gradient-to-br from-dark-950 via-dark-900 to-dark-800 text-white border-2 border-royal-400 shadow-vip-glow space-y-3">
+                                <div class="flex items-center justify-between border-b border-slate-700 pb-2">
+                                    <span class="text-xs font-black uppercase tracking-wider text-royal-300 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-crown text-yellow-400 animate-bounce"></i> VIP Access प्लान चुनें (Optional)
+                                    </span>
+                                </div>
+                                <div>${vipHeaderNote}</div>
+
+                                <div class="grid grid-cols-2 gap-2.5 pt-1">
+                                    <!-- No VIP -->
+                                    <label class="flex items-center gap-2 p-2.5 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer hover:border-slate-500 transition">
+                                        <input type="radio" name="vipPlanOption" value="0" data-price="0" checked onchange="window.calculateCredits()" class="w-4 h-4 accent-amber-400">
+                                        <div class="text-left">
+                                            <div class="text-xs font-bold text-slate-200">सिर्फ क्रेडिट्स</div>
+                                            <div class="text-[10px] text-slate-400">No VIP (+₹0)</div>
+                                        </div>
+                                    </label>
+
+                                    <!-- 1 Month: ₹100 (+30 Days) -->
+                                    <label class="flex items-center gap-2 p-2.5 rounded-xl bg-dark-800 border border-royal-500/40 cursor-pointer hover:border-royal-400 transition">
+                                        <input type="radio" name="vipPlanOption" value="30" data-price="100" onchange="window.calculateCredits()" class="w-4 h-4 accent-amber-400">
+                                        <div class="text-left">
+                                            <div class="text-xs font-black text-royal-300">1 Month (+30d)</div>
+                                            <div class="text-[11px] font-black text-green-400">+ ₹100</div>
+                                        </div>
+                                    </label>
+
+                                    <!-- 2 Months: ₹180 (+60 Days) -->
+                                    <label class="flex items-center gap-2 p-2.5 rounded-xl bg-dark-800 border border-royal-500/40 cursor-pointer hover:border-royal-400 transition">
+                                        <input type="radio" name="vipPlanOption" value="60" data-price="180" onchange="window.calculateCredits()" class="w-4 h-4 accent-amber-400">
+                                        <div class="text-left">
+                                            <div class="text-xs font-black text-royal-300">2 Months (+60d)</div>
+                                            <div class="text-[11px] font-black text-green-400">+ ₹180 <span class="text-[9px] text-amber-300">(Save ₹20)</span></div>
+                                        </div>
+                                    </label>
+
+                                    <!-- 3 Months: ₹250 (+90 Days) -->
+                                    <label class="flex items-center gap-2 p-2.5 rounded-xl bg-dark-800 border border-royal-500/40 cursor-pointer hover:border-royal-400 transition">
+                                        <input type="radio" name="vipPlanOption" value="90" data-price="250" onchange="window.calculateCredits()" class="w-4 h-4 accent-amber-400">
+                                        <div class="text-left">
+                                            <div class="text-xs font-black text-royal-300">3 Months (+90d)</div>
+                                            <div class="text-[11px] font-black text-green-400">+ ₹250 <span class="text-[9px] text-amber-300">(Save ₹50)</span></div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="p-5 bg-white rounded-2xl border border-royal-200 text-center shadow-card mt-4 space-y-2">
+                                <p class="text-xs font-bold text-royal-600 uppercase tracking-widest">You will get</p>
+                                <p class="text-3xl font-black text-dark-900" id="calculatedCredits">0 <span class="text-sm font-bold text-slate-400">Credits</span></p>
+                                <div id="vipSummaryBadge" style="display: none;" class="bg-gradient-to-r from-yellow-300 to-amber-500 text-dark-950 text-xs font-black px-3 py-1 rounded-full shadow-sm">
+                                    <i class="fa-solid fa-crown mr-1"></i> + 30 Days VIP Access (₹100)
+                                </div>
+                                <div class="border-t border-slate-100 pt-2 mt-2 flex justify-between items-center px-2">
+                                    <span class="text-xs font-bold text-slate-500 uppercase">कुल पेमेंट (Total Payable):</span>
+                                    <span id="totalPayableDisplay" class="text-2xl font-black text-green-600">₹0</span>
+                                </div>
+                            </div>
+                            
+                            <button id="btnGenerateQR" onclick="window.generateQR()" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-4 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-2">Generate Payment QR <i class="fa-solid fa-qrcode ml-1"></i></button>
+                        </div>
+
+                        <div id="qrSection" style="display: none;" class="flex-col items-center justify-center space-y-4 bg-white p-6 rounded-3xl border-2 border-royal-400 shadow-card relative">
+                            <h4 class="text-[11px] font-bold text-royal-700 uppercase tracking-widest text-center bg-royal-100 px-4 py-2 rounded-full"><i class="fa-solid fa-qrcode mr-1"></i> Scan & Pay using any UPI App</h4>
+                            
+                            <p id="qrPayableAmountText" class="text-xl font-black text-green-600 bg-green-50 px-4 py-1 rounded-xl border border-green-200">Pay ₹0</p>
+
+                            <div class="p-3 border border-slate-200 rounded-2xl bg-white shadow-sm">
+                                <img id="upiQRCode" src="" alt="UPI QR Code" class="w-48 h-48 md:w-52 md:h-52 object-contain">
+                            </div>
+                            
+                            <div class="w-full pt-1">
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 text-center">Enter 12-Digit UTR / Ref Number</label>
+                                <input type="text" id="utrNumber" placeholder="Enter UTR after payment" class="w-full p-4 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-amber-500 outline-none transition text-center tracking-widest uppercase">
+                            </div>
+                            
+                            <button onclick="window.submitPayment()" id="btnSubmitPayment" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-4 rounded-xl shadow-md transition transform hover:-translate-y-0.5">Submit For Verification <i class="fa-solid fa-paper-plane ml-1"></i></button>
+                            <p id="paymentErrorMsg" style="display: none;" class="text-xs font-bold text-red-500 text-center mt-2 p-2 bg-red-50 rounded-lg border border-red-200"></p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            else if(serviceName === 'password') {
+                container.innerHTML = `
+                    <div class="max-w-md mx-auto py-4">
+                        <div class="text-center mb-6">
+                            <div class="w-16 h-16 bg-royal-100 text-royal-600 rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl shadow-sm border border-royal-200">
+                                <i class="fa-solid fa-key"></i>
+                            </div>
+                            <h3 class="text-2xl font-black text-dark-900">Change Your Password</h3>
+                            <p class="text-xs font-bold text-slate-400 mt-1">अपना पुराना पासवर्ड डालकर नया पासवर्ड सेट करें</p>
+                        </div>
+
+                        <form onsubmit="window.handleChangePassword(event)" class="space-y-4 bg-slate-50 p-6 rounded-3xl border border-slate-200">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Current Password (पुराना पासवर्ड)</label>
+                                <input type="password" id="currentPassword" required placeholder="Enter current password" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-royal-400 outline-none transition font-semibold">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">New Password (नया पासवर्ड)</label>
+                                <input type="password" id="newPassword" required minlength="6" placeholder="Minimum 6 characters" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-royal-400 outline-none transition font-semibold">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Confirm New Password (दोबारा लिखें)</label>
+                                <input type="password" id="confirmPassword" required minlength="6" placeholder="Re-enter new password" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-royal-400 outline-none transition font-semibold">
+                            </div>
+                            <div id="passwordMsgBox" style="display: none;"></div>
+                            <button type="submit" id="btnChangePass" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-4 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-2">
+                                Update Password <i class="fa-solid fa-lock ml-1"></i>
+                            </button>
+                        </form>
+                    </div>
+                `;
+            }
+            
+            else if(serviceName === 'history') {
+                const isVipUser = window.currentUserData && window.currentUserData.isVip;
+                const vipFilterOptions = isVipUser ? `
+                    <option value="DOB 18+">जन्म प्रमाण पत्र (18+)</option>
+                    <option value="Annexure 1">Annexure 1</option>
+                    <option value="Annexure 1A">Annexure 1A</option>
+                    <option value="Annexure 3">Annexure 3</option>
+                    <option value="Annexure 3A">Annexure 3A</option>
+                    <option value="Annexure B">Annexure B</option>
+                    <option value="Annexure C">Annexure C</option>
+                    <option value="Annexure D">Annexure D</option>
+                    <option value="Annexure E">Annexure E</option>
+                ` : '';
+
+                container.innerHTML = `
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-slate-100 pb-6 mb-6">
+                        <div>
+                            <h3 class="text-2xl font-black text-dark-900 mb-1"><i class="fa-solid fa-folder-open text-royal-500 mr-2"></i> My History</h3>
+                            <p id="userHistoryCount" class="text-sm font-bold text-royal-600 bg-royal-50 border border-royal-200 px-3 py-1 rounded-full inline-block">Total Files: 0</p>
+                        </div>
+                        
+                        <div class="flex items-center gap-3 w-full md:w-auto">
+                            <div class="flex-1 md:flex-none">
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Filter Type</label>
+                                <select onchange="window.renderHistory(this.value)" class="w-full md:w-52 p-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:ring-2 focus:ring-royal-400 font-semibold cursor-pointer outline-none">
+                                    <option value="ALL">All Documents</option>
+                                    <option value="Domicile">मूल निवास</option>
+                                    <option value="Caste">जाति प्रमाण पत्र</option>
+                                    ${vipFilterOptions}
+                                </select>
+                            </div>
+                            <div class="flex items-end h-full mt-4 md:mt-0">
+                                <button onclick="window.loadUserHistory()" class="h-[42px] bg-slate-100 text-slate-600 px-4 rounded-xl text-sm font-bold hover:bg-slate-200 transition shadow-sm" title="Refresh"><i class="fa-solid fa-rotate-right"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto border border-slate-200 rounded-2xl">
+                        <table class="w-full text-left border-collapse bg-white min-w-[600px]">
+                            <thead class="bg-slate-50 border-b border-slate-200 text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                                <tr><th class="p-4 rounded-tl-2xl">File Name</th><th class="p-4">Type</th><th class="p-4">Date & Time</th><th class="p-4 text-right rounded-tr-2xl">Action</th></tr>
+                            </thead>
+                            <tbody id="historyTableBody" class="text-sm text-slate-700"></tbody>
+                        </table>
+                    </div>
+                `;
+                window.loadUserHistory();
+            }
+        };
+    </script>
+</head>
+<body class="bg-slate-50 font-sans min-h-screen flex flex-col justify-between selection:bg-royal-300 selection:text-dark-900 transition-colors duration-300">
+    
+    <!-- SECURITY LOADING SCREEN -->
+    <div id="loadingScreen" style="display: flex;" class="fixed inset-0 bg-dark-900 z-[200] flex-col items-center justify-center">
+        <i class="fa-solid fa-sun text-7xl text-royal-400 mb-6 animate-spin-slow"></i>
+        <h2 class="text-2xl font-black text-white tracking-widest uppercase">Ojas Print Service</h2>
+        <p class="text-sm text-royal-300 mt-2 font-bold animate-pulse">Checking Security...</p>
     </div>
 
-    <p style="font-size: 0.9rem; color: #475569; margin-bottom: 12px;">
-      <strong>VIP प्लान चुनें या समय बढ़ाएं:</strong> (नया प्लान लेने पर बचे हुए दिनों में ही नए दिन जुड़ जाएंगे)
-    </p>
-
-    <div class="plans-grid">
-      <!-- Plan 1: 1 Month -->
-      <div class="plan-card">
-        <h3>1 Month</h3>
-        <div class="plan-price">₹100</div>
-        <div class="plan-days">+30 Days</div>
-        <button class="btn" onclick="addVipValidity(30, 100, 'User Purchase')">Buy ₹100</button>
-      </div>
-
-      <!-- Plan 2: 2 Months -->
-      <div class="plan-card">
-        <h3>2 Months</h3>
-        <div class="plan-price">₹180</div>
-        <div class="plan-days">+60 Days</div>
-        <button class="btn" onclick="addVipValidity(60, 180, 'User Purchase')">Buy ₹180</button>
-      </div>
-
-      <!-- Plan 3: 3 Months -->
-      <div class="plan-card">
-        <h3>3 Months</h3>
-        <div class="plan-price">₹250</div>
-        <div class="plan-days">+90 Days</div>
-        <button class="btn" onclick="addVipValidity(90, 250, 'User Purchase')">Buy ₹250</button>
-      </div>
+    <!-- 🔔 FLOATING CORNER ALERT WHEN <= 5 DAYS REMAINING IN VIP -->
+    <div id="vipCornerAlert" style="display: none;" class="fixed bottom-5 right-5 z-[150] w-80 md:w-96 bg-amber-50 border-l-8 border-amber-500 rounded-2xl p-4 shadow-2xl text-slate-800 corner-alert-anim">
+        <div class="flex justify-between items-start mb-1.5">
+            <h4 class="text-sm font-black text-amber-900 flex items-center gap-1.5">
+                <i class="fa-solid fa-triangle-exclamation text-amber-600 animate-bounce"></i> VIP एक्सपायरी अलर्ट!
+            </h4>
+            <button onclick="window.dismissCornerAlert()" class="text-slate-400 hover:text-red-500 text-xs font-bold"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <p id="cornerAlertDaysText" class="text-xs font-semibold text-amber-800 leading-relaxed mb-3">
+            आपके VIP एक्सेस खत्म होने में कुछ ही दिन बचे हैं!
+        </p>
+        <div class="grid grid-cols-3 gap-1.5">
+            <button onclick="window.jumpToVipUpgrade(30)" class="bg-amber-500 hover:bg-amber-600 text-white font-black py-2 px-2 rounded-lg text-[10px] shadow transition">+1M (₹100)</button>
+            <button onclick="window.jumpToVipUpgrade(60)" class="bg-amber-600 hover:bg-amber-700 text-white font-black py-2 px-2 rounded-lg text-[10px] shadow transition">+2M (₹180)</button>
+            <button onclick="window.jumpToVipUpgrade(90)" class="bg-dark-900 hover:bg-black text-royal-300 font-black py-2 px-2 rounded-lg text-[10px] shadow transition">+3M (₹250)</button>
+        </div>
     </div>
-  </div>
 
-  <!-- ADMIN PORTAL -->
-  <div class="card">
-    <h2>🛠️ एडमिन पोर्टल (Admin Control)</h2>
-    <p style="font-size: 0.9rem; color: #475569;">
-      एडमिन यहाँ से सीधे यूजर की वैलिडिटी में +30, +60 या +90 दिन जोड़ सकता है:
-    </p>
-
-    <div class="admin-btn-group">
-      <button class="btn btn-admin" onclick="addVipValidity(30, 100, 'Admin Panel')">
-        ➕ Activate / Add +30 Days (1 Month - ₹100)
-      </button>
-      <button class="btn btn-admin" onclick="addVipValidity(60, 180, 'Admin Panel')">
-        ➕ Activate / Add +60 Days (2 Months - ₹180)
-      </button>
-      <button class="btn btn-admin" onclick="addVipValidity(90, 250, 'Admin Panel')">
-        ➕ Activate / Add +90 Days (3 Months - ₹250)
-      </button>
-      
-      <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 8px 0;">
-      
-      <!-- Testing Buttons for 3-5 Day Alert -->
-      <button class="btn btn-test" onclick="simulateRemainingDays(3)">
-        🔔 टेस्ट करें: 3 दिन बचे हैं (Check Corner Alert)
-      </button>
-      <button class="btn btn-reset" onclick="resetVIP()">
-        🗑️ VIP रीसेट / खत्म करें
-      </button>
+    <!-- FULL SCREEN PDF VIEWER MODAL -->
+    <div id="pdfViewerModal" style="display: none;" class="fixed inset-0 z-[100] bg-dark-900/80 backdrop-blur-md items-center justify-center p-2 md:p-6 transition-opacity">
+        <div class="bg-white w-full max-w-6xl h-full flex flex-col rounded-2xl shadow-2xl overflow-hidden">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center p-4 border-b border-slate-200 bg-slate-50 gap-3">
+                <div class="flex items-center gap-3 overflow-hidden w-full md:w-auto">
+                    <div class="w-8 h-8 bg-royal-100 text-royal-600 rounded-lg flex items-center justify-center shrink-0"><i class="fa-solid fa-file-pdf"></i></div>
+                    <h3 id="pdfViewerTitle" class="font-bold text-slate-800 truncate">Document Preview</h3>
+                </div>
+                <div class="flex items-center gap-3 w-full md:w-auto justify-end">
+                    <button id="modalDownloadBtn" class="bg-dark-900 hover:bg-black text-royal-300 px-4 py-2 rounded-xl text-sm font-bold transition shadow-glow flex items-center gap-2 border border-dark-800">
+                        <i class="fa-solid fa-download"></i> Download
+                    </button>
+                    <button onclick="window.closePdfViewer()" class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-200 text-slate-600 hover:bg-red-500 hover:text-white transition shadow-sm"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+            </div>
+            <div class="flex-grow bg-slate-300 relative">
+                <div id="pdfLoadingSpinner" class="absolute inset-0 flex flex-col items-center justify-center text-royal-600 bg-slate-100">
+                    <i class="fa-solid fa-spinner fa-spin text-4xl mb-3"></i>
+                    <p class="text-sm font-bold text-slate-600 mt-2">Loading Preview...</p>
+                </div>
+                <iframe id="pdfIframe" class="w-full h-full relative z-10 border-none" onload="document.getElementById('pdfLoadingSpinner').style.display='none'" src=""></iframe>
+            </div>
+        </div>
     </div>
-  </div>
-</div>
 
-<!-- CORNER ALERT FOR 5 DAYS OR LESS -->
-<div class="corner-alert" id="cornerAlertBox">
-  <h4>
-    <span>⚠️ VIP एक्सपायरी अलर्ट!</span>
-  </h4>
-  <p id="cornerAlertText">
-    आपके VIP एक्सेस खत्म होने में सिर्फ 3 दिन बचे हैं। क्या आप फिर से VIP एक्सेस बढ़ाना चाहते हैं?
-  </p>
-  <button class="btn-renew" onclick="scrollToPlans()">
-    अभी VIP वैलिडिटी बढ़ाएं (+30 / +60 / +90 दिन)
-  </button>
-</div>
+    <!-- LOGIN SCREEN -->
+    <div id="loginSection" style="display: none;" class="items-center justify-center flex-grow p-4 min-h-screen bg-dark-900 relative overflow-hidden">
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-royal-500/20 rounded-full blur-[100px] pointer-events-none"></div>
+        <div class="bg-white p-8 md:p-10 rounded-3xl shadow-[0_0_40px_rgba(245,158,11,0.15)] border-t-4 border-royal-500 w-full max-w-md relative z-10 text-slate-800">
+            <div class="text-center mb-8">
+                <div class="w-20 h-20 bg-gradient-to-br from-royal-300 to-royal-600 text-white rounded-full flex items-center justify-center mx-auto mb-5 text-4xl shadow-glow">
+                    <i class="fa-solid fa-sun"></i>
+                </div>
+                <h1 class="text-3xl font-black text-dark-900 tracking-tight">Ojas Print Service</h1>
+                <p class="text-[10px] font-bold text-slate-400 mt-2 uppercase tracking-widest">Secure Portal Login</p>
+            </div>
+            <form id="loginForm" onsubmit="window.handleLogin(event)" class="space-y-5">
+                <input type="text" id="loginUsername" placeholder="User ID / Email" required class="w-full px-5 py-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-royal-500 outline-none bg-slate-50 text-sm font-semibold transition">
+                <input type="password" id="loginPassword" placeholder="Password" required class="w-full px-5 py-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-royal-500 outline-none bg-slate-50 text-sm font-semibold transition">
+                <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-4 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-2 text-base">Secure Login <i class="fa-solid fa-arrow-right ml-1"></i></button>
+            </form>
+            <div id="loginError" style="display: none;" class="mt-5 text-center text-sm font-bold text-red-500 bg-red-50 p-3 rounded-xl border border-red-100"></div>
+        </div>
+    </div>
 
-<script>
-  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+    <!-- DASHBOARD SCREEN -->
+    <div id="dashboardSection" style="display: none;" class="flex-grow flex-col">
+        <header class="bg-dark-950 shadow-2xl px-4 md:px-8 py-4 flex flex-wrap justify-between items-center sticky top-0 z-40 border-b-2 border-royal-500 gap-3">
+            <div class="flex items-center gap-3">
+                <div id="portalHeaderIcon" class="w-10 h-10 bg-gradient-to-br from-royal-400 to-royal-600 text-white rounded-xl flex items-center justify-center shadow-inner">
+                    <i class="fa-solid fa-sun text-lg"></i>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <h2 id="portalHeaderTitle" class="text-lg md:text-xl font-black text-white leading-tight">Ojas <span class="text-royal-400">Portal</span></h2>
+                    <span id="vipStatusBadge" style="display: none;" class="items-center gap-1 bg-gradient-to-r from-yellow-300 via-royal-400 to-amber-500 text-dark-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-widest shadow-vip-glow">
+                        <i class="fa-solid fa-crown text-[9px]"></i> VIP 20% OFF
+                    </span>
+                    <!-- ⏳ LIVE VIP COUNTDOWN BADGE IN HEADER -->
+                    <div id="vipHeaderTimerBox" style="display: none;" onclick="window.jumpToVipUpgrade(30)" title="Click to extend VIP validity" class="cursor-pointer items-center gap-1.5 bg-dark-800 border border-royal-400/50 text-royal-300 px-3 py-1 rounded-full text-xs font-mono font-bold shadow-sm hover:bg-dark-700 transition">
+                        <i class="fa-regular fa-clock text-yellow-400 animate-pulse"></i>
+                        <span id="vipHeaderTimerText">00d : 00h : 00m : 00s</span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 md:gap-4">
+                <p class="text-xs text-slate-400 font-bold hidden lg:block">Welcome, <span id="displayUser" class="text-white"></span></p>
+                <a href="admin.html" id="adminPanelLink" style="display: none;" class="bg-dark-800 border border-slate-700 text-royal-300 hover:text-white px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-sm font-bold shadow-sm transition"><i class="fa-solid fa-shield-halved mr-1"></i> <span class="hidden md:inline">Admin Panel</span></a>
+                
+                <div id="creditDisplayBox" style="display: none;" class="bg-royal-500/10 border border-royal-500/30 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-sm font-bold text-royal-400 shadow-sm items-center cursor-pointer hover:bg-royal-500/20 transition" onclick="window.switchService('add_credit')" title="Add Credits">
+                    <i class="fa-solid fa-wallet mr-2 text-royal-500"></i> Credits: <span id="displayCredits" class="ml-1 text-lg font-black text-white">0</span>
+                </div>
+                
+                <button onclick="window.handleLogout()" class="bg-red-500/10 hover:bg-red-500 hover:text-white text-red-400 border border-red-500/30 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-sm font-bold transition shadow-sm"><i class="fa-solid fa-power-off"></i> <span class="hidden md:inline ml-1">Logout</span></button>
+            </div>
+        </header>
 
-  // 1. डेटाबेस से एक्सपायरी टाइम लेना (अभी LocalStorage में है, इसे Firebase से जोड़ सकते हैं)
-  function getVipExpiry() {
-    const saved = localStorage.getItem('user_vip_expiry');
-    return saved ? parseInt(saved, 10) : 0;
-  }
+        <main class="max-w-6xl mx-auto w-full p-4 md:p-8 flex-grow">
+            
+            <!-- ✨ SHINY VIP PROMO BANNER WITH 3 PLANS FOR NORMAL USERS ✨ -->
+            <div id="normalUserVipPromo" style="display: none;" class="mb-6 rounded-3xl vip-promo-shine border-2 border-royal-400 p-5 text-white shadow-vip-glow relative overflow-hidden">
+                <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 relative z-10">
+                    <div class="space-y-1.5">
+                        <div class="inline-flex items-center gap-2 bg-gradient-to-r from-yellow-300 to-amber-500 text-dark-950 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider shadow">
+                            <i class="fa-solid fa-crown animate-bounce"></i> VIP धमाका ऑफर — हर ट्रांजैक्शन पर 20% की छूट!
+                        </div>
+                        <h3 class="text-lg md:text-xl font-black text-royal-300">
+                            अपना VIP Portal अनलॉक करें — 18+ DOB और सारे Annexures बनाएं!
+                        </h3>
+                        <ul class="text-xs md:text-sm text-slate-200 font-semibold space-y-1 pt-1">
+                            <li><i class="fa-solid fa-circle-check text-green-400 mr-1.5"></i> <strong>20% OFF:</strong> हर डॉक्यूमेंट 10 की जगह सिर्फ <strong>8 क्रेडिट</strong> में बनाएं!</li>
+                            <li><i class="fa-solid fa-circle-check text-green-400 mr-1.5"></i> <strong>18+ जन्म प्रमाण पत्र (DOB)</strong> और <strong>सारे Annexures (1, 1A, 3, 3A, B, C, D, E)</strong> तुरंत निकालें!</li>
+                        </ul>
+                    </div>
+                    <!-- 3 Quick Plan Buttons -->
+                    <div class="grid grid-cols-3 gap-2.5 w-full lg:w-auto shrink-0">
+                        <button onclick="window.jumpToVipUpgrade(30)" class="bg-dark-900/90 hover:bg-royal-500 hover:text-dark-950 text-white border border-royal-400 p-3 rounded-2xl text-center transition transform hover:scale-105 shadow-md">
+                            <div class="text-[10px] font-bold uppercase text-royal-300">1 Month</div>
+                            <div class="text-lg font-black">₹100</div>
+                            <div class="text-[10px] opacity-80">+30 Days</div>
+                        </button>
+                        <button onclick="window.jumpToVipUpgrade(60)" class="bg-dark-900/90 hover:bg-royal-500 hover:text-dark-950 text-white border border-royal-400 p-3 rounded-2xl text-center transition transform hover:scale-105 shadow-md">
+                            <div class="text-[10px] font-bold uppercase text-royal-300">2 Months</div>
+                            <div class="text-lg font-black">₹180</div>
+                            <div class="text-[10px] text-green-400 font-bold">+60 Days</div>
+                        </button>
+                        <button onclick="window.jumpToVipUpgrade(90)" class="bg-gradient-to-b from-yellow-300 via-royal-400 to-amber-500 text-dark-950 border border-yellow-100 p-3 rounded-2xl text-center transition transform hover:scale-105 shadow-vip-glow">
+                            <div class="text-[10px] font-black uppercase">3 Months</div>
+                            <div class="text-lg font-black">₹250</div>
+                            <div class="text-[10px] font-black">+90 Days</div>
+                        </button>
+                    </div>
+                </div>
+            </div>
 
-  function saveVipExpiry(timestamp) {
-    localStorage.setItem('user_vip_expiry', timestamp.toString());
-    updateUI();
-  }
+            <!-- Standard Navigation Grid -->
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-6">
+                <button onclick="window.switchService('domicile')" id="btn-domicile" class="service-tab"><i class="fa-solid fa-house-chimney"></i> Domicile</button>
+                <button onclick="window.switchService('caste')" id="btn-caste" class="service-tab"><i class="fa-solid fa-users"></i> Caste Cert</button>
+                <button onclick="window.switchService('history')" id="btn-history" class="service-tab"><i class="fa-solid fa-clock-rotate-left"></i> My History</button>
+                <button onclick="window.switchService('password')" id="btn-password" class="service-tab"><i class="fa-solid fa-key"></i> Password</button>
+                <button onclick="window.switchService('add_credit')" id="btn-add_credit" class="service-tab col-span-2 md:col-span-1 !bg-amber-50 !text-amber-700 !border-amber-200 hover:!bg-amber-100"><i class="fa-solid fa-plus-circle"></i> Add Credit / VIP</button>
+            </div>
 
-  // 2. VIP वैलिडिटी जोड़ने का मुख्य फंक्शन (User & Admin दोनों के लिए)
-  function addVipValidity(daysToAdd, amount, source) {
-    const now = Date.now();
-    const currentExpiry = getVipExpiry();
-
-    // अगर पहले से VIP एक्टिव है तो उसी के आगे दिन जुड़ेंगे, वरना आज से शुरू होगा
-    const baseTime = (currentExpiry > now) ? currentExpiry : now;
-    const newExpiry = baseTime + (daysToAdd * MS_PER_DAY);
-
-    saveVipExpiry(newExpiry);
-    alert(`[${source}] सफल! +${daysToAdd} दिन जोड़ दिए गए हैं।`);
-  }
-
-  // 3. टेस्टिंग के लिए: सिर्फ 3 दिन बचने की स्थिति बनाना
-  function simulateRemainingDays(days) {
-    const newExpiry = Date.now() + (days * MS_PER_DAY) - 10000; // ठीक 3 दिन
-    saveVipExpiry(newExpiry);
-  }
-
-  function resetVIP() {
-    localStorage.removeItem('user_vip_expiry');
-    updateUI();
-  }
-
-  function scrollToPlans() {
-    document.getElementById('plansSection').scrollIntoView({ behavior: 'smooth' });
-  }
-
-  // 4. हर सेकंड काउंटडाउन और 5-दिन वाला कॉर्नर अलर्ट अपडेट करना
-  function updateUI() {
-    const now = Date.now();
-    const expiry = getVipExpiry();
-    const diff = expiry - now;
-
-    const badge = document.getElementById('vipBadge');
-    const countdownEl = document.getElementById('countdownDisplay');
-    const expiryDateEl = document.getElementById('expiryDateDisplay');
-    const alertBox = document.getElementById('cornerAlertBox');
-    const alertText = document.getElementById('cornerAlertText');
-
-    if (diff <= 0) {
-      badge.textContent = 'VIP INACTIVE / EXPIRED';
-      badge.className = 'badge expired';
-      countdownEl.textContent = '00d : 00h : 00m : 00s';
-      expiryDateEl.textContent = 'कोई एक्टिव VIP प्लान नहीं है';
-      alertBox.style.display = 'none';
-      return;
-    }
-
-    // VIP एक्टिव है
-    badge.textContent = 'VIP ACTIVE';
-    badge.className = 'badge active';
-
-    // दिन, घंटे, मिनट, सेकंड की गणना
-    const days = Math.floor(diff / MS_PER_DAY);
-    const hours = Math.floor((diff % MS_PER_DAY) / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-    countdownEl.textContent = `${days}d : ${hours}h : ${minutes}m : ${seconds}s`;
-
-    const formattedDate = new Date(expiry).toLocaleString('hi-IN', {
-      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-    });
-    expiryDateEl.textContent = `वैधता समाप्ति: ${formattedDate}`;
-
-    // कॉर्नर अलर्ट लॉजिक: अगर 5 दिन या उससे कम (5, 4, 3, 2, 1 दिन) बचे हैं
-    const remainingDaysCeil = Math.ceil(diff / MS_PER_DAY);
-    if (remainingDaysCeil <= 5 && remainingDaysCeil >= 1) {
-      alertBox.style.display = 'block';
-      alertText.innerHTML = `आपके VIP एक्सेस खत्म होने में सिर्फ <strong>${remainingDaysCeil} दिन</strong> बचे हैं! रुकावट से बचने के लिए अभी अपना VIP एक्सेस आगे बढ़ाएं।`;
-    } else {
-      alertBox.style.display = 'none';
-    }
-  }
-
-  setInterval(updateUI, 1000);
-  updateUI();
-</script>
-
+            <!-- 👑 VIP EXCLUSIVE SERVICES PANEL (Visible ONLY when VIP is Active) -->
+            <div id="vipServicesBar" style="display: none;" class="mb-8 p-5 rounded-3xl bg-gradient-to-r from-dark-950 via-dark-900 to-dark-950 border-2 border-royal-400 shadow-vip-glow">
+                <div class="flex flex-wrap items-center justify-between mb-3 border-b border-slate-800 pb-2.5 gap-2">
+                    <span class="text-xs font-black uppercase tracking-widest text-royal-300 flex items-center gap-2">
+                        <i class="fa-solid fa-crown text-royal-400 animate-bounce"></i> VIP Exclusive Services (20% Discount Active)
+                    </span>
+                    <button onclick="window.jumpToVipUpgrade(30)" class="text-[11px] bg-royal-500/20 hover:bg-royal-500 hover:text-dark-950 text-royal-300 border border-royal-400/40 px-3 py-1 rounded-full font-bold transition">
+                        <i class="fa-solid fa-plus-circle mr-1"></i> Extend VIP Time (+30 / +60 / +90 Days)
+                    </button>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+                    <button onclick="window.switchService('dob18')" id="btn-dob18" class="vip-tab"><i class="fa-solid fa-cake-candles"></i> DOB (18+)</button>
+                    <button onclick="window.switchService('annexure1')" id="btn-annexure1" class="vip-tab"><i class="fa-solid fa-file-signature"></i> Annexure 1</button>
+                    <button onclick="window.switchService('annexure1a')" id="btn-annexure1a" class="vip-tab"><i class="fa-solid fa-file-signature"></i> Annexure 1A</button>
+                    <button onclick="window.switchService('annexure3')" id="btn-annexure3" class="vip-tab"><i class="fa-solid fa-file-signature"></i> Annexure 3</button>
+                    <button onclick="window.switchService('annexure3a')" id="btn-annexure3a" class="vip-tab"><i class="fa-solid fa-file-signature"></i> Annexure 3A</button>
+                    <button onclick="window.switchService('annexureb')" id="btn-annexureb" class="vip-tab"><i class="fa-solid fa-file-contract"></i> Annexure B</button>
+                    <button onclick="window.switchService('annexurec')" id="btn-annexurec" class="vip-tab"><i class="fa-solid fa-file-contract"></i> Annexure C</button>
+                    <button onclick="window.switchService('annexured')" id="btn-annexured" class="vip-tab"><i class="fa-solid fa-file-contract"></i> Annexure D</button>
+                    <button onclick="window.switchService('annexuree')" id="btn-annexuree" class="vip-tab"><i class="fa-solid fa-file-contract"></i> Annexure E</button>
+                </div>
+            </div>
+            
+            <!-- Dynamic Form Container -->
+            <div id="mainFormCard" class="bg-white text-slate-800 rounded-3xl shadow-card border border-slate-100 p-6 md:p-8">
+                <div id="formContainer"></div>
+            </div>
+        </main>
+    </div>
+    
+    <footer class="bg-dark-950 border-t border-slate-800 text-center py-5 text-[11px] font-bold text-slate-400 mt-auto uppercase tracking-widest">
+        © 2026 Ojas Print Service | Secure Portal
+    </footer>
 </body>
 </html>
