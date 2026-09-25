@@ -58,11 +58,11 @@
             font-family: 'Times New Roman', Times, serif;
             width: 794px;
             height: 1122px;
-            padding: 48px 64px;
+            padding: 44px 62px;
             background: #ffffff;
             color: #000000;
-            font-size: 15.5px;
-            line-height: 1.6;
+            font-size: 15px;
+            line-height: 1.55;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
@@ -697,112 +697,233 @@
             }
         };
 
-        // ================= ANNEXURE E SINGLE-PAGE A4 HTML BUILDER (NO UNDERLINES / NO LINES THROUGH NAMES) =================
-        window.buildAnnexureEHtmlString = function(d = {}, withShadow = true) {
-            const title = d.title || 'Shri';
-            const appName = d.applicantName || '';
-            const rel = d.rel || 'S/o';
-            const relName = d.relativeName || '';
-            const address = d.address || '';
-            const idNum = d.idNumber || '';
-            const rec1 = d.recorded1 || '';
-            const rec2 = d.recorded2 || '';
-            const retain = d.retainName || '';
-            const remove = d.removeName || '';
+        // ================= MASTER HTML BUILDER FOR ANNEXURES B, C, D, E & F (SINGLE-PAGE A4, NO UNDERLINES) =================
+        window.buildAffidavitAnnexureHtml = function(serviceType, d = {}, withShadow = true) {
+            const shadowClass = withShadow ? 'shadow-2xl' : '';
             const place = d.place || '';
             const day = d.day || '';
             const monthYear = d.monthYear || '';
-            const shadowClass = withShadow ? 'shadow-2xl' : '';
+
+            let rightHeader = 'Annexure E (for adults)';
+            let subTitle = '(Applicable where the name is recorded in Aadhaar with “urf” or “alias” and the Aadhaar<br>number holder seeks to retain one of the names)';
+            let introParagraph = '';
+            let pointsHtml = '';
+            let bottomNote = '(This affidavit may be signed and attested in presence of a Judicial Magistrate or Executive<br>Magistrate/Notary Public)';
+            let pageFooter = 'Page 10 of 11';
+
+            // 1. ANNEXURE B (FOR ADULTS - DATA ENTRY ERROR IN NAME)
+            if (serviceType === 'Annexure B') {
+                rightHeader = 'Annexure B (for adults)';
+                subTitle = '(Applicable where the resident\'s name had been incorrectly recorded in Aadhaar due to data<br>entry error)';
+                introParagraph = `I, <span>${d.title || 'Shri'}</span> <span class="filled-val">${d.applicantName || ''}</span>, <span>${d.rel || 'S/o'}</span> <span class="filled-val">${d.relativeName || ''}</span>, resident of <span class="filled-val">${d.address || ''}</span>, do hereby solemnly affirm and declare as under:`;
+                pointsHtml = `
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
+                        That I am the holder of Aadhaar number <span class="filled-val">${d.idNumber || ''}</span>.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
+                        That my correct name is <span class="filled-val">${d.correctName || ''}</span>.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
+                        That due to an inadvertent data entry error at the time of enrolment/update, my name had been recorded in Aadhaar as <span class="filled-val">${d.wrongName || ''}</span>, whereas my correct name is <span class="filled-val">${d.correctName || ''}</span>.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
+                        That the update request pertains only to the correction of my name and does not amount to a change of identity or adoption of a different name.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
+                        That I am submitting the prescribed supporting document evidencing my correct name.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
+                        That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of my Aadhaar number and prosecution under the applicable laws.
+                    </li>
+                `;
+                bottomNote = '(This affidavit may be signed and attested in the presence of a Judicial Magistrate or<br>Executive Magistrate/Notary Public)';
+                pageFooter = 'Page 7 of 11';
+            }
+
+            // 2. ANNEXURE C (FOR MINORS - DATA ENTRY ERROR IN NAME)
+            else if (serviceType === 'Annexure C') {
+                rightHeader = 'Annexure C (for minors)';
+                subTitle = '(Applicable where the resident\'s name had been incorrectly recorded in Aadhaar due to data<br>entry error)';
+                introParagraph = `I, <span>${d.title || 'Shri'}</span> <span class="filled-val">${d.guardianName || ''}</span>, <span>${d.rel || 'S/o'}</span> <span class="filled-val">${d.relativeName || ''}</span>, resident of <span class="filled-val">${d.address || ''}</span>, being the <span>${d.guardianRole || 'father/mother/legal guardian'}</span> of minor <span class="filled-val">${d.minorName || ''}</span>, do hereby solemnly affirm and declare as under:`;
+                pointsHtml = `
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
+                        That minor <span class="filled-val">${d.minorName || ''}</span> is the holder of Aadhaar Number <span class="filled-val">${d.idNumber || ''}</span>.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
+                        That correct name of the minor is <span class="filled-val">${d.correctName || ''}</span>.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
+                        That due to an inadvertent data entry error at the time of enrolment/update, his/her name had been recorded in Aadhaar as <span class="filled-val">${d.wrongName || ''}</span>, whereas his/her correct name is <span class="filled-val">${d.correctName || ''}</span>.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
+                        That the update request pertains only to the correction of his/her name and does not amount to a change of identity or adoption of a different name.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
+                        That I am submitting the prescribed supporting document evidencing his/her correct name.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
+                        That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of my Aadhaar number and prosecution under the applicable laws.
+                    </li>
+                `;
+                pageFooter = 'Page 8 of 11';
+            }
+
+            // 3. ANNEXURE D (SURNAME CHANGE POST MARRIAGE / DIVORCE)
+            else if (serviceType === 'Annexure D') {
+                rightHeader = 'Annexure D';
+                subTitle = '(Applicable for change of surname in Aadhaar post Marriage/Divorce)';
+                const husbandPart = d.husbandName ? `, W/o <span class="filled-val">${d.husbandName}</span>` : '';
+                introParagraph = `I, <span>${d.title || 'Smt.'}</span> <span class="filled-val">${d.applicantName || ''}</span>, D/o <span class="filled-val">${d.fatherName || ''}</span>${husbandPart} (wherever applicable), resident of <span class="filled-val">${d.address || ''}</span>, do hereby solemnly affirm and declare as under:`;
+                pointsHtml = `
+                    <li style="margin-bottom: 11px; padding-left: 6px; line-height: 1.5;">
+                        That I am the holder of Aadhaar number <span class="filled-val">${d.idNumber || ''}</span>.
+                    </li>
+                    <li style="margin-bottom: 11px; padding-left: 6px; line-height: 1.5;">
+                        That my name prior to marriage/divorce was <span class="filled-val">${d.priorName || ''}</span>.
+                    </li>
+                    <li style="margin-bottom: 11px; padding-left: 6px; line-height: 1.55;">
+                        That consequent upon my ${d.eventType || 'marriage solemnized on'} <span class="filled-val">${d.eventDate || ''}</span>, I have adopted/am entitled to use the surname <span class="filled-val">${d.newSurname || ''}</span>, and my full name is now <span class="filled-val">${d.newFullName || ''}</span>.
+                    </li>
+                    <li style="margin-bottom: 11px; padding-left: 6px; line-height: 1.55;">
+                        That I request for name update in my Aadhaar by replacing my earlier surname <span class="filled-val">${d.earlierSurname || ''}</span> with my present surname <span class="filled-val">${d.newSurname || ''}</span>, while my identity as the individual remains same.
+                    </li>
+                    <li style="margin-bottom: 11px; padding-left: 6px; line-height: 1.5;">
+                        That I am submitting the prescribed supporting document(s) in support of the said change of surname.
+                    </li>
+                    <li style="margin-bottom: 11px; padding-left: 6px; line-height: 1.5;">
+                        That the requested name update is solely on account of marriage/divorce and does not involve any fraudulent assumption or concealment of identity.
+                    </li>
+                    <li style="margin-bottom: 11px; padding-left: 6px; line-height: 1.5;">
+                        That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of my Aadhaar number and prosecution under the applicable laws.
+                    </li>
+                `;
+                pageFooter = 'Page 9 of 11';
+            }
+
+            // 4. ANNEXURE F (FOR MINORS - URF / ALIAS REMOVAL)
+            else if (serviceType === 'Annexure F') {
+                rightHeader = 'Annexure F (for minors)';
+                subTitle = '(Applicable where the name is recorded in Aadhaar with “urf” or “alias” and the Aadhaar<br>number holder seeks to retain one of the names)';
+                introParagraph = `I, <span>${d.title || 'Shri'}</span> <span class="filled-val">${d.guardianName || ''}</span>, <span>${d.rel || 'S/o'}</span> <span class="filled-val">${d.relativeName || ''}</span>, resident of <span class="filled-val">${d.address || ''}</span>, being the <span>${d.guardianRole || 'father/mother/legal guardian'}</span> of minor <span class="filled-val">${d.minorName || ''}</span>, do hereby solemnly affirm and declare as under:`;
+                pointsHtml = `
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
+                        That minor <span class="filled-val">${d.minorName || ''}</span> is the holder of Aadhaar Number <span class="filled-val">${d.idNumber || ''}</span>.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
+                        That the name of the minor is presently recorded/used as <span class="filled-val">${d.recorded1 || ''}</span> urf or alias <span class="filled-val">${d.recorded2 || ''}</span>, in his/her Aadhaar, both names referring to one and the same minor.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
+                        That I, being the <span>${d.guardianRole || 'father/mother/legal guardian'}</span> of the minor, seek to retain the name <span class="filled-val">${d.retainName || ''}</span> and discontinue the use of <span class="filled-val">${d.removeName || ''}</span> as an alias/urf.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
+                        That the requested update is limited to removal of the “urf/alias” and retention of the aforesaid name and does not amount to a change of identity or adoption of a different name of minor.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
+                        That I am submitting the prescribed supporting document(s) in support of the name sought to be retained.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
+                        That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of my Aadhaar number and prosecution under the applicable laws.
+                    </li>
+                `;
+                pageFooter = 'Page 11 of 11';
+            }
+
+            // 5. DEFAULT: ANNEXURE E (FOR ADULTS - URF / ALIAS REMOVAL)
+            else {
+                rightHeader = 'Annexure E (for adults)';
+                subTitle = '(Applicable where the name is recorded in Aadhaar with “urf” or “alias” and the Aadhaar<br>number holder seeks to retain one of the names)';
+                introParagraph = `I, <span>${d.title || 'Shri'}</span> <span class="filled-val">${d.applicantName || ''}</span>, <span>${d.rel || 'S/o'}</span> <span class="filled-val">${d.relativeName || ''}</span>, resident of <span class="filled-val">${d.address || ''}</span>, do hereby solemnly affirm and declare as under:`;
+                pointsHtml = `
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
+                        That I am the holder of Aadhaar Number <span class="filled-val">${d.idNumber || ''}</span>.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
+                        That my name is presently recorded/used as <span class="filled-val">${d.recorded1 || ''}</span> urf or alias <span class="filled-val">${d.recorded2 || ''}</span> in my Aadhaar, both names referring to one and the same person, i.e. myself.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
+                        That I intend to retain the name <span class="filled-val">${d.retainName || ''}</span> and discontinue the use of <span class="filled-val">${d.removeName || ''}</span> as an alias/urf.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
+                        That the requested update is limited to removal of the “urf or alias” and retention of the aforesaid name and does not amount to a change of identity or adoption of a different name.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
+                        That I am submitting the prescribed supporting document(s) in support of the name sought to be retained.
+                    </li>
+                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
+                        That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of my Aadhaar number and prosecution under the applicable laws.
+                    </li>
+                `;
+                pageFooter = 'Page 10 of 11';
+            }
 
             return `
                 <div class="affidavit-paper ${shadowClass}">
                     <div>
-                        <div style="display: flex; justify-content: space-between; font-family: Arial, sans-serif; font-size: 11px; color: #222; margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; font-family: Arial, sans-serif; font-size: 11px; color: #222; margin-bottom: 16px;">
                             <span>HQ-16024/4/2020-EU-I-HQ</span>
                             <span>I/58751/2026</span>
                         </div>
 
-                        <div style="text-align: right; font-weight: bold; font-size: 16px; margin-bottom: 12px;">
-                            Annexure E (for adults)
+                        <div style="text-align: right; font-weight: bold; font-size: 16px; margin-bottom: 10px;">
+                            ${rightHeader}
                         </div>
 
-                        <div style="text-align: center; font-weight: bold; font-size: 17px; margin-bottom: 8px;">
+                        <div style="text-align: center; font-weight: bold; font-size: 17px; margin-bottom: 6px;">
                             AFFIDAVIT
                         </div>
 
-                        <div style="text-align: center; font-size: 14.5px; line-height: 1.4; margin-bottom: 10px; padding: 0 10px;">
-                            (Applicable where the name is recorded in Aadhaar with “urf” or “alias” and the Aadhaar<br>
-                            number holder seeks to retain one of the names)
+                        <div style="text-align: center; font-size: 14.5px; line-height: 1.38; margin-bottom: 8px; padding: 0 10px;">
+                            ${subTitle}
                         </div>
 
-                        <div style="text-align: center; font-size: 14.5px; margin-bottom: 22px;">
+                        <div style="text-align: center; font-size: 14.5px; margin-bottom: 18px;">
                             (To be printed on Non-Judicial Stamp Paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)
                         </div>
 
-                        <div style="text-align: justify; line-height: 1.75; margin-bottom: 16px;">
-                            I, <span>${title}</span> <span class="filled-val">${appName}</span>, 
-                            <span>${rel}</span> <span class="filled-val">${relName}</span>, 
-                            resident of <span class="filled-val">${address}</span>, do hereby solemnly affirm and declare as under:
+                        <div style="text-align: justify; line-height: 1.7; margin-bottom: 14px;">
+                            ${introParagraph}
                         </div>
 
-                        <ol style="list-style-type: decimal; padding-left: 26px; margin-bottom: 20px; text-align: justify;">
-                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
-                                That I am the holder of Aadhaar Number <span class="filled-val">${idNum}</span>.
-                            </li>
-                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
-                                That my name is presently recorded/used as <span class="filled-val">${rec1}</span> urf or alias <span class="filled-val">${rec2}</span> in my Aadhaar, both names referring to one and the same person, i.e. myself.
-                            </li>
-                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
-                                That I intend to retain the name <span class="filled-val">${retain}</span> and discontinue the use of <span class="filled-val">${remove}</span> as an alias/urf.
-                            </li>
-                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
-                                That the requested update is limited to removal of the “urf or alias” and retention of the aforesaid name and does not amount to a change of identity or adoption of a different name.
-                            </li>
-                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
-                                That I am submitting the prescribed supporting document(s) in support of the name sought to be retained.
-                            </li>
-                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
-                                That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of my Aadhaar number and prosecution under the applicable laws.
-                            </li>
+                        <ol style="list-style-type: decimal; padding-left: 26px; margin-bottom: 16px; text-align: justify;">
+                            ${pointsHtml}
                         </ol>
 
-                        <div style="text-align: right; font-weight: bold; margin-top: 30px; margin-bottom: 16px;">
+                        <div style="text-align: right; font-weight: bold; margin-top: 22px; margin-bottom: 12px;">
                             Deponent
                         </div>
 
-                        <div style="font-weight: bold; margin-bottom: 8px;">
+                        <div style="font-weight: bold; margin-bottom: 6px;">
                             Verification:
                         </div>
 
-                        <div style="text-align: justify; line-height: 1.7; margin-bottom: 34px;">
+                        <div style="text-align: justify; line-height: 1.65; margin-bottom: 26px;">
                             Verified at <span class="filled-val">${place}</span> on this <span class="filled-val">${day}</span> day of <span class="filled-val">${monthYear}</span> that the contents of this affidavit are true and correct to the best of my knowledge and belief, and nothing material has been concealed therefrom.
                         </div>
 
-                        <div style="text-align: right; font-weight: bold; margin-bottom: 22px;">
+                        <div style="text-align: right; font-weight: bold; margin-bottom: 18px;">
                             Deponent
                         </div>
 
-                        <div style="text-align: center; font-size: 14.5px; line-height: 1.4;">
-                            (This affidavit may be signed and attested in presence of a Judicial Magistrate or Executive<br>
-                            Magistrate/Notary Public)
+                        <div style="text-align: center; font-size: 14px; line-height: 1.38;">
+                            ${bottomNote}
                         </div>
                     </div>
 
                     <div style="text-align: right; font-family: Arial, sans-serif; font-size: 12px;">
-                        Page 10 of 11
+                        ${pageFooter}
                     </div>
                 </div>
             `;
         };
 
-        // Helpers for Annexure E Form
+        // Helpers for Dates & Name Syncing in B, C, D, E, F
         window.getOrdinalDay = function(n) {
             const s = ["th", "st", "nd", "rd"];
             const v = n % 100;
             return n + (s[(v - 20) % 10] || s[v] || s[0]);
         };
 
-        window.initAnnexureEDefaults = function() {
+        window.initAffidavitDateDefaults = function() {
             const now = new Date();
             const dayEl = document.getElementById('inpDay');
             const myEl = document.getElementById('inpMonthYear');
@@ -810,24 +931,24 @@
             if (myEl) myEl.value = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase();
         };
 
-        window.syncAnnexureENames = function() {
-            const appName = document.getElementById('inpApplicantName')?.value.trim().toUpperCase() || '';
+        window.syncUrfNames = function() {
+            const mainName = document.getElementById('inpMainUrfTarget')?.value.trim().toUpperCase() || '';
             const rec1Input = document.getElementById('inpRecorded1');
             const rec2Input = document.getElementById('inpRecorded2');
             const retainInput = document.getElementById('inpRetainName');
             const removeInput = document.getElementById('inpRemoveName');
 
-            if (appName && document.activeElement?.id === 'inpApplicantName') {
-                rec1Input.value = appName;
-                retainInput.value = appName;
-            } else if (document.activeElement?.id === 'inpRecorded1') {
+            if (mainName && document.activeElement?.id === 'inpMainUrfTarget') {
+                if (rec1Input) rec1Input.value = mainName;
+                if (retainInput) retainInput.value = mainName;
+            } else if (document.activeElement?.id === 'inpRecorded1' && retainInput) {
                 retainInput.value = rec1Input.value.toUpperCase();
-            } else if (document.activeElement?.id === 'inpRecorded2') {
+            } else if (document.activeElement?.id === 'inpRecorded2' && removeInput) {
                 removeInput.value = rec2Input.value.toUpperCase();
             }
         };
 
-        window.swapAnnexureERetainRemove = function() {
+        window.swapRetainRemove = function() {
             const retainInput = document.getElementById('inpRetainName');
             const removeInput = document.getElementById('inpRemoveName');
             if (!retainInput || !removeInput) return;
@@ -836,8 +957,8 @@
             removeInput.value = temp;
         };
 
-        // ZERO-CLIPPING SINGLE-PAGE A4 PDF DOWNLOADER
-        window.downloadHtmlDocAsPdf = async function(formDataObj, fileName) {
+        // ZERO-CLIPPING SINGLE-PAGE A4 PDF DOWNLOADER FOR B, C, D, E, F
+        window.downloadHtmlDocAsPdf = async function(serviceType, formDataObj, fileName) {
             const btn = document.getElementById('modalDownloadBtn');
             const origHtml = btn ? btn.innerHTML : '';
             if (btn) {
@@ -854,7 +975,7 @@
             tempWrapper.style.zIndex = '-9999';
             tempWrapper.style.background = '#ffffff';
             tempWrapper.style.overflow = 'hidden';
-            tempWrapper.innerHTML = window.buildAnnexureEHtmlString(formDataObj, false);
+            tempWrapper.innerHTML = window.buildAffidavitAnnexureHtml(serviceType, formDataObj, false);
             document.body.appendChild(tempWrapper);
 
             const targetEl = tempWrapper.querySelector('.affidavit-paper');
@@ -894,41 +1015,58 @@
             }
         };
 
-        // GENERATE ANNEXURE E: SAVES TO HISTORY & REDIRECTS TO DOCUMENTS TAB
-        window.submitAnnexureEForm = async function(event) {
+        // UNIFIED SUBMIT FUNCTION FOR ANNEXURE B, C, D, E, F (NO AUTO-DOWNLOAD ON GENERATE, SAVES TO HISTORY)
+        window.submitHtmlAnnexureForm = async function(event, serviceType, fileIdMarker) {
             event.preventDefault();
 
             if (!window.currentUserData) return alert('Please login first!');
             if (!window.currentUserData.isVip) return alert('यह सर्विस केवल VIP यूज़र्स के लिए है!');
 
-            const docCost = 8;
+            const docCost = 8; // 20% VIP Discount
             if (!window.currentUserData.isAdmin && window.currentUserData.credits < docCost) {
-                return alert(`Insufficient credits! You need ${docCost} credits to generate Annexure E. Please add credits from your wallet.`);
+                return alert(`Insufficient credits! You need ${docCost} credits to generate ${serviceType}. Please add credits from your wallet.`);
             }
 
-            const btn = document.getElementById('btnSubmitAnnexureE');
+            const btn = event.target.querySelector('button[type="submit"]');
             const origText = btn.innerHTML;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Generating Document...';
             btn.disabled = true;
 
+            const val = (id) => document.getElementById(id)?.value.trim() || '';
+            const upVal = (id) => val(id).toUpperCase();
+
             const formDataObj = {
-                title: document.getElementById('inpTitle').value,
-                applicantName: document.getElementById('inpApplicantName').value.trim().toUpperCase(),
-                rel: document.getElementById('inpRel').value,
-                relativeName: document.getElementById('inpRelativeName').value.trim().toUpperCase(),
-                address: document.getElementById('inpAddress').value.trim().toUpperCase(),
-                idNumber: document.getElementById('inpIdNumber').value.trim(),
-                recorded1: document.getElementById('inpRecorded1').value.trim().toUpperCase(),
-                recorded2: document.getElementById('inpRecorded2').value.trim().toUpperCase(),
-                retainName: document.getElementById('inpRetainName').value.trim().toUpperCase(),
-                removeName: document.getElementById('inpRemoveName').value.trim().toUpperCase(),
-                place: document.getElementById('inpPlace').value.trim().toUpperCase(),
-                day: document.getElementById('inpDay').value.trim(),
-                monthYear: document.getElementById('inpMonthYear').value.trim().toUpperCase()
+                title: val('inpTitle'),
+                applicantName: upVal('inpApplicantName') || upVal('inpMainUrfTarget'),
+                guardianName: upVal('inpGuardianName'),
+                guardianRole: val('inpGuardianRole'),
+                minorName: upVal('inpMinorName') || upVal('inpMainUrfTarget'),
+                rel: val('inpRel'),
+                relativeName: upVal('inpRelativeName'),
+                fatherName: upVal('inpFatherName'),
+                husbandName: upVal('inpHusbandName'),
+                address: upVal('inpAddress'),
+                idNumber: val('inpIdNumber'),
+                correctName: upVal('inpCorrectName'),
+                wrongName: upVal('inpWrongName'),
+                priorName: upVal('inpPriorName'),
+                eventType: val('inpEventType'),
+                eventDate: upVal('inpEventDate'),
+                earlierSurname: upVal('inpEarlierSurname'),
+                newSurname: upVal('inpNewSurname'),
+                newFullName: upVal('inpNewFullName'),
+                recorded1: upVal('inpRecorded1'),
+                recorded2: upVal('inpRecorded2'),
+                retainName: upVal('inpRetainName'),
+                removeName: upVal('inpRemoveName'),
+                place: upVal('inpPlace'),
+                day: val('inpDay'),
+                monthYear: upVal('inpMonthYear')
             };
 
-            const cleanName = (formDataObj.applicantName || 'CUSTOMER').replace(/[^a-zA-Z0-9]/g, '_');
-            const pdfFileName = `${cleanName} - Annexure E.pdf`;
+            const primaryPersonName = formDataObj.minorName || formDataObj.applicantName || formDataObj.guardianName || 'CUSTOMER';
+            const cleanName = primaryPersonName.replace(/[^a-zA-Z0-9]/g, '_');
+            const pdfFileName = `${cleanName} - ${serviceType}.pdf`;
 
             try {
                 if (!window.currentUserData.isAdmin) {
@@ -942,17 +1080,17 @@
                 await addDoc(collection(db, "history"), {
                     userId: window.currentUserData.uid,
                     fileName: pdfFileName,
-                    fileId: 'LOCAL_HTML_ANNEXURE_E',
-                    serviceType: 'Annexure E',
+                    fileId: fileIdMarker,
+                    serviceType: serviceType,
                     formData: formDataObj,
                     timestamp: new Date()
                 });
 
-                alert('आपका डॉक्यूमेंट (Annexure E) सफलतापूर्वक जनरेट हो चुका है! अब आप अपनी हिस्ट्री (Documents) से इसे Preview और Download कर सकते हैं।');
+                alert(`आपका डॉक्यूमेंट (${serviceType}) सफलतापूर्वक जनरेट हो चुका है! अब आप अपनी हिस्ट्री (Documents) से इसे Preview और Download कर सकते हैं।`);
                 event.target.reset();
                 window.switchService('history');
             } catch (err) {
-                console.error("Annexure E Error:", err);
+                console.error("Annexure Generation Error:", err);
                 alert('Error generating document: ' + err.message);
             } finally {
                 if (btn) {
@@ -962,7 +1100,7 @@
             }
         };
 
-        // ================= IN-APP PREVIEW MODAL =================
+        // ================= IN-APP PREVIEW MODAL (SUPPORTS GOOGLE DRIVE & ALL HTML ANNEXURES B, C, D, E, F) =================
         window.openPdfViewer = function(fileId, fileName, historyIndex = -1) {
             document.getElementById('pdfViewerTitle').innerText = fileName;
             const iframe = document.getElementById('pdfIframe');
@@ -970,16 +1108,18 @@
             const spinner = document.getElementById('pdfLoadingSpinner');
             const downloadBtn = document.getElementById('modalDownloadBtn');
 
-            if (fileId === 'LOCAL_HTML_ANNEXURE_E' && historyIndex >= 0) {
+            if (String(fileId).startsWith('LOCAL_HTML_ANNEXURE') && historyIndex >= 0) {
                 const record = window.historyData[historyIndex];
                 const fData = record?.formData || {};
+                const sType = record?.serviceType || 'Annexure E';
+
                 spinner.style.display = 'none';
                 iframe.style.display = 'none';
                 htmlPreviewContainer.style.display = 'flex';
-                htmlPreviewContainer.innerHTML = window.buildAnnexureEHtmlString(fData, true);
+                htmlPreviewContainer.innerHTML = window.buildAffidavitAnnexureHtml(sType, fData, true);
 
                 downloadBtn.onclick = async function() {
-                    await window.downloadHtmlDocAsPdf(fData, fileName);
+                    await window.downloadHtmlDocAsPdf(sType, fData, fileName);
                 };
             } else {
                 htmlPreviewContainer.style.display = 'none';
@@ -1024,7 +1164,7 @@
             });
         }
 
-        // ================= FORM SUBMISSION (DOB = 15 CREDITS | OTHERS = 8 OR 10 CREDITS) =================
+        // ================= FORM SUBMISSION FOR GOOGLE APPS SCRIPT DOCS =================
         window.submitForm = async function(event, serviceType) {
             event.preventDefault();
 
@@ -1232,6 +1372,28 @@
             `;
         }
 
+        function getVerificationBlockHtml() {
+            return `
+                <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                    <span class="text-xs font-black text-slate-700 uppercase block mb-3">Verification (सत्यापन का स्थान और तारीख)</span>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">स्थान (Verified at Place)</label>
+                            <input type="text" id="inpPlace" placeholder="e.g. BARAUT" required class="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold uppercase bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">दिन (Day)</label>
+                            <input type="text" id="inpDay" placeholder="e.g. 25th" required class="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">महीना व वर्ष (Month & Year)</label>
+                            <input type="text" id="inpMonthYear" placeholder="e.g. SEPTEMBER 2026" required class="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold uppercase bg-white">
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
         // ================= MAIN SERVICE SWITCHER =================
         window.switchService = function(serviceName) {
             window.currentActiveTab = serviceName;
@@ -1360,27 +1522,24 @@
                 `;
             }
 
-            // VIP EXCLUSIVE: ANNEXURE E (CLEAN FORM ONLY -> GENERATES & SAVES TO HISTORY)
-            else if(serviceName === 'annexuree') {
-                if (!window.currentUserData || !window.currentUserData.isVip) {
-                    return window.switchService('domicile');
-                }
+            // 🔥 1. ANNEXURE B (FOR ADULTS - DATA ENTRY ERROR IN NAME)
+            else if(serviceName === 'annexureb') {
+                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService('domicile');
 
                 container.innerHTML = `
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-100 pb-4 mb-6">
                         <div>
-                            <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-file-contract text-royal-500 mr-2"></i> Annexure E (For Adults) - Affidavit</h3>
-                            <p class="text-xs font-bold text-slate-500 mt-0.5">नाम में से "उर्फ़ / Alias" हटाने हेतु शपथ पत्र — जनरेट करने के बाद Documents (History) में जाकर Preview और Download करें।</p>
+                            <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-file-contract text-royal-500 mr-2"></i> Annexure B (For Adults) - Affidavit</h3>
+                            <p class="text-xs font-bold text-slate-500 mt-0.5">डेटा एंट्री की गलती से गलत दर्ज हुए नाम को सही कराने हेतु शपथ पत्र (वयस्कों के लिए)</p>
                         </div>
                         ${statusTagHtml}
                     </div>
-
-                    <form id="annexureEForm" onsubmit="window.submitAnnexureEForm(event)" class="space-y-5">
+                    <form onsubmit="window.submitHtmlAnnexureForm(event, 'Annexure B', 'LOCAL_HTML_ANNEXURE_B')" class="space-y-5">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div class="grid grid-cols-3 gap-3">
                                 <div>
                                     <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Title</label>
-                                    <select id="inpTitle" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white outline-none">
+                                    <select id="inpTitle" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 outline-none">
                                         <option value="Shri">Shri</option>
                                         <option value="Smt.">Smt.</option>
                                         <option value="Ms.">Ms.</option>
@@ -1388,14 +1547,268 @@
                                 </div>
                                 <div class="col-span-2">
                                     <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आवेदक का नाम (Applicant Name)</label>
-                                    <input type="text" id="inpApplicantName" oninput="window.syncAnnexureENames()" placeholder="e.g. RAMESH KUMAR" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none">
+                                    <input type="text" id="inpApplicantName" oninput="document.getElementById('inpCorrectName').value = this.value.toUpperCase()" placeholder="e.g. RAMESH KUMAR" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none">
                                 </div>
                             </div>
 
                             <div class="grid grid-cols-3 gap-3">
                                 <div>
                                     <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label>
-                                    <select id="inpRel" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white outline-none">
+                                    <select id="inpRel" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 outline-none">
+                                        <option value="S/o">S/o</option>
+                                        <option value="D/o">D/o</option>
+                                        <option value="W/o">W/o</option>
+                                    </select>
+                                </div>
+                                <div class="col-span-2">
+                                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पिता / पति का नाम (Father/Husband)</label>
+                                    <input type="text" id="inpRelativeName" placeholder="e.g. SURESH CHAND" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Resident of)</label>
+                                <input type="text" id="inpAddress" placeholder="e.g. VILL BARAUT, DISTT BAGHPAT (U.P.)" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">1. 12-Digit ID Number</label>
+                                <input type="text" id="inpIdNumber" placeholder="Enter 12-digit number" maxlength="14" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none tracking-wider">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-amber-50 rounded-2xl border border-amber-200">
+                            <div>
+                                <label class="block text-[11px] font-black text-red-700 uppercase mb-1">गलती से दर्ज हुआ गलत नाम (Incorrectly Recorded Name)</label>
+                                <input type="text" id="inpWrongName" placeholder="e.g. RAMES KUMAR" required class="w-full p-3 border border-red-300 rounded-xl text-sm font-bold uppercase bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-black text-green-800 uppercase mb-1">सही नाम (Correct Name)</label>
+                                <input type="text" id="inpCorrectName" placeholder="e.g. RAMESH KUMAR" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-white">
+                            </div>
+                        </div>
+
+                        ${getVerificationBlockHtml()}
+
+                        <button type="submit" class="w-full bg-gradient-to-r from-dark-900 via-dark-800 to-dark-900 hover:bg-black text-royal-300 font-black py-4 px-4 rounded-xl shadow-vip-glow transition transform hover:-translate-y-0.5 text-base border border-royal-500/40">
+                            ${submitBtnText}
+                        </button>
+                    </form>
+                `;
+                window.initAffidavitDateDefaults();
+            }
+
+            // 🔥 2. ANNEXURE C (FOR MINORS - DATA ENTRY ERROR IN NAME)
+            else if(serviceName === 'annexurec') {
+                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService('domicile');
+
+                container.innerHTML = `
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-100 pb-4 mb-6">
+                        <div>
+                            <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-child text-royal-500 mr-2"></i> Annexure C (For Minors) - Affidavit</h3>
+                            <p class="text-xs font-bold text-slate-500 mt-0.5">नाबालिग बच्चे (Minor) के नाम में डेटा एंट्री की गलती को सुधारने हेतु अभिभावक का शपथ पत्र</p>
+                        </div>
+                        ${statusTagHtml}
+                    </div>
+                    <form onsubmit="window.submitHtmlAnnexureForm(event, 'Annexure C', 'LOCAL_HTML_ANNEXURE_C')" class="space-y-5">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div class="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Guardian Title</label>
+                                    <select id="inpTitle" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 outline-none">
+                                        <option value="Shri">Shri</option>
+                                        <option value="Smt.">Smt.</option>
+                                        <option value="Ms.">Ms.</option>
+                                    </select>
+                                </div>
+                                <div class="col-span-2">
+                                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">माता/पिता/अभिभावक का नाम (Guardian Name)</label>
+                                    <input type="text" id="inpGuardianName" placeholder="e.g. MANOJ KUMAR" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label>
+                                    <select id="inpRel" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 outline-none">
+                                        <option value="S/o">S/o</option>
+                                        <option value="D/o">D/o</option>
+                                        <option value="W/o">W/o</option>
+                                    </select>
+                                </div>
+                                <div class="col-span-2">
+                                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">अभिभावक के पिता/पति का नाम</label>
+                                    <input type="text" id="inpRelativeName" placeholder="e.g. RAJENDRA SINGH" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Resident of)</label>
+                                <input type="text" id="inpAddress" placeholder="e.g. VILL BARAUT, DISTT BAGHPAT (U.P.)" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">बच्चे से संबंध (Being the)</label>
+                                <select id="inpGuardianRole" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 outline-none">
+                                    <option value="father">father (पिता)</option>
+                                    <option value="mother">mother (माता)</option>
+                                    <option value="legal guardian">legal guardian (कानूनी अभिभावक)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-indigo-50 rounded-2xl border border-indigo-200">
+                            <div>
+                                <label class="block text-[11px] font-black text-indigo-900 uppercase mb-1">नाबालिग बच्चे का नाम (Minor Name)</label>
+                                <input type="text" id="inpMinorName" oninput="document.getElementById('inpCorrectName').value = this.value.toUpperCase()" placeholder="e.g. AARAV KUMAR" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-black text-indigo-900 uppercase mb-1">1. बच्चे का 12-Digit ID Number</label>
+                                <input type="text" id="inpIdNumber" placeholder="Enter minor's 12-digit number" maxlength="14" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-white tracking-wider">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-black text-red-700 uppercase mb-1">3. कार्ड में गलत दर्ज नाम (Incorrect Name)</label>
+                                <input type="text" id="inpWrongName" placeholder="e.g. ARAV" required class="w-full p-3 border border-red-300 rounded-xl text-sm font-bold uppercase bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-black text-green-800 uppercase mb-1">2. बच्चे का सही नाम (Correct Name of Minor)</label>
+                                <input type="text" id="inpCorrectName" placeholder="e.g. AARAV KUMAR" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-white">
+                            </div>
+                        </div>
+
+                        ${getVerificationBlockHtml()}
+
+                        <button type="submit" class="w-full bg-gradient-to-r from-dark-900 via-dark-800 to-dark-900 hover:bg-black text-royal-300 font-black py-4 px-4 rounded-xl shadow-vip-glow transition transform hover:-translate-y-0.5 text-base border border-royal-500/40">
+                            ${submitBtnText}
+                        </button>
+                    </form>
+                `;
+                window.initAffidavitDateDefaults();
+            }
+
+            // 🔥 3. ANNEXURE D (CHANGE OF SURNAME POST MARRIAGE / DIVORCE)
+            else if(serviceName === 'annexured') {
+                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService('domicile');
+
+                container.innerHTML = `
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-100 pb-4 mb-6">
+                        <div>
+                            <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-ring text-royal-500 mr-2"></i> Annexure D (Post Marriage / Divorce Surname Change)</h3>
+                            <p class="text-xs font-bold text-slate-500 mt-0.5">विवाह या तलाक के बाद आधार में सरनेम (Surname) बदलने हेतु शपथ पत्र</p>
+                        </div>
+                        ${statusTagHtml}
+                    </div>
+                    <form onsubmit="window.submitHtmlAnnexureForm(event, 'Annexure D', 'LOCAL_HTML_ANNEXURE_D')" class="space-y-5">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div class="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Title</label>
+                                    <select id="inpTitle" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 outline-none">
+                                        <option value="Smt.">Smt.</option>
+                                        <option value="Ms.">Ms.</option>
+                                    </select>
+                                </div>
+                                <div class="col-span-2">
+                                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आवेदिका का वर्तमान नाम (Applicant Name)</label>
+                                    <input type="text" id="inpApplicantName" oninput="document.getElementById('inpNewFullName').value = this.value.toUpperCase()" placeholder="e.g. POOJA SHARMA" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पिता का नाम (D/o Father Name)</label>
+                                <input type="text" id="inpFatherName" placeholder="e.g. RAMESH VERMA" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पति का नाम (W/o Husband Name)</label>
+                                <input type="text" id="inpHusbandName" placeholder="e.g. ANKIT SHARMA" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">1. 12-Digit ID Number</label>
+                                <input type="text" id="inpIdNumber" placeholder="Enter 12-digit number" maxlength="14" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none tracking-wider">
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Resident of)</label>
+                                <input type="text" id="inpAddress" placeholder="e.g. VILL BARAUT, DISTT BAGHPAT (U.P.)" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-amber-50 rounded-2xl border border-amber-200">
+                            <div>
+                                <label class="block text-[10px] font-black text-amber-900 uppercase mb-1">2. शादी/तलाक से पहले का पूरा नाम</label>
+                                <input type="text" id="inpPriorName" placeholder="e.g. POOJA VERMA" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-amber-900 uppercase mb-1">3. कारण (Marriage / Divorce)</label>
+                                <select id="inpEventType" class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold bg-white outline-none">
+                                    <option value="marriage solemnized on">Marriage Solemnized On (विवाह)</option>
+                                    <option value="divorce becoming effective on">Divorce Effective On (तलाक)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-amber-900 uppercase mb-1">3. विवाह / तलाक की तारीख (Date)</label>
+                                <input type="text" id="inpEventDate" placeholder="e.g. 15/02/2024" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-red-700 uppercase mb-1">4. पुराना सरनेम (Earlier Surname)</label>
+                                <input type="text" id="inpEarlierSurname" placeholder="e.g. VERMA" required class="w-full p-3 border border-red-300 rounded-xl text-sm font-bold uppercase bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-green-800 uppercase mb-1">3 & 4. नया सरनेम (Present Surname)</label>
+                                <input type="text" id="inpNewSurname" placeholder="e.g. SHARMA" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black text-green-800 uppercase mb-1">3. अब नया पूरा नाम (New Full Name)</label>
+                                <input type="text" id="inpNewFullName" placeholder="e.g. POOJA SHARMA" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-white">
+                            </div>
+                        </div>
+
+                        ${getVerificationBlockHtml()}
+
+                        <button type="submit" class="w-full bg-gradient-to-r from-dark-900 via-dark-800 to-dark-900 hover:bg-black text-royal-300 font-black py-4 px-4 rounded-xl shadow-vip-glow transition transform hover:-translate-y-0.5 text-base border border-royal-500/40">
+                            ${submitBtnText}
+                        </button>
+                    </form>
+                `;
+                window.initAffidavitDateDefaults();
+            }
+
+            // 🔥 4. ANNEXURE E (FOR ADULTS - URF / ALIAS REMOVAL)
+            else if(serviceName === 'annexuree') {
+                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService('domicile');
+
+                container.innerHTML = `
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-100 pb-4 mb-6">
+                        <div>
+                            <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-file-contract text-royal-500 mr-2"></i> Annexure E (For Adults) - Affidavit</h3>
+                            <p class="text-xs font-bold text-slate-500 mt-0.5">वयस्कों के नाम में से "उर्फ़ / Alias" हटाने हेतु शपथ पत्र</p>
+                        </div>
+                        ${statusTagHtml}
+                    </div>
+
+                    <form onsubmit="window.submitHtmlAnnexureForm(event, 'Annexure E', 'LOCAL_HTML_ANNEXURE_E')" class="space-y-5">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div class="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Title</label>
+                                    <select id="inpTitle" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 outline-none">
+                                        <option value="Shri">Shri</option>
+                                        <option value="Smt.">Smt.</option>
+                                        <option value="Ms.">Ms.</option>
+                                    </select>
+                                </div>
+                                <div class="col-span-2">
+                                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आवेदक का नाम (Applicant Name)</label>
+                                    <input type="text" id="inpMainUrfTarget" oninput="window.syncUrfNames()" placeholder="e.g. RAMESH KUMAR" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label>
+                                    <select id="inpRel" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 outline-none">
                                         <option value="S/o">S/o</option>
                                         <option value="D/o">D/o</option>
                                         <option value="W/o">W/o</option>
@@ -1422,18 +1835,18 @@
                             <div class="p-4 bg-amber-50 rounded-2xl border border-amber-200 space-y-3">
                                 <div class="flex justify-between items-center">
                                     <span class="text-xs font-black text-amber-900 uppercase">2. कार्ड में दर्ज दोनों नाम (Urf / Alias)</span>
-                                    <button type="button" onclick="window.swapAnnexureERetainRemove()" class="text-[11px] bg-amber-200 hover:bg-amber-300 text-amber-950 font-black px-2.5 py-1 rounded-lg transition">
+                                    <button type="button" onclick="window.swapRetainRemove()" class="text-[11px] bg-amber-200 hover:bg-amber-300 text-amber-950 font-black px-2.5 py-1 rounded-lg transition">
                                         <i class="fa-solid fa-right-left mr-1"></i> नाम बदलें (Swap)
                                     </button>
                                 </div>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div>
                                         <label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">पहला नाम (Recorded Name 1)</label>
-                                        <input type="text" id="inpRecorded1" oninput="window.syncAnnexureENames()" placeholder="e.g. RAMESH" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-white">
+                                        <input type="text" id="inpRecorded1" oninput="window.syncUrfNames()" placeholder="e.g. RAMESH" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-white">
                                     </div>
                                     <div>
                                         <label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">उर्फ़ के बाद का नाम (Alias Name 2)</label>
-                                        <input type="text" id="inpRecorded2" oninput="window.syncAnnexureENames()" placeholder="e.g. SONU" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-white">
+                                        <input type="text" id="inpRecorded2" oninput="window.syncUrfNames()" placeholder="e.g. SONU" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-white">
                                     </div>
                                 </div>
                             </div>
@@ -1453,33 +1866,132 @@
                             </div>
                         </div>
 
-                        <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                            <span class="text-xs font-black text-slate-700 uppercase block mb-3">Verification (सत्यापन का स्थान और तारीख)</span>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">स्थान (Verified at Place)</label>
-                                    <input type="text" id="inpPlace" placeholder="e.g. BARAUT" required class="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold uppercase bg-white">
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">दिन (Day)</label>
-                                    <input type="text" id="inpDay" placeholder="e.g. 25th" required class="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold bg-white">
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">महीना व वर्ष (Month & Year)</label>
-                                    <input type="text" id="inpMonthYear" placeholder="e.g. SEPTEMBER 2026" required class="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold uppercase bg-white">
-                                </div>
-                            </div>
-                        </div>
+                        ${getVerificationBlockHtml()}
 
-                        <button type="submit" id="btnSubmitAnnexureE" class="w-full bg-gradient-to-r from-dark-900 via-dark-800 to-dark-900 hover:bg-black text-royal-300 font-black py-4 px-4 rounded-xl shadow-vip-glow transition transform hover:-translate-y-0.5 text-base border border-royal-500/40">
+                        <button type="submit" class="w-full bg-gradient-to-r from-dark-900 via-dark-800 to-dark-900 hover:bg-black text-royal-300 font-black py-4 px-4 rounded-xl shadow-vip-glow transition transform hover:-translate-y-0.5 text-base border border-royal-500/40">
                             ${submitBtnText}
                         </button>
                     </form>
                 `;
-                window.initAnnexureEDefaults();
+                window.initAffidavitDateDefaults();
             }
 
-            // OTHER ANNEXURES (1, 1A, 3, 3A, B, C, D)
+            // 🔥 5. ANNEXURE F (FOR MINORS - URF / ALIAS REMOVAL)
+            else if(serviceName === 'annexuref') {
+                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService('domicile');
+
+                container.innerHTML = `
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-100 pb-4 mb-6">
+                        <div>
+                            <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-child-reaching text-royal-500 mr-2"></i> Annexure F (For Minors) - Affidavit</h3>
+                            <p class="text-xs font-bold text-slate-500 mt-0.5">नाबालिग बच्चे (Minor) के नाम में से "उर्फ़ / Alias" हटाने हेतु माता/पिता का शपथ पत्र</p>
+                        </div>
+                        ${statusTagHtml}
+                    </div>
+
+                    <form onsubmit="window.submitHtmlAnnexureForm(event, 'Annexure F', 'LOCAL_HTML_ANNEXURE_F')" class="space-y-5">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div class="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Guardian Title</label>
+                                    <select id="inpTitle" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 outline-none">
+                                        <option value="Shri">Shri</option>
+                                        <option value="Smt.">Smt.</option>
+                                        <option value="Ms.">Ms.</option>
+                                    </select>
+                                </div>
+                                <div class="col-span-2">
+                                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">माता/पिता/अभिभावक का नाम (Guardian Name)</label>
+                                    <input type="text" id="inpGuardianName" placeholder="e.g. MANOJ KUMAR" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label>
+                                    <select id="inpRel" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 outline-none">
+                                        <option value="S/o">S/o</option>
+                                        <option value="D/o">D/o</option>
+                                        <option value="W/o">W/o</option>
+                                    </select>
+                                </div>
+                                <div class="col-span-2">
+                                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">अभिभावक के पिता/पति का नाम</label>
+                                    <input type="text" id="inpRelativeName" placeholder="e.g. RAJENDRA SINGH" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Resident of)</label>
+                                <input type="text" id="inpAddress" placeholder="e.g. VILL BARAUT, DISTT BAGHPAT (U.P.)" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">बच्चे से संबंध (Being the)</label>
+                                <select id="inpGuardianRole" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 outline-none">
+                                    <option value="father">father (पिता)</option>
+                                    <option value="mother">mother (माता)</option>
+                                    <option value="legal guardian">legal guardian (कानूनी अभिभावक)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">नाबालिग बच्चे का नाम (Minor Name)</label>
+                                <input type="text" id="inpMainUrfTarget" oninput="window.syncUrfNames()" placeholder="e.g. AARAV KUMAR" required class="w-full p-3.5 border border-indigo-200 rounded-xl text-sm font-bold uppercase bg-indigo-50/50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">1. बच्चे का 12-Digit ID Number</label>
+                                <input type="text" id="inpIdNumber" placeholder="Enter minor's 12-digit number" maxlength="14" required class="w-full p-3.5 border border-indigo-200 rounded-xl text-sm font-bold uppercase bg-indigo-50/50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none tracking-wider">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div class="p-4 bg-amber-50 rounded-2xl border border-amber-200 space-y-3">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs font-black text-amber-900 uppercase">2. बच्चे के कार्ड में दर्ज दोनों नाम (Urf / Alias)</span>
+                                    <button type="button" onclick="window.swapRetainRemove()" class="text-[11px] bg-amber-200 hover:bg-amber-300 text-amber-950 font-black px-2.5 py-1 rounded-lg transition">
+                                        <i class="fa-solid fa-right-left mr-1"></i> नाम बदलें (Swap)
+                                    </button>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">पहला नाम (Recorded Name 1)</label>
+                                        <input type="text" id="inpRecorded1" oninput="window.syncUrfNames()" placeholder="e.g. AARAV KUMAR" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-white">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">उर्फ़ के बाद का नाम (Alias Name 2)</label>
+                                        <input type="text" id="inpRecorded2" oninput="window.syncUrfNames()" placeholder="e.g. CHINTU" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-white">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="p-4 bg-green-50 rounded-2xl border border-green-200 space-y-3">
+                                <span class="text-xs font-black text-green-900 uppercase block">3. कौन-सा नाम रखना है और कौन-सा हटाना है</span>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-green-800 uppercase mb-1">रखने वाला नाम (Retain Name)</label>
+                                        <input type="text" id="inpRetainName" placeholder="e.g. AARAV KUMAR" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-white">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-red-700 uppercase mb-1">हटाने वाला नाम (Discontinue)</label>
+                                        <input type="text" id="inpRemoveName" placeholder="e.g. CHINTU" required class="w-full p-3 border border-red-300 rounded-xl text-sm font-bold uppercase bg-white">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        ${getVerificationBlockHtml()}
+
+                        <button type="submit" class="w-full bg-gradient-to-r from-dark-900 via-dark-800 to-dark-900 hover:bg-black text-royal-300 font-black py-4 px-4 rounded-xl shadow-vip-glow transition transform hover:-translate-y-0.5 text-base border border-royal-500/40">
+                            ${submitBtnText}
+                        </button>
+                    </form>
+                `;
+                window.initAffidavitDateDefaults();
+            }
+
+            // OTHER ANNEXURES (1, 1A, 3, 3A)
             else if(serviceName.startsWith('annexure')) {
                 if (!window.currentUserData || !window.currentUserData.isVip) {
                     return window.switchService('domicile');
@@ -1489,10 +2001,7 @@
                     'annexure1': 'Annexure 1',
                     'annexure1a': 'Annexure 1A',
                     'annexure3': 'Annexure 3',
-                    'annexure3a': 'Annexure 3A',
-                    'annexureb': 'Annexure B',
-                    'annexurec': 'Annexure C',
-                    'annexured': 'Annexure D'
+                    'annexure3a': 'Annexure 3A'
                 };
                 const titleText = annexureNames[serviceName] || 'Annexure Form';
 
@@ -1670,6 +2179,7 @@
                     <option value="Annexure C">Annexure C</option>
                     <option value="Annexure D">Annexure D</option>
                     <option value="Annexure E">Annexure E</option>
+                    <option value="Annexure F">Annexure F</option>
                 ` : '';
 
                 container.innerHTML = `
@@ -1829,7 +2339,7 @@
                         <ul class="text-xs md:text-sm text-slate-200 font-semibold space-y-1 pt-1">
                             <li><i class="fa-solid fa-circle-check text-green-400 mr-1.5"></i> <strong>20% OFF:</strong> सामान्य डॉक्यूमेंट 10 की जगह सिर्फ <strong>8 क्रेडिट</strong> में बनाएं!</li>
                             <li><i class="fa-solid fa-circle-check text-green-400 mr-1.5"></i> <strong>25% Special OFF:</strong> <strong>18+ जन्म प्रमाण पत्र (DOB)</strong> <del class="text-red-400">20</del> की जगह सिर्फ <strong>15 क्रेडिट</strong> में बनाएं!</li>
-                            <li><i class="fa-solid fa-circle-check text-green-400 mr-1.5"></i> <strong>सारे Annexures (1, 1A, 3, 3A, B, C, D, E)</strong> सीधे टाइप करके तुरंत निकालें!</li>
+                            <li><i class="fa-solid fa-circle-check text-green-400 mr-1.5"></i> <strong>सारे Annexures (1, 1A, 3, 3A, B, C, D, E, F)</strong> सीधे टाइप करके तुरंत निकालें!</li>
                         </ul>
                     </div>
                     <div class="grid grid-cols-3 gap-2.5 w-full lg:w-auto shrink-0">
@@ -1862,7 +2372,7 @@
                 <button onclick="window.switchService('add_credit')" id="btn-add_credit" class="service-tab !bg-amber-50 !text-amber-700 !border-amber-200 hover:!bg-amber-100"><i class="fa-solid fa-plus-circle"></i> Add Credit / VIP</button>
             </div>
 
-            <!-- VIP EXCLUSIVE SERVICES PANEL -->
+            <!-- 👑 VIP EXCLUSIVE SERVICES PANEL (WITH ANNEXURE F ADDED) -->
             <div id="vipServicesBar" style="display: none;" class="mb-8 p-5 rounded-3xl bg-gradient-to-r from-dark-950 via-dark-900 to-dark-950 border-2 border-royal-400 shadow-vip-glow">
                 <div class="flex flex-wrap items-center justify-between mb-3 border-b border-slate-800 pb-2.5 gap-2">
                     <span class="text-xs font-black uppercase tracking-widest text-royal-300 flex items-center gap-2">
@@ -1882,6 +2392,7 @@
                     <button onclick="window.switchService('annexurec')" id="btn-annexurec" class="vip-tab"><i class="fa-solid fa-file-contract"></i> Annexure C</button>
                     <button onclick="window.switchService('annexured')" id="btn-annexured" class="vip-tab"><i class="fa-solid fa-file-contract"></i> Annexure D</button>
                     <button onclick="window.switchService('annexuree')" id="btn-annexuree" class="vip-tab"><i class="fa-solid fa-file-contract"></i> Annexure E</button>
+                    <button onclick="window.switchService('annexuref')" id="btn-annexuref" class="vip-tab"><i class="fa-solid fa-file-contract"></i> Annexure F</button>
                 </div>
             </div>
             
