@@ -53,7 +53,7 @@
             animation: slideInRight 0.4s ease-out forwards;
         }
 
-        /* फिक्स सिंगल-पेज A4 लेआउट (794px x 1122px) बिना किसी अंडरलाइन के */
+        /* Fixed Single-Page A4 Layout (794px x 1122px) without underlines */
         .affidavit-paper {
             font-family: 'Times New Roman', Times, serif;
             width: 794px;
@@ -423,7 +423,7 @@
             }
         };
 
-        // ================= MOBILE-FRIENDLY PAYMENT & 3 VIP PLANS CALCULATOR =================
+        // ================= MOBILE-FRIENDLY PAYMENT + DIRECT UPI APP LINKS =================
         window.calculateCredits = function() {
             const creditAmt = parseFloat(document.getElementById('rupeeAmount')?.value) || 0;
             const selectedPlanEl = document.querySelector('input[name="vipPlanOption"]:checked');
@@ -476,13 +476,35 @@
 
             const upiId = "8279650137@ptyes"; 
             const payeeName = "Ojas Print Service";
-            const upiString = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${totalPayable}&cu=INR`;
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(upiString)}`;
+            const txnNote = wantsVip ? `Ojas VIP ${window.currentVipDays}d` : `Ojas Credits`;
+            const queryParams = `pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${totalPayable}&cu=INR&tn=${encodeURIComponent(txnNote)}`;
+
+            // 1. Universal UPI Deep Link & App-Specific Deep Links (With Pre-Filled Amount)
+            const universalUpiUrl = `upi://pay?${queryParams}`;
+            const paytmUrl = `paytmmp://pay?${queryParams}`;
+            const phonepeUrl = `phonepe://pay?${queryParams}`;
+            const gpayUrl = `tez://upi/pay?${queryParams}`;
+
+            // 2. QR Code Image URL
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`;
 
             document.getElementById('upiQRCode').src = qrUrl;
             document.getElementById('qrPayableAmountText').innerText = `कुल पेमेंट: ₹${totalPayable}`;
             
-            // On mobile/desktop, switch cleanly from Step 1 to Step 2 QR view
+            // Bind Direct App Links with Exact Amount
+            const mainUpiBtn = document.getElementById('btnDirectUpiPay');
+            if (mainUpiBtn) {
+                mainUpiBtn.href = universalUpiUrl;
+                mainUpiBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> Pay ₹${totalPayable} Directly via UPI App`;
+            }
+            const btnPaytm = document.getElementById('btnPaytmApp');
+            if (btnPaytm) btnPaytm.href = paytmUrl;
+            const btnPhonePe = document.getElementById('btnPhonePeApp');
+            if (btnPhonePe) btnPhonePe.href = phonepeUrl;
+            const btnGPay = document.getElementById('btnGPayApp');
+            if (btnGPay) btnGPay.href = gpayUrl;
+
+            // Switch cleanly from Step 1 to Step 2
             document.getElementById('paymentStep1').style.display = 'none';
             document.getElementById('qrSection').style.display = 'flex';
         };
@@ -511,7 +533,7 @@
             }
 
             if (!utr || utr.length < 10) {
-                errorMsg.innerText = 'कृपया सही 12 अंकों का UTR / Ref No दर्ज करें।';
+                errorMsg.innerText = 'कृपया पेमेंट के बाद 12 अंकों का सही UTR / Ref No दर्ज करें।';
                 errorMsg.style.display = 'block';
                 return;
             }
@@ -1948,7 +1970,7 @@
                 window.initVerificationDefaults();
             }
             
-            // 📱 MOBILE-FIRST COMPACT ADD CREDITS + VIP PAGE
+            // 📱 MOBILE-FIRST COMPACT ADD CREDITS + VIP PAGE WITH DIRECT UPI APP LINKS
             else if(serviceName === 'add_credit') {
                 container.innerHTML = `
                     <div id="walletMainUI" class="max-w-md mx-auto">
@@ -2022,11 +2044,11 @@
                             </div>
                             
                             <button id="btnGenerateQR" onclick="window.generateQR()" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-glow transition text-sm">
-                                Generate Payment QR <i class="fa-solid fa-qrcode ml-1"></i>
+                                Proceed to Pay (QR & UPI Link) <i class="fa-solid fa-arrow-right ml-1"></i>
                             </button>
                         </div>
 
-                        <!-- Step 2: Compact QR & UTR Screen (Fits 100% on Mobile Screen) -->
+                        <!-- Step 2: QR + Direct 1-Click UPI App Links + UTR Input -->
                         <div id="qrSection" style="display: none;" class="flex-col items-center space-y-3 bg-slate-50 p-4 rounded-2xl border-2 border-royal-400">
                             <div class="w-full flex justify-between items-center">
                                 <button type="button" onclick="window.backToPaymentStep1()" class="text-xs font-bold text-slate-600 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
@@ -2035,16 +2057,44 @@
                                 <span id="qrPayableAmountText" class="text-sm font-black text-green-700 bg-green-100 px-3 py-1 rounded-lg border border-green-300">कुल पेमेंट: ₹0</span>
                             </div>
 
-                            <div class="p-2 border border-slate-200 rounded-xl bg-white shadow-sm">
-                                <img id="upiQRCode" src="" alt="UPI QR Code" class="w-40 h-40 object-contain">
+                            <!-- 🔥 DIRECT 1-CLICK UPI APP REDIRECT BUTTONS (NO SCREENSHOT NEEDED ON PHONE) -->
+                            <div class="w-full bg-white p-3 rounded-xl border border-green-200 shadow-sm space-y-2">
+                                <p class="text-[11px] font-black text-slate-700 text-center">
+                                    <i class="fa-solid fa-mobile-screen-button text-green-600 mr-1"></i> मोबाइल से 1-Click में सीधे ऐप खोलकर पेमेंट करें:
+                                </p>
+                                <a id="btnDirectUpiPay" href="#" class="w-full bg-green-600 hover:bg-green-700 active:scale-95 text-white font-black py-3 px-4 rounded-xl shadow transition text-xs md:text-sm flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-bolt"></i> Pay Directly via Any UPI App
+                                </a>
+                                <div class="grid grid-cols-3 gap-2 pt-1">
+                                    <a id="btnPaytmApp" href="#" class="bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 font-black py-2 rounded-lg text-[11px] text-center transition">
+                                        Paytm
+                                    </a>
+                                    <a id="btnPhonePeApp" href="#" class="bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 font-black py-2 rounded-lg text-[11px] text-center transition">
+                                        PhonePe
+                                    </a>
+                                    <a id="btnGPayApp" href="#" class="bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 font-black py-2 rounded-lg text-[11px] text-center transition">
+                                        GPay
+                                    </a>
+                                </div>
                             </div>
-                            <p class="text-[11px] font-bold text-slate-500 text-center">किसी भी UPI ऐप से स्कैन करके पेमेंट करें और नीचे 12 अंकों का UTR डालें:</p>
+
+                            <div class="flex items-center w-full gap-2">
+                                <div class="h-px bg-slate-200 flex-1"></div>
+                                <span class="text-[10px] font-bold text-slate-400 uppercase">या QR स्कैन करें</span>
+                                <div class="h-px bg-slate-200 flex-1"></div>
+                            </div>
+
+                            <div class="p-2 border border-slate-200 rounded-xl bg-white shadow-sm">
+                                <img id="upiQRCode" src="" alt="UPI QR Code" class="w-36 h-36 object-contain">
+                            </div>
                             
-                            <input type="text" id="utrNumber" placeholder="12-Digit UTR / Ref No डालें" class="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold bg-white focus:ring-2 focus:ring-amber-500 outline-none text-center tracking-widest uppercase">
-                            
-                            <button onclick="window.submitPayment()" id="btnSubmitPayment" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-3.5 rounded-xl shadow transition text-sm">
-                                Submit UTR For Verification <i class="fa-solid fa-paper-plane ml-1"></i>
-                            </button>
+                            <div class="w-full pt-1 space-y-2">
+                                <label class="block text-[11px] font-black text-slate-600 text-center">पेमेंट करने के बाद 12 अंकों का UTR नंबर यहाँ डालें:</label>
+                                <input type="text" id="utrNumber" placeholder="Enter 12-Digit UTR / Ref No" class="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold bg-white focus:ring-2 focus:ring-amber-500 outline-none text-center tracking-widest uppercase">
+                                <button onclick="window.submitPayment()" id="btnSubmitPayment" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-3.5 rounded-xl shadow transition text-sm">
+                                    Submit UTR For Verification <i class="fa-solid fa-paper-plane ml-1"></i>
+                                </button>
+                            </div>
                             <p id="paymentErrorMsg" style="display: none;" class="text-xs font-bold text-red-500 text-center p-2 bg-red-50 rounded-lg border border-red-200 w-full"></p>
                         </div>
                     </div>
@@ -2237,7 +2287,7 @@
                     <i class="fa-solid fa-gear text-sm"></i>
                 </button>
 
-                <!-- ⚙️ GEAR DROPDOWN MENU (CONTAINS ADD CREDIT, DOC HISTORY, PAYMENT HISTORY, PASSWORD, LOGOUT) -->
+                <!-- ⚙️ GEAR DROPDOWN MENU -->
                 <div id="gearDropdownMenu" class="hidden absolute right-0 top-12 w-60 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200 py-2 z-50">
                     <div class="px-4 py-2 border-b border-slate-100 bg-slate-50">
                         <p class="text-[10px] font-bold text-slate-400 uppercase">Logged in as</p>
