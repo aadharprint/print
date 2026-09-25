@@ -87,7 +87,7 @@
                 const querySnapshot = await getDocs(q);
                 
                 window.pendingPaymentsData = [];
-                querySnapshot.forEach((doc) => { window.pendingPaymentsData.push({ id: doc.id, ...doc.data() }); });
+                querySnapshot.forEach((docSnap) => { window.pendingPaymentsData.push({ id: docSnap.id, ...docSnap.data() }); });
                 window.pendingPaymentsData.sort((a, b) => a.timestamp.seconds - b.timestamp.seconds);
                 window.renderPendingPayments();
             } catch (err) {
@@ -160,7 +160,6 @@
 
                 if (vipDaysToAdd > 0) {
                     const now = Date.now();
-                    // अगर पहले से VIP एक्टिव है तो उसी के आगे दिन जुड़ेंगे, वरना आज से शुरू होगा
                     const baseTime = (currentExpiry > now) ? currentExpiry : now;
                     const newExpiry = baseTime + (vipDaysToAdd * MS_PER_DAY);
                     updatePayload.isVip = true;
@@ -265,7 +264,6 @@
             }
         };
 
-        // ADMIN DIRECT +30, +60, +90 DAYS OR REMOVE VIP FUNCTION
         window.adminUpdateVipDays = async function(daysToAdd) {
             const uid = document.getElementById('userSelectDropdown').value;
             if (!uid || !window.usersDataList[uid]) return alert('Please select a user first!');
@@ -441,7 +439,7 @@
 
                 const historySnap = await getDocs(collection(db, "history"));
                 window.adminAllHistoryData = [];
-                historySnap.forEach(doc => { window.adminAllHistoryData.push({ id: doc.id, ...doc.data() }); });
+                historySnap.forEach(docSnap => { window.adminAllHistoryData.push({ id: docSnap.id, ...docSnap.data() }); });
                 window.adminAllHistoryData.sort((a, b) => b.timestamp.seconds - a.timestamp.seconds);
 
                 window.renderAdminHistory(); 
@@ -563,7 +561,7 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Full Name</label><input type="text" name="NAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Father/Husband Name</label><input type="text" name="FATHER" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">ID Number (12 Digits)</label><input type="text" name="AADHAR" required maxlength="12" pattern="\\d{12}" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">12-Digit ID Number</label><input type="text" name="AADHAR" required maxlength="12" pattern="\\d{12}" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Enrollment Date</label><input type="date" name="DATE" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Old DOB</label><input type="date" name="OLDDOB" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">New DOB</label><input type="date" name="NEWDOB" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
