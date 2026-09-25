@@ -1,27 +1,248 @@
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIP Access & Admin Validity System</title>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background: #f1f5f9; margin: 0; padding: 20px; color: #1e293b; }
+    .container { max-width: 900px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 768px) { .container { grid-template-columns: 1fr; } }
 
-// एडमिन या पेमेंट सक्सेस होने पर कॉल करें: days = 30, 60, या 90
-async function updateDatabaseVIP(db, userId, daysToAdd, planPrice) {
-  const userRef = doc(db, "users", userId);
-  const userSnap = await getDoc(userRef);
+    .card { background: #ffffff; border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; }
+    h2 { margin-top: 0; font-size: 1.25rem; color: #0f172a; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; }
 
-  const now = Date.now();
-  let currentExpiry = 0;
+    /* Status & Countdown Box */
+    .vip-status-box { background: linear-gradient(135deg, #1e1b4b, #312e81); color: white; padding: 18px; border-radius: 10px; text-align: center; margin-bottom: 20px; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; margin-bottom: 8px; }
+    .badge.active { background: #22c55e; color: #fff; }
+    .badge.expired { background: #ef4444; color: #fff; }
+    .countdown-timer { font-size: 1.5rem; font-weight: 700; letter-spacing: 1px; margin: 10px 0; color: #facc15; }
+    .expiry-date { font-size: 0.85rem; color: #cbd5e1; }
 
-  if (userSnap.exists() && userSnap.data().vipExpiry) {
-    currentExpiry = userSnap.data().vipExpiry;
+    /* VIP Plans */
+    .plans-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .plan-card { border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px; text-align: center; cursor: pointer; transition: 0.2s; background: #f8fafc; }
+    .plan-card:hover { border-color: #4f46e5; background: #eef2ff; transform: translateY(-2px); }
+    .plan-card h3 { margin: 5px 0; font-size: 1rem; color: #334155; }
+    .plan-price { font-size: 1.3rem; font-weight: 800; color: #4f46e5; margin: 5px 0; }
+    .plan-days { font-size: 0.8rem; color: #64748b; margin-bottom: 10px; }
+    .btn { background: #4f46e5; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; width: 100%; transition: 0.2s; }
+    .btn:hover { background: #4338ca; }
+
+    /* Admin Buttons */
+    .admin-btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+    .btn-admin { background: #0f766e; padding: 11px; font-size: 0.95rem; }
+    .btn-admin:hover { background: #115e59; }
+    .btn-test { background: #d97706; }
+    .btn-test:hover { background: #b45309; }
+    .btn-reset { background: #dc2626; }
+    .btn-reset:hover { background: #b91c1c; }
+
+    /* Corner Expiry Alert (5 Days or Less) */
+    .corner-alert {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 330px;
+      background: #fffbeb;
+      border-left: 6px solid #f59e0b;
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.18);
+      display: none;
+      z-index: 9999;
+      animation: slideIn 0.4s ease-out;
+    }
+    @keyframes slideIn { from { transform: translateX(120%); } to { transform: translateX(0); } }
+    .corner-alert h4 { margin: 0 0 6px 0; color: #b45309; font-size: 1rem; display: flex; align-items: center; justify-content: space-between; }
+    .corner-alert p { margin: 0 0 12px 0; font-size: 0.88rem; color: #78350f; line-height: 1.4; }
+    .corner-alert .btn-renew { background: #f59e0b; color: #fff; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; }
+    .corner-alert .btn-renew:hover { background: #d97706; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- USER DASHBOARD -->
+  <div class="card" id="plansSection">
+    <h2>👤 यूजर VIP डैशबोर्ड (User View)</h2>
+    
+    <div class="vip-status-box">
+      <span id="vipBadge" class="badge expired">VIP INACTIVE</span>
+      <div class="countdown-timer" id="countdownDisplay">00d : 00h : 00m : 00s</div>
+      <div class="expiry-date" id="expiryDateDisplay">कोई एक्टिव प्लान नहीं है</div>
+    </div>
+
+    <p style="font-size: 0.9rem; color: #475569; margin-bottom: 12px;">
+      <strong>VIP प्लान चुनें या समय बढ़ाएं:</strong> (नया प्लान लेने पर बचे हुए दिनों में ही नए दिन जुड़ जाएंगे)
+    </p>
+
+    <div class="plans-grid">
+      <!-- Plan 1: 1 Month -->
+      <div class="plan-card">
+        <h3>1 Month</h3>
+        <div class="plan-price">₹100</div>
+        <div class="plan-days">+30 Days</div>
+        <button class="btn" onclick="addVipValidity(30, 100, 'User Purchase')">Buy ₹100</button>
+      </div>
+
+      <!-- Plan 2: 2 Months -->
+      <div class="plan-card">
+        <h3>2 Months</h3>
+        <div class="plan-price">₹180</div>
+        <div class="plan-days">+60 Days</div>
+        <button class="btn" onclick="addVipValidity(60, 180, 'User Purchase')">Buy ₹180</button>
+      </div>
+
+      <!-- Plan 3: 3 Months -->
+      <div class="plan-card">
+        <h3>3 Months</h3>
+        <div class="plan-price">₹250</div>
+        <div class="plan-days">+90 Days</div>
+        <button class="btn" onclick="addVipValidity(90, 250, 'User Purchase')">Buy ₹250</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN PORTAL -->
+  <div class="card">
+    <h2>🛠️ एडमिन पोर्टल (Admin Control)</h2>
+    <p style="font-size: 0.9rem; color: #475569;">
+      एडमिन यहाँ से सीधे यूजर की वैलिडिटी में +30, +60 या +90 दिन जोड़ सकता है:
+    </p>
+
+    <div class="admin-btn-group">
+      <button class="btn btn-admin" onclick="addVipValidity(30, 100, 'Admin Panel')">
+        ➕ Activate / Add +30 Days (1 Month - ₹100)
+      </button>
+      <button class="btn btn-admin" onclick="addVipValidity(60, 180, 'Admin Panel')">
+        ➕ Activate / Add +60 Days (2 Months - ₹180)
+      </button>
+      <button class="btn btn-admin" onclick="addVipValidity(90, 250, 'Admin Panel')">
+        ➕ Activate / Add +90 Days (3 Months - ₹250)
+      </button>
+      
+      <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 8px 0;">
+      
+      <!-- Testing Buttons for 3-5 Day Alert -->
+      <button class="btn btn-test" onclick="simulateRemainingDays(3)">
+        🔔 टेस्ट करें: 3 दिन बचे हैं (Check Corner Alert)
+      </button>
+      <button class="btn btn-reset" onclick="resetVIP()">
+        🗑️ VIP रीसेट / खत्म करें
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- CORNER ALERT FOR 5 DAYS OR LESS -->
+<div class="corner-alert" id="cornerAlertBox">
+  <h4>
+    <span>⚠️ VIP एक्सपायरी अलर्ट!</span>
+  </h4>
+  <p id="cornerAlertText">
+    आपके VIP एक्सेस खत्म होने में सिर्फ 3 दिन बचे हैं। क्या आप फिर से VIP एक्सेस बढ़ाना चाहते हैं?
+  </p>
+  <button class="btn-renew" onclick="scrollToPlans()">
+    अभी VIP वैलिडिटी बढ़ाएं (+30 / +60 / +90 दिन)
+  </button>
+</div>
+
+<script>
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+  // 1. डेटाबेस से एक्सपायरी टाइम लेना (अभी LocalStorage में है, इसे Firebase से जोड़ सकते हैं)
+  function getVipExpiry() {
+    const saved = localStorage.getItem('user_vip_expiry');
+    return saved ? parseInt(saved, 10) : 0;
   }
 
-  // अगर पुराना प्लान चल रहा है तो उसी में आगे जोड़ें, वरना आज से जोड़ें
-  const baseTime = (currentExpiry > now) ? currentExpiry : now;
-  const newExpiry = baseTime + (daysToAdd * 24 * 60 * 60 * 1000);
+  function saveVipExpiry(timestamp) {
+    localStorage.setItem('user_vip_expiry', timestamp.toString());
+    updateUI();
+  }
 
-  await updateDoc(userRef, {
-    isVIP: true,
-    vipExpiry: newExpiry,
-    lastPlanPrice: planPrice,
-    lastUpdated: now
-  });
+  // 2. VIP वैलिडिटी जोड़ने का मुख्य फंक्शन (User & Admin दोनों के लिए)
+  function addVipValidity(daysToAdd, amount, source) {
+    const now = Date.now();
+    const currentExpiry = getVipExpiry();
 
-  console.log(`User ${userId} VIP extended by ${daysToAdd} days!`);
-}
+    // अगर पहले से VIP एक्टिव है तो उसी के आगे दिन जुड़ेंगे, वरना आज से शुरू होगा
+    const baseTime = (currentExpiry > now) ? currentExpiry : now;
+    const newExpiry = baseTime + (daysToAdd * MS_PER_DAY);
+
+    saveVipExpiry(newExpiry);
+    alert(`[${source}] सफल! +${daysToAdd} दिन जोड़ दिए गए हैं।`);
+  }
+
+  // 3. टेस्टिंग के लिए: सिर्फ 3 दिन बचने की स्थिति बनाना
+  function simulateRemainingDays(days) {
+    const newExpiry = Date.now() + (days * MS_PER_DAY) - 10000; // ठीक 3 दिन
+    saveVipExpiry(newExpiry);
+  }
+
+  function resetVIP() {
+    localStorage.removeItem('user_vip_expiry');
+    updateUI();
+  }
+
+  function scrollToPlans() {
+    document.getElementById('plansSection').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // 4. हर सेकंड काउंटडाउन और 5-दिन वाला कॉर्नर अलर्ट अपडेट करना
+  function updateUI() {
+    const now = Date.now();
+    const expiry = getVipExpiry();
+    const diff = expiry - now;
+
+    const badge = document.getElementById('vipBadge');
+    const countdownEl = document.getElementById('countdownDisplay');
+    const expiryDateEl = document.getElementById('expiryDateDisplay');
+    const alertBox = document.getElementById('cornerAlertBox');
+    const alertText = document.getElementById('cornerAlertText');
+
+    if (diff <= 0) {
+      badge.textContent = 'VIP INACTIVE / EXPIRED';
+      badge.className = 'badge expired';
+      countdownEl.textContent = '00d : 00h : 00m : 00s';
+      expiryDateEl.textContent = 'कोई एक्टिव VIP प्लान नहीं है';
+      alertBox.style.display = 'none';
+      return;
+    }
+
+    // VIP एक्टिव है
+    badge.textContent = 'VIP ACTIVE';
+    badge.className = 'badge active';
+
+    // दिन, घंटे, मिनट, सेकंड की गणना
+    const days = Math.floor(diff / MS_PER_DAY);
+    const hours = Math.floor((diff % MS_PER_DAY) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+    countdownEl.textContent = `${days}d : ${hours}h : ${minutes}m : ${seconds}s`;
+
+    const formattedDate = new Date(expiry).toLocaleString('hi-IN', {
+      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    expiryDateEl.textContent = `वैधता समाप्ति: ${formattedDate}`;
+
+    // कॉर्नर अलर्ट लॉजिक: अगर 5 दिन या उससे कम (5, 4, 3, 2, 1 दिन) बचे हैं
+    const remainingDaysCeil = Math.ceil(diff / MS_PER_DAY);
+    if (remainingDaysCeil <= 5 && remainingDaysCeil >= 1) {
+      alertBox.style.display = 'block';
+      alertText.innerHTML = `आपके VIP एक्सेस खत्म होने में सिर्फ <strong>${remainingDaysCeil} दिन</strong> बचे हैं! रुकावट से बचने के लिए अभी अपना VIP एक्सेस आगे बढ़ाएं।`;
+    } else {
+      alertBox.style.display = 'none';
+    }
+  }
+
+  setInterval(updateUI, 1000);
+  updateUI();
+</script>
+
+</body>
+</html>
