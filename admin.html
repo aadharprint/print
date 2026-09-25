@@ -8,7 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Royal Theme Config (Gold & Deep Slate) -->
+    <!-- Royal Theme Config -->
     <script>
         tailwind.config = {
             theme: {
@@ -45,6 +45,7 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
         const ADMIN_EMAIL = "hkosiun1221@gmail.com";
+        const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
         window.currentUserData = null;
         window.allUsersMap = {}; 
@@ -67,7 +68,7 @@
                 document.getElementById('loadingScreen').classList.add('hidden');
                 
                 await window.loadAllUsersForDropdown(); 
-                window.switchAdminMainTab('payments'); // Default to Payments tab
+                window.switchAdminMainTab('payments');
             }
         });
 
@@ -76,23 +77,19 @@
             window.location.href = "index.html";
         };
 
-        // ================= SECTION: PENDING PAYMENTS (NEW) =================
+        // ================= SECTION 0: PENDING PAYMENTS & VIP PLAN APPROVAL =================
         window.loadPendingPayments = async function() {
             const tbody = document.getElementById('adminPaymentsTableBody');
             tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400 font-bold"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2 text-royal-500"></i><br>Loading pending payments...</td></tr>`;
 
             try {
-                // Fetch ONLY pending payments
                 const q = query(collection(db, "payments"), where("status", "==", "Pending"));
                 const querySnapshot = await getDocs(q);
                 
                 window.pendingPaymentsData = [];
                 querySnapshot.forEach((doc) => { window.pendingPaymentsData.push({ id: doc.id, ...doc.data() }); });
-                
-                // Sort Oldest first (First come first serve)
                 window.pendingPaymentsData.sort((a, b) => a.timestamp.seconds - b.timestamp.seconds);
                 window.renderPendingPayments();
-
             } catch (err) {
                 tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-red-500 font-bold">Error loading payments: ${err.message}</td></tr>`;
             }
@@ -113,61 +110,88 @@
                 const dateStr = dateObj.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
                 const timeStr = dateObj.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
                 
+                const vipDays = data.vipDaysRequested || (data.wantsVip ? 30 : 0);
+                const vipFee = data.vipPlanFee || (data.wantsVip ? 100 : 0);
+
+                const vipRequestBadge = vipDays > 0 
+                    ? `<div class="mt-1 inline-flex items-center gap-1 bg-amber-100 text-amber-900 border border-amber-400 px-2.5 py-1 rounded-full text-xs font-black shadow-sm"><i class="fa-solid fa-crown text-amber-500"></i> VIP Plan: +${vipDays} Days (₹${vipFee})</div>` 
+                    : `<div class="mt-1 inline-flex items-center gap-1 bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md text-[11px] font-bold">Normal Credit Recharge</div>`;
+
                 tbody.innerHTML += `
                     <tr class="border-b border-slate-100 text-sm hover:bg-slate-50 transition duration-200">
                         <td class="p-4 font-bold text-slate-700">${data.email}</td>
-                        <td class="p-4 font-black text-green-600">₹${data.amountPaid}</td>
-                        <td class="p-4 font-bold text-royal-600">+${data.creditsRequested} Credits</td>
+                        <td class="p-4 font-black text-green-600 text-lg">₹${data.amountPaid}</td>
+                        <td class="p-4">
+                            <span class="font-black text-royal-600 text-sm">+${data.creditsRequested || 0} Credits</span>
+                            <br>${vipRequestBadge}
+                        </td>
                         <td class="p-4 font-mono font-bold text-slate-800 tracking-wider">${data.utrNumber}</td>
                         <td class="p-4 text-slate-500 text-xs font-medium">${dateStr} <br> ${timeStr}</td>
                         <td class="p-4 text-right whitespace-nowrap">
-                            <button onclick="window.approvePayment('${data.id}', '${data.userId}', ${data.creditsRequested})" class="bg-green-100 hover:bg-green-600 text-green-700 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm mr-2 border border-green-200"><i class="fa-solid fa-check"></i> Approve</button>
-                            <button onclick="window.rejectPayment('${data.id}')" class="bg-red-50 hover:bg-red-600 text-red-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm border border-red-200"><i class="fa-solid fa-xmark"></i> Reject</button>
+                            <button onclick="window.approvePayment('${data.id}', '${data.userId}', ${data.creditsRequested || 0}, ${vipDays})" class="bg-green-100 hover:bg-green-600 text-green-700 hover:text-white px-3.5 py-2 rounded-lg text-xs font-black transition shadow-sm mr-2 border border-green-300"><i class="fa-solid fa-check"></i> Approve</button>
+                            <button onclick="window.rejectPayment('${data.id}')" class="bg-red-50 hover:bg-red-600 text-red-600 hover:text-white px-3.5 py-2 rounded-lg text-xs font-bold transition shadow-sm border border-red-200"><i class="fa-solid fa-xmark"></i> Reject</button>
                         </td>
                     </tr>
                 `;
             });
         };
 
-        window.approvePayment = async function(paymentDocId, userId, creditsToAdd) {
-            if(!confirm(`Are you sure you want to APPROVE this payment and add ${creditsToAdd} credits to the user?`)) return;
+        window.approvePayment = async function(paymentDocId, userId, creditsToAdd, vipDaysToAdd) {
+            const confirmMsg = vipDaysToAdd > 0 
+                ? `Approve Payment:\n• Add +${creditsToAdd} Credits\n• Add +${vipDaysToAdd} Days VIP Access\n\nContinue?`
+                : `Approve Payment and add +${creditsToAdd} Credits to this user?`;
+            
+            if(!confirm(confirmMsg)) return;
 
             try {
-                // 1. Get current user credits
                 const userRef = doc(db, "users", userId);
                 const userSnap = await getDoc(userRef);
                 let currentCredits = 0;
-                if(userSnap.exists()) currentCredits = userSnap.data().credits || 0;
+                let currentExpiry = 0;
 
-                // 2. Add credits
+                if(userSnap.exists()) {
+                    const uData = userSnap.data();
+                    currentCredits = uData.credits || 0;
+                    currentExpiry = uData.vipExpiry || 0;
+                }
+
                 const newCredits = currentCredits + creditsToAdd;
-                await updateDoc(userRef, { credits: newCredits });
+                const updatePayload = { credits: newCredits };
 
-                // 3. Mark payment as Approved
+                if (vipDaysToAdd > 0) {
+                    const now = Date.now();
+                    // अगर पहले से VIP एक्टिव है तो उसी के आगे दिन जुड़ेंगे, वरना आज से शुरू होगा
+                    const baseTime = (currentExpiry > now) ? currentExpiry : now;
+                    const newExpiry = baseTime + (vipDaysToAdd * MS_PER_DAY);
+                    updatePayload.isVip = true;
+                    updatePayload.vipExpiry = newExpiry;
+                }
+
+                await updateDoc(userRef, updatePayload);
                 await updateDoc(doc(db, "payments", paymentDocId), { status: "Approved" });
 
-                alert('Successfully Approved! Credits added to user wallet.');
-                window.loadPendingPayments(); // Refresh list
-
+                alert(vipDaysToAdd > 0 
+                    ? `Approved! +${creditsToAdd} Credits & +${vipDaysToAdd} Days VIP Validity added!` 
+                    : `Approved! +${creditsToAdd} Credits added to user wallet.`);
+                
+                await window.loadAllUsersForDropdown();
+                window.loadPendingPayments();
             } catch (err) { alert('Error approving payment: ' + err.message); }
         };
 
         window.rejectPayment = async function(paymentDocId) {
-            if(!confirm(`Are you sure you want to REJECT this payment? The user will NOT get any credits.`)) return;
-
+            if(!confirm(`Are you sure you want to REJECT this payment?`)) return;
             try {
-                // Mark payment as Rejected
                 await updateDoc(doc(db, "payments", paymentDocId), { status: "Rejected" });
-                window.loadPendingPayments(); // Refresh list
+                window.loadPendingPayments();
             } catch (err) { alert('Error rejecting payment: ' + err.message); }
         };
 
-        // ================= IN-APP PREVIEW & MANUAL DOWNLOAD =================
+        // ================= IN-APP PREVIEW =================
         window.openPdfViewer = function(fileId, fileName) {
             document.getElementById('pdfViewerTitle').innerText = fileName;
             document.getElementById('pdfLoadingSpinner').style.display = 'flex';
-            const previewUrl = `https://drive.google.com/file/d/${fileId}/preview`;
-            document.getElementById('pdfIframe').src = previewUrl;
+            document.getElementById('pdfIframe').src = `https://drive.google.com/file/d/${fileId}/preview`;
             const downloadBtn = document.getElementById('modalDownloadBtn');
             downloadBtn.onclick = function() { window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank'); };
             document.getElementById('pdfViewerModal').classList.remove('hidden');
@@ -180,31 +204,107 @@
             document.body.style.overflow = 'auto'; 
         };
 
-        // ================= SECTION 1: USER MANAGEMENT =================
+        // ================= SECTION 1: USER & VIP VALIDITY (+30/+60/+90 DAYS) =================
         window.loadAllUsersForDropdown = async function() {
             try {
                 const usersSnap = await getDocs(collection(db, "users"));
                 const select = document.getElementById('userSelectDropdown');
+                const currentSelected = select.value;
                 select.innerHTML = '<option value="">-- Please select a user --</option>';
                 window.usersDataList = {}; 
                 
-                usersSnap.forEach(doc => {
-                    const data = doc.data();
-                    window.usersDataList[doc.id] = data;
-                    select.innerHTML += `<option value="${doc.id}">${data.email}</option>`;
+                const now = Date.now();
+                usersSnap.forEach(docSnap => {
+                    const data = docSnap.data();
+                    window.usersDataList[docSnap.id] = data;
+                    const isCurrentlyVip = data.isVip && (!data.vipExpiry || data.vipExpiry > now);
+                    const vipLabel = isCurrentlyVip ? '👑 [VIP] ' : '';
+                    select.innerHTML += `<option value="${docSnap.id}">${vipLabel}${data.email}</option>`;
                 });
+                if (currentSelected && window.usersDataList[currentSelected]) {
+                    select.value = currentSelected;
+                    window.handleUserSelection();
+                }
             } catch(err) { console.error("Error loading users:", err); }
         };
 
         window.handleUserSelection = function() {
             const uid = document.getElementById('userSelectDropdown').value;
             const display = document.getElementById('currentUserCreditsDisplay');
+            const vipBadge = document.getElementById('selectedUserVipBadge');
+
             if(uid && window.usersDataList[uid]) {
-                display.innerText = window.usersDataList[uid].credits || 0;
+                const uData = window.usersDataList[uid];
+                display.innerText = uData.credits || 0;
                 display.classList.remove('text-slate-400'); display.classList.add('text-royal-600');
+
+                const now = Date.now();
+                const expiry = uData.vipExpiry || 0;
+                const isActiveVip = uData.isVip && (expiry === 0 || expiry > now);
+
+                if (isActiveVip) {
+                    if (expiry > now) {
+                        const remDays = Math.ceil((expiry - now) / MS_PER_DAY);
+                        const expDateStr = new Date(expiry).toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
+                        vipBadge.innerHTML = `
+                            <span class="bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1 rounded-full text-xs font-black inline-block">
+                                <i class="fa-solid fa-crown text-amber-500 mr-1"></i>VIP Active (${remDays} Days Left)
+                            </span>
+                            <div class="text-[10px] font-bold text-slate-500 mt-1">Expires: ${expDateStr}</div>
+                        `;
+                    } else {
+                        vipBadge.innerHTML = '<span class="bg-amber-100 text-amber-800 border border-amber-300 px-3 py-1 rounded-full text-xs font-black"><i class="fa-solid fa-crown text-amber-500 mr-1"></i>VIP Active</span>';
+                    }
+                } else {
+                    vipBadge.innerHTML = '<span class="bg-slate-100 text-slate-600 border border-slate-200 px-3 py-1 rounded-full text-xs font-bold">Normal User (No VIP)</span>';
+                }
             } else {
                 display.innerText = '--';
                 display.classList.add('text-slate-400'); display.classList.remove('text-royal-600');
+                vipBadge.innerHTML = '--';
+            }
+        };
+
+        // ADMIN DIRECT +30, +60, +90 DAYS OR REMOVE VIP FUNCTION
+        window.adminUpdateVipDays = async function(daysToAdd) {
+            const uid = document.getElementById('userSelectDropdown').value;
+            if (!uid || !window.usersDataList[uid]) return alert('Please select a user first!');
+
+            const uData = window.usersDataList[uid];
+            const msg = document.getElementById('adminMsg');
+
+            try {
+                if (daysToAdd === 0) {
+                    if (!confirm(`Are you sure you want to remove VIP Access for ${uData.email} and make them a Normal User?`)) return;
+                    await updateDoc(doc(db, "users", uid), { isVip: false, vipExpiry: 0 });
+                    window.usersDataList[uid].isVip = false;
+                    window.usersDataList[uid].vipExpiry = 0;
+
+                    msg.className = "mt-3 p-3 bg-slate-100 text-slate-800 rounded-xl text-sm font-bold border border-slate-300";
+                    msg.innerHTML = `<i class="fa-solid fa-user mr-1"></i> VIP Access removed! User is now a Normal User.`;
+                } else {
+                    const now = Date.now();
+                    const currentExpiry = uData.vipExpiry || 0;
+                    const baseTime = (uData.isVip && currentExpiry > now) ? currentExpiry : now;
+                    const newExpiry = baseTime + (daysToAdd * MS_PER_DAY);
+
+                    await updateDoc(doc(db, "users", uid), { isVip: true, vipExpiry: newExpiry });
+                    window.usersDataList[uid].isVip = true;
+                    window.usersDataList[uid].vipExpiry = newExpiry;
+
+                    const totalDaysNow = Math.ceil((newExpiry - now) / MS_PER_DAY);
+                    msg.className = "mt-3 p-3 bg-amber-50 text-amber-900 rounded-xl text-sm font-bold border border-amber-300";
+                    msg.innerHTML = `<i class="fa-solid fa-crown text-amber-500 mr-1"></i> +${daysToAdd} Days VIP Added! Total Active Validity: <strong>${totalDaysNow} Days</strong>.`;
+                }
+
+                await window.loadAllUsersForDropdown();
+                document.getElementById('userSelectDropdown').value = uid;
+                window.handleUserSelection();
+
+                msg.classList.remove('hidden');
+                setTimeout(() => msg.classList.add('hidden'), 4000);
+            } catch (err) {
+                alert('Error updating VIP validity: ' + err.message);
             }
         };
 
@@ -213,6 +313,7 @@
             const newUserEmail = document.getElementById('newAdminUserEmail').value.trim().toLowerCase();
             const newUserPass = document.getElementById('newAdminUserPass').value.trim();
             const initialCredits = parseInt(document.getElementById('newAdminUserCredits').value) || 10;
+            const initialVipDays = parseInt(document.getElementById('newAdminUserVipDays').value) || 0;
             const msg = document.getElementById('adminCreateMsg');
             const btn = event.target.querySelector('button[type="submit"]');
             
@@ -227,12 +328,20 @@
                 const data = await res.json();
                 if (data.error) throw new Error(data.error.message);
 
+                const isVip = initialVipDays > 0;
+                const vipExpiry = isVip ? (Date.now() + (initialVipDays * MS_PER_DAY)) : 0;
+
                 await setDoc(doc(db, "users", data.localId), {
-                    email: newUserEmail, username: newUserEmail.split('@')[0], credits: initialCredits, isVip: false, createdAt: new Date()
+                    email: newUserEmail, 
+                    username: newUserEmail.split('@')[0], 
+                    credits: initialCredits, 
+                    isVip: isVip, 
+                    vipExpiry: vipExpiry,
+                    createdAt: new Date()
                 });
                 
                 msg.className = "mt-3 p-3 bg-green-50 text-green-700 rounded-xl text-sm font-bold border border-green-200";
-                msg.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> Success! User created.`;
+                msg.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> Success! User created ${isVip ? `with +${initialVipDays} Days VIP 👑` : '(Normal User)'}.`;
                 event.target.reset();
                 await window.loadAllUsersForDropdown();
             } catch(err) {
@@ -303,7 +412,7 @@
                         userId: window.currentUserData.uid, fileName: `${dataObj.NAME || 'Premium Doc'} - ${serviceType}.pdf`,
                         fileId: result.fileId || result.id || 'N/A', serviceType: serviceType, timestamp: new Date()
                     });
-                    alert(`Success! Document generated successfully. You can view it in 'Database Records'.`);
+                    alert(`Success! Document generated. View in 'Database Records'.`);
                     formElement.reset();
                 } else { throw new Error(result.error || 'API Response Failed'); }
             } catch(err) { alert('Technical issue occurred: ' + err.message); } 
@@ -322,7 +431,6 @@
                 filterUserDropdown.innerHTML = '<option value="ALL">All Users</option>';
                 filterUserDropdown.innerHTML += `<option value="${window.currentUserData.uid}">👑 Harish Kumar (Admin)</option>`;
                 
-                // Use the loaded users list
                 for (const [uid, data] of Object.entries(window.usersDataList)) {
                      window.allUsersMap[uid] = data.email;
                      if (uid !== window.currentUserData.uid) {
@@ -411,22 +519,17 @@
             finally { btn.innerHTML = origHTML; btn.disabled = false; }
         };
 
-        // ================= TABS & UI NAVIGATION =================
         window.switchAdminMainTab = function(tabName) {
-            const tabs = ['payments', 'users', 'services', 'history']; // Added payments tab
+            const tabs = ['payments', 'users', 'services', 'history'];
             tabs.forEach(t => {
                 const btn = document.getElementById(`tab-${t}`);
-                if(btn) {
-                    btn.className = "flex-1 bg-white text-slate-500 font-bold py-3.5 px-2 rounded-xl hover:bg-slate-50 transition shadow-sm border border-slate-200 text-[11px] md:text-sm flex justify-center items-center gap-1.5 md:gap-2";
-                }
+                if(btn) btn.className = "flex-1 bg-white text-slate-500 font-bold py-3.5 px-2 rounded-xl hover:bg-slate-50 transition shadow-sm border border-slate-200 text-[11px] md:text-sm flex justify-center items-center gap-1.5 md:gap-2";
                 const section = document.getElementById(`section-${t}`);
                 if(section) section.classList.add('hidden');
             });
 
             const activeBtn = document.getElementById(`tab-${tabName}`);
-            if(activeBtn) {
-                activeBtn.className = "flex-1 bg-dark-900 text-royal-300 font-bold py-3.5 px-2 rounded-xl shadow-glow transition transform -translate-y-1 text-[11px] md:text-sm flex justify-center items-center gap-1.5 md:gap-2 border border-dark-800";
-            }
+            if(activeBtn) activeBtn.className = "flex-1 bg-dark-900 text-royal-300 font-bold py-3.5 px-2 rounded-xl shadow-glow transition transform -translate-y-1 text-[11px] md:text-sm flex justify-center items-center gap-1.5 md:gap-2 border border-dark-800";
             
             const activeSection = document.getElementById(`section-${tabName}`);
             if(activeSection) activeSection.classList.remove('hidden');
@@ -441,16 +544,15 @@
                 b.className = "bg-white text-slate-600 border border-slate-200 py-3 rounded-xl font-bold text-[11px] md:text-sm text-center transition hover:bg-royal-50 hover:text-royal-700 hover:border-royal-200 premium-tab";
             });
             const activeBtn = document.getElementById('btn-' + type);
-            if(activeBtn) {
-                activeBtn.className = "bg-gradient-to-br from-royal-400 to-royal-600 text-white py-3 rounded-xl font-bold text-[11px] md:text-sm text-center shadow-md transform scale-105 transition premium-tab ring-2 ring-royal-200";
-            }
+            if(activeBtn) activeBtn.className = "bg-gradient-to-br from-royal-400 to-royal-600 text-white py-3 rounded-xl font-bold text-[11px] md:text-sm text-center shadow-md transform scale-105 transition premium-tab ring-2 ring-royal-200";
 
             const container = document.getElementById('premiumFormContainer');
-            const annexureTypes = ['annexure1', 'annexure1a', 'annexure3', 'annexureb', 'annexurec', 'annexured', 'annexuree'];
+            const annexureTypes = ['annexure1', 'annexure1a', 'annexure3', 'annexure3a', 'annexureb', 'annexurec', 'annexured', 'annexuree'];
 
             if (annexureTypes.includes(type)) {
                 let titleText = type.replace('annexure', 'Annexure ').toUpperCase();
                 if(type === 'annexure1a') titleText = 'Annexure 1A';
+                if(type === 'annexure3a') titleText = 'Annexure 3A';
 
                 container.innerHTML = `
                     <div class="mb-6 flex justify-between items-center border-b border-slate-100 pb-4">
@@ -461,7 +563,7 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Full Name</label><input type="text" name="NAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Father/Husband Name</label><input type="text" name="FATHER" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Aadhaar Number (12 Digits)</label><input type="text" name="AADHAR" required maxlength="12" pattern="\\d{12}" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">ID Number (12 Digits)</label><input type="text" name="AADHAR" required maxlength="12" pattern="\\d{12}" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Enrollment Date</label><input type="date" name="DATE" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Old DOB</label><input type="date" name="OLDDOB" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">New DOB</label><input type="date" name="NEWDOB" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
@@ -496,10 +598,9 @@
         <h2 class="text-xl font-bold text-white tracking-widest uppercase">Admin Secure Access</h2>
     </div>
 
-    <!-- FULL SCREEN PDF VIEWER MODAL (IN-APP) -->
+    <!-- FULL SCREEN PDF VIEWER MODAL -->
     <div id="pdfViewerModal" class="fixed inset-0 z-[100] hidden bg-dark-900/80 backdrop-blur-md flex items-center justify-center p-2 md:p-6 transition-opacity">
         <div class="bg-white w-full max-w-6xl h-full flex flex-col rounded-2xl shadow-2xl overflow-hidden">
-            
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center p-4 border-b border-slate-200 bg-slate-50 gap-3">
                 <div class="flex items-center gap-3 overflow-hidden w-full md:w-auto">
                     <div class="w-8 h-8 bg-royal-100 text-royal-600 rounded-lg flex items-center justify-center shrink-0"><i class="fa-solid fa-file-pdf"></i></div>
@@ -512,7 +613,6 @@
                     <button onclick="window.closePdfViewer()" class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-200 text-slate-600 hover:bg-red-500 hover:text-white transition shadow-sm"><i class="fa-solid fa-xmark text-lg"></i></button>
                 </div>
             </div>
-
             <div class="flex-grow bg-slate-300 relative">
                 <div id="pdfLoadingSpinner" class="absolute inset-0 flex flex-col items-center justify-center text-royal-600 bg-slate-100">
                     <i class="fa-solid fa-spinner fa-spin text-4xl mb-3"></i>
@@ -523,8 +623,7 @@
         </div>
     </div>
 
-
-    <!-- Header (Royal Theme) -->
+    <!-- Header -->
     <header class="bg-dark-900 shadow-xl px-4 md:px-8 py-4 flex justify-between items-center sticky top-0 z-40 border-b-2 border-royal-500">
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 bg-gradient-to-br from-royal-400 to-royal-600 text-white rounded-xl flex items-center justify-center shadow-inner"><i class="fa-solid fa-crown text-lg"></i></div>
@@ -542,22 +641,21 @@
         
         <!-- Main Navigation Tabs -->
         <div class="flex flex-col md:flex-row gap-3 md:gap-4 mb-8">
-            <!-- NEW PENDING PAYMENTS TAB -->
-            <button onclick="window.switchAdminMainTab('payments')" id="tab-payments" class="flex-1 relative"><i class="fa-solid fa-money-bill-transfer"></i> Pending Approvals <span class="absolute -top-2 -right-2 flex h-4 w-4"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span class="relative inline-flex rounded-full h-4 w-4 bg-red-500 text-[8px] text-white items-center justify-center font-bold">!</span></span></button>
-            <button onclick="window.switchAdminMainTab('users')" id="tab-users" class="flex-1"><i class="fa-solid fa-users-gear"></i> User Management</button>
+            <button onclick="window.switchAdminMainTab('payments')" id="tab-payments" class="flex-1 relative"><i class="fa-solid fa-money-bill-transfer"></i> Pending Approvals</button>
+            <button onclick="window.switchAdminMainTab('users')" id="tab-users" class="flex-1"><i class="fa-solid fa-users-gear"></i> Users & VIP Validity</button>
             <button onclick="window.switchAdminMainTab('services')" id="tab-services" class="flex-1"><i class="fa-solid fa-gem"></i> Premium Services</button>
             <button onclick="window.switchAdminMainTab('history')" id="tab-history" class="flex-1"><i class="fa-solid fa-database"></i> Database Records</button>
         </div>
 
-        <!-- ================= SECTION 0: PENDING PAYMENTS (NEW) ================= -->
+        <!-- ================= SECTION 0: PENDING PAYMENTS ================= -->
         <div id="section-payments" class="hidden">
             <div class="bg-white rounded-3xl shadow-card border border-slate-100 p-6 md:p-8">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-6 mb-6">
                     <div>
-                        <h3 class="text-2xl font-black text-dark-900 mb-1"><i class="fa-solid fa-money-bill-transfer text-green-500 mr-2"></i> Action Required: Pending Payments</h3>
+                        <h3 class="text-2xl font-black text-dark-900 mb-1"><i class="fa-solid fa-money-bill-transfer text-green-500 mr-2"></i> Pending Payment & VIP Plan Approvals</h3>
                         <p id="pendingPaymentsCount" class="text-sm font-bold text-slate-500">Pending Requests: 0</p>
                     </div>
-                    <button onclick="window.loadPendingPayments()" class="h-[42px] bg-slate-100 text-slate-600 px-4 rounded-xl text-sm font-bold hover:bg-slate-200 transition shadow-sm" title="Refresh"><i class="fa-solid fa-rotate-right mr-1"></i> Refresh</button>
+                    <button onclick="window.loadPendingPayments()" class="h-[42px] bg-slate-100 text-slate-600 px-4 rounded-xl text-sm font-bold hover:bg-slate-200 transition shadow-sm"><i class="fa-solid fa-rotate-right mr-1"></i> Refresh</button>
                 </div>
                 
                 <div class="overflow-x-auto border border-slate-100 rounded-2xl">
@@ -565,22 +663,20 @@
                         <thead class="bg-slate-50 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                             <tr>
                                 <th class="p-4 rounded-tl-2xl">User Email</th>
-                                <th class="p-4">Amount Paid</th>
-                                <th class="p-4">Requested Credits</th>
+                                <th class="p-4">Total Paid</th>
+                                <th class="p-4">Credits & VIP Plan Breakdown</th>
                                 <th class="p-4">UTR Number</th>
                                 <th class="p-4">Date & Time</th>
-                                <th class="p-4 text-right rounded-tr-2xl">Action (Approve / Reject)</th>
+                                <th class="p-4 text-right rounded-tr-2xl">Action</th>
                             </tr>
                         </thead>
-                        <tbody id="adminPaymentsTableBody" class="text-sm">
-                            <!-- Loaded Dynamically -->
-                        </tbody>
+                        <tbody id="adminPaymentsTableBody" class="text-sm"></tbody>
                     </table>
                 </div>
             </div>
         </div>
 
-        <!-- ================= SECTION 1: USER MANAGEMENT ================= -->
+        <!-- ================= SECTION 1: USER & VIP VALIDITY MANAGEMENT ================= -->
         <div id="section-users" class="grid grid-cols-1 md:grid-cols-2 gap-6 hidden">
             <!-- Create User Card -->
             <div class="bg-white rounded-3xl p-6 md:p-8 shadow-card border border-slate-100 flex flex-col h-full">
@@ -593,19 +689,28 @@
                         <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Email ID</label><input type="email" id="newAdminUserEmail" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
                         <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Password</label><input type="password" id="newAdminUserPass" required minlength="6" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
                         <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Initial Credits</label><input type="number" id="newAdminUserCredits" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Initial VIP Plan (Optional)</label>
+                            <select id="newAdminUserVipDays" class="w-full p-3.5 border border-amber-300 rounded-xl text-sm bg-amber-50 font-bold text-amber-900 outline-none">
+                                <option value="0">Normal User (No VIP)</option>
+                                <option value="30">👑 1 Month VIP (+30 Days)</option>
+                                <option value="60">👑 2 Months VIP (+60 Days)</option>
+                                <option value="90">👑 3 Months VIP (+90 Days)</option>
+                            </select>
+                        </div>
                     </div>
                     <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-bold py-3.5 rounded-xl text-sm shadow-glow transition mt-4">Register User</button>
                 </form>
                 <div id="adminCreateMsg" class="hidden"></div>
             </div>
 
-            <!-- Credit Management Card (Manual) -->
+            <!-- Credit & +30/+60/+90 Days VIP Validity Card -->
             <div class="bg-white rounded-3xl p-6 md:p-8 shadow-card border border-slate-100 flex flex-col h-full">
-                <div class="mb-6 flex items-center gap-3">
-                    <div class="w-12 h-12 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center text-xl border border-green-100"><i class="fa-solid fa-wallet"></i></div>
+                <div class="mb-5 flex items-center gap-3">
+                    <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-xl border border-amber-200"><i class="fa-solid fa-crown"></i></div>
                     <div>
-                        <h3 class="text-xl font-black text-dark-900">Manage Credits Manually</h3>
-                        <p class="text-[10px] font-bold text-slate-500 uppercase">For adjustments</p>
+                        <h3 class="text-xl font-black text-dark-900">Credits & VIP Validity</h3>
+                        <p class="text-[10px] font-bold text-slate-500 uppercase">Add +30 / +60 / +90 Days or Adjust Credits</p>
                     </div>
                 </div>
                 
@@ -618,17 +723,42 @@
                     </div>
                     
                     <div class="p-4 bg-royal-50 rounded-xl flex justify-between items-center border border-royal-200">
-                        <span class="text-sm font-bold text-royal-800">Current Balance:</span>
-                        <span class="text-3xl font-black text-royal-600" id="currentUserCreditsDisplay">--</span>
+                        <div>
+                            <span class="text-xs font-bold text-royal-800 block">Current Balance:</span>
+                            <span class="text-3xl font-black text-royal-600" id="currentUserCreditsDisplay">--</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-xs font-bold text-royal-800 block mb-1">VIP Status & Validity:</span>
+                            <div id="selectedUserVipBadge">--</div>
+                        </div>
                     </div>
 
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Enter Credit Amount</label>
-                        <input type="number" id="creditAdjustmentAmount" placeholder="e.g., 50" min="1" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition">
+                    <!-- 👑 +30, +60, +90 DAYS VIP STACKING BUTTONS -->
+                    <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
+                        <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider">Add VIP Validity Days (Stacks on Existing Days)</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button type="button" onclick="window.adminUpdateVipDays(30)" class="bg-amber-500 hover:bg-amber-600 text-white font-black py-2.5 px-2 rounded-xl text-xs shadow transition">
+                                +30 Days<br><span class="text-[10px] font-normal opacity-90">(1 Month)</span>
+                            </button>
+                            <button type="button" onclick="window.adminUpdateVipDays(60)" class="bg-amber-600 hover:bg-amber-700 text-white font-black py-2.5 px-2 rounded-xl text-xs shadow transition">
+                                +60 Days<br><span class="text-[10px] font-normal opacity-90">(2 Months)</span>
+                            </button>
+                            <button type="button" onclick="window.adminUpdateVipDays(90)" class="bg-dark-900 hover:bg-black text-royal-300 font-black py-2.5 px-2 rounded-xl text-xs shadow transition">
+                                +90 Days<br><span class="text-[10px] font-normal opacity-90">(3 Months)</span>
+                            </button>
+                        </div>
+                        <button type="button" onclick="window.adminUpdateVipDays(0)" class="w-full bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 font-bold py-2 rounded-xl text-xs transition">
+                            <i class="fa-solid fa-user-xmark mr-1"></i> Remove VIP (Make Normal User)
+                        </button>
                     </div>
 
-                    <div class="flex gap-3 pt-2">
-                        <button id="btnAdd" type="button" onclick="window.adjustCredits('add')" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl text-sm shadow-sm transition"><i class="fa-solid fa-plus mr-1"></i> Add</button>
+                    <div class="border-t border-slate-100 pt-3">
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Manual Credit Adjustment</label>
+                        <input type="number" id="creditAdjustmentAmount" placeholder="e.g., 50" min="1" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition">
+                    </div>
+
+                    <div class="flex gap-3">
+                        <button id="btnAdd" type="button" onclick="window.adjustCredits('add')" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl text-sm shadow-sm transition"><i class="fa-solid fa-plus mr-1"></i> Add Credits</button>
                         <button id="btnSub" type="button" onclick="window.adjustCredits('sub')" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl text-sm shadow-sm transition"><i class="fa-solid fa-minus mr-1"></i> Subtract</button>
                     </div>
                 </div>
@@ -638,10 +768,11 @@
 
         <!-- ================= SECTION 2: PREMIUM SERVICES ================= -->
         <div id="section-services" class="hidden">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
                 <button onclick="window.switchPremiumService('annexure1')" id="btn-annexure1" class="premium-tab">Annexure 1</button>
                 <button onclick="window.switchPremiumService('annexure1a')" id="btn-annexure1a" class="premium-tab">Annexure 1A</button>
                 <button onclick="window.switchPremiumService('annexure3')" id="btn-annexure3" class="premium-tab">Annexure 3</button>
+                <button onclick="window.switchPremiumService('annexure3a')" id="btn-annexure3a" class="premium-tab">Annexure 3A</button>
                 <button onclick="window.switchPremiumService('annexureb')" id="btn-annexureb" class="premium-tab">Annexure B</button>
                 <button onclick="window.switchPremiumService('annexurec')" id="btn-annexurec" class="premium-tab">Annexure C</button>
                 <button onclick="window.switchPremiumService('annexured')" id="btn-annexured" class="premium-tab">Annexure D</button>
@@ -654,7 +785,6 @@
         <!-- ================= SECTION 3: HISTORY ================= -->
         <div id="section-history" class="hidden">
             <div class="bg-white rounded-3xl shadow-card border border-slate-100 p-6 md:p-8">
-                
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-slate-100 pb-6 mb-6">
                     <div>
                         <h3 class="text-2xl font-black text-dark-900 mb-1">Database Records</h3>
@@ -674,10 +804,11 @@
                                 <option value="ALL">All Documents</option>
                                 <option value="Domicile">Domicile</option>
                                 <option value="Caste">Caste Certificate</option>
-                                <option value="DOB">Birth Certificate</option>
+                                <option value="DOB 18+">DOB (18+)</option>
                                 <option value="Annexure 1">Annexure 1</option>
                                 <option value="Annexure 1A">Annexure 1A</option>
                                 <option value="Annexure 3">Annexure 3</option>
+                                <option value="Annexure 3A">Annexure 3A</option>
                                 <option value="Annexure B">Annexure B</option>
                                 <option value="Annexure C">Annexure C</option>
                                 <option value="Annexure D">Annexure D</option>
@@ -686,7 +817,7 @@
                             </select>
                         </div>
                         <div class="flex gap-2 mt-4 md:mt-0 items-end h-full">
-                            <button onclick="window.loadAdminHistory()" class="h-[38px] bg-slate-100 text-slate-600 px-4 rounded-lg text-sm font-bold hover:bg-slate-200 transition" title="Refresh"><i class="fa-solid fa-rotate-right"></i></button>
+                            <button onclick="window.loadAdminHistory()" class="h-[38px] bg-slate-100 text-slate-600 px-4 rounded-lg text-sm font-bold hover:bg-slate-200 transition"><i class="fa-solid fa-rotate-right"></i></button>
                             <button id="bulkDeleteBtn" onclick="window.bulkDeleteFilteredHistory()" class="h-[38px] bg-red-50 text-red-600 border border-red-100 px-4 rounded-lg text-sm font-bold hover:bg-red-500 hover:text-white transition flex items-center gap-2"><i class="fa-solid fa-trash-can"></i> <span class="hidden md:inline">Delete All Shown</span></button>
                         </div>
                     </div>
@@ -703,8 +834,7 @@
                                 <th class="p-4 text-right">Action</th>
                             </tr>
                         </thead>
-                        <tbody id="adminHistoryTableBody" class="text-sm">
-                        </tbody>
+                        <tbody id="adminHistoryTableBody" class="text-sm"></tbody>
                     </table>
                 </div>
             </div>
