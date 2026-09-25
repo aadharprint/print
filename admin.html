@@ -1,12 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Super Admin - Harish Kumar</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Super Admin - Ojas Portal</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- html2pdf.js for Direct PDF Download from History -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     
     <!-- Royal Theme Config -->
     <script>
@@ -14,22 +17,46 @@
             theme: {
                 extend: {
                     colors: { 
-                        royal: { 50: '#fffbeb', 100: '#fef3c7', 300: '#fcd34d', 500: '#f59e0b', 600: '#d97706', 900: '#78350f' },
-                        dark: { 800: '#1e293b', 900: '#0f172a' }
+                        royal: { 50: '#fffbeb', 100: '#fef3c7', 300: '#fcd34d', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 900: '#78350f' },
+                        dark: { 700: '#334155', 800: '#1e293b', 900: '#0f172a', 950: '#020617' }
                     },
                     boxShadow: {
-                        'glow': '0 0 20px rgba(245, 158, 11, 0.3)',
-                        'card': '0 10px 30px -5px rgba(0,0,0,0.08)'
+                        'glow': '0 0 15px rgba(245, 158, 11, 0.3)',
+                        'card': '0 4px 20px -2px rgba(0,0,0,0.06)'
                     }
                 }
             }
         }
     </script>
 
+    <style>
+        /* हिस्ट्री से Annexure प्रीव्यू और डाउनलोड करने के लिए फिक्स सिंगल-पेज A4 लेआउट */
+        .affidavit-paper {
+            font-family: 'Times New Roman', Times, serif;
+            width: 794px;
+            height: 1122px;
+            padding: 46px 62px;
+            background: #ffffff;
+            color: #000000;
+            font-size: 15px;
+            line-height: 1.55;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+        .filled-val {
+            font-weight: bold;
+            color: #000000;
+        }
+    </style>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBSiDAvDYyBG8hkmez7s900JHhlbenG2nU",
@@ -53,11 +80,6 @@
         window.adminAllHistoryData = []; 
         window.pendingPaymentsData = []; 
 
-        const API_URLS = {
-            "ANNEXURE": "https://script.google.com/macros/s/AKfycbyA3916RXjuVRInvDPksOzbzczesTFAWo4gVzvjazGNfQl_REwC0YrYpTu03jlXwlb07w/exec", 
-            "AFFIDAVIT": "https://script.google.com/macros/s/AKfycbyA3916RXjuVRInvDPksOzbzczesTFAWo4gVzvjazGNfQl_REwC0YrYpTu03jlXwlb07w/exec"
-        };
-
         onAuthStateChanged(auth, async (user) => {
             if (!user || user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
                 alert('Not authorized! Only Super Admin can access this page.');
@@ -77,10 +99,21 @@
             window.location.href = "index.html";
         };
 
-        // ================= SECTION 0: PENDING PAYMENTS & VIP PLAN APPROVAL =================
+        // UTR कॉपी करने का फंक्शन (मोबाइल के लिए बेहद उपयोगी)
+        window.copyUtrText = function(utr, btnEl) {
+            navigator.clipboard.writeText(utr);
+            const orig = btnEl.innerHTML;
+            btnEl.innerHTML = '<i class="fa-solid fa-check text-green-600"></i> Copied';
+            setTimeout(() => { btnEl.innerHTML = orig; }, 1500);
+        };
+
+        // ================= SECTION 1: MOBILE-FRIENDLY PENDING PAYMENTS & VIP APPROVALS =================
         window.loadPendingPayments = async function() {
-            const tbody = document.getElementById('adminPaymentsTableBody');
-            tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400 font-bold"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2 text-royal-500"></i><br>Loading pending payments...</td></tr>`;
+            const container = document.getElementById('adminPaymentsCardsContainer');
+            container.innerHTML = `
+                <div class="col-span-1 md:col-span-2 p-10 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100">
+                    <i class="fa-solid fa-spinner fa-spin text-3xl mb-2 text-royal-500"></i><br>पेमेंट रिक्वेस्ट लोड हो रही हैं...
+                </div>`;
 
             try {
                 const q = query(collection(db, "payments"), where("status", "==", "Pending"));
@@ -88,57 +121,108 @@
                 
                 window.pendingPaymentsData = [];
                 querySnapshot.forEach((docSnap) => { window.pendingPaymentsData.push({ id: docSnap.id, ...docSnap.data() }); });
-                window.pendingPaymentsData.sort((a, b) => a.timestamp.seconds - b.timestamp.seconds);
+                window.pendingPaymentsData.sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
                 window.renderPendingPayments();
             } catch (err) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-red-500 font-bold">Error loading payments: ${err.message}</td></tr>`;
+                container.innerHTML = `<div class="col-span-1 md:col-span-2 p-6 text-center text-red-500 font-bold bg-white rounded-2xl">Error: ${err.message}</div>`;
             }
         };
 
         window.renderPendingPayments = function() {
-            const tbody = document.getElementById('adminPaymentsTableBody');
-            document.getElementById('pendingPaymentsCount').innerText = `Pending Requests: ${window.pendingPaymentsData.length}`;
-            tbody.innerHTML = '';
+            const container = document.getElementById('adminPaymentsCardsContainer');
+            const count = window.pendingPaymentsData.length;
+            
+            document.getElementById('pendingPaymentsCount').innerText = `${count} Pending`;
+            const navBadge = document.getElementById('navPendingBadge');
+            if (navBadge) {
+                navBadge.innerText = count;
+                navBadge.style.display = count > 0 ? 'inline-flex' : 'none';
+            }
 
-            if(window.pendingPaymentsData.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-10 text-center text-slate-400"><i class="fa-solid fa-check-double text-5xl mb-3 text-green-300"></i><br>All caught up! No pending payments.</td></tr>`;
+            container.innerHTML = '';
+
+            if(count === 0) {
+                container.innerHTML = `
+                    <div class="col-span-1 md:col-span-2 p-12 text-center bg-white rounded-3xl border border-slate-100 shadow-card">
+                        <div class="w-16 h-16 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto mb-3 text-3xl">
+                            <i class="fa-solid fa-check-double"></i>
+                        </div>
+                        <h4 class="text-base font-black text-slate-800">कोई पेंडिंग पेमेंट नहीं है!</h4>
+                        <p class="text-xs text-slate-400 font-semibold mt-1">सभी पेमेंट और VIP रिक्वेस्ट क्लियर हो चुकी हैं।</p>
+                    </div>`;
                 return;
             }
 
             window.pendingPaymentsData.forEach(data => {
-                const dateObj = new Date(data.timestamp.seconds * 1000);
+                const sec = data.timestamp?.seconds || Math.floor(Date.now() / 1000);
+                const dateObj = new Date(sec * 1000);
                 const dateStr = dateObj.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
                 const timeStr = dateObj.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
                 
                 const vipDays = data.vipDaysRequested || (data.wantsVip ? 30 : 0);
                 const vipFee = data.vipPlanFee || (data.wantsVip ? 100 : 0);
+                const creditsReq = data.creditsRequested || 0;
 
-                const vipRequestBadge = vipDays > 0 
-                    ? `<div class="mt-1 inline-flex items-center gap-1 bg-amber-100 text-amber-900 border border-amber-400 px-2.5 py-1 rounded-full text-xs font-black shadow-sm"><i class="fa-solid fa-crown text-amber-500"></i> VIP Plan: +${vipDays} Days (₹${vipFee})</div>` 
-                    : `<div class="mt-1 inline-flex items-center gap-1 bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md text-[11px] font-bold">Normal Credit Recharge</div>`;
+                const vipBanner = vipDays > 0 
+                    ? `<div class="flex items-center justify-between bg-amber-50 border border-amber-300 px-3 py-2 rounded-xl">
+                        <span class="text-xs font-black text-amber-900 flex items-center gap-1.5"><i class="fa-solid fa-crown text-amber-500"></i> VIP Plan Request</span>
+                        <span class="bg-amber-400 text-dark-950 text-xs font-black px-2.5 py-0.5 rounded-full">+${vipDays} Days (₹${vipFee})</span>
+                       </div>` 
+                    : `<div class="flex items-center justify-between bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+                        <span class="text-[11px] font-bold text-slate-500">Request Type</span>
+                        <span class="text-[11px] font-bold text-slate-700">Normal Credit Recharge</span>
+                       </div>`;
 
-                tbody.innerHTML += `
-                    <tr class="border-b border-slate-100 text-sm hover:bg-slate-50 transition duration-200">
-                        <td class="p-4 font-bold text-slate-700">${data.email}</td>
-                        <td class="p-4 font-black text-green-600 text-lg">₹${data.amountPaid}</td>
-                        <td class="p-4">
-                            <span class="font-black text-royal-600 text-sm">+${data.creditsRequested || 0} Credits</span>
-                            <br>${vipRequestBadge}
-                        </td>
-                        <td class="p-4 font-mono font-bold text-slate-800 tracking-wider">${data.utrNumber}</td>
-                        <td class="p-4 text-slate-500 text-xs font-medium">${dateStr} <br> ${timeStr}</td>
-                        <td class="p-4 text-right whitespace-nowrap">
-                            <button onclick="window.approvePayment('${data.id}', '${data.userId}', ${data.creditsRequested || 0}, ${vipDays})" class="bg-green-100 hover:bg-green-600 text-green-700 hover:text-white px-3.5 py-2 rounded-lg text-xs font-black transition shadow-sm mr-2 border border-green-300"><i class="fa-solid fa-check"></i> Approve</button>
-                            <button onclick="window.rejectPayment('${data.id}')" class="bg-red-50 hover:bg-red-600 text-red-600 hover:text-white px-3.5 py-2 rounded-lg text-xs font-bold transition shadow-sm border border-red-200"><i class="fa-solid fa-xmark"></i> Reject</button>
-                        </td>
-                    </tr>
+                container.innerHTML += `
+                    <div class="bg-white rounded-2xl p-4 md:p-5 shadow-card border-2 border-slate-100 hover:border-royal-400 transition flex flex-col justify-between space-y-3.5">
+                        <!-- Top: User & Amount -->
+                        <div class="flex justify-between items-start gap-2 border-b border-slate-100 pb-3">
+                            <div class="overflow-hidden">
+                                <p class="text-xs md:text-sm font-black text-dark-900 truncate"><i class="fa-solid fa-user text-royal-500 mr-1"></i> ${data.email}</p>
+                                <p class="text-[11px] font-semibold text-slate-400 mt-0.5"><i class="fa-regular fa-clock mr-1"></i> ${dateStr} • ${timeStr}</p>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <span class="bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-xl text-lg font-black block">₹${data.amountPaid}</span>
+                            </div>
+                        </div>
+
+                        <!-- Middle: UTR Copy Box & Breakdown -->
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between bg-slate-100 px-3 py-2 rounded-xl border border-slate-200">
+                                <div>
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase block">UTR / Ref Number</span>
+                                    <span class="font-mono font-black text-sm text-slate-900 tracking-wider">${data.utrNumber}</span>
+                                </div>
+                                <button onclick="window.copyUtrText('${data.utrNumber}', this)" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition">
+                                    <i class="fa-regular fa-copy mr-1"></i> Copy
+                                </button>
+                            </div>
+
+                            <div class="flex items-center justify-between bg-royal-50/60 border border-royal-200 px-3 py-2 rounded-xl">
+                                <span class="text-xs font-bold text-royal-900">Credits to Add:</span>
+                                <span class="text-sm font-black text-royal-600">+${creditsReq} Credits</span>
+                            </div>
+
+                            ${vipBanner}
+                        </div>
+
+                        <!-- Bottom: Thumb-Friendly Approve / Reject Buttons -->
+                        <div class="grid grid-cols-2 gap-2.5 pt-1">
+                            <button onclick="window.approvePayment('${data.id}', '${data.userId}', ${creditsReq}, ${vipDays})" class="bg-green-600 hover:bg-green-700 active:scale-95 text-white py-3 rounded-xl text-xs md:text-sm font-black shadow-sm transition flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-check-circle"></i> Approve
+                            </button>
+                            <button onclick="window.rejectPayment('${data.id}')" class="bg-red-50 hover:bg-red-600 active:scale-95 text-red-600 hover:text-white border border-red-200 py-3 rounded-xl text-xs md:text-sm font-black transition flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-circle-xmark"></i> Reject
+                            </button>
+                        </div>
+                    </div>
                 `;
             });
         };
 
         window.approvePayment = async function(paymentDocId, userId, creditsToAdd, vipDaysToAdd) {
             const confirmMsg = vipDaysToAdd > 0 
-                ? `Approve Payment:\n• Add +${creditsToAdd} Credits\n• Add +${vipDaysToAdd} Days VIP Access\n\nContinue?`
+                ? `Approve Payment:\n• Add +${creditsToAdd} Credits\n• Add +${vipDaysToAdd} Days VIP Access\n\nक्या आप कन्फर्म हैं?`
                 : `Approve Payment and add +${creditsToAdd} Credits to this user?`;
             
             if(!confirm(confirmMsg)) return;
@@ -170,8 +254,8 @@
                 await updateDoc(doc(db, "payments", paymentDocId), { status: "Approved" });
 
                 alert(vipDaysToAdd > 0 
-                    ? `Approved! +${creditsToAdd} Credits & +${vipDaysToAdd} Days VIP Validity added!` 
-                    : `Approved! +${creditsToAdd} Credits added to user wallet.`);
+                    ? `Approved! +${creditsToAdd} Credits और +${vipDaysToAdd} Days VIP वैलिडिटी जोड़ दी गई है!` 
+                    : `Approved! +${creditsToAdd} Credits यूज़र के वॉलेट में जोड़ दिए गए हैं।`);
                 
                 await window.loadAllUsersForDropdown();
                 window.loadPendingPayments();
@@ -179,37 +263,20 @@
         };
 
         window.rejectPayment = async function(paymentDocId) {
-            if(!confirm(`Are you sure you want to REJECT this payment?`)) return;
+            if(!confirm(`क्या आप वाकई इस पेमेंट रिक्वेस्ट को REJECT करना चाहते हैं?`)) return;
             try {
                 await updateDoc(doc(db, "payments", paymentDocId), { status: "Rejected" });
                 window.loadPendingPayments();
             } catch (err) { alert('Error rejecting payment: ' + err.message); }
         };
 
-        // ================= IN-APP PREVIEW =================
-        window.openPdfViewer = function(fileId, fileName) {
-            document.getElementById('pdfViewerTitle').innerText = fileName;
-            document.getElementById('pdfLoadingSpinner').style.display = 'flex';
-            document.getElementById('pdfIframe').src = `https://drive.google.com/file/d/${fileId}/preview`;
-            const downloadBtn = document.getElementById('modalDownloadBtn');
-            downloadBtn.onclick = function() { window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank'); };
-            document.getElementById('pdfViewerModal').classList.remove('hidden');
-            document.body.style.overflow = 'hidden'; 
-        };
-
-        window.closePdfViewer = function() {
-            document.getElementById('pdfViewerModal').classList.add('hidden');
-            document.getElementById('pdfIframe').src = ''; 
-            document.body.style.overflow = 'auto'; 
-        };
-
-        // ================= SECTION 1: USER & VIP VALIDITY (+30/+60/+90 DAYS) =================
+        // ================= SECTION 2: USER & VIP VALIDITY MANAGEMENT =================
         window.loadAllUsersForDropdown = async function() {
             try {
                 const usersSnap = await getDocs(collection(db, "users"));
                 const select = document.getElementById('userSelectDropdown');
-                const currentSelected = select.value;
-                select.innerHTML = '<option value="">-- Please select a user --</option>';
+                const currentSelected = select ? select.value : '';
+                if (select) select.innerHTML = '<option value="">-- यूज़र सेलेक्ट करें --</option>';
                 window.usersDataList = {}; 
                 
                 const now = Date.now();
@@ -218,9 +285,9 @@
                     window.usersDataList[docSnap.id] = data;
                     const isCurrentlyVip = data.isVip && (!data.vipExpiry || data.vipExpiry > now);
                     const vipLabel = isCurrentlyVip ? '👑 [VIP] ' : '';
-                    select.innerHTML += `<option value="${docSnap.id}">${vipLabel}${data.email}</option>`;
+                    if (select) select.innerHTML += `<option value="${docSnap.id}">${vipLabel}${data.email} (${data.credits || 0} Cr)</option>`;
                 });
-                if (currentSelected && window.usersDataList[currentSelected]) {
+                if (select && currentSelected && window.usersDataList[currentSelected]) {
                     select.value = currentSelected;
                     window.handleUserSelection();
                 }
@@ -235,7 +302,6 @@
             if(uid && window.usersDataList[uid]) {
                 const uData = window.usersDataList[uid];
                 display.innerText = uData.credits || 0;
-                display.classList.remove('text-slate-400'); display.classList.add('text-royal-600');
 
                 const now = Date.now();
                 const expiry = uData.vipExpiry || 0;
@@ -246,40 +312,39 @@
                         const remDays = Math.ceil((expiry - now) / MS_PER_DAY);
                         const expDateStr = new Date(expiry).toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
                         vipBadge.innerHTML = `
-                            <span class="bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1 rounded-full text-xs font-black inline-block">
-                                <i class="fa-solid fa-crown text-amber-500 mr-1"></i>VIP Active (${remDays} Days Left)
+                            <span class="bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full text-xs font-black inline-block">
+                                👑 VIP (${remDays}d Left)
                             </span>
-                            <div class="text-[10px] font-bold text-slate-500 mt-1">Expires: ${expDateStr}</div>
+                            <div class="text-[10px] font-bold text-slate-500 mt-0.5">Exp: ${expDateStr}</div>
                         `;
                     } else {
-                        vipBadge.innerHTML = '<span class="bg-amber-100 text-amber-800 border border-amber-300 px-3 py-1 rounded-full text-xs font-black"><i class="fa-solid fa-crown text-amber-500 mr-1"></i>VIP Active</span>';
+                        vipBadge.innerHTML = '<span class="bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 rounded-full text-xs font-black">👑 VIP Active</span>';
                     }
                 } else {
-                    vipBadge.innerHTML = '<span class="bg-slate-100 text-slate-600 border border-slate-200 px-3 py-1 rounded-full text-xs font-bold">Normal User (No VIP)</span>';
+                    vipBadge.innerHTML = '<span class="bg-slate-200 text-slate-700 px-2.5 py-0.5 rounded-full text-xs font-bold">Normal User</span>';
                 }
             } else {
                 display.innerText = '--';
-                display.classList.add('text-slate-400'); display.classList.remove('text-royal-600');
                 vipBadge.innerHTML = '--';
             }
         };
 
         window.adminUpdateVipDays = async function(daysToAdd) {
             const uid = document.getElementById('userSelectDropdown').value;
-            if (!uid || !window.usersDataList[uid]) return alert('Please select a user first!');
+            if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले ड्रॉपडाउन से यूज़र सेलेक्ट करें!');
 
             const uData = window.usersDataList[uid];
             const msg = document.getElementById('adminMsg');
 
             try {
                 if (daysToAdd === 0) {
-                    if (!confirm(`Are you sure you want to remove VIP Access for ${uData.email} and make them a Normal User?`)) return;
+                    if (!confirm(`क्या आप ${uData.email} का VIP Access हटाकर उसे Normal User बनाना चाहते हैं?`)) return;
                     await updateDoc(doc(db, "users", uid), { isVip: false, vipExpiry: 0 });
                     window.usersDataList[uid].isVip = false;
                     window.usersDataList[uid].vipExpiry = 0;
 
-                    msg.className = "mt-3 p-3 bg-slate-100 text-slate-800 rounded-xl text-sm font-bold border border-slate-300";
-                    msg.innerHTML = `<i class="fa-solid fa-user mr-1"></i> VIP Access removed! User is now a Normal User.`;
+                    msg.className = "mt-3 p-3 bg-slate-100 text-slate-800 rounded-xl text-xs font-bold border border-slate-300 text-center";
+                    msg.innerHTML = `VIP Access हटा दिया गया है! यूज़र अब Normal User है।`;
                 } else {
                     const now = Date.now();
                     const currentExpiry = uData.vipExpiry || 0;
@@ -291,8 +356,8 @@
                     window.usersDataList[uid].vipExpiry = newExpiry;
 
                     const totalDaysNow = Math.ceil((newExpiry - now) / MS_PER_DAY);
-                    msg.className = "mt-3 p-3 bg-amber-50 text-amber-900 rounded-xl text-sm font-bold border border-amber-300";
-                    msg.innerHTML = `<i class="fa-solid fa-crown text-amber-500 mr-1"></i> +${daysToAdd} Days VIP Added! Total Active Validity: <strong>${totalDaysNow} Days</strong>.`;
+                    msg.className = "mt-3 p-3 bg-amber-50 text-amber-900 rounded-xl text-xs font-bold border border-amber-300 text-center";
+                    msg.innerHTML = `👑 +${daysToAdd} Days VIP जोड़ दिए गए! कुल एक्टिव वैलिडिटी: <strong>${totalDaysNow} Days</strong>`;
                 }
 
                 await window.loadAllUsersForDropdown();
@@ -306,13 +371,13 @@
             }
         };
 
-        // 🔥 CREATE NEW USER: DEFAULT 30 CREDITS + 2 DAYS VIP TRIAL
+        // CREATE NEW USER: DEFAULT 30 CREDITS + 2 DAYS VIP TRIAL
         window.createNewUserByAdmin = async function(event) {
             event.preventDefault();
-            const newUserEmail = document.getElementById('newAdminUserEmail').value.trim().toLowerCase();
+            const rawUser = document.getElementById('newAdminUserEmail').value.trim().toLowerCase();
+            const newUserEmail = rawUser.includes('@') ? rawUser : `${rawUser}@ovportal.com`;
             const newUserPass = document.getElementById('newAdminUserPass').value.trim();
             
-            // Default 30 Credits & 2 Days VIP if left untouched
             const creditsInputVal = parseInt(document.getElementById('newAdminUserCredits').value);
             const initialCredits = isNaN(creditsInputVal) ? 30 : creditsInputVal;
             
@@ -323,7 +388,7 @@
             const btn = event.target.querySelector('button[type="submit"]');
             
             btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating...';
-            msg.classList.remove('hidden'); msg.innerText = "Registering user with 30 Credits & 2 Days VIP...";
+            msg.classList.remove('hidden'); msg.innerText = "Creating account...";
 
             try {
                 const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`, {
@@ -345,18 +410,17 @@
                     createdAt: new Date()
                 });
                 
-                msg.className = "mt-3 p-3 bg-green-50 text-green-800 rounded-xl text-sm font-bold border border-green-300";
-                msg.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> User Created! <strong>${initialCredits} Credits</strong> & <strong>${isVip ? `+${initialVipDays} Days VIP Access 👑` : 'Normal Access'}</strong> activated.`;
+                msg.className = "mt-3 p-3 bg-green-50 text-green-800 rounded-xl text-xs font-bold border border-green-300 text-center";
+                msg.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> ID Created: <strong>${newUserEmail}</strong> (${initialCredits} Cr + ${initialVipDays}d VIP)`;
                 
-                // Reset form and keep 30 Credits + 2 Days VIP as default
                 event.target.reset();
                 document.getElementById('newAdminUserCredits').value = 30;
                 document.getElementById('newAdminUserVipDays').value = "2";
                 
                 await window.loadAllUsersForDropdown();
             } catch(err) {
-                msg.className = "mt-3 p-3 bg-red-50 text-red-700 rounded-xl text-sm font-bold border border-red-200";
-                msg.innerHTML = `<i class="fa-solid fa-circle-xmark mr-1"></i> Error: ${err.message}`;
+                msg.className = "mt-3 p-3 bg-red-50 text-red-700 rounded-xl text-xs font-bold border border-red-200 text-center";
+                msg.innerHTML = `Error: ${err.message}`;
             } finally { btn.disabled = false; btn.innerText = "Register User (30 Credits + 2d VIP)"; }
         };
 
@@ -364,13 +428,13 @@
             const uid = document.getElementById('userSelectDropdown').value;
             const amount = parseInt(document.getElementById('creditAdjustmentAmount').value);
             
-            if(!uid) return alert('Please select a user!');
-            if(!amount || amount <= 0) return alert('Please enter a valid amount!');
+            if(!uid) return alert('कृपया पहले यूज़र सेलेक्ट करें!');
+            if(!amount || amount <= 0) return alert('कृपया सही क्रेडिट संख्या डालें!');
 
             const btnId = action === 'add' ? 'btnAdd' : 'btnSub';
             const btn = document.getElementById(btnId);
             const origText = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>...'; btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; btn.disabled = true;
 
             const msg = document.getElementById('adminMsg'); msg.classList.remove('hidden');
 
@@ -387,52 +451,23 @@
                 document.getElementById('currentUserCreditsDisplay').innerText = newCredits;
                 document.getElementById('creditAdjustmentAmount').value = ''; 
                 
-                msg.className = "mt-3 p-3 bg-green-50 text-green-700 rounded-xl text-sm font-bold border border-green-200";
-                msg.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> Update successful! New Credits: <strong>${newCredits}</strong>`;
+                msg.className = "mt-3 p-3 bg-green-50 text-green-700 rounded-xl text-xs font-bold border border-green-200 text-center";
+                msg.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> अपडेट हो गया! नया बैलेंस: <strong>${newCredits} Credits</strong>`;
+                await window.loadAllUsersForDropdown();
+                document.getElementById('userSelectDropdown').value = uid;
             } catch(err) {
-                msg.className = "mt-3 p-3 bg-red-50 text-red-700 rounded-xl text-sm font-bold border border-red-200";
-                msg.innerHTML = `<i class="fa-solid fa-circle-xmark mr-1"></i> Error: ${err.message}`;
+                msg.className = "mt-3 p-3 bg-red-50 text-red-700 rounded-xl text-xs font-bold border border-red-200 text-center";
+                msg.innerHTML = `Error: ${err.message}`;
             } finally {
                 btn.innerHTML = origText; btn.disabled = false;
                 setTimeout(() => { msg.classList.add('hidden'); }, 3000);
             }
         };
 
-        // ================= SECTION 2: PREMIUM SERVICES =================
-        window.submitPremiumForm = async function(event, serviceType) {
-            event.preventDefault();
-            const formElement = event.target;
-            const submitBtn = formElement.querySelector('button[type="submit"]');
-            const originalBtnText = submitBtn.innerHTML;
-            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Generating...';
-            submitBtn.disabled = true;
-
-            const formData = new FormData(formElement);
-            formData.append('USER_ID', window.currentUserData.email);
-            formData.append('SERVICE_TYPE', serviceType);
-            const dataObj = {}; formData.forEach((v, k) => { dataObj[k] = v; });
-            let targetUrl = serviceType.toLowerCase().includes('annexure') ? API_URLS["ANNEXURE"] : API_URLS["AFFIDAVIT"];
-
-            try {
-                const res = await fetch(targetUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(dataObj) });
-                const result = await res.json();
-
-                if (result.success || result.fileId) {
-                    await addDoc(collection(db, "history"), {
-                        userId: window.currentUserData.uid, fileName: `${dataObj.NAME || 'Premium Doc'} - ${serviceType}.pdf`,
-                        fileId: result.fileId || result.id || 'N/A', serviceType: serviceType, timestamp: new Date()
-                    });
-                    alert(`Success! Document generated. View in 'Database Records'.`);
-                    formElement.reset();
-                } else { throw new Error(result.error || 'API Response Failed'); }
-            } catch(err) { alert('Technical issue occurred: ' + err.message); } 
-            finally { submitBtn.innerHTML = originalBtnText; submitBtn.disabled = false; }
-        };
-
-        // ================= SECTION 3: HISTORY =================
+        // ================= SECTION 3: DATABASE RECORDS (HISTORY PREVIEW & DELETE) =================
         window.loadAdminHistory = async function() {
-            const tbody = document.getElementById('adminHistoryTableBody');
-            tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400 font-bold"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2 text-royal-500"></i><br>Loading records from database...</td></tr>`;
+            const container = document.getElementById('adminHistoryListContainer');
+            container.innerHTML = `<div class="p-10 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>रिकॉर्ड्स लोड हो रहे हैं...</div>`;
 
             try {
                 const filterUserDropdown = document.getElementById('filterUser');
@@ -452,57 +487,67 @@
                 const historySnap = await getDocs(collection(db, "history"));
                 window.adminAllHistoryData = [];
                 historySnap.forEach(docSnap => { window.adminAllHistoryData.push({ id: docSnap.id, ...docSnap.data() }); });
-                window.adminAllHistoryData.sort((a, b) => b.timestamp.seconds - a.timestamp.seconds);
+                window.adminAllHistoryData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
 
                 window.renderAdminHistory(); 
             } catch (err) {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500 font-bold">Error: ${err.message}</td></tr>`;
+                container.innerHTML = `<div class="p-6 text-center text-red-500 font-bold bg-white rounded-2xl">Error: ${err.message}</div>`;
             }
         };
 
         window.renderAdminHistory = function() {
-            const tbody = document.getElementById('adminHistoryTableBody');
+            const container = document.getElementById('adminHistoryListContainer');
             const fUser = document.getElementById('filterUser').value;
             const fType = document.getElementById('filterType').value;
 
-            let filteredData = window.adminAllHistoryData;
+            const indexedData = window.adminAllHistoryData.map((item, idx) => ({ ...item, _origIndex: idx }));
+            let filteredData = indexedData;
             if (fUser !== 'ALL') filteredData = filteredData.filter(item => item.userId === fUser);
             if (fType !== 'ALL') filteredData = filteredData.filter(item => item.serviceType === fType);
 
             document.getElementById('historyCount').innerText = `Total Files: ${filteredData.length}`;
 
-            tbody.innerHTML = '';
+            container.innerHTML = '';
             if(filteredData.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-10 text-center text-slate-400"><i class="fa-regular fa-folder-open text-5xl mb-3 text-slate-300"></i><br>No records found.</td></tr>`;
+                container.innerHTML = `<div class="p-10 text-center text-slate-400 bg-white rounded-2xl border border-slate-100"><i class="fa-regular fa-folder-open text-4xl mb-2 text-slate-300"></i><br>कोई फाइल नहीं मिली।</div>`;
                 return;
             }
 
             filteredData.forEach(data => {
-                const dateObj = new Date(data.timestamp.seconds * 1000);
+                const sec = data.timestamp?.seconds || Math.floor(Date.now() / 1000);
+                const dateObj = new Date(sec * 1000);
                 const dateStr = dateObj.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
                 const timeStr = dateObj.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
                 
-                const userEmail = (data.userId === window.currentUserData.uid) 
-                    ? '<span class="text-royal-600 font-bold bg-royal-50 px-2 py-1 rounded-md border border-royal-200"><i class="fa-solid fa-crown text-[10px]"></i> Harish</span>' 
-                    : `<span class="font-semibold text-slate-700">${window.allUsersMap[data.userId] || 'Unknown'}</span>`;
+                const userBadge = (data.userId === window.currentUserData.uid) 
+                    ? '<span class="text-royal-700 font-black bg-royal-100 px-2 py-0.5 rounded text-[10px] border border-royal-200">👑 Admin</span>' 
+                    : `<span class="font-bold text-slate-600 text-xs">${window.allUsersMap[data.userId] || 'User'}</span>`;
 
-                tbody.innerHTML += `
-                    <tr class="border-b border-slate-100 text-sm hover:bg-slate-50 transition duration-200">
-                        <td class="p-4">${userEmail}</td>
-                        <td class="p-4 font-bold text-slate-800">${data.fileName}</td>
-                        <td class="p-4"><span class="bg-slate-100 text-slate-600 border border-slate-200 px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wide">${data.serviceType}</span></td>
-                        <td class="p-4 text-slate-500 text-xs font-medium">${dateStr} <br> ${timeStr}</td>
-                        <td class="p-4 text-right whitespace-nowrap">
-                            <button onclick="window.openPdfViewer('${data.fileId}', '${data.fileName}')" class="inline-flex items-center gap-1 bg-royal-50 text-royal-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-royal-500 hover:text-white transition shadow-sm mr-2 border border-royal-200"><i class="fa-solid fa-eye"></i> Preview</button>
-                            <button onclick="window.deleteHistoryRecord('${data.id}')" class="inline-flex items-center w-8 h-8 justify-center bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition shadow-sm border border-red-100" title="Delete"><i class="fa-solid fa-trash"></i></button>
-                        </td>
-                    </tr>
+                container.innerHTML += `
+                    <div class="bg-white p-3.5 md:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 hover:border-royal-400 transition">
+                        <div class="space-y-1 overflow-hidden w-full">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-md text-[10px] font-black uppercase">${data.serviceType}</span>
+                                ${userBadge}
+                                <span class="text-[11px] text-slate-400 font-medium ml-auto sm:ml-0">${dateStr} • ${timeStr}</span>
+                            </div>
+                            <p class="font-black text-slate-800 text-xs md:text-sm truncate">${data.fileName}</p>
+                        </div>
+                        <div class="flex items-center gap-2 w-full sm:w-auto justify-end shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+                            <button onclick="window.openPdfViewer('${data.fileId}', '${data.fileName}', ${data._origIndex})" class="flex-1 sm:flex-initial justify-center inline-flex items-center gap-1.5 bg-royal-50 text-royal-700 px-3.5 py-2 rounded-xl text-xs font-black hover:bg-royal-500 hover:text-white transition border border-royal-200">
+                                <i class="fa-solid fa-eye"></i> Preview & PDF
+                            </button>
+                            <button onclick="window.deleteHistoryRecord('${data.id}')" class="w-9 h-9 inline-flex items-center justify-center bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition border border-red-100" title="Delete">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
                 `;
             });
         };
 
         window.deleteHistoryRecord = async function(docId) {
-            if(!confirm('Warning: Do you really want to permanently delete this file?')) return;
+            if(!confirm('क्या आप इस फाइल को हमेशा के लिए डिलीट करना चाहते हैं?')) return;
             try { await deleteDoc(doc(db, "history", docId)); window.loadAdminHistory(); } 
             catch (err) { alert('Error deleting: ' + err.message); }
         };
@@ -514,8 +559,8 @@
             if (fUser !== 'ALL') filteredData = filteredData.filter(item => item.userId === fUser);
             if (fType !== 'ALL') filteredData = filteredData.filter(item => item.serviceType === fType);
 
-            if (filteredData.length === 0) return alert('No files found to delete!');
-            if(!confirm(`Warning!\nDo you really want to delete these ${filteredData.length} files permanently?`)) return;
+            if (filteredData.length === 0) return alert('डिलीट करने के लिए कोई फाइल नहीं है!');
+            if(!confirm(`चेतावनी!\nक्या आप वाकई इन ${filteredData.length} फाइलों को हमेशा के लिए डिलीट करना चाहते हैं?`)) return;
 
             const btn = document.getElementById('bulkDeleteBtn');
             const origHTML = btn.innerHTML;
@@ -523,352 +568,685 @@
 
             try {
                 await Promise.all(filteredData.map(item => deleteDoc(doc(db, "history", item.id))));
-                alert(`Success! ${filteredData.length} files deleted.`);
+                alert(`Success! ${filteredData.length} फाइलें डिलीट कर दी गईं।`);
                 window.loadAdminHistory(); 
             } catch (err) { alert('Error occurred: ' + err.message); } 
             finally { btn.innerHTML = origHTML; btn.disabled = false; }
         };
 
+        // ================= UNIFIED HTML RENDERER FOR PREVIEWING USER-GENERATED ANNEXURES IN HISTORY =================
+        window.buildLocalAffidavitHtml = function(fileId, d = {}, withShadow = true) {
+            const shadowClass = withShadow ? 'shadow-2xl' : '';
+
+            if (fileId === 'LOCAL_HTML_ANNEXURE_1') {
+                return `
+                    <div class="affidavit-paper ${shadowClass}">
+                        <div>
+                            <div style="text-align: center; font-weight: bold; font-size: 17px; text-decoration: underline; margin-bottom: 6px;">Annexure-I- For Adults</div>
+                            <div style="text-align: center; font-weight: bold; font-size: 16px; text-decoration: underline; margin-bottom: 10px;">Affidavit for date of birth updation</div>
+                            <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4; margin-bottom: 22px;">
+                                (Applicable for cases where the DoB is verified in Aadhaar. To be printed on non-judicial<br>
+                                stamp paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)
+                            </div>
+                            <div style="text-align: justify; line-height: 1.75; margin-bottom: 14px;">
+                                1. I, <span class="filled-val">${d.applicantName || ''}</span> ${d.rel || 'S/D/W/o'} <span class="filled-val">${d.relativeName || ''}</span> resident of <span class="filled-val">${d.address || ''}</span> holding Aadhaar number <span class="filled-val">${d.idNumber || ''}</span> do hereby solemnly affirm and declare as under:-
+                            </div>
+                            <ol style="list-style-type: lower-roman; padding-left: 34px; margin-bottom: 18px; text-align: justify;">
+                                <li style="margin-bottom: 11px; padding-left: 6px;">That I am the resident of the above said address.</li>
+                                <li style="margin-bottom: 11px; padding-left: 6px;">That my correct date of birth is <span class="filled-val">${d.newDob || ''}</span>.</li>
+                                <li style="margin-bottom: 11px; padding-left: 6px;">That the earlier recorded date of birth in Aadhaar is <span class="filled-val">${d.oldDob || ''}</span> based on <span class="filled-val">${d.oldDoc || ''}</span> document submitted by me.</li>
+                                <li style="margin-bottom: 11px; padding-left: 6px;">That I have <span class="filled-val">${d.updateTimes || 'NEVER'}</span> (never/once/ more than once) updated my date of birth in Aadhaar.</li>
+                                <li style="margin-bottom: 11px; padding-left: 6px;">That currently a corrected version of the same document as mentioned in (iii) above / birth certificate (choose as applicable) is being provided in support of DoB update request.</li>
+                                <li style="margin-bottom: 11px; padding-left: 6px;">That I wish to get my date of birth updated in the Aadhaar as <span class="filled-val">${d.newDob || ''}</span> for which I am submitting <span class="filled-val">${d.newDoc || ''}</span> as proof of date of birth.</li>
+                                <li style="margin-bottom: 11px; padding-left: 6px;">That I further undertake that I shall not be eligible for any further updation of my date of birth in Aadhaar.</li>
+                            </ol>
+                            <div style="text-align: justify; line-height: 1.65; margin-bottom: 14px;">
+                                2. I undertake that if the document submitted as proof of date of birth is found to be fraudulent/false/forged/non-genuine or I was not entitled for the said document, my Aadhaar number may be deactivated as per Regulation 28 of the Aadhaar (Enrolment and Update) Regulations, 2016 and I shall be liable to be prosecuted under provisions of the applicable law.
+                            </div>
+                            <div style="text-align: justify; line-height: 1.65; margin-bottom: 38px;">
+                                3. I hereby declare that all the information mentioned above is true to the best of my knowledge. In case of any discrepancies, the undersigned will be held responsible.
+                            </div>
+                        </div>
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 26px; font-weight: bold;">
+                                <div>Date: <span class="filled-val">${d.date || ''}</span></div>
+                                <div style="text-align: right;">
+                                    <div style="margin-bottom: 4px;" class="filled-val">${d.applicantName || ''}</div>
+                                    <div>Name &amp; Signature of Resident (Deponent)</div>
+                                </div>
+                            </div>
+                            <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4;">
+                                (This affidavit may be signed and attested in presence of a Judicial Magistrate or Executive<br>Magistrate/Notary Public)
+                            </div>
+                        </div>
+                    </div>`;
+            }
+
+            if (fileId === 'LOCAL_HTML_ANNEXURE_1A') {
+                return `
+                    <div class="affidavit-paper ${shadowClass}">
+                        <div>
+                            <div style="text-align: center; font-weight: bold; font-size: 17px; text-decoration: underline; margin-bottom: 6px;">Annexure IA- For children</div>
+                            <div style="text-align: center; font-weight: bold; font-size: 16px; text-decoration: underline; margin-bottom: 8px;">Affidavit for date of birth updation</div>
+                            <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4; margin-bottom: 18px;">
+                                (Applicable for cases where the DoB is verified in Aadhaar. To be printed on non-judicial<br>
+                                stamp paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)
+                            </div>
+                            <div style="text-align: justify; line-height: 1.7; margin-bottom: 12px;">
+                                1. I, <span class="filled-val">${d.parentName || ''}</span> ${d.rel || 'S/D/W/o'} <span class="filled-val">${d.relativeName || ''}</span> resident of <span class="filled-val">${d.address || ''}</span> holding Aadhaar number <span class="filled-val">${d.parentIdNumber || ''}</span> do hereby solemnly affirm and declare as under:-
+                            </div>
+                            <ol style="list-style-type: lower-roman; padding-left: 34px; margin-bottom: 16px; text-align: justify;">
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I am the resident of the above said address.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I am parent/legal guardian of the <span class="filled-val">${d.childName || ''}</span> holding Aadhaar number <span class="filled-val">${d.childIdNumber || ''}</span>.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That correct date of birth of my child/ ward is <span class="filled-val">${d.newDob || ''}</span>.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That the earlier recorded date of birth in Aadhaar of my child/ward is <span class="filled-val">${d.oldDob || ''}</span> based on <span class="filled-val">${d.oldDoc || ''}</span> document submitted by me.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I have <span class="filled-val">${d.updateTimes || 'NEVER'}</span> (never/once/more than once) updated my child/ward date of birth in Aadhaar.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That birth certificate of my child/ward is being provided in support of DoB update request.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I wish to get my child/ward date of birth updated in the Aadhaar as <span class="filled-val">${d.newDob || ''}</span> for which I am submitting his/her <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> as proof of date of birth.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I further undertake that my child/ward shall not be eligible for any further updation of date of birth in Aadhaar.</li>
+                            </ol>
+                            <div style="text-align: justify; line-height: 1.6; margin-bottom: 10px;">2. That I am the resident of the above said address.</div>
+                            <div style="text-align: justify; line-height: 1.6; margin-bottom: 12px;">
+                                3. I undertake that if the document submitted as proof of date of birth is found to be fraudulent/false/forged/non-genuine or my child/ward was not entitled for the said document, the Aadhaar number of my child/ward may be deactivated as per Regulation 28 of the Aadhaar (Enrolment and Update) Regulations, 2016 and I shall be liable to be prosecuted under provisions of the applicable law.
+                            </div>
+                            <div style="text-align: justify; line-height: 1.6; margin-bottom: 28px;">
+                                4. I hereby declare that all the information mentioned above is true to the best of my knowledge. In case of any discrepancies, the undersigned will be held responsible.
+                            </div>
+                        </div>
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 22px; font-weight: bold;">
+                                <div>Date: <span class="filled-val">${d.date || ''}</span></div>
+                                <div style="text-align: right;">
+                                    <div style="margin-bottom: 4px;" class="filled-val">${d.parentName || ''}</div>
+                                    <div>Name &amp; Signature of Parent/Guardian of Minor (Deponent)</div>
+                                </div>
+                            </div>
+                            <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4;">
+                                (This affidavit may be signed and attested in presence of a Judicial Magistrate or Executive<br>Magistrate/Notary Public)
+                            </div>
+                        </div>
+                    </div>`;
+            }
+
+            if (fileId === 'LOCAL_HTML_ANNEXURE_3') {
+                return `
+                    <div class="affidavit-paper ${shadowClass}">
+                        <div>
+                            <div style="text-align: center; font-weight: bold; font-size: 17px; text-decoration: underline; margin-bottom: 6px;">Annexure III-For adults</div>
+                            <div style="text-align: center; font-weight: bold; font-size: 16px; text-decoration: underline; margin-bottom: 8px;">Affidavit for reactivation of Aadhaar</div>
+                            <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4; margin-bottom: 20px;">
+                                (To be printed on non-judicial stamp paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)
+                            </div>
+                            <div style="text-align: justify; line-height: 1.75; margin-bottom: 14px;">
+                                1. I, <span class="filled-val">${d.applicantName || ''}</span> ${d.rel || 'S/D/W/o'} <span class="filled-val">${d.relativeName || ''}</span> resident of <span class="filled-val">${d.address || ''}</span> holding Aadhaar number <span class="filled-val">${d.idNumber || ''}</span> do hereby solemnly affirm and declare as under: -
+                            </div>
+                            <ol style="list-style-type: lower-roman; padding-left: 34px; margin-bottom: 18px; text-align: justify;">
+                                <li style="margin-bottom: 10px; padding-left: 6px;">That I am resident of the above said address.</li>
+                                <li style="margin-bottom: 10px; padding-left: 6px;">That I had earlier submitted an invalid document - <span class="filled-val">${d.invalidDocName || ''}</span> bearing number <span class="filled-val">${d.invalidDocNo || ''}</span> dated <span class="filled-val">${d.invalidDocDate || ''}</span> and provided false information, while enrolment/update through EID number <span class="filled-val">${d.eidNumber || ''}</span> as proof of date of birth.</li>
+                                <li style="margin-bottom: 10px; padding-left: 6px;">That I understand and accept that submission of such invalid document and false information is a violation of law and legal action may be taken against me for the same under Aadhaar Act and/or any other applicable laws.</li>
+                                <li style="margin-bottom: 10px; padding-left: 6px;">That I sincerely regret this act and tenders an unconditional apology and ensures that such mistake shall not be repeated.</li>
+                                <li style="margin-bottom: 10px; padding-left: 6px;">That I humbly seek pardon and request UIDAI to kindly reactivate my Aadhaar number <span class="filled-val">${d.idNumber || ''}</span> to enable its continued usage.</li>
+                                <li style="margin-bottom: 10px; padding-left: 6px;">That I undertake to submit only genuine, correct and verifiable proof of date of birth document <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> in support of my request to reactivate my Aadhaar.</li>
+                                <li style="margin-bottom: 10px; padding-left: 6px;">That I further undertake that I shall not be eligible for any further updation of my date of birth in Aadhaar.</li>
+                            </ol>
+                            <div style="text-align: justify; line-height: 1.65; margin-bottom: 14px;">
+                                2. I undertake that if the document submitted as proof of date of birth is found to be fraudulent/false/forged/non-genuine or I was not entitled for the said document, my Aadhaar number may again be deactivated as per Regulation 28 of the Aadhaar (Enrolment and Update) Regulations, 2016 and I shall be liable to be prosecuted under provisions of the applicable laws.
+                            </div>
+                            <div style="text-align: justify; line-height: 1.65; margin-bottom: 34px;">
+                                3. I hereby declare that all the information mentioned above is true to the best of my knowledge. In case of any discrepancies if arises, the undersigned will be held responsible.
+                            </div>
+                        </div>
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; font-weight: bold;">
+                                <div>Date: <span class="filled-val">${d.date || ''}</span></div>
+                                <div style="text-align: right;">
+                                    <div style="margin-bottom: 4px;" class="filled-val">${d.applicantName || ''}</div>
+                                    <div>Name &amp; Signature of Resident (Deponent)</div>
+                                </div>
+                            </div>
+                            <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4;">
+                                (This affidavit may be signed and attested in presence of a Judicial Magistrate or Executive<br>Magistrate/Notary Public)
+                            </div>
+                        </div>
+                    </div>`;
+            }
+
+            if (fileId === 'LOCAL_HTML_ANNEXURE_3A') {
+                return `
+                    <div class="affidavit-paper ${shadowClass}">
+                        <div>
+                            <div style="text-align: center; font-weight: bold; font-size: 17px; text-decoration: underline; margin-bottom: 6px;">Annexure IIIA-For children</div>
+                            <div style="text-align: center; font-weight: bold; font-size: 16px; text-decoration: underline; margin-bottom: 8px;">Affidavit for reactivation of Aadhaar</div>
+                            <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4; margin-bottom: 18px;">
+                                (To be printed on non-judicial stamp paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)
+                            </div>
+                            <div style="text-align: justify; line-height: 1.7; margin-bottom: 12px;">
+                                1. I, <span class="filled-val">${d.parentName || ''}</span> ${d.rel || 'S/D/W/o'} <span class="filled-val">${d.relativeName || ''}</span> resident of <span class="filled-val">${d.address || ''}</span> holding Aadhaar number <span class="filled-val">${d.parentIdNumber || ''}</span> do hereby solemnly affirm and declare as under: -
+                            </div>
+                            <ol style="list-style-type: lower-roman; padding-left: 34px; margin-bottom: 16px; text-align: justify;">
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I am resident of the above said address.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I am parent/legal guardian of the <span class="filled-val">${d.childName || ''}</span> holding Aadhaar No <span class="filled-val">${d.childIdNumber || ''}</span>.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I had earlier submitted an invalid document- <span class="filled-val">${d.invalidDocName || ''}</span> bearing number <span class="filled-val">${d.invalidDocNo || ''}</span> dated <span class="filled-val">${d.invalidDocDate || ''}</span> or provided false information, while enrolment/update through EID number <span class="filled-val">${d.eidNumber || ''}</span> as proof of date of birth of my child/ward.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I understand and accepts that submission of such invalid document and false information is a violation of law and legal action may be taken against me for the same under Aadhaar Act and/or any other applicable laws.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I sincerely regret this act and tenders an unconditional apology and ensures that such mistake shall not be repeated.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I humbly seek pardon and request UIDAI to kindly reactivate my child/ward Aadhaar number <span class="filled-val">${d.childIdNumber || ''}</span> to enable its continued usage.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I undertake to submit only genuine, correct and verifiable proof of date of birth document <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> in support of my request to reactivate my child/ward Aadhaar.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I further undertake that my child/ward shall not be eligible for any further updation of date of birth in Aadhaar.</li>
+                            </ol>
+                            <div style="text-align: justify; line-height: 1.6; margin-bottom: 12px;">
+                                2. I undertake that if the document submitted as proof of date of birth is found to be fraudulent/false/forged/non-genuine or my child/ward was not entitled for the same, Aadhaar number of my child/ward may again be deactivated as per Regulation 28 of the Aadhaar (Enrolment and Update) Regulations, 2016 and I shall be liable to be prosecuted under provisions of the applicable laws.
+                            </div>
+                            <div style="text-align: justify; line-height: 1.6; margin-bottom: 28px;">
+                                3. I hereby declare that all the information mentioned above is true to the best of my knowledge. In case of any discrepancies if arises, the undersigned will be held responsible.
+                            </div>
+                        </div>
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 22px; font-weight: bold;">
+                                <div>Date: <span class="filled-val">${d.date || ''}</span></div>
+                                <div style="text-align: right;">
+                                    <div style="margin-bottom: 4px;" class="filled-val">${d.parentName || ''}</div>
+                                    <div>Name &amp; Signature of Parent/Guardian of Minor (Deponent)</div>
+                                </div>
+                            </div>
+                            <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4;">
+                                (This affidavit may be signed and attested in presence of a Judicial Magistrate or Executive<br>Magistrate/Notary Public)
+                            </div>
+                        </div>
+                    </div>`;
+            }
+
+            if (fileId === 'LOCAL_HTML_ANNEXURE_B' || fileId === 'LOCAL_HTML_ANNEXURE_C' || fileId === 'LOCAL_HTML_ANNEXURE_D') {
+                const isChild = (fileId === 'LOCAL_HTML_ANNEXURE_C');
+                const headingMap = {
+                    'LOCAL_HTML_ANNEXURE_B': 'Annexure B (for adults)',
+                    'LOCAL_HTML_ANNEXURE_C': 'Annexure C (for children)',
+                    'LOCAL_HTML_ANNEXURE_D': 'Annexure D (for name update)'
+                };
+                const subTitleText = isChild
+                    ? '(Applicable for Name Change / Correction of Minor Child in Aadhaar by Parent/Legal Guardian)'
+                    : '(Applicable where the Aadhaar number holder seeks to update / change Name in Aadhaar)';
+
+                const bodyPoints = isChild ? `
+                    <li style="margin-bottom: 14px; padding-left: 6px;">That I am the parent/legal guardian of minor child <span class="filled-val">${d.childName || d.newName || ''}</span> holding Aadhaar Number <span class="filled-val">${d.childIdNumber || d.idNumber || ''}</span>.</li>
+                    <li style="margin-bottom: 14px; padding-left: 6px;">That the name of my child/ward is presently recorded in Aadhaar as <span class="filled-val">${d.oldName || ''}</span>.</li>
+                    <li style="margin-bottom: 14px; padding-left: 6px;">That I intend to update/change the name of my child/ward from <span class="filled-val">${d.oldName || ''}</span> to the correct name <span class="filled-val">${d.newName || ''}</span> in Aadhaar, both names referring to one and the same child.</li>
+                    <li style="margin-bottom: 14px; padding-left: 6px;">That I am submitting the prescribed supporting Proof of Identity (PoI) document (<span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span>) in support of the name sought to be updated.</li>
+                    <li style="margin-bottom: 14px; padding-left: 6px;">That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of Aadhaar number and prosecution under the applicable laws.</li>
+                ` : `
+                    <li style="margin-bottom: 14px; padding-left: 6px;">That I am the holder of Aadhaar Number <span class="filled-val">${d.idNumber || ''}</span>.</li>
+                    <li style="margin-bottom: 14px; padding-left: 6px;">That my name is presently recorded in my Aadhaar as <span class="filled-val">${d.oldName || ''}</span>.</li>
+                    <li style="margin-bottom: 14px; padding-left: 6px;">That I have changed/updated my name and intend to record my correct name as <span class="filled-val">${d.newName || ''}</span> in place of <span class="filled-val">${d.oldName || ''}</span> in my Aadhaar, both names referring to one and the same person, i.e. myself.</li>
+                    <li style="margin-bottom: 14px; padding-left: 6px;">That I am submitting the prescribed supporting Proof of Identity (PoI) document (<span class="filled-val">${d.newDoc || 'POI CERTIFICATE'}</span>) in support of the name sought to be updated.</li>
+                    <li style="margin-bottom: 14px; padding-left: 6px;">That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of my Aadhaar number and prosecution under the applicable laws.</li>
+                `;
+
+                return `
+                    <div class="affidavit-paper ${shadowClass}">
+                        <div>
+                            <div style="display: flex; justify-content: space-between; font-family: Arial, sans-serif; font-size: 11px; color: #222; margin-bottom: 20px;">
+                                <span>HQ-16024/4/2020-EU-I-HQ</span>
+                                <span>I/58751/2026</span>
+                            </div>
+                            <div style="text-align: right; font-weight: bold; font-size: 16px; margin-bottom: 12px;">${headingMap[fileId]}</div>
+                            <div style="text-align: center; font-weight: bold; font-size: 17px; margin-bottom: 8px;">AFFIDAVIT</div>
+                            <div style="text-align: center; font-size: 14.5px; line-height: 1.4; margin-bottom: 10px; padding: 0 10px;">${subTitleText}</div>
+                            <div style="text-align: center; font-size: 14.5px; margin-bottom: 22px;">(To be printed on Non-Judicial Stamp Paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)</div>
+                            <div style="text-align: justify; line-height: 1.75; margin-bottom: 16px;">
+                                I, <span>${d.title || 'Shri'}</span> <span class="filled-val">${d.applicantName || ''}</span>, 
+                                <span>${d.rel || 'S/o'}</span> <span class="filled-val">${d.relativeName || ''}</span>, 
+                                resident of <span class="filled-val">${d.address || ''}</span>, do hereby solemnly affirm and declare as under:
+                            </div>
+                            <ol style="list-style-type: decimal; padding-left: 26px; margin-bottom: 20px; text-align: justify;">${bodyPoints}</ol>
+                            <div style="text-align: right; font-weight: bold; margin-top: 30px; margin-bottom: 16px;">Deponent</div>
+                            <div style="font-weight: bold; margin-bottom: 8px;">Verification:</div>
+                            <div style="text-align: justify; line-height: 1.7; margin-bottom: 34px;">
+                                Verified at <span class="filled-val">${d.place || ''}</span> on this <span class="filled-val">${d.day || ''}</span> day of <span class="filled-val">${d.monthYear || ''}</span> that the contents of this affidavit are true and correct to the best of my knowledge and belief, and nothing material has been concealed therefrom.
+                            </div>
+                            <div style="text-align: right; font-weight: bold; margin-bottom: 22px;">Deponent</div>
+                            <div style="text-align: center; font-size: 14.5px; line-height: 1.4;">
+                                (This affidavit may be signed and attested in presence of a Judicial Magistrate or Executive<br>Magistrate/Notary Public)
+                            </div>
+                        </div>
+                        <div style="text-align: right; font-family: Arial, sans-serif; font-size: 12px;">UIDAI Standard Affidavit Format</div>
+                    </div>`;
+            }
+
+            if (fileId === 'LOCAL_HTML_ANNEXURE_F') {
+                return `
+                    <div class="affidavit-paper ${shadowClass}">
+                        <div>
+                            <div style="display: flex; justify-content: space-between; font-family: Arial, sans-serif; font-size: 11px; color: #222; margin-bottom: 20px;">
+                                <span>HQ-16024/4/2020-EU-I-HQ</span>
+                                <span>I/58751/2026</span>
+                            </div>
+                            <div style="text-align: right; font-weight: bold; font-size: 16px; margin-bottom: 12px;">Annexure F (for children)</div>
+                            <div style="text-align: center; font-weight: bold; font-size: 17px; margin-bottom: 8px;">AFFIDAVIT</div>
+                            <div style="text-align: center; font-size: 14.5px; line-height: 1.4; margin-bottom: 10px; padding: 0 10px;">
+                                (Applicable where the name of minor child is recorded in Aadhaar with “urf” or “alias” and the<br>parent/legal guardian seeks to retain one of the names)
+                            </div>
+                            <div style="text-align: center; font-size: 14.5px; margin-bottom: 22px;">(To be printed on Non-Judicial Stamp Paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)</div>
+                            <div style="text-align: justify; line-height: 1.75; margin-bottom: 16px;">
+                                I, <span>${d.title || 'Shri'}</span> <span class="filled-val">${d.parentName || ''}</span>, 
+                                <span>${d.rel || 'S/o'}</span> <span class="filled-val">${d.relativeName || ''}</span>, 
+                                resident of <span class="filled-val">${d.address || ''}</span>, holding Aadhaar Number <span class="filled-val">${d.parentIdNumber || ''}</span>, do hereby solemnly affirm and declare as under:
+                            </div>
+                            <ol style="list-style-type: decimal; padding-left: 26px; margin-bottom: 20px; text-align: justify;">
+                                <li style="margin-bottom: 13px; padding-left: 6px;">That I am the parent/legal guardian of minor child <span class="filled-val">${d.childName || ''}</span> who is the holder of Aadhaar Number <span class="filled-val">${d.childIdNumber || ''}</span>.</li>
+                                <li style="margin-bottom: 13px; padding-left: 6px;">That the name of my child/ward is presently recorded/used as <span class="filled-val">${d.recorded1 || ''}</span> urf or alias <span class="filled-val">${d.recorded2 || ''}</span> in Aadhaar, both names referring to one and the same child.</li>
+                                <li style="margin-bottom: 13px; padding-left: 6px;">That I intend to retain the name <span class="filled-val">${d.retainName || ''}</span> for my child/ward and discontinue the use of <span class="filled-val">${d.removeName || ''}</span> as an alias/urf.</li>
+                                <li style="margin-bottom: 13px; padding-left: 6px;">That the requested update is limited to removal of the “urf or alias” and retention of the aforesaid name and does not amount to a change of identity or adoption of a different name.</li>
+                                <li style="margin-bottom: 13px; padding-left: 6px;">That I am submitting the prescribed supporting document(s) in support of the name of my child/ward sought to be retained.</li>
+                                <li style="margin-bottom: 13px; padding-left: 6px;">That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of Aadhaar number and prosecution under the applicable laws.</li>
+                            </ol>
+                            <div style="text-align: right; font-weight: bold; margin-top: 26px; margin-bottom: 14px;">Deponent (Parent/Guardian)</div>
+                            <div style="font-weight: bold; margin-bottom: 8px;">Verification:</div>
+                            <div style="text-align: justify; line-height: 1.65; margin-bottom: 30px;">
+                                Verified at <span class="filled-val">${d.place || ''}</span> on this <span class="filled-val">${d.day || ''}</span> day of <span class="filled-val">${d.monthYear || ''}</span> that the contents of this affidavit are true and correct to the best of my knowledge and belief, and nothing material has been concealed therefrom.
+                            </div>
+                            <div style="text-align: right; font-weight: bold; margin-bottom: 20px;">Deponent (Parent/Guardian)</div>
+                            <div style="text-align: center; font-size: 14.5px; line-height: 1.4;">
+                                (This affidavit may be signed and attested in presence of a Judicial Magistrate or Executive<br>Magistrate/Notary Public)
+                            </div>
+                        </div>
+                        <div style="text-align: right; font-family: Arial, sans-serif; font-size: 12px;">Page 11 of 11</div>
+                    </div>`;
+            }
+
+            return `
+                <div class="affidavit-paper ${shadowClass}">
+                    <div>
+                        <div style="display: flex; justify-content: space-between; font-family: Arial, sans-serif; font-size: 11px; color: #222; margin-bottom: 20px;">
+                            <span>HQ-16024/4/2020-EU-I-HQ</span>
+                            <span>I/58751/2026</span>
+                        </div>
+                        <div style="text-align: right; font-weight: bold; font-size: 16px; margin-bottom: 12px;">Annexure E (for adults)</div>
+                        <div style="text-align: center; font-weight: bold; font-size: 17px; margin-bottom: 8px;">AFFIDAVIT</div>
+                        <div style="text-align: center; font-size: 14.5px; line-height: 1.4; margin-bottom: 10px; padding: 0 10px;">
+                            (Applicable where the name is recorded in Aadhaar with “urf” or “alias” and the Aadhaar<br>number holder seeks to retain one of the names)
+                        </div>
+                        <div style="text-align: center; font-size: 14.5px; margin-bottom: 22px;">(To be printed on Non-Judicial Stamp Paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)</div>
+                        <div style="text-align: justify; line-height: 1.75; margin-bottom: 16px;">
+                            I, <span>${d.title || 'Shri'}</span> <span class="filled-val">${d.applicantName || ''}</span>, 
+                            <span>${d.rel || 'S/o'}</span> <span class="filled-val">${d.relativeName || ''}</span>, 
+                            resident of <span class="filled-val">${d.address || ''}</span>, do hereby solemnly affirm and declare as under:
+                        </div>
+                        <ol style="list-style-type: decimal; padding-left: 26px; margin-bottom: 20px; text-align: justify;">
+                            <li style="margin-bottom: 14px; padding-left: 6px;">That I am the holder of Aadhaar Number <span class="filled-val">${d.idNumber || ''}</span>.</li>
+                            <li style="margin-bottom: 14px; padding-left: 6px;">That my name is presently recorded/used as <span class="filled-val">${d.recorded1 || ''}</span> urf or alias <span class="filled-val">${d.recorded2 || ''}</span> in my Aadhaar, both names referring to one and the same person, i.e. myself.</li>
+                            <li style="margin-bottom: 14px; padding-left: 6px;">That I intend to retain the name <span class="filled-val">${d.retainName || ''}</span> and discontinue the use of <span class="filled-val">${d.removeName || ''}</span> as an alias/urf.</li>
+                            <li style="margin-bottom: 14px; padding-left: 6px;">That the requested update is limited to removal of the “urf or alias” and retention of the aforesaid name and does not amount to a change of identity or adoption of a different name.</li>
+                            <li style="margin-bottom: 14px; padding-left: 6px;">That I am submitting the prescribed supporting document(s) in support of the name sought to be retained.</li>
+                            <li style="margin-bottom: 14px; padding-left: 6px;">That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of my Aadhaar number and prosecution under the applicable laws.</li>
+                        </ol>
+                        <div style="text-align: right; font-weight: bold; margin-top: 30px; margin-bottom: 16px;">Deponent</div>
+                        <div style="font-weight: bold; margin-bottom: 8px;">Verification:</div>
+                        <div style="text-align: justify; line-height: 1.7; margin-bottom: 34px;">
+                            Verified at <span class="filled-val">${d.place || ''}</span> on this <span class="filled-val">${d.day || ''}</span> day of <span class="filled-val">${d.monthYear || ''}</span> that the contents of this affidavit are true and correct to the best of my knowledge and belief, and nothing material has been concealed therefrom.
+                        </div>
+                        <div style="text-align: right; font-weight: bold; margin-bottom: 22px;">Deponent</div>
+                        <div style="text-align: center; font-size: 14.5px; line-height: 1.4;">
+                            (This affidavit may be signed and attested in presence of a Judicial Magistrate or Executive<br>Magistrate/Notary Public)
+                        </div>
+                    </div>
+                    <div style="text-align: right; font-family: Arial, sans-serif; font-size: 12px;">Page 10 of 11</div>
+                </div>`;
+        };
+
+        window.downloadHtmlDocAsPdf = async function(fileId, formDataObj, fileName) {
+            const btn = document.getElementById('modalDownloadBtn');
+            const origHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Downloading...';
+                btn.disabled = true;
+            }
+
+            const tempWrapper = document.createElement('div');
+            tempWrapper.style.position = 'fixed';
+            tempWrapper.style.left = '0';
+            tempWrapper.style.top = '0';
+            tempWrapper.style.width = '794px';
+            tempWrapper.style.height = '1122px';
+            tempWrapper.style.zIndex = '-9999';
+            tempWrapper.style.background = '#ffffff';
+            tempWrapper.style.overflow = 'hidden';
+            tempWrapper.innerHTML = window.buildLocalAffidavitHtml(fileId, formDataObj, false);
+            document.body.appendChild(tempWrapper);
+
+            const targetEl = tempWrapper.querySelector('.affidavit-paper');
+
+            try {
+                const opt = {
+                    margin: 0,
+                    filename: fileName,
+                    image: { type: 'jpeg', quality: 1.0 },
+                    html2canvas: { scale: 2, useCORS: true, scrollY: 0, scrollX: 0, width: 794, height: 1122, windowWidth: 794, windowHeight: 1122 },
+                    jsPDF: { unit: 'px', format: [794, 1122], orientation: 'portrait', hotfixes: ['px_scaling'] }
+                };
+                await html2pdf().set(opt).from(targetEl).save();
+            } catch (err) {
+                alert("PDF डाउनलोड करने में समस्या आई।");
+            } finally {
+                document.body.removeChild(tempWrapper);
+                if (btn) {
+                    btn.innerHTML = origHtml;
+                    btn.disabled = false;
+                }
+            }
+        };
+
+        window.openPdfViewer = function(fileId, fileName, historyIndex = -1) {
+            document.getElementById('pdfViewerTitle').innerText = fileName;
+            const iframe = document.getElementById('pdfIframe');
+            const htmlPreviewContainer = document.getElementById('htmlDocPreviewContainer');
+            const spinner = document.getElementById('pdfLoadingSpinner');
+            const downloadBtn = document.getElementById('modalDownloadBtn');
+
+            if (String(fileId).startsWith('LOCAL_HTML_') && historyIndex >= 0) {
+                const record = window.adminAllHistoryData[historyIndex];
+                const fData = record?.formData || {};
+                spinner.style.display = 'none';
+                iframe.style.display = 'none';
+                htmlPreviewContainer.style.display = 'flex';
+                htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true);
+
+                downloadBtn.onclick = async function() {
+                    await window.downloadHtmlDocAsPdf(fileId, fData, fileName);
+                };
+            } else {
+                htmlPreviewContainer.style.display = 'none';
+                htmlPreviewContainer.innerHTML = '';
+                iframe.style.display = 'block';
+                spinner.style.display = 'flex';
+                iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
+                downloadBtn.onclick = function() {
+                    window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank');
+                };
+            }
+
+            document.getElementById('pdfViewerModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden'; 
+        };
+
+        window.closePdfViewer = function() {
+            document.getElementById('pdfViewerModal').classList.add('hidden');
+            document.getElementById('pdfIframe').src = ''; 
+            document.getElementById('htmlDocPreviewContainer').innerHTML = '';
+            document.body.style.overflow = 'auto'; 
+        };
+
+        // ================= 3-TAB NAVIGATION SWITCHER =================
         window.switchAdminMainTab = function(tabName) {
-            const tabs = ['payments', 'users', 'services', 'history'];
+            const tabs = ['payments', 'users', 'history'];
             tabs.forEach(t => {
                 const btn = document.getElementById(`tab-${t}`);
-                if(btn) btn.className = "flex-1 bg-white text-slate-500 font-bold py-3.5 px-2 rounded-xl hover:bg-slate-50 transition shadow-sm border border-slate-200 text-[11px] md:text-sm flex justify-center items-center gap-1.5 md:gap-2";
+                if(btn) btn.className = "flex-1 bg-white text-slate-500 font-bold py-3 px-2 rounded-xl hover:bg-slate-50 transition border border-slate-200 text-xs md:text-sm flex justify-center items-center gap-1.5";
                 const section = document.getElementById(`section-${t}`);
                 if(section) section.classList.add('hidden');
             });
 
             const activeBtn = document.getElementById(`tab-${tabName}`);
-            if(activeBtn) activeBtn.className = "flex-1 bg-dark-900 text-royal-300 font-bold py-3.5 px-2 rounded-xl shadow-glow transition transform -translate-y-1 text-[11px] md:text-sm flex justify-center items-center gap-1.5 md:gap-2 border border-dark-800";
+            if(activeBtn) activeBtn.className = "flex-1 bg-dark-900 text-royal-300 font-black py-3 px-2 rounded-xl shadow-glow transition text-xs md:text-sm flex justify-center items-center gap-1.5 border border-royal-500/50";
             
             const activeSection = document.getElementById(`section-${tabName}`);
             if(activeSection) activeSection.classList.remove('hidden');
 
             if (tabName === 'payments') window.loadPendingPayments();
-            if (tabName === 'services') window.switchPremiumService('annexure1');
             if (tabName === 'history') window.loadAdminHistory(); 
-        };
-
-        window.switchPremiumService = function(type) {
-            document.querySelectorAll('.premium-tab').forEach(b => {
-                b.className = "bg-white text-slate-600 border border-slate-200 py-3 rounded-xl font-bold text-[11px] md:text-sm text-center transition hover:bg-royal-50 hover:text-royal-700 hover:border-royal-200 premium-tab";
-            });
-            const activeBtn = document.getElementById('btn-' + type);
-            if(activeBtn) activeBtn.className = "bg-gradient-to-br from-royal-400 to-royal-600 text-white py-3 rounded-xl font-bold text-[11px] md:text-sm text-center shadow-md transform scale-105 transition premium-tab ring-2 ring-royal-200";
-
-            const container = document.getElementById('premiumFormContainer');
-            const annexureTypes = ['annexure1', 'annexure1a', 'annexure3', 'annexure3a', 'annexureb', 'annexurec', 'annexured', 'annexuree'];
-
-            if (annexureTypes.includes(type)) {
-                let titleText = type.replace('annexure', 'Annexure ').toUpperCase();
-                if(type === 'annexure1a') titleText = 'Annexure 1A';
-                if(type === 'annexure3a') titleText = 'Annexure 3A';
-
-                container.innerHTML = `
-                    <div class="mb-6 flex justify-between items-center border-b border-slate-100 pb-4">
-                        <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-chess-knight text-royal-500 mr-2"></i> ${titleText}</h3>
-                        <span class="bg-green-100 text-green-700 px-3 py-1 rounded-md text-[10px] font-bold border border-green-200 uppercase tracking-widest">Admin Access</span>
-                    </div>
-                    <form onsubmit="window.submitPremiumForm(event, '${titleText}')" class="space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Full Name</label><input type="text" name="NAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Father/Husband Name</label><input type="text" name="FATHER" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">12-Digit ID Number</label><input type="text" name="AADHAR" required maxlength="12" pattern="\\d{12}" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Enrollment Date</label><input type="date" name="DATE" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Old DOB</label><input type="date" name="OLDDOB" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">New DOB</label><input type="date" name="NEWDOB" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Old Document</label><select name="OLDDOCUMENT" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option><option value="MARKSHEET">MARKSHEET</option></select></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">New Document</label><select name="NEWDOCUMENT" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"><option value="BIRTH CERTIFICATE">BIRTH CERTIFICATE</option><option value="MARKSHEET">MARKSHEET</option></select></div>
-                            <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Full Address</label><textarea name="ADDRESS" rows="2" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></textarea></div>
-                        </div>
-                        <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-bold py-3.5 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-4">Generate Document <i class="fa-solid fa-wand-magic-sparkles ml-1"></i></button>
-                    </form>`;
-            } else if (type === 'affidavit') {
-                container.innerHTML = `
-                    <div class="mb-6 border-b border-slate-100 pb-4">
-                        <h3 class="text-xl font-black text-dark-900"><i class="fa-solid fa-scale-balanced text-royal-500 mr-2"></i> General Affidavit</h3>
-                    </div>
-                    <form onsubmit="window.submitPremiumForm(event, 'Affidavit')" class="space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Deponent Name</label><input type="text" name="NAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Father/Husband Name</label><input type="text" name="FATHER" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition"></div>
-                            <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Affidavit Details / Reason</label><textarea name="REASON" rows="4" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none uppercase transition" placeholder="Write the detailed purpose here..."></textarea></div>
-                        </div>
-                        <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-bold py-3.5 rounded-xl shadow-glow transition transform hover:-translate-y-0.5 mt-4">Generate Affidavit <i class="fa-solid fa-gavel ml-1"></i></button>
-                    </form>`;
-            }
         };
     </script>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col selection:bg-royal-300 selection:text-dark-900">
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col selection:bg-royal-300 selection:text-dark-900">
     
     <!-- Loading Screen -->
     <div id="loadingScreen" class="fixed inset-0 bg-dark-900 z-[100] flex flex-col items-center justify-center">
-        <i class="fa-solid fa-crown text-6xl text-royal-400 mb-4 animate-bounce"></i>
-        <h2 class="text-xl font-bold text-white tracking-widest uppercase">Admin Secure Access</h2>
+        <i class="fa-solid fa-crown text-5xl text-royal-400 mb-3 animate-bounce"></i>
+        <h2 class="text-lg font-black text-white tracking-widest uppercase">Admin Secure Access</h2>
     </div>
 
-    <!-- FULL SCREEN PDF VIEWER MODAL -->
-    <div id="pdfViewerModal" class="fixed inset-0 z-[100] hidden bg-dark-900/80 backdrop-blur-md flex items-center justify-center p-2 md:p-6 transition-opacity">
+    <!-- FULL SCREEN PDF & HTML VIEWER MODAL -->
+    <div id="pdfViewerModal" class="fixed inset-0 z-[100] hidden bg-dark-900/80 backdrop-blur-md flex items-center justify-center p-2 md:p-6">
         <div class="bg-white w-full max-w-6xl h-full flex flex-col rounded-2xl shadow-2xl overflow-hidden">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center p-4 border-b border-slate-200 bg-slate-50 gap-3">
-                <div class="flex items-center gap-3 overflow-hidden w-full md:w-auto">
-                    <div class="w-8 h-8 bg-royal-100 text-royal-600 rounded-lg flex items-center justify-center shrink-0"><i class="fa-solid fa-file-pdf"></i></div>
-                    <h3 id="pdfViewerTitle" class="font-bold text-slate-800 truncate">Document Preview</h3>
+            <div class="flex justify-between items-center p-3 md:p-4 border-b border-slate-200 bg-slate-50 gap-2">
+                <div class="flex items-center gap-2 overflow-hidden">
+                    <div class="w-7 h-7 bg-royal-100 text-royal-600 rounded-lg flex items-center justify-center shrink-0 text-xs"><i class="fa-solid fa-file-pdf"></i></div>
+                    <h3 id="pdfViewerTitle" class="font-bold text-slate-800 text-xs md:text-sm truncate">Document Preview</h3>
                 </div>
-                <div class="flex items-center gap-3 w-full md:w-auto justify-end">
-                    <button id="modalDownloadBtn" class="bg-royal-600 hover:bg-royal-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition shadow-md flex items-center gap-2">
-                        <i class="fa-solid fa-download"></i> Download
+                <div class="flex items-center gap-2 shrink-0">
+                    <button id="modalDownloadBtn" class="bg-royal-600 hover:bg-royal-700 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs font-bold transition shadow-md flex items-center gap-1.5">
+                        <i class="fa-solid fa-download"></i> Download PDF
                     </button>
-                    <button onclick="window.closePdfViewer()" class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-200 text-slate-600 hover:bg-red-500 hover:text-white transition shadow-sm"><i class="fa-solid fa-xmark text-lg"></i></button>
+                    <button onclick="window.closePdfViewer()" class="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-200 text-slate-600 hover:bg-red-500 hover:text-white transition"><i class="fa-solid fa-xmark"></i></button>
                 </div>
             </div>
-            <div class="flex-grow bg-slate-300 relative">
+            <div class="flex-grow bg-slate-300 relative overflow-y-auto">
                 <div id="pdfLoadingSpinner" class="absolute inset-0 flex flex-col items-center justify-center text-royal-600 bg-slate-100">
-                    <i class="fa-solid fa-spinner fa-spin text-4xl mb-3"></i>
-                    <p class="text-sm font-bold text-slate-600 mt-2">Loading Preview...</p>
+                    <i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i>
+                    <p class="text-xs font-bold text-slate-600">Loading Preview...</p>
                 </div>
                 <iframe id="pdfIframe" class="w-full h-full relative z-10 border-none" onload="document.getElementById('pdfLoadingSpinner').style.display='none'" src=""></iframe>
+                <div id="htmlDocPreviewContainer" style="display: none;" class="w-full min-h-full p-2 md:p-6 justify-center items-start relative z-20 bg-slate-300 overflow-x-auto"></div>
             </div>
         </div>
     </div>
 
-    <!-- Header -->
-    <header class="bg-dark-900 shadow-xl px-4 md:px-8 py-4 flex justify-between items-center sticky top-0 z-40 border-b-2 border-royal-500">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-gradient-to-br from-royal-400 to-royal-600 text-white rounded-xl flex items-center justify-center shadow-inner"><i class="fa-solid fa-crown text-lg"></i></div>
+    <!-- COMPACT MOBILE-FRIENDLY HEADER -->
+    <header class="bg-dark-950 shadow-lg px-3 md:px-6 py-3 flex justify-between items-center sticky top-0 z-40 border-b border-royal-500">
+        <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 bg-gradient-to-br from-royal-400 to-royal-600 text-dark-950 rounded-xl flex items-center justify-center shadow-glow font-black">
+                <i class="fa-solid fa-crown text-base"></i>
+            </div>
             <div>
-                <h2 class="text-xl font-black text-white leading-tight">Welcome, <span class="text-royal-400">Harish Kumar</span></h2>
+                <h2 class="text-sm md:text-lg font-black text-white leading-tight">Admin <span class="text-royal-400">Harish Kumar</span></h2>
+                <p class="text-[10px] font-bold text-slate-400">Payment & VIP Control Panel</p>
             </div>
         </div>
-        <div class="flex items-center gap-3">
-            <a href="index.html" class="hidden md:flex items-center gap-2 text-slate-300 hover:text-royal-300 transition font-bold text-sm bg-dark-800 border border-slate-700 px-4 py-2 rounded-xl"><i class="fa-solid fa-house"></i> Home Portal</a>
-            <button onclick="window.handleLogout()" class="bg-red-500/10 hover:bg-red-500 hover:text-white text-red-400 border border-red-500/30 px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-2"><i class="fa-solid fa-power-off"></i> Logout</button>
+        <div class="flex items-center gap-2">
+            <a href="index.html" class="flex items-center gap-1.5 text-royal-300 hover:text-white transition font-bold text-xs bg-dark-800 border border-slate-700 px-3 py-2 rounded-xl">
+                <i class="fa-solid fa-house"></i> <span class="hidden sm:inline">VIP Portal</span>
+            </a>
+            <button onclick="window.handleLogout()" class="bg-red-500/15 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/30 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                <i class="fa-solid fa-power-off"></i> <span class="hidden sm:inline">Logout</span>
+            </button>
         </div>
     </header>
 
-    <main id="adminPanelContent" class="max-w-6xl mx-auto w-full p-4 md:p-8 flex-grow hidden">
+    <main id="adminPanelContent" class="max-w-5xl mx-auto w-full p-3 md:p-6 flex-grow hidden">
         
-        <!-- Main Navigation Tabs -->
-        <div class="flex flex-col md:flex-row gap-3 md:gap-4 mb-8">
-            <button onclick="window.switchAdminMainTab('payments')" id="tab-payments" class="flex-1 relative"><i class="fa-solid fa-money-bill-transfer"></i> Pending Approvals</button>
-            <button onclick="window.switchAdminMainTab('users')" id="tab-users" class="flex-1"><i class="fa-solid fa-users-gear"></i> Users & VIP Validity</button>
-            <button onclick="window.switchAdminMainTab('services')" id="tab-services" class="flex-1"><i class="fa-solid fa-gem"></i> Premium Services</button>
-            <button onclick="window.switchAdminMainTab('history')" id="tab-history" class="flex-1"><i class="fa-solid fa-database"></i> Database Records</button>
+        <!-- Clean 3-Tab Navigation Bar -->
+        <div class="grid grid-cols-3 gap-2 md:gap-3 mb-5 sticky top-[61px] z-30 bg-slate-100/95 backdrop-blur py-1.5">
+            <button onclick="window.switchAdminMainTab('payments')" id="tab-payments">
+                <i class="fa-solid fa-bolt text-amber-400"></i>
+                <span>Approvals</span>
+                <span id="navPendingBadge" style="display: none;" class="bg-red-600 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">0</span>
+            </button>
+            <button onclick="window.switchAdminMainTab('users')" id="tab-users">
+                <i class="fa-solid fa-users-gear"></i>
+                <span>Users & VIP</span>
+            </button>
+            <button onclick="window.switchAdminMainTab('history')" id="tab-history">
+                <i class="fa-solid fa-folder-tree"></i>
+                <span>Records</span>
+            </button>
         </div>
 
-        <!-- ================= SECTION 0: PENDING PAYMENTS ================= -->
-        <div id="section-payments" class="hidden">
-            <div class="bg-white rounded-3xl shadow-card border border-slate-100 p-6 md:p-8">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-6 mb-6">
-                    <div>
-                        <h3 class="text-2xl font-black text-dark-900 mb-1"><i class="fa-solid fa-money-bill-transfer text-green-500 mr-2"></i> Pending Payment & VIP Plan Approvals</h3>
-                        <p id="pendingPaymentsCount" class="text-sm font-bold text-slate-500">Pending Requests: 0</p>
-                    </div>
-                    <button onclick="window.loadPendingPayments()" class="h-[42px] bg-slate-100 text-slate-600 px-4 rounded-xl text-sm font-bold hover:bg-slate-200 transition shadow-sm"><i class="fa-solid fa-rotate-right mr-1"></i> Refresh</button>
+        <!-- ================= SECTION 1: MOBILE-FIRST PENDING PAYMENTS ================= -->
+        <div id="section-payments" class="space-y-4">
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex justify-between items-center">
+                <div>
+                    <h3 class="text-base md:text-lg font-black text-dark-900 flex items-center gap-2">
+                        <i class="fa-solid fa-money-bill-transfer text-green-600"></i> Payment & VIP Approvals
+                    </h3>
+                    <p id="pendingPaymentsCount" class="text-xs font-bold text-amber-600">0 Pending</p>
                 </div>
-                
-                <div class="overflow-x-auto border border-slate-100 rounded-2xl">
-                    <table class="w-full text-left border-collapse bg-white min-w-[800px]">
-                        <thead class="bg-slate-50 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                            <tr>
-                                <th class="p-4 rounded-tl-2xl">User Email</th>
-                                <th class="p-4">Total Paid</th>
-                                <th class="p-4">Credits & VIP Plan Breakdown</th>
-                                <th class="p-4">UTR Number</th>
-                                <th class="p-4">Date & Time</th>
-                                <th class="p-4 text-right rounded-tr-2xl">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="adminPaymentsTableBody" class="text-sm"></tbody>
-                    </table>
-                </div>
+                <button onclick="window.loadPendingPayments()" class="bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-rotate-right"></i> Refresh
+                </button>
             </div>
+            
+            <!-- Mobile-Friendly Cards Grid (No Horizontal Scroll) -->
+            <div id="adminPaymentsCardsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3.5"></div>
         </div>
 
-        <!-- ================= SECTION 1: USER & VIP VALIDITY MANAGEMENT ================= -->
-        <div id="section-users" class="grid grid-cols-1 md:grid-cols-2 gap-6 hidden">
-            <!-- Create User Card (Pre-loaded with 30 Credits + 2 Days VIP Trial) -->
-            <div class="bg-white rounded-3xl p-6 md:p-8 shadow-card border border-slate-100 flex flex-col h-full">
-                <div class="mb-5 flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-3">
-                        <div class="w-12 h-12 bg-royal-50 text-royal-600 rounded-2xl flex items-center justify-center text-xl border border-royal-100"><i class="fa-solid fa-user-plus"></i></div>
+        <!-- ================= SECTION 2: USER & VIP VALIDITY MANAGEMENT ================= -->
+        <div id="section-users" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
+            
+            <!-- Manage Existing User Credits & VIP Validity (Placed First for Quick Mobile Access) -->
+            <div class="bg-white rounded-2xl p-4 md:p-6 shadow-card border border-slate-200 flex flex-col justify-between">
+                <div class="space-y-4">
+                    <div class="flex items-center gap-2.5 border-b border-slate-100 pb-3">
+                        <div class="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-lg border border-amber-200"><i class="fa-solid fa-crown"></i></div>
                         <div>
-                            <h3 class="text-xl font-black text-dark-900">Create New User</h3>
-                            <p class="text-[10px] font-bold text-green-600 uppercase">Default: 30 Credits + 2 Days VIP Trial</p>
+                            <h3 class="text-base font-black text-dark-900">Manage Credits & VIP</h3>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase">Add +2 / +30 / +60 / +90 Days or Credits</p>
                         </div>
                     </div>
-                </div>
-                <form id="adminCreateUserForm" onsubmit="window.createNewUserByAdmin(event)" class="space-y-4 flex-grow flex flex-col">
-                    <div class="space-y-4 flex-grow">
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Email ID</label>
-                            <input type="email" id="newAdminUserEmail" placeholder="user@ovportal.com" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Password</label>
-                            <input type="password" id="newAdminUserPass" placeholder="Minimum 6 characters" required minlength="6" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Initial Welcome Credits (Default: 30)</label>
-                            <input type="number" id="newAdminUserCredits" value="30" required class="w-full p-3.5 border border-green-300 rounded-xl text-sm bg-green-50 font-black text-green-900 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Initial VIP Access (Default: 2 Days Trial)</label>
-                            <select id="newAdminUserVipDays" class="w-full p-3.5 border border-amber-300 rounded-xl text-sm bg-amber-50 font-black text-amber-900 outline-none cursor-pointer">
-                                <option value="2" selected>🎁 2 Days Free VIP Trial (Default)</option>
-                                <option value="30">👑 1 Month VIP (+30 Days)</option>
-                                <option value="60">👑 2 Months VIP (+60 Days)</option>
-                                <option value="90">👑 3 Months VIP (+90 Days)</option>
-                                <option value="0">Normal User (0 Days VIP)</option>
-                            </select>
-                        </div>
-                    </div>
-                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl text-sm shadow-glow transition mt-4">
-                        Register User (30 Credits + 2d VIP)
-                    </button>
-                </form>
-                <div id="adminCreateMsg" class="hidden"></div>
-            </div>
-
-            <!-- Credit & +2/+30/+60/+90 Days VIP Validity Card -->
-            <div class="bg-white rounded-3xl p-6 md:p-8 shadow-card border border-slate-100 flex flex-col h-full">
-                <div class="mb-5 flex items-center gap-3">
-                    <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-xl border border-amber-200"><i class="fa-solid fa-crown"></i></div>
+                    
                     <div>
-                        <h3 class="text-xl font-black text-dark-900">Credits & VIP Validity</h3>
-                        <p class="text-[10px] font-bold text-slate-500 uppercase">Add +2 / +30 / +60 / +90 Days or Adjust Credits</p>
-                    </div>
-                </div>
-                
-                <div class="space-y-4 flex-grow">
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Select User</label>
-                        <select id="userSelectDropdown" onchange="window.handleUserSelection()" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition font-semibold text-slate-700 cursor-pointer">
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Select User</label>
+                        <select id="userSelectDropdown" onchange="window.handleUserSelection()" class="w-full p-3 border border-slate-300 rounded-xl text-xs md:text-sm bg-slate-50 font-bold text-slate-800 outline-none focus:border-royal-500">
                             <option value="">-- Loading Users... --</option>
                         </select>
                     </div>
                     
-                    <div class="p-4 bg-royal-50 rounded-xl flex justify-between items-center border border-royal-200">
+                    <div class="p-3.5 bg-royal-50 rounded-xl flex justify-between items-center border border-royal-200">
                         <div>
-                            <span class="text-xs font-bold text-royal-800 block">Current Balance:</span>
-                            <span class="text-3xl font-black text-royal-600" id="currentUserCreditsDisplay">--</span>
+                            <span class="text-[10px] font-bold text-royal-800 uppercase block">Credits Balance</span>
+                            <span class="text-2xl font-black text-royal-600" id="currentUserCreditsDisplay">--</span>
                         </div>
                         <div class="text-right">
-                            <span class="text-xs font-bold text-royal-800 block mb-1">VIP Status & Validity:</span>
+                            <span class="text-[10px] font-bold text-royal-800 uppercase block mb-0.5">Account Status</span>
                             <div id="selectedUserVipBadge">--</div>
                         </div>
                     </div>
 
-                    <!-- 👑 +2, +30, +60, +90 DAYS VIP STACKING BUTTONS -->
-                    <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
-                        <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider">Add VIP Validity Days (Stacks on Existing Days)</label>
-                        <div class="grid grid-cols-4 gap-2">
-                            <button type="button" onclick="window.adminUpdateVipDays(2)" class="bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-black py-2.5 px-1 rounded-xl text-xs shadow-sm transition">
-                                +2 Days<br><span class="text-[9px] font-bold">(Trial)</span>
+                    <!-- 1-Tap VIP Validity Buttons -->
+                    <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                        <label class="block text-[10px] font-black text-slate-500 uppercase">Add VIP Validity (Stacks on Remaining Days)</label>
+                        <div class="grid grid-cols-4 gap-1.5">
+                            <button type="button" onclick="window.adminUpdateVipDays(2)" class="bg-amber-100 hover:bg-amber-200 active:scale-95 text-amber-900 border border-amber-300 font-black py-2 rounded-lg text-xs transition">
+                                +2d<br><span class="text-[9px] font-normal">Trial</span>
                             </button>
-                            <button type="button" onclick="window.adminUpdateVipDays(30)" class="bg-amber-500 hover:bg-amber-600 text-white font-black py-2.5 px-1 rounded-xl text-xs shadow transition">
-                                +30 Days<br><span class="text-[9px] font-normal opacity-90">(1 Month)</span>
+                            <button type="button" onclick="window.adminUpdateVipDays(30)" class="bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-black py-2 rounded-lg text-xs transition">
+                                +30d<br><span class="text-[9px] font-normal">1M</span>
                             </button>
-                            <button type="button" onclick="window.adminUpdateVipDays(60)" class="bg-amber-600 hover:bg-amber-700 text-white font-black py-2.5 px-1 rounded-xl text-xs shadow transition">
-                                +60 Days<br><span class="text-[9px] font-normal opacity-90">(2 Months)</span>
+                            <button type="button" onclick="window.adminUpdateVipDays(60)" class="bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-black py-2 rounded-lg text-xs transition">
+                                +60d<br><span class="text-[9px] font-normal">2M</span>
                             </button>
-                            <button type="button" onclick="window.adminUpdateVipDays(90)" class="bg-dark-900 hover:bg-black text-royal-300 font-black py-2.5 px-1 rounded-xl text-xs shadow transition">
-                                +90 Days<br><span class="text-[9px] font-normal opacity-90">(3 Months)</span>
+                            <button type="button" onclick="window.adminUpdateVipDays(90)" class="bg-dark-900 hover:bg-black active:scale-95 text-royal-300 font-black py-2 rounded-lg text-xs transition">
+                                +90d<br><span class="text-[9px] font-normal">3M</span>
                             </button>
                         </div>
-                        <button type="button" onclick="window.adminUpdateVipDays(0)" class="w-full bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 font-bold py-2 rounded-xl text-xs transition">
-                            <i class="fa-solid fa-user-xmark mr-1"></i> Remove VIP Immediately (Make Normal User)
+                        <button type="button" onclick="window.adminUpdateVipDays(0)" class="w-full bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 font-bold py-2 rounded-lg text-xs transition">
+                            <i class="fa-solid fa-user-xmark mr-1"></i> Remove VIP (Make Normal User)
                         </button>
                     </div>
 
-                    <div class="border-t border-slate-100 pt-3">
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Manual Credit Adjustment</label>
-                        <input type="number" id="creditAdjustmentAmount" placeholder="e.g., 50" min="1" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-400 outline-none transition">
-                    </div>
-
-                    <div class="flex gap-3">
-                        <button id="btnAdd" type="button" onclick="window.adjustCredits('add')" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl text-sm shadow-sm transition"><i class="fa-solid fa-plus mr-1"></i> Add Credits</button>
-                        <button id="btnSub" type="button" onclick="window.adjustCredits('sub')" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl text-sm shadow-sm transition"><i class="fa-solid fa-minus mr-1"></i> Subtract</button>
+                    <!-- Manual Credit Add/Sub -->
+                    <div class="pt-1 space-y-2">
+                        <label class="block text-[10px] font-black text-slate-500 uppercase">Add / Subtract Credits</label>
+                        <div class="flex gap-2">
+                            <input type="number" id="creditAdjustmentAmount" placeholder="Amount (e.g. 50)" min="1" class="w-1/2 p-2.5 border border-slate-300 rounded-xl text-sm font-bold bg-slate-50 outline-none">
+                            <button id="btnAdd" type="button" onclick="window.adjustCredits('add')" class="w-1/4 bg-green-600 hover:bg-green-700 text-white font-black py-2.5 rounded-xl text-xs transition">+ Add</button>
+                            <button id="btnSub" type="button" onclick="window.adjustCredits('sub')" class="w-1/4 bg-red-500 hover:bg-red-600 text-white font-black py-2.5 rounded-xl text-xs transition">- Sub</button>
+                        </div>
                     </div>
                 </div>
                 <div id="adminMsg" class="hidden"></div>
             </div>
-        </div>
 
-        <!-- ================= SECTION 2: PREMIUM SERVICES ================= -->
-        <div id="section-services" class="hidden">
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-                <button onclick="window.switchPremiumService('annexure1')" id="btn-annexure1" class="premium-tab">Annexure 1</button>
-                <button onclick="window.switchPremiumService('annexure1a')" id="btn-annexure1a" class="premium-tab">Annexure 1A</button>
-                <button onclick="window.switchPremiumService('annexure3')" id="btn-annexure3" class="premium-tab">Annexure 3</button>
-                <button onclick="window.switchPremiumService('annexure3a')" id="btn-annexure3a" class="premium-tab">Annexure 3A</button>
-                <button onclick="window.switchPremiumService('annexureb')" id="btn-annexureb" class="premium-tab">Annexure B</button>
-                <button onclick="window.switchPremiumService('annexurec')" id="btn-annexurec" class="premium-tab">Annexure C</button>
-                <button onclick="window.switchPremiumService('annexured')" id="btn-annexured" class="premium-tab">Annexure D</button>
-                <button onclick="window.switchPremiumService('annexuree')" id="btn-annexuree" class="premium-tab">Annexure E</button>
-                <button onclick="window.switchPremiumService('affidavit')" id="btn-affidavit" class="premium-tab">Affidavit</button>
+            <!-- Create New User Card -->
+            <div class="bg-white rounded-2xl p-4 md:p-6 shadow-card border border-slate-200 flex flex-col justify-between">
+                <div class="space-y-4">
+                    <div class="flex items-center gap-2.5 border-b border-slate-100 pb-3">
+                        <div class="w-10 h-10 bg-royal-50 text-royal-600 rounded-xl flex items-center justify-center text-lg border border-royal-200"><i class="fa-solid fa-user-plus"></i></div>
+                        <div>
+                            <h3 class="text-base font-black text-dark-900">Create New User</h3>
+                            <p class="text-[10px] font-bold text-green-600 uppercase">Auto: 30 Credits + 2 Days VIP Trial</p>
+                        </div>
+                    </div>
+
+                    <form id="adminCreateUserForm" onsubmit="window.createNewUserByAdmin(event)" class="space-y-3.5">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">User ID or Email</label>
+                            <input type="text" id="newAdminUserEmail" placeholder="e.g. rahul123 या rahul@ovportal.com" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 font-semibold outline-none focus:bg-white focus:border-royal-400">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Password</label>
+                            <input type="text" id="newAdminUserPass" placeholder="Minimum 6 characters" required minlength="6" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 font-semibold outline-none focus:bg-white focus:border-royal-400">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Welcome Credits</label>
+                                <input type="number" id="newAdminUserCredits" value="30" required class="w-full p-3 border border-green-300 rounded-xl text-sm bg-green-50 font-black text-green-900 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Initial VIP Plan</label>
+                                <select id="newAdminUserVipDays" class="w-full p-3 border border-amber-300 rounded-xl text-xs bg-amber-50 font-black text-amber-900 outline-none">
+                                    <option value="2" selected>🎁 2d Free Trial</option>
+                                    <option value="30">👑 30 Days (1M)</option>
+                                    <option value="60">👑 60 Days (2M)</option>
+                                    <option value="90">👑 90 Days (3M)</option>
+                                    <option value="0">Normal (0d)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl text-xs md:text-sm shadow-glow transition mt-2">
+                            Register User (30 Credits + 2d VIP)
+                        </button>
+                    </form>
+                </div>
+                <div id="adminCreateMsg" class="hidden"></div>
             </div>
-            <div class="bg-white rounded-3xl shadow-card border border-slate-100 p-6 md:p-8" id="premiumFormContainer"></div>
         </div>
 
-        <!-- ================= SECTION 3: HISTORY ================= -->
-        <div id="section-history" class="hidden">
-            <div class="bg-white rounded-3xl shadow-card border border-slate-100 p-6 md:p-8">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-slate-100 pb-6 mb-6">
+        <!-- ================= SECTION 3: DATABASE RECORDS (HISTORY) ================= -->
+        <div id="section-history" class="space-y-4 hidden">
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
+                <div class="flex justify-between items-center">
                     <div>
-                        <h3 class="text-2xl font-black text-dark-900 mb-1">Database Records</h3>
-                        <p id="historyCount" class="text-sm font-bold text-slate-500">Total Files: 0</p>
+                        <h3 class="text-base md:text-lg font-black text-dark-900">Generated Documents</h3>
+                        <p id="historyCount" class="text-xs font-bold text-royal-600">Total Files: 0</p>
                     </div>
-                    
-                    <div class="flex flex-wrap md:flex-nowrap items-center gap-3 w-full md:w-auto">
-                        <div class="flex-1 md:flex-none">
-                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">User Filter</label>
-                            <select id="filterUser" onchange="window.renderAdminHistory()" class="w-full md:w-48 p-2 border border-slate-200 rounded-lg text-sm bg-slate-50 font-semibold cursor-pointer outline-none focus:border-royal-400">
-                                <option value="ALL">All Users</option>
-                            </select>
-                        </div>
-                        <div class="flex-1 md:flex-none">
-                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Document Filter</label>
-                            <select id="filterType" onchange="window.renderAdminHistory()" class="w-full md:w-40 p-2 border border-slate-200 rounded-lg text-sm bg-slate-50 font-semibold cursor-pointer outline-none focus:border-royal-400">
-                                <option value="ALL">All Documents</option>
-                                <option value="Domicile">Domicile</option>
-                                <option value="Caste">Caste Certificate</option>
-                                <option value="DOB 18+">DOB (18+)</option>
-                                <option value="Annexure 1">Annexure 1</option>
-                                <option value="Annexure 1A">Annexure 1A</option>
-                                <option value="Annexure 3">Annexure 3</option>
-                                <option value="Annexure 3A">Annexure 3A</option>
-                                <option value="Annexure B">Annexure B</option>
-                                <option value="Annexure C">Annexure C</option>
-                                <option value="Annexure D">Annexure D</option>
-                                <option value="Annexure E">Annexure E</option>
-                                <option value="Affidavit">Affidavit</option>
-                            </select>
-                        </div>
-                        <div class="flex gap-2 mt-4 md:mt-0 items-end h-full">
-                            <button onclick="window.loadAdminHistory()" class="h-[38px] bg-slate-100 text-slate-600 px-4 rounded-lg text-sm font-bold hover:bg-slate-200 transition"><i class="fa-solid fa-rotate-right"></i></button>
-                            <button id="bulkDeleteBtn" onclick="window.bulkDeleteFilteredHistory()" class="h-[38px] bg-red-50 text-red-600 border border-red-100 px-4 rounded-lg text-sm font-bold hover:bg-red-500 hover:text-white transition flex items-center gap-2"><i class="fa-solid fa-trash-can"></i> <span class="hidden md:inline">Delete All Shown</span></button>
-                        </div>
+                    <div class="flex gap-2">
+                        <button onclick="window.loadAdminHistory()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-bold transition"><i class="fa-solid fa-rotate-right"></i></button>
+                        <button id="bulkDeleteBtn" onclick="window.bulkDeleteFilteredHistory()" class="bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-trash-can"></i> Delete Shown
+                        </button>
                     </div>
                 </div>
-                
-                <div class="overflow-x-auto border border-slate-100 rounded-2xl">
-                    <table class="w-full text-left border-collapse bg-white min-w-[800px]">
-                        <thead class="bg-slate-50 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                            <tr>
-                                <th class="p-4">User (Email)</th>
-                                <th class="p-4">File Name</th>
-                                <th class="p-4">Document Type</th>
-                                <th class="p-4">Date & Time</th>
-                                <th class="p-4 text-right">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="adminHistoryTableBody" class="text-sm"></tbody>
-                    </table>
+
+                <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Filter by User</label>
+                        <select id="filterUser" onchange="window.renderAdminHistory()" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 font-bold outline-none">
+                            <option value="ALL">All Users</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Filter by Type</label>
+                        <select id="filterType" onchange="window.renderAdminHistory()" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 font-bold outline-none">
+                            <option value="ALL">All Documents</option>
+                            <option value="Domicile">Domicile</option>
+                            <option value="Caste">Caste Certificate</option>
+                            <option value="DOB 18+">DOB (18+)</option>
+                            <option value="Annexure 1">Annexure 1</option>
+                            <option value="Annexure 1A">Annexure 1A</option>
+                            <option value="Annexure 3">Annexure 3</option>
+                            <option value="Annexure 3A">Annexure 3A</option>
+                            <option value="Annexure B">Annexure B</option>
+                            <option value="Annexure C">Annexure C</option>
+                            <option value="Annexure D">Annexure D</option>
+                            <option value="Annexure E">Annexure E</option>
+                            <option value="Annexure F">Annexure F</option>
+                        </select>
+                    </div>
                 </div>
             </div>
+
+            <!-- Mobile-Friendly Records List -->
+            <div id="adminHistoryListContainer" class="space-y-2.5"></div>
         </div>
+
     </main>
 </body>
 </html>
