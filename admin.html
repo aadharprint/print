@@ -30,7 +30,7 @@
     </script>
 
     <style>
-        /* हिस्ट्री से Annexure प्रीव्यू और डाउनलोड करने के लिए फिक्स सिंगल-पेज A4 लेआउट */
+        /* फिक्स सिंगल-पेज A4 लेआउट (margin: 0 !important ताकि लैपटॉप या मोबाइल पर कभी बाईं तरफ से न कटे) */
         .affidavit-paper {
             font-family: 'Times New Roman', Times, serif;
             width: 794px;
@@ -44,8 +44,9 @@
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            margin: 0 auto;
+            margin: 0 !important;
             overflow: hidden;
+            flex-shrink: 0;
         }
         .filled-val {
             font-weight: bold;
@@ -119,7 +120,6 @@
                 </div>`;
 
             try {
-                // सभी पेमेंट्स लोड करें (Pending, Approved, Rejected) ताकि पूरी हिस्ट्री रहे
                 const querySnapshot = await getDocs(collection(db, "payments"));
                 
                 window.allPaymentsData = [];
@@ -127,7 +127,6 @@
                     window.allPaymentsData.push({ id: docSnap.id, ...docSnap.data() });
                 });
 
-                // सबसे नई पेमेंट सबसे ऊपर (Newest First)
                 window.allPaymentsData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
                 
                 window.updatePaymentStatsAndBadges();
@@ -157,7 +156,6 @@
                 }
             });
 
-            // Update Top Summary Cards
             document.getElementById('statPendingCount').innerText = `${pendingCount} Requests`;
             document.getElementById('statPendingAmt').innerText = `₹${pendingAmt}`;
             document.getElementById('statApprovedCount').innerText = `${approvedCount} Txns`;
@@ -165,13 +163,11 @@
             document.getElementById('statRejectedCount').innerText = `${rejectedCount} Txns`;
             document.getElementById('statRejectedAmt').innerText = `₹${rejectedAmt}`;
 
-            // Update Filter Pill Counts
             document.getElementById('pillCountPending').innerText = pendingCount;
             document.getElementById('pillCountApproved').innerText = approvedCount;
             document.getElementById('pillCountRejected').innerText = rejectedCount;
             document.getElementById('pillCountAll').innerText = window.allPaymentsData.length;
 
-            // Update Main Navbar Red Badge
             const navBadge = document.getElementById('navPendingBadge');
             if (navBadge) {
                 navBadge.innerText = pendingCount;
@@ -182,7 +178,6 @@
         window.setPaymentFilter = function(filterStatus) {
             window.currentPaymentFilter = filterStatus;
 
-            // Style Filter Pills
             const filters = ['Pending', 'Approved', 'Rejected', 'ALL'];
             filters.forEach(f => {
                 const btn = document.getElementById(`filterPill-${f}`);
@@ -243,7 +238,6 @@
                 const creditsReq = data.creditsRequested !== undefined ? data.creditsRequested : (data.creditsAdded || 0);
                 const status = data.status || 'Pending';
 
-                // Status Badge
                 let statusBadge = '';
                 let cardBorder = 'border-slate-200';
                 if (status === 'Pending') {
@@ -267,7 +261,6 @@
                         <span class="text-[11px] font-bold text-slate-700">Normal Credit Recharge</span>
                        </div>`;
 
-                // Action / Resolution Buttons based on status
                 let actionButtonsHtml = '';
                 if (status === 'Pending') {
                     actionButtonsHtml = `
@@ -281,7 +274,6 @@
                         </div>
                     `;
                 } else if (status === 'Rejected') {
-                    // Resolution Feature: Allow Admin to Approve a previously Rejected payment if resolved later!
                     actionButtonsHtml = `
                         <div class="flex items-center gap-2 pt-1">
                             <button onclick="window.approvePayment('${data.id}', '${data.userId}', ${creditsReq}, ${vipDays}, true)" class="flex-1 bg-amber-500 hover:bg-amber-600 active:scale-95 text-dark-950 py-2.5 px-3 rounded-xl text-xs font-black shadow-sm transition flex items-center justify-center gap-1.5">
@@ -293,7 +285,6 @@
                         </div>
                     `;
                 } else {
-                    // Approved Status
                     actionButtonsHtml = `
                         <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px] text-green-700 font-bold">
                             <span><i class="fa-solid fa-circle-check mr-1"></i> क्रेडिट्स और प्लान यूज़र को मिल चुके हैं</span>
@@ -306,7 +297,6 @@
 
                 container.innerHTML += `
                     <div class="bg-white rounded-2xl p-4 shadow-card border-2 ${cardBorder} transition flex flex-col justify-between space-y-3">
-                        <!-- Top: User, Date & Amount -->
                         <div class="flex justify-between items-start gap-2 border-b border-slate-100 pb-2.5">
                             <div class="overflow-hidden">
                                 <div class="flex items-center gap-1.5 mb-1">
@@ -320,7 +310,6 @@
                             </div>
                         </div>
 
-                        <!-- Middle: UTR Copy Box & Breakdown -->
                         <div class="space-y-2">
                             <div class="flex items-center justify-between bg-slate-100 px-3 py-2 rounded-xl border border-slate-200">
                                 <div>
@@ -340,7 +329,6 @@
                             ${vipBanner}
                         </div>
 
-                        <!-- Bottom: Action / Resolution Controls -->
                         ${actionButtonsHtml}
                     </div>
                 `;
@@ -385,8 +373,8 @@
                 });
 
                 alert(vipDaysToAdd > 0 
-                    ? `सफलतापूर्वक अप्रूव हो गया! +${creditsToAdd} Credits और +${vipDaysToAdd} Days VIP वैलिडिटी जोड़ दी गई है!` 
-                    : `सफलतापूर्वक अप्रूव हो गया! +${creditsToAdd} Credits यूज़र के वॉलेट में जोड़ दिए गए हैं।`);
+                    ? `सफलतापूर्वक अप्रूव हो गया! +${creditsToAdd} Credits और +${vipDaysToAdd} Days VIP वैलिडिटी जोड़ दी गई है!` 
+                    : `सफलतापूर्वक अप्रूव हो गया! +${creditsToAdd} Credits यूज़र के वॉलेट में जोड़ दिए गए हैं।`);
                 
                 await window.loadAllUsersForDropdown();
                 window.loadAllPayments();
@@ -496,7 +484,7 @@
 
                     const totalDaysNow = Math.ceil((newExpiry - now) / MS_PER_DAY);
                     msg.className = "mt-3 p-3 bg-amber-50 text-amber-900 rounded-xl text-xs font-bold border border-amber-300 text-center";
-                    msg.innerHTML = `👑 +${daysToAdd} Days VIP जोड़ दिए गए! कुल एक्टिव वैलिडिटी: <strong>${totalDaysNow} Days</strong>`;
+                    msg.innerHTML = `👑 +${daysToAdd} Days VIP जोड़ दिए गए! कुल एक्टिव वैलिडिटी: <strong>${totalDaysNow} Days</strong>`;
                 }
 
                 await window.loadAllUsersForDropdown();
@@ -510,7 +498,6 @@
             }
         };
 
-        // CREATE NEW USER: DEFAULT 30 CREDITS + 2 DAYS VIP TRIAL
         window.createNewUserByAdmin = async function(event) {
             event.preventDefault();
             const rawUser = document.getElementById('newAdminUserEmail').value.trim().toLowerCase();
@@ -603,7 +590,7 @@
             }
         };
 
-        // ================= SECTION 3: DATABASE RECORDS (HISTORY PREVIEW & DELETE) =================
+        // ================= SECTION 3: DATABASE RECORDS (HISTORY PREVIEW, DIRECT PRINT & DELETE) =================
         window.loadAdminHistory = async function() {
             const container = document.getElementById('adminHistoryListContainer');
             container.innerHTML = `<div class="p-10 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>रिकॉर्ड्स लोड हो रहे हैं...</div>`;
@@ -662,6 +649,8 @@
                     ? '<span class="text-royal-700 font-black bg-royal-100 px-2 py-0.5 rounded text-[10px] border border-royal-200">👑 Admin</span>' 
                     : `<span class="font-bold text-slate-600 text-xs">${window.allUsersMap[data.userId] || 'User'}</span>`;
 
+                const safeFileName = String(data.fileName || 'Document.pdf').replace(/'/g, "\\'");
+
                 container.innerHTML += `
                     <div class="bg-white p-3.5 md:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 hover:border-royal-400 transition">
                         <div class="space-y-1 overflow-hidden w-full">
@@ -673,8 +662,11 @@
                             <p class="font-black text-slate-800 text-xs md:text-sm truncate">${data.fileName}</p>
                         </div>
                         <div class="flex items-center gap-2 w-full sm:w-auto justify-end shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
-                            <button onclick="window.openPdfViewer('${data.fileId}', '${data.fileName}', ${data._origIndex})" class="flex-1 sm:flex-initial justify-center inline-flex items-center gap-1.5 bg-royal-50 text-royal-700 px-3.5 py-2 rounded-xl text-xs font-black hover:bg-royal-500 hover:text-white transition border border-royal-200">
-                                <i class="fa-solid fa-eye"></i> Preview & PDF
+                            <button onclick="window.openPdfViewer('${data.fileId}', '${safeFileName}', ${data._origIndex})" class="flex-1 sm:flex-initial justify-center inline-flex items-center gap-1.5 bg-royal-50 text-royal-700 px-3 py-2 rounded-xl text-xs font-black hover:bg-royal-500 hover:text-white transition border border-royal-200">
+                                <i class="fa-solid fa-eye"></i> Preview / Print / PDF
+                            </button>
+                            <button onclick="window.triggerDirectPrintByIndex(${data._origIndex}, this)" class="inline-flex items-center justify-center gap-1 bg-amber-500 hover:bg-amber-600 text-dark-950 px-3 py-2 rounded-xl text-xs font-black transition shadow-sm" title="Direct Print">
+                                <i class="fa-solid fa-print"></i> Print
                             </button>
                             <button onclick="window.deleteHistoryRecord('${data.id}')" class="w-9 h-9 inline-flex items-center justify-center bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition border border-red-100" title="Delete">
                                 <i class="fa-solid fa-trash"></i>
@@ -713,10 +705,11 @@
             finally { btn.innerHTML = origHTML; btn.disabled = false; }
         };
 
-        // ================= UNIFIED HTML RENDERER FOR PREVIEWING USER-GENERATED ANNEXURES IN HISTORY =================
+        // ================= UNIFIED SINGLE-PAGE A4 HTML BUILDER FOR ALL 9 ANNEXURES =================
         window.buildLocalAffidavitHtml = function(fileId, d = {}, withShadow = true) {
             const shadowClass = withShadow ? 'shadow-2xl' : '';
 
+            // 1. ANNEXURE-I (FOR ADULTS - DOB UPDATE)
             if (fileId === 'LOCAL_HTML_ANNEXURE_1') {
                 return `
                     <div class="affidavit-paper ${shadowClass}">
@@ -761,6 +754,7 @@
                     </div>`;
             }
 
+            // 2. ANNEXURE-IA (FOR CHILDREN - DOB UPDATE)
             if (fileId === 'LOCAL_HTML_ANNEXURE_1A') {
                 return `
                     <div class="affidavit-paper ${shadowClass}">
@@ -807,6 +801,7 @@
                     </div>`;
             }
 
+            // 3. ANNEXURE-III (FOR ADULTS - REACTIVATION)
             if (fileId === 'LOCAL_HTML_ANNEXURE_3') {
                 return `
                     <div class="affidavit-paper ${shadowClass}">
@@ -850,6 +845,7 @@
                     </div>`;
             }
 
+            // 4. ANNEXURE-IIIA (FOR CHILDREN - REACTIVATION)
             if (fileId === 'LOCAL_HTML_ANNEXURE_3A') {
                 return `
                     <div class="affidavit-paper ${shadowClass}">
@@ -894,6 +890,7 @@
                     </div>`;
             }
 
+            // 5, 6, 7. ANNEXURE B, C, D (NAME CHANGE / CORRECTION AFFIDAVITS)
             if (fileId === 'LOCAL_HTML_ANNEXURE_B' || fileId === 'LOCAL_HTML_ANNEXURE_C' || fileId === 'LOCAL_HTML_ANNEXURE_D') {
                 const isChild = (fileId === 'LOCAL_HTML_ANNEXURE_C');
                 const headingMap = {
@@ -950,6 +947,7 @@
                     </div>`;
             }
 
+            // 8. ANNEXURE F (FOR CHILDREN - URF/ALIAS REMOVAL)
             if (fileId === 'LOCAL_HTML_ANNEXURE_F') {
                 return `
                     <div class="affidavit-paper ${shadowClass}">
@@ -970,12 +968,12 @@
                                 resident of <span class="filled-val">${d.address || ''}</span>, holding Aadhaar Number <span class="filled-val">${d.parentIdNumber || ''}</span>, do hereby solemnly affirm and declare as under:
                             </div>
                             <ol style="list-style-type: decimal; padding-left: 26px; margin-bottom: 20px; text-align: justify;">
-                                <li style="margin-bottom: 13px; padding-left: 6px;">That I am the parent/legal guardian of minor child <span class="filled-val">${d.childName || ''}</span> who is the holder of Aadhaar Number <span class="filled-val">${d.childIdNumber || ''}</span>.</li>
-                                <li style="margin-bottom: 13px; padding-left: 6px;">That the name of my child/ward is presently recorded/used as <span class="filled-val">${d.recorded1 || ''}</span> urf or alias <span class="filled-val">${d.recorded2 || ''}</span> in Aadhaar, both names referring to one and the same child.</li>
-                                <li style="margin-bottom: 13px; padding-left: 6px;">That I intend to retain the name <span class="filled-val">${d.retainName || ''}</span> for my child/ward and discontinue the use of <span class="filled-val">${d.removeName || ''}</span> as an alias/urf.</li>
-                                <li style="margin-bottom: 13px; padding-left: 6px;">That the requested update is limited to removal of the “urf or alias” and retention of the aforesaid name and does not amount to a change of identity or adoption of a different name.</li>
-                                <li style="margin-bottom: 13px; padding-left: 6px;">That I am submitting the prescribed supporting document(s) in support of the name of my child/ward sought to be retained.</li>
-                                <li style="margin-bottom: 13px; padding-left: 6px;">That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of Aadhaar number and prosecution under the applicable laws.</li>
+                                <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.55;">That I am the parent/legal guardian of minor child <span class="filled-val">${d.childName || ''}</span> who is the holder of Aadhaar Number <span class="filled-val">${d.childIdNumber || ''}</span>.</li>
+                                <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.55;">That the name of my child/ward is presently recorded/used as <span class="filled-val">${d.recorded1 || ''}</span> urf or alias <span class="filled-val">${d.recorded2 || ''}</span> in Aadhaar, both names referring to one and the same child.</li>
+                                <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.55;">That I intend to retain the name <span class="filled-val">${d.retainName || ''}</span> for my child/ward and discontinue the use of <span class="filled-val">${d.removeName || ''}</span> as an alias/urf.</li>
+                                <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.5;">That the requested update is limited to removal of the “urf or alias” and retention of the aforesaid name and does not amount to a change of identity or adoption of a different name.</li>
+                                <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.5;">That I am submitting the prescribed supporting document(s) in support of the name of my child/ward sought to be retained.</li>
+                                <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.5;">That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of Aadhaar number and prosecution under the applicable laws.</li>
                             </ol>
                             <div style="text-align: right; font-weight: bold; margin-top: 26px; margin-bottom: 14px;">Deponent (Parent/Guardian)</div>
                             <div style="font-weight: bold; margin-bottom: 8px;">Verification:</div>
@@ -991,6 +989,7 @@
                     </div>`;
             }
 
+            // 9. ANNEXURE E (FOR ADULTS - URF/ALIAS REMOVAL)
             return `
                 <div class="affidavit-paper ${shadowClass}">
                     <div>
@@ -1010,12 +1009,12 @@
                             resident of <span class="filled-val">${d.address || ''}</span>, do hereby solemnly affirm and declare as under:
                         </div>
                         <ol style="list-style-type: decimal; padding-left: 26px; margin-bottom: 20px; text-align: justify;">
-                            <li style="margin-bottom: 14px; padding-left: 6px;">That I am the holder of Aadhaar Number <span class="filled-val">${d.idNumber || ''}</span>.</li>
-                            <li style="margin-bottom: 14px; padding-left: 6px;">That my name is presently recorded/used as <span class="filled-val">${d.recorded1 || ''}</span> urf or alias <span class="filled-val">${d.recorded2 || ''}</span> in my Aadhaar, both names referring to one and the same person, i.e. myself.</li>
-                            <li style="margin-bottom: 14px; padding-left: 6px;">That I intend to retain the name <span class="filled-val">${d.retainName || ''}</span> and discontinue the use of <span class="filled-val">${d.removeName || ''}</span> as an alias/urf.</li>
-                            <li style="margin-bottom: 14px; padding-left: 6px;">That the requested update is limited to removal of the “urf or alias” and retention of the aforesaid name and does not amount to a change of identity or adoption of a different name.</li>
-                            <li style="margin-bottom: 14px; padding-left: 6px;">That I am submitting the prescribed supporting document(s) in support of the name sought to be retained.</li>
-                            <li style="margin-bottom: 14px; padding-left: 6px;">That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of my Aadhaar number and prosecution under the applicable laws.</li>
+                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">That I am the holder of Aadhaar Number <span class="filled-val">${d.idNumber || ''}</span>.</li>
+                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">That my name is presently recorded/used as <span class="filled-val">${d.recorded1 || ''}</span> urf or alias <span class="filled-val">${d.recorded2 || ''}</span> in my Aadhaar, both names referring to one and the same person, i.e. myself.</li>
+                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">That I intend to retain the name <span class="filled-val">${d.retainName || ''}</span> and discontinue the use of <span class="filled-val">${d.removeName || ''}</span> as an alias/urf.</li>
+                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">That the requested update is limited to removal of the “urf or alias” and retention of the aforesaid name and does not amount to a change of identity or adoption of a different name.</li>
+                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">That I am submitting the prescribed supporting document(s) in support of the name sought to be retained.</li>
+                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of my Aadhaar number and prosecution under the applicable laws.</li>
                         </ol>
                         <div style="text-align: right; font-weight: bold; margin-top: 30px; margin-bottom: 16px;">Deponent</div>
                         <div style="font-weight: bold; margin-bottom: 8px;">Verification:</div>
@@ -1031,6 +1030,7 @@
                 </div>`;
         };
 
+        // ================= 100% DESKTOP & MOBILE FIXED SINGLE-PAGE A4 PDF DOWNLOADER =================
         window.downloadHtmlDocAsPdf = async function(fileId, formDataObj, fileName) {
             const btn = document.getElementById('modalDownloadBtn');
             const origHtml = btn ? btn.innerHTML : '';
@@ -1039,15 +1039,12 @@
                 btn.disabled = true;
             }
 
+            const savedScrollX = window.scrollX;
+            const savedScrollY = window.scrollY;
+            window.scrollTo(0, 0);
+
             const tempWrapper = document.createElement('div');
-            tempWrapper.style.position = 'fixed';
-            tempWrapper.style.left = '0';
-            tempWrapper.style.top = '0';
-            tempWrapper.style.width = '794px';
-            tempWrapper.style.height = '1122px';
-            tempWrapper.style.zIndex = '-9999';
-            tempWrapper.style.background = '#ffffff';
-            tempWrapper.style.overflow = 'hidden';
+            tempWrapper.style.cssText = 'position:fixed;top:0;left:0;width:794px;height:1122px;margin:0;padding:0;z-index:99999;background:#ffffff;overflow:hidden;';
             tempWrapper.innerHTML = window.buildLocalAffidavitHtml(fileId, formDataObj, false);
             document.body.appendChild(tempWrapper);
 
@@ -1058,14 +1055,30 @@
                     margin: 0,
                     filename: fileName,
                     image: { type: 'jpeg', quality: 1.0 },
-                    html2canvas: { scale: 2, useCORS: true, scrollY: 0, scrollX: 0, width: 794, height: 1122, windowWidth: 794, windowHeight: 1122 },
-                    jsPDF: { unit: 'px', format: [794, 1122], orientation: 'portrait', hotfixes: ['px_scaling'] }
+                    html2canvas: {
+                        scale: 2,
+                        useCORS: true,
+                        x: 0,
+                        y: 0,
+                        scrollX: 0,
+                        scrollY: 0,
+                        width: 794,
+                        height: 1122,
+                        windowWidth: 794,
+                        windowHeight: 1122
+                    },
+                    jsPDF: {
+                        unit: 'mm',
+                        format: 'a4',
+                        orientation: 'portrait'
+                    }
                 };
                 await html2pdf().set(opt).from(targetEl).save();
             } catch (err) {
                 alert("PDF डाउनलोड करने में समस्या आई।");
             } finally {
                 document.body.removeChild(tempWrapper);
+                window.scrollTo(savedScrollX, savedScrollY);
                 if (btn) {
                     btn.innerHTML = origHtml;
                     btn.disabled = false;
@@ -1073,12 +1086,179 @@
             }
         };
 
+        // ================= BACKGROUND GOOGLE DRIVE PDF FETCHER (FOR DIRECT PRINT & DOWNLOAD WITHOUT OPENING DRIVE TAB) =================
+        window.fetchDrivePdfBlob = async function(fileId) {
+            const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+            const proxyUrls = [
+                `https://corsproxy.io/?${encodeURIComponent(driveUrl)}`,
+                `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(driveUrl)}`,
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(driveUrl)}`
+            ];
+
+            for (const pUrl of proxyUrls) {
+                try {
+                    const res = await fetch(pUrl);
+                    if (res.ok) {
+                        const buf = await res.arrayBuffer();
+                        if (buf && buf.byteLength > 500) {
+                            return new Blob([buf], { type: 'application/pdf' });
+                        }
+                    }
+                } catch (e) {
+                    // Try next proxy
+                }
+            }
+            return null;
+        };
+
+        // बिना Google Drive का नया टैब खोले सीधे डाउनलोड करें
+        window.directDownloadDrivePdf = async function(fileId, fileName) {
+            const btn = document.getElementById('modalDownloadBtn');
+            const origHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Downloading...';
+                btn.disabled = true;
+            }
+
+            try {
+                const pdfBlob = await window.fetchDrivePdfBlob(fileId);
+                if (pdfBlob) {
+                    const blobUrl = URL.createObjectURL(pdfBlob);
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+                } else {
+                    // Fallback: Hidden iframe से डाउनलोड करें ताकि Google Drive का नया टैब न खुले
+                    let dlFrame = document.getElementById('hiddenDriveDownloadIframe');
+                    if (dlFrame) document.body.removeChild(dlFrame);
+                    dlFrame = document.createElement('iframe');
+                    dlFrame.id = 'hiddenDriveDownloadIframe';
+                    dlFrame.style.display = 'none';
+                    dlFrame.src = `https://drive.google.com/uc?export=download&id=${fileId}`;
+                    document.body.appendChild(dlFrame);
+                }
+            } finally {
+                if (btn) {
+                    btn.innerHTML = origHtml;
+                    btn.disabled = false;
+                }
+            }
+        };
+
+        // 🖨️ DIRECT PRINT WITHOUT OPENING GOOGLE DRIVE TAB (WORKS FOR BOTH LOCAL ANNEXURES & DRIVE PDFs)
+        window.directPrintDocument = async function(fileId, formDataObj, fileName, btnEl = null) {
+            const targetBtn = btnEl || document.getElementById('modalPrintBtn');
+            const origHtml = targetBtn ? targetBtn.innerHTML : '';
+
+            if (String(fileId).startsWith('LOCAL_HTML_')) {
+                const htmlContent = window.buildLocalAffidavitHtml(fileId, formDataObj, false);
+                let printFrame = document.getElementById('directPrintIframe');
+                if (printFrame) document.body.removeChild(printFrame);
+
+                printFrame = document.createElement('iframe');
+                printFrame.id = 'directPrintIframe';
+                printFrame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+                document.body.appendChild(printFrame);
+
+                const frameDoc = printFrame.contentWindow.document;
+                frameDoc.open();
+                frameDoc.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>${fileName || 'Print Document'}</title>
+                        <style>
+                            @page { size: A4; margin: 0; }
+                            html, body { margin: 0; padding: 0; background: #ffffff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                            .affidavit-paper {
+                                font-family: 'Times New Roman', Times, serif;
+                                width: 210mm;
+                                height: 297mm;
+                                padding: 14mm 18mm;
+                                background: #ffffff;
+                                color: #000000;
+                                font-size: 12pt;
+                                line-height: 1.55;
+                                box-sizing: border-box;
+                                display: flex;
+                                flex-direction: column;
+                                justify-content: space-between;
+                                margin: 0 !important;
+                                overflow: hidden;
+                            }
+                            .filled-val { font-weight: bold; color: #000000; }
+                        </style>
+                    </head>
+                    <body>${htmlContent}</body>
+                    </html>
+                `);
+                frameDoc.close();
+
+                setTimeout(() => {
+                    printFrame.contentWindow.focus();
+                    printFrame.contentWindow.print();
+                }, 250);
+            } else {
+                // Google Drive PDF: बैकग्राउंड में PDF Blob लोड करके सीधे सिस्टम का Print Dialog खोलें (बिना Google Drive पर जाए)
+                if (targetBtn) {
+                    targetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Printing...';
+                    targetBtn.disabled = true;
+                }
+
+                try {
+                    const pdfBlob = await window.fetchDrivePdfBlob(fileId);
+                    if (pdfBlob) {
+                        const blobUrl = URL.createObjectURL(pdfBlob);
+                        let printFrame = document.getElementById('directPrintIframe');
+                        if (printFrame) document.body.removeChild(printFrame);
+
+                        printFrame = document.createElement('iframe');
+                        printFrame.id = 'directPrintIframe';
+                        printFrame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+                        printFrame.src = blobUrl;
+                        document.body.appendChild(printFrame);
+
+                        printFrame.onload = function() {
+                            setTimeout(() => {
+                                try {
+                                    printFrame.contentWindow.focus();
+                                    printFrame.contentWindow.print();
+                                } catch (err) {
+                                    console.error(err);
+                                }
+                            }, 300);
+                        };
+                    } else {
+                        alert("सीधे प्रिंट के लिए फाइल तैयार नहीं हो सकी। कृपया Preview में जाकर Download PDF का उपयोग करें।");
+                    }
+                } finally {
+                    if (targetBtn) {
+                        targetBtn.innerHTML = origHtml;
+                        targetBtn.disabled = false;
+                    }
+                }
+            }
+        };
+
+        // हिस्ट्री लिस्ट से 1-क्लिक में डायरेक्ट प्रिंट करने का हेल्पर
+        window.triggerDirectPrintByIndex = function(historyIndex, btnEl) {
+            const record = window.adminAllHistoryData[historyIndex];
+            if (!record) return;
+            window.directPrintDocument(record.fileId, record.formData || {}, record.fileName || 'Document.pdf', btnEl);
+        };
+
+        // ================= PREVIEW MODAL OPENER =================
         window.openPdfViewer = function(fileId, fileName, historyIndex = -1) {
             document.getElementById('pdfViewerTitle').innerText = fileName;
             const iframe = document.getElementById('pdfIframe');
             const htmlPreviewContainer = document.getElementById('htmlDocPreviewContainer');
             const spinner = document.getElementById('pdfLoadingSpinner');
             const downloadBtn = document.getElementById('modalDownloadBtn');
+            const printBtn = document.getElementById('modalPrintBtn');
 
             if (String(fileId).startsWith('LOCAL_HTML_') && historyIndex >= 0) {
                 const record = window.adminAllHistoryData[historyIndex];
@@ -1091,15 +1271,26 @@
                 downloadBtn.onclick = async function() {
                     await window.downloadHtmlDocAsPdf(fileId, fData, fileName);
                 };
+                if (printBtn) {
+                    printBtn.onclick = function() {
+                        window.directPrintDocument(fileId, fData, fileName, printBtn);
+                    };
+                }
             } else {
                 htmlPreviewContainer.style.display = 'none';
                 htmlPreviewContainer.innerHTML = '';
                 iframe.style.display = 'block';
                 spinner.style.display = 'flex';
                 iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
+                
                 downloadBtn.onclick = function() {
-                    window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank');
+                    window.directDownloadDrivePdf(fileId, fileName);
                 };
+                if (printBtn) {
+                    printBtn.onclick = function() {
+                        window.directPrintDocument(fileId, {}, fileName, printBtn);
+                    };
+                }
             }
 
             document.getElementById('pdfViewerModal').classList.remove('hidden');
@@ -1142,7 +1333,7 @@
         <h2 class="text-lg font-black text-white tracking-widest uppercase">Admin Secure Access</h2>
     </div>
 
-    <!-- FULL SCREEN PDF & HTML VIEWER MODAL -->
+    <!-- FULL SCREEN PDF & HTML VIEWER MODAL (WITH DIRECT PRINT + FIXED A4 DOWNLOAD) -->
     <div id="pdfViewerModal" class="fixed inset-0 z-[100] hidden bg-dark-900/80 backdrop-blur-md flex items-center justify-center p-2 md:p-6">
         <div class="bg-white w-full max-w-6xl h-full flex flex-col rounded-2xl shadow-2xl overflow-hidden">
             <div class="flex justify-between items-center p-3 md:p-4 border-b border-slate-200 bg-slate-50 gap-2">
@@ -1151,7 +1342,12 @@
                     <h3 id="pdfViewerTitle" class="font-bold text-slate-800 text-xs md:text-sm truncate">Document Preview</h3>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                    <button id="modalDownloadBtn" class="bg-royal-600 hover:bg-royal-700 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs font-bold transition shadow-md flex items-center gap-1.5">
+                    <!-- 🖨️ DIRECT PRINT BUTTON -->
+                    <button id="modalPrintBtn" class="bg-amber-500 hover:bg-amber-600 text-dark-950 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs font-black transition shadow-sm flex items-center gap-1.5">
+                        <i class="fa-solid fa-print"></i> Print
+                    </button>
+                    <!-- 📥 DOWNLOAD PDF BUTTON -->
+                    <button id="modalDownloadBtn" class="bg-dark-900 hover:bg-black text-royal-300 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs font-bold transition shadow-glow flex items-center gap-1.5">
                         <i class="fa-solid fa-download"></i> Download PDF
                     </button>
                     <button onclick="window.closePdfViewer()" class="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-200 text-slate-600 hover:bg-red-500 hover:text-white transition"><i class="fa-solid fa-xmark"></i></button>
