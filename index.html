@@ -53,7 +53,7 @@
             animation: slideInRight 0.4s ease-out forwards;
         }
 
-        /* Fixed Single-Page A4 Layout (794px x 1122px) without underlines */
+        /* फिक्स सिंगल-पेज A4 लेआउट (margin: 0 ताकि लैपटॉप पर कभी बाईं तरफ से न कटे) */
         .affidavit-paper {
             font-family: 'Times New Roman', Times, serif;
             width: 794px;
@@ -67,8 +67,9 @@
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            margin: 0 auto;
+            margin: 0 !important;
             overflow: hidden;
+            flex-shrink: 0;
         }
         .filled-val {
             font-weight: bold;
@@ -310,7 +311,7 @@
             document.getElementById('vipCornerAlert').style.display = 'none';
         };
 
-        // ================= SETUP DASHBOARD (CLEAN & COMPACT) =================
+        // ================= SETUP DASHBOARD =================
         function setupDashboard(userData) {
             document.getElementById('displayUser').innerText = userData.username.toUpperCase();
             const adminLink = document.getElementById('adminPanelLink');
@@ -479,19 +480,16 @@
             const txnNote = wantsVip ? `Ojas VIP ${window.currentVipDays}d` : `Ojas Credits`;
             const queryParams = `pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${totalPayable}&cu=INR&tn=${encodeURIComponent(txnNote)}`;
 
-            // 1. Universal UPI Deep Link & App-Specific Deep Links (With Pre-Filled Amount)
             const universalUpiUrl = `upi://pay?${queryParams}`;
             const paytmUrl = `paytmmp://pay?${queryParams}`;
             const phonepeUrl = `phonepe://pay?${queryParams}`;
             const gpayUrl = `tez://upi/pay?${queryParams}`;
 
-            // 2. QR Code Image URL
             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`;
 
             document.getElementById('upiQRCode').src = qrUrl;
             document.getElementById('qrPayableAmountText').innerText = `कुल पेमेंट: ₹${totalPayable}`;
             
-            // Bind Direct App Links with Exact Amount
             const mainUpiBtn = document.getElementById('btnDirectUpiPay');
             if (mainUpiBtn) {
                 mainUpiBtn.href = universalUpiUrl;
@@ -504,7 +502,6 @@
             const btnGPay = document.getElementById('btnGPayApp');
             if (btnGPay) btnGPay.href = gpayUrl;
 
-            // Switch cleanly from Step 1 to Step 2
             document.getElementById('paymentStep1').style.display = 'none';
             document.getElementById('qrSection').style.display = 'flex';
         };
@@ -1160,7 +1157,7 @@
             removeInput.value = temp;
         };
 
-        // ZERO-CLIPPING SINGLE-PAGE A4 PDF DOWNLOADER
+        // 🔥 100% DESKTOP & MOBILE FIXED SINGLE-PAGE A4 PDF DOWNLOADER (ZERO LEFT CLIPPING)
         window.downloadHtmlDocAsPdf = async function(fileId, formDataObj, fileName) {
             const btn = document.getElementById('modalDownloadBtn');
             const origHtml = btn ? btn.innerHTML : '';
@@ -1169,15 +1166,12 @@
                 btn.disabled = true;
             }
 
+            const savedScrollX = window.scrollX;
+            const savedScrollY = window.scrollY;
+            window.scrollTo(0, 0);
+
             const tempWrapper = document.createElement('div');
-            tempWrapper.style.position = 'fixed';
-            tempWrapper.style.left = '0';
-            tempWrapper.style.top = '0';
-            tempWrapper.style.width = '794px';
-            tempWrapper.style.height = '1122px';
-            tempWrapper.style.zIndex = '-9999';
-            tempWrapper.style.background = '#ffffff';
-            tempWrapper.style.overflow = 'hidden';
+            tempWrapper.style.cssText = 'position:fixed;top:0;left:0;width:794px;height:1122px;margin:0;padding:0;z-index:99999;background:#ffffff;overflow:hidden;';
             tempWrapper.innerHTML = window.buildLocalAffidavitHtml(fileId, formDataObj, false);
             document.body.appendChild(tempWrapper);
 
@@ -1191,18 +1185,19 @@
                     html2canvas: {
                         scale: 2,
                         useCORS: true,
-                        scrollY: 0,
+                        x: 0,
+                        y: 0,
                         scrollX: 0,
+                        scrollY: 0,
                         width: 794,
                         height: 1122,
                         windowWidth: 794,
                         windowHeight: 1122
                     },
                     jsPDF: {
-                        unit: 'px',
-                        format: [794, 1122],
-                        orientation: 'portrait',
-                        hotfixes: ['px_scaling']
+                        unit: 'mm',
+                        format: 'a4',
+                        orientation: 'portrait'
                     }
                 };
                 await html2pdf().set(opt).from(targetEl).save();
@@ -1210,10 +1205,67 @@
                 alert("PDF डाउनलोड करने में समस्या आई।");
             } finally {
                 document.body.removeChild(tempWrapper);
+                window.scrollTo(savedScrollX, savedScrollY);
                 if (btn) {
                     btn.innerHTML = origHtml;
                     btn.disabled = false;
                 }
+            }
+        };
+
+        // 🖨️ DIRECT PRINT WITHOUT DOWNLOADING (OPENS SYSTEM PRINT DIALOG FOR EXACT A4 PAGE)
+        window.directPrintDocument = function(fileId, formDataObj, fileName) {
+            if (String(fileId).startsWith('LOCAL_HTML_')) {
+                const htmlContent = window.buildLocalAffidavitHtml(fileId, formDataObj, false);
+                let printFrame = document.getElementById('directPrintIframe');
+                if (printFrame) document.body.removeChild(printFrame);
+
+                printFrame = document.createElement('iframe');
+                printFrame.id = 'directPrintIframe';
+                printFrame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+                document.body.appendChild(printFrame);
+
+                const frameDoc = printFrame.contentWindow.document;
+                frameDoc.open();
+                frameDoc.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>${fileName || 'Print Document'}</title>
+                        <style>
+                            @page { size: A4; margin: 0; }
+                            html, body { margin: 0; padding: 0; background: #ffffff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                            .affidavit-paper {
+                                font-family: 'Times New Roman', Times, serif;
+                                width: 210mm;
+                                height: 297mm;
+                                padding: 14mm 18mm;
+                                background: #ffffff;
+                                color: #000000;
+                                font-size: 12pt;
+                                line-height: 1.55;
+                                box-sizing: border-box;
+                                display: flex;
+                                flex-direction: column;
+                                justify-content: space-between;
+                                margin: 0 !important;
+                                overflow: hidden;
+                            }
+                            .filled-val { font-weight: bold; color: #000000; }
+                        </style>
+                    </head>
+                    <body>${htmlContent}</body>
+                    </html>
+                `);
+                frameDoc.close();
+
+                setTimeout(() => {
+                    printFrame.contentWindow.focus();
+                    printFrame.contentWindow.print();
+                }, 250);
+            } else {
+                // For Google Drive PDFs, open the direct print/view window
+                window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
             }
         };
 
@@ -1270,7 +1322,7 @@
                     timestamp: new Date()
                 });
 
-                alert(`आपका डॉक्यूमेंट (${serviceType}) जनरेट हो चुका है! अब आप यहाँ History से इसे Preview और Download कर सकते हैं।`);
+                alert(`आपका डॉक्यूमेंट (${serviceType}) जनरेट हो चुका है! अब आप यहाँ History से इसे Preview, Print और Download कर सकते हैं।`);
                 formEl.reset();
                 window.switchService('history');
             } catch (err) {
@@ -1283,13 +1335,14 @@
             }
         };
 
-        // ================= IN-APP PREVIEW MODAL =================
+        // ================= IN-APP PREVIEW MODAL (WITH DIRECT PRINT + DOWNLOAD PDF) =================
         window.openPdfViewer = function(fileId, fileName, historyIndex = -1) {
             document.getElementById('pdfViewerTitle').innerText = fileName;
             const iframe = document.getElementById('pdfIframe');
             const htmlPreviewContainer = document.getElementById('htmlDocPreviewContainer');
             const spinner = document.getElementById('pdfLoadingSpinner');
             const downloadBtn = document.getElementById('modalDownloadBtn');
+            const printBtn = document.getElementById('modalPrintBtn');
 
             if (String(fileId).startsWith('LOCAL_HTML_') && historyIndex >= 0) {
                 const record = window.historyData[historyIndex];
@@ -1302,6 +1355,11 @@
                 downloadBtn.onclick = async function() {
                     await window.downloadHtmlDocAsPdf(fileId, fData, fileName);
                 };
+                if (printBtn) {
+                    printBtn.onclick = function() {
+                        window.directPrintDocument(fileId, fData, fileName);
+                    };
+                }
             } else {
                 htmlPreviewContainer.style.display = 'none';
                 htmlPreviewContainer.innerHTML = '';
@@ -1311,6 +1369,11 @@
                 downloadBtn.onclick = function() {
                     window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank');
                 };
+                if (printBtn) {
+                    printBtn.onclick = function() {
+                        window.directPrintDocument(fileId, {}, fileName);
+                    };
+                }
             }
 
             document.getElementById('pdfViewerModal').style.display = 'flex';
@@ -1468,7 +1531,7 @@
                         <td class="p-3 text-slate-500 text-[11px] font-medium">${dateStr} <br> ${timeStr}</td>
                         <td class="p-3 text-right whitespace-nowrap">
                             <button onclick="window.openPdfViewer('${data.fileId}', '${data.fileName}', ${data._origIndex})" class="inline-flex items-center gap-1 bg-royal-50 text-royal-700 border border-royal-200 hover:bg-royal-600 hover:text-white px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition shadow-sm">
-                                <i class="fa-solid fa-eye"></i> Preview & Download
+                                <i class="fa-solid fa-eye"></i> Preview / Print / PDF
                             </button>
                         </td>
                     </tr>
@@ -1636,7 +1699,7 @@
             }
             
             // DOB CERTIFICATE (18+ VIP): 15 CREDITS WITH 25% OFF FROM 20 CREDITS
-              else if(serviceName === 'dob18') {
+            else if(serviceName === 'dob18') {
                 if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService('domicile');
 
                 const dobSubmitBtnText = window.currentUserData && window.currentUserData.isAdmin 
@@ -1659,7 +1722,8 @@
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Father Name</label><input type="text" name="FNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Mother Name</label><input type="text" name="MNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Pin Code</label><input type="text" name="PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
-                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Address  Like (vill - rampur, meerut,) Only</label><input type="text" name="ADDRESS" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
+                            <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Full Address</label><textarea name="ADDRESS" rows="2" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></textarea></div>
+                        </div>
                         <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base">${dobSubmitBtnText}</button>
                     </form>
                 `;
@@ -1672,7 +1736,7 @@
                     <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                         <div>
                             <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-file-signature text-royal-500 mr-1.5"></i> Annexure-I (Adults DoB Update)</h3>
-                            <p class="text-[11px] text-slate-500">जनरेट करने के बाद ⚙️ गियर आइकन -> Document History से डाउनलोड करें।</p>
+                            <p class="text-[11px] text-slate-500">जनरेट करने के बाद ⚙️ गियर आइकन -> Document History से Print व Download करें।</p>
                         </div>
                         ${statusTagHtml}
                     </div>
@@ -2056,7 +2120,7 @@
                                 <span id="qrPayableAmountText" class="text-sm font-black text-green-700 bg-green-100 px-3 py-1 rounded-lg border border-green-300">कुल पेमेंट: ₹0</span>
                             </div>
 
-                            <!-- 🔥 DIRECT 1-CLICK UPI APP REDIRECT BUTTONS (NO SCREENSHOT NEEDED ON PHONE) -->
+                            <!-- DIRECT 1-CLICK UPI APP REDIRECT BUTTONS -->
                             <div class="w-full bg-white p-3 rounded-xl border border-green-200 shadow-sm space-y-2">
                                 <p class="text-[11px] font-black text-slate-700 text-center">
                                     <i class="fa-solid fa-mobile-screen-button text-green-600 mr-1"></i> मोबाइल से 1-Click में सीधे ऐप खोलकर पेमेंट करें:
@@ -2204,7 +2268,7 @@
         <button onclick="window.jumpToVipUpgrade(30)" class="w-full bg-dark-900 text-royal-300 font-black py-1.5 rounded-lg text-[11px]">अभी VIP वैलिडिटी बढ़ाएं</button>
     </div>
 
-    <!-- FULL SCREEN PDF & HTML DOCUMENT VIEWER MODAL -->
+    <!-- FULL SCREEN PDF & HTML DOCUMENT VIEWER MODAL (WITH DIRECT PRINT + DOWNLOAD PDF) -->
     <div id="pdfViewerModal" style="display: none;" class="fixed inset-0 z-[100] bg-dark-900/80 backdrop-blur-md items-center justify-center p-2 md:p-6 transition-opacity">
         <div class="bg-white w-full max-w-6xl h-full flex flex-col rounded-2xl shadow-2xl overflow-hidden">
             <div class="flex justify-between items-center p-3 md:p-4 border-b border-slate-200 bg-slate-50 gap-2">
@@ -2213,6 +2277,11 @@
                     <h3 id="pdfViewerTitle" class="font-bold text-slate-800 text-xs md:text-sm truncate">Document Preview</h3>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
+                    <!-- 🖨️ DIRECT PRINT BUTTON -->
+                    <button id="modalPrintBtn" class="bg-amber-500 hover:bg-amber-600 text-dark-950 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs font-black transition shadow-sm flex items-center gap-1.5">
+                        <i class="fa-solid fa-print"></i> Print
+                    </button>
+                    <!-- 📥 DOWNLOAD PDF BUTTON -->
                     <button id="modalDownloadBtn" class="bg-dark-900 hover:bg-black text-royal-300 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs font-bold transition shadow-glow flex items-center gap-1.5">
                         <i class="fa-solid fa-download"></i> Download PDF
                     </button>
