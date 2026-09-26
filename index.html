@@ -113,6 +113,7 @@
         window.currentVipDays = 0;
         window.currentVipPlanFee = 0;
 
+        // ================= DEPLOYED GOOGLE APPS SCRIPT API URLS =================
         const API_URLS = {
             "domicile": "https://script.google.com/macros/s/AKfycbwqvv_hWDzTltYcP7UDC41uPM7X2wvCzYFvu_eKu8t82TJf_f4QD5tLQtZ23_JCgYlgFA/exec",
             "DOB": "https://script.google.com/macros/s/AKfycbyncAUbXWLplC_uHgodCqhPCDLTWFiWEQVzxPAInLP7zedGUQRdRbvix_jdDBJrYMlc9w/exec",
@@ -1431,8 +1432,9 @@
             formData.append('USER_ID', window.currentUserData.email);
             formData.append('SERVICE_TYPE', serviceType);
 
+            // FIXED TARGET URL SELECTION (Direct mapping to API_URLS)
             let targetUrl = "";
-            if (serviceType === 'Domicile') targetUrl = API_URLS[formData.get('DISTRICT')] || API_URLS["BAGHPAT"];
+            if (serviceType === 'Domicile') targetUrl = API_URLS["domicile"];
             else if (serviceType === 'Caste') targetUrl = API_URLS["CASTE"];
             else if (serviceType === 'DOB' || serviceType === 'DOB 18+') targetUrl = API_URLS["DOB"];
 
@@ -1537,35 +1539,47 @@
             });
         };
 
-        // ================= HINDI DROPDOWNS (UPDATED WITH MEERUT, SAHARANPUR & GHAZIABAD) =================
+        // ================= ALL 6 DISTRICTS, TEHSILS & ALL RELATED THANAS DROPDOWN MAPPING =================
+        const DISTRICT_DATA_MAP = {
+            'BAGHPAT': {
+                tehsils: ['बड़ौत', 'खेकड़ा', 'बागपत'],
+                thanas: ['बड़ौत', 'खेकड़ा', 'बागपत', 'छपरोली', 'बिनौली', 'रमाला', 'दोघट', 'सिंघावली अहीर', 'बालैनी', 'चांदीनगर', 'महिला थाना']
+            },
+            'SHAMLI': {
+                tehsils: ['कैराना', 'ऊन', 'शामली'],
+                thanas: ['थाना भवन', 'कैराना', 'झिंझाना', 'शामली', 'बाबरी', 'कांधला', 'गढ़ी पुख्ता', 'आदर्श मंडी', 'महिला थाना']
+            },
+            'MUZAFFARNAGAR': {
+                tehsils: ['बुढ़ाना', 'खतौली', 'जानसठ', 'मुजफ्फरनगर'],
+                thanas: ['बुढ़ाना', 'खतौली', 'जानसठ', 'मीरापुर', 'सिविल लाइन', 'कोतवाली नगर', 'नई मंडी', 'चरथावल', 'पुरकाजी', 'छपार', 'मंसूरपुर', 'शाहपुर', 'सिखेड़ा', 'फुगाना', 'भौराकलां', 'ककरौली', 'भोपा', 'रतनपुरी', 'तितावी', 'रामराज', 'महिला थाना']
+            },
+            'MEERUT': {
+                tehsils: ['मेरठ', 'मवाना', 'सरधना'],
+                thanas: ['मवाना', 'सरधना', 'जानी', 'रोहटा', 'परतापुर', 'कंकरखेड़ा', 'दौराला', 'हस्तिनापुर', 'बहसूमा', 'फलावदा', 'किठौर', 'मुंडाली', 'खरखौदा', 'इंचौली', 'गंगानगर', 'मेडिकल', 'नौचंदी', 'सिविल लाइन', 'कोतवाली', 'देहली गेट', 'लिसाड़ी गेट', 'ब्रह्मपुरी', 'टीपी नगर', 'पल्लवपुरम', 'सरूरपुर', 'लालकुर्ती', 'सदर बाजार', 'रेलवे रोड', 'लोहियानगर', 'महिला थाना']
+            },
+            'SAHARANPUR': {
+                tehsils: ['सहारनपुर', 'बेहट', 'देवबंद', 'रामपुर मनिहारन', 'नकुड़'],
+                thanas: ['बेहट', 'देवबंद', 'रामपुर मनिहारन', 'नकुड़', 'गंगोह', 'चिलकाना', 'सरसावा', 'तीतरों', 'नानौता', 'बड़गांव', 'मिर्जापुर', 'फतेहपुर', 'गागलहेड़ी', 'नागल', 'कोतवाली देहात', 'कोतवाली नगर', 'सदर बाजार', 'कुतुबशेर', 'जनकपुरी', 'मंडी', 'बिहारीगढ़', 'महिला थाना']
+            },
+            'GHAZIABAD': {
+                tehsils: ['गाजियाबाद', 'मोदीनगर', 'लोनी'],
+                thanas: ['मोदीनगर', 'लोनी', 'मुरादनगर', 'भोजपुर', 'निवाड़ी', 'लोनी बॉर्डर', 'ट्रॉनिका सिटी', 'अंकुर विहार', 'साहिबाबाद', 'लिंक रोड', 'टीला मोड़', 'शालीमार गार्डन', 'इंदिरापुरम', 'कौशांबी', 'खोड़ा', 'विजयनगर', 'क्रॉसिंग रिपब्लिक', 'कोतवाली घंटाघर', 'सिहानी गेट', 'नंदग्राम', 'कविनगर', 'मधुबन बापूधाम', 'मसूरी', 'वेव सिटी', 'महिला थाना']
+            }
+        };
+
         window.updateTehsilsAndThanas = function() {
             const districtEl = document.getElementById('districtSelect');
             const tehsilSelect = document.getElementById('tehsilSelect');
             const thanaSelect = document.getElementById('thanaSelect');
             if (!districtEl || !tehsilSelect) return;
-            const district = districtEl.value;
-            let tehsils = []; 
-            let thanas = [];
-            
-            if (district === 'BAGHPAT') {
-                tehsils = ['बड़ौत', 'खेकड़ा', 'बागपत']; 
-                thanas = ['बड़ौत', 'खेकड़ा', 'बागपत', 'छपरोली', 'बिनौली', 'रमाला', 'दोघट', 'सिंघावली अहीर', 'बालैनी', 'चांदीनगर'];
-            } else if (district === 'SHAMLI') {
-                tehsils = ['कैराना', 'ऊन', 'शामली']; 
-                thanas = ['थाना भवन', 'कैराना', 'झिंझाना', 'शामली', 'बाबरी', 'कांधला', 'गढ़ी पुख्ता', 'आदर्श मंडी'];
-            } else if (district === 'MUZAFFARNAGAR') {
-                tehsils = ['बुढ़ाना', 'खतौली', 'जानसठ', 'मुजफ्फरनगर']; 
-                thanas = ['बुढ़ाना', 'खतौली', 'जानसठ', 'मीरापुर', 'सिविल लाइन', 'कोतवाली नगर', 'नई मंडी'];
-            } else if (district === 'MEERUT') {
-                tehsils = ['मेरठ', 'मवाना', 'सरधना'];
-            } else if (district === 'SAHARANPUR') {
-                tehsils = ['सहारनपुर', 'बेहट', 'देवबंद', 'रामपुर मनिहारन', 'नकुड़'];
-            } else if (district === 'GHAZIABAD') {
-                tehsils = ['गाजियाबाद', 'मोदीनगर', 'लोनी'];
-            }
 
-            tehsilSelect.innerHTML = tehsils.map(t => `<option value="${t}">${t}</option>`).join('');
-            if (thanaSelect) thanaSelect.innerHTML = thanas.map(t => `<option value="${t}">${t}</option>`).join('');
+            const selectedDistrict = districtEl.value;
+            const data = DISTRICT_DATA_MAP[selectedDistrict] || DISTRICT_DATA_MAP['BAGHPAT'];
+
+            tehsilSelect.innerHTML = data.tehsils.map(t => `<option value="${t}">${t}</option>`).join('');
+            if (thanaSelect) {
+                thanaSelect.innerHTML = data.thanas.map(th => `<option value="${th}">${th}</option>`).join('');
+            }
         };
 
         function getPaymentHistorySectionHtml() {
@@ -1649,7 +1663,7 @@
 
             const todayISO = new Date().toISOString().split('T')[0];
 
-            // DOMICILE
+            // DOMICILE (ALL 6 DISTRICTS, TEHSILS, ALL THANAS, VILLAGE NAME & VLE NAME INPUTS)
             if(serviceName === 'domicile') {
                 container.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
@@ -1658,25 +1672,75 @@
                     </div>
                     <form onsubmit="window.submitForm(event, 'Domicile')" class="space-y-3.5">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">District</label><select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"><option value="BAGHPAT">बागपत</option><option value="SHAMLI">शामली</option><option value="MUZAFFARNAGAR">मुजफ्फरनगर</option></select></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Tehsil</label><select id="tehsilSelect" name="TAHSEEL" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></select></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="REL" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none"><option value="पुत्र / पुत्री">पुत्र / पुत्री</option><option value="पत्नी      .">पत्नी</option></select></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Customer Name</label><input type="text" name="NAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Hindi Name (Optional)</label><input type="text" name="HNAME" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Father/Husband Name</label><input type="text" name="FNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Mother Name</label><input type="text" name="MNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">House Number (MN)</label><input type="text" name="MN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Area / Locality</label><input type="text" name="AREA" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Village / Ward</label><input type="text" name="GRAM" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Police Station (Thana)</label><select id="thanaSelect" name="THANA" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></select></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Upload Photo</label><input type="file" name="PHOTO" accept="image/*" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-royal-100 file:text-royal-700 cursor-pointer"></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">District (जिला)</label>
+                                <select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                                    <option value="BAGHPAT">बागपत</option>
+                                    <option value="SHAMLI">शामली</option>
+                                    <option value="MUZAFFARNAGAR">मुजफ्फरनगर</option>
+                                    <option value="MEERUT">मेरठ</option>
+                                    <option value="SAHARANPUR">सहारनपुर</option>
+                                    <option value="GHAZIABAD">गाजियाबाद</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Tehsil (तहसील)</label>
+                                <select id="tehsilSelect" name="TAHSEEL" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Police Station (थाना)</label>
+                                <select id="thanaSelect" name="THANA" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation (संबंध)</label>
+                                <select name="REL" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none">
+                                    <option value="पुत्र / पुत्री">पुत्र / पुत्री</option>
+                                    <option value="पत्नी      .">पत्नी</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Customer Name (English)</label>
+                                <input type="text" name="NAME" placeholder="Enter Full Name" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Hindi Name (Optional)</label>
+                                <input type="text" name="HNAME" placeholder="हिंदी में नाम (वैकल्पिक)" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Father / Husband Name</label>
+                                <input type="text" name="FNAME" placeholder="Enter Father/Husband Name" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Mother Name</label>
+                                <input type="text" name="MNAME" placeholder="Enter Mother Name" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">House Number (मकान नंबर - MN)</label>
+                                <input type="text" name="MN" placeholder="e.g. 124" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Area / Locality (मोहल्ला / पोस्ट)</label>
+                                <input type="text" name="AREA" placeholder="Enter Area / Locality" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Village / Ward Name (गाँव / वार्ड)</label>
+                                <input type="text" name="GRAM" placeholder="Enter Village / Ward Name" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">VLE Name (जन सेवा केंद्र संचालक)</label>
+                                <input type="text" name="VLE" placeholder="Enter VLE Name" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Upload Photo</label>
+                                <input type="file" name="PHOTO" accept="image/*" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-royal-100 file:text-royal-700 cursor-pointer">
+                            </div>
                         </div>
                         <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-glow transition text-sm md:text-base">${submitBtnText}</button>
                     </form>
                 `;
                 window.updateTehsilsAndThanas();
             } 
-            // CASTE (WITH MEERUT, SAHARANPUR & GHAZIABAD ADDED)
+            // CASTE (ALL 6 DISTRICTS, TEHSILS, VILLAGE & VLE INPUTS)
             else if(serviceName === 'caste') {
                 container.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
@@ -1704,7 +1768,7 @@
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Father/Husband Name</label><input type="text" name="FNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Mother Name</label><input type="text" name="MNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Area / Locality</label><input type="text" name="AREA" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Village / Ward</label><input type="text" name="GRAM" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Village / Ward Name</label><input type="text" name="GRAM" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">VLE Name</label><input type="text" name="VLE" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Upload Photo</label><input type="file" name="PHOTO" accept="image/*" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-royal-100 file:text-royal-700 cursor-pointer"></div>
                         </div>
