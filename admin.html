@@ -8,8 +8,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- html2pdf.js for Direct PDF Download from History -->
+    <!-- html2pdf.js for Direct Single-Page A4 PDF Download -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- PDF.js for Rendering Google Doc Stamp Overlay Crisply -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     
     <!-- Royal Theme Config -->
     <script>
@@ -30,8 +32,9 @@
     </script>
 
     <style>
-        /* फिक्स सिंगल-पेज A4 लेआउट (margin: 0 !important ताकि लैपटॉप पर कभी बाईं तरफ से न कटे) */
+        /* फिक्स सिंगल-पेज A4 लेआउट (margin: 0 !important ताकि लैपटॉप या मोबाइल पर कभी बाईं तरफ से न कटे) */
         .affidavit-paper {
+            position: relative;
             font-family: 'Times New Roman', Times, serif;
             width: 794px;
             height: 1122px;
@@ -51,6 +54,26 @@
         .filled-val {
             font-weight: bold;
             color: #000000;
+        }
+        /* स्टैम्प ओवरलैप लेयर */
+        .stamp-overlay-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 794px;
+            height: 1122px;
+            pointer-events: none;
+            z-index: 30;
+            mix-blend-mode: multiply;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .stamp-overlay-layer img {
+            width: 100%;
+            height: 100%;
+            object-fit: fill;
+            mix-blend-mode: multiply;
         }
     </style>
 
@@ -75,6 +98,19 @@
         const ADMIN_EMAIL = "hkosiun1221@gmail.com";
         const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+        // ================= STAMP GOOGLE DOC CONFIG =================
+        // आपकी दी गई Google Docs स्टैम्प फाइल का ID:
+        const STAMP_DOC_ID = "1EyQ_mYyEpUSPue4PRPFxfvpBmpfXDhRRpTKmjIzxvhw";
+        
+        window.cachedStampDataUrl = null;
+        window.cachedStampHtml = null;
+        window.stampSelectionMap = {}; // प्रत्येक हिस्ट्री रिकॉर्ड के लिए With/Without Stamp स्टेटस
+        window.currentModalContext = { fileId: '', fileName: '', historyIndex: -1, withStamp: false };
+
+        if (window.pdfjsLib) {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+
         window.currentUserData = null;
         window.allUsersMap = {}; 
         window.usersDataList = {}; 
@@ -82,7 +118,82 @@
         
         // Payment History & Filter State
         window.allPaymentsData = []; 
-        window.currentPaymentFilter = 'Pending'; // 'Pending' | 'Approved' | 'Rejected' | 'ALL'
+        window.currentPaymentFilter = 'Pending';
+
+        // ================= PRELOAD GOOGLE DOC STAMP OVERLAY =================
+        window.preloadStampFromGoogleDoc = async function() {
+            if (window.cachedStampDataUrl) return window.cachedStampDataUrl;
+
+            const pdfExportUrl = `https://docs.google.com/document/d/${STAMP_DOC_ID}/export?format=pdf`;
+            const proxyList = [
+                `https://corsproxy.io/?${encodeURIComponent(pdfExportUrl)}`,
+                `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(pdfExportUrl)}`,
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(pdfExportUrl)}`
+            ];
+
+            // 1. Try rendering exact Google Doc PDF Page 1 to transparent PNG via PDF.js
+            if (window.pdfjsLib) {
+                for (const proxyUrl of proxyList) {
+                    try {
+                        const res = await fetch(proxyUrl);
+                        if (!res.ok) continue;
+                        const arrayBuf = await res.arrayBuffer();
+                        if (!arrayBuf || arrayBuf.byteLength < 500) continue;
+
+                        const pdf = await window.pdfjsLib.getDocument({ data: arrayBuf }).promise;
+                        const page = await pdf.getPage(1);
+                        const viewport = page.getViewport({ scale: 2.0 });
+
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = viewport.width;
+                        canvas.height = viewport.height;
+
+                        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+                        // सफेद बैकग्राउंड को पारदर्शी (Transparent) बनाएं ताकि Annexure का टेक्स्ट साफ दिखे
+                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const data = imgData.data;
+                        for (let i = 0; i < data.length; i += 4) {
+                            if (data[i] > 245 && data[i + 1] > 245 && data[i + 2] > 245) {
+                                data[i + 3] = 0;
+                            }
+                        }
+                        ctx.putImageData(imgData, 0, 0);
+
+                        window.cachedStampDataUrl = canvas.toDataURL('image/png');
+                        return window.cachedStampDataUrl;
+                    } catch (e) {
+                        console.warn("Stamp PDF proxy attempt failed, trying next...", e);
+                    }
+                }
+            }
+
+            // 2. Fallback: Try fetching Google Doc exported HTML to extract embedded stamp image
+            const htmlExportUrl = `https://docs.google.com/document/d/${STAMP_DOC_ID}/export?format=html`;
+            for (const proxyUrl of [
+                `https://corsproxy.io/?${encodeURIComponent(htmlExportUrl)}`,
+                `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(htmlExportUrl)}`
+            ]) {
+                try {
+                    const res = await fetch(proxyUrl);
+                    if (res.ok) {
+                        const htmlText = await res.text();
+                        const parser = new DOMParser();
+                        const docEl = parser.parseFromString(htmlText, 'text/html');
+                        const firstImg = docEl.querySelector('img');
+                        if (firstImg && firstImg.src) {
+                            window.cachedStampDataUrl = firstImg.src;
+                            return window.cachedStampDataUrl;
+                        }
+                    }
+                } catch (e) {}
+            }
+
+            // 3. Direct Google Drive High-Res Thumbnail Fallback
+            window.cachedStampDataUrl = `https://drive.google.com/thumbnail?id=${STAMP_DOC_ID}&sz=w1600`;
+            return window.cachedStampDataUrl;
+        };
 
         onAuthStateChanged(auth, async (user) => {
             if (!user || user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
@@ -93,6 +204,9 @@
                 document.getElementById('adminPanelContent').classList.remove('hidden');
                 document.getElementById('loadingScreen').classList.add('hidden');
                 
+                // बैकग्राउंड में स्टैम्प फाइल प्री-लोड करें
+                window.preloadStampFromGoogleDoc();
+
                 await window.loadAllUsersForDropdown(); 
                 window.switchAdminMainTab('payments');
             }
@@ -103,7 +217,6 @@
             window.location.href = "index.html";
         };
 
-        // UTR कॉपी करने का फंक्शन
         window.copyUtrText = function(utr, btnEl) {
             navigator.clipboard.writeText(utr);
             const orig = btnEl.innerHTML;
@@ -590,7 +703,7 @@
             }
         };
 
-        // ================= SECTION 3: DATABASE RECORDS (HISTORY PREVIEW, PRINT & DELETE) =================
+        // ================= SECTION 3: DATABASE RECORDS (HISTORY PREVIEW, STAMP CHECKBOX, DIRECT PRINT & DELETE) =================
         window.loadAdminHistory = async function() {
             const container = document.getElementById('adminHistoryListContainer');
             container.innerHTML = `<div class="p-10 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>रिकॉर्ड्स लोड हो रहे हैं...</div>`;
@@ -619,6 +732,10 @@
             } catch (err) {
                 container.innerHTML = `<div class="p-6 text-center text-red-500 font-bold bg-white rounded-2xl">Error: ${err.message}</div>`;
             }
+        };
+
+        window.toggleRowStampCheckbox = function(origIndex, isChecked) {
+            window.stampSelectionMap[origIndex] = isChecked;
         };
 
         window.renderAdminHistory = function() {
@@ -650,6 +767,16 @@
                     : `<span class="font-bold text-slate-600 text-xs">${window.allUsersMap[data.userId] || 'User'}</span>`;
 
                 const safeFileName = String(data.fileName || 'Document.pdf').replace(/'/g, "\\'");
+                const isAnnexure = String(data.fileId || '').startsWith('LOCAL_HTML_');
+                const isStampChecked = !!window.stampSelectionMap[data._origIndex];
+
+                // Annexure फाइलों के आगे With Stamp चेकबॉक्स
+                const stampCheckboxHtml = isAnnexure ? `
+                    <label class="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-2 rounded-xl text-xs font-black cursor-pointer select-none transition shadow-sm" title="टिक करने पर स्टैम्प के साथ प्रिंट और डाउनलोड होगा">
+                        <input type="checkbox" id="stampChk-${data._origIndex}" ${isStampChecked ? 'checked' : ''} onchange="window.toggleRowStampCheckbox(${data._origIndex}, this.checked)" class="w-4 h-4 accent-amber-600 rounded cursor-pointer">
+                        <span><i class="fa-solid fa-stamp text-amber-600 mr-0.5"></i> With Stamp</span>
+                    </label>
+                ` : '';
 
                 container.innerHTML += `
                     <div class="bg-white p-3.5 md:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 hover:border-royal-400 transition">
@@ -661,9 +788,13 @@
                             </div>
                             <p class="font-black text-slate-800 text-xs md:text-sm truncate">${data.fileName}</p>
                         </div>
-                        <div class="flex items-center gap-2 w-full sm:w-auto justify-end shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
-                            <button onclick="window.openPdfViewer('${data.fileId}', '${safeFileName}', ${data._origIndex})" class="flex-1 sm:flex-initial justify-center inline-flex items-center gap-1.5 bg-royal-50 text-royal-700 px-3.5 py-2 rounded-xl text-xs font-black hover:bg-royal-500 hover:text-white transition border border-royal-200">
-                                <i class="fa-solid fa-eye"></i> Preview / Print / PDF
+                        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+                            ${stampCheckboxHtml}
+                            <button onclick="window.openPdfViewer('${data.fileId}', '${safeFileName}', ${data._origIndex})" class="flex-1 sm:flex-initial justify-center inline-flex items-center gap-1.5 bg-royal-50 text-royal-700 px-3 py-2 rounded-xl text-xs font-black hover:bg-royal-500 hover:text-white transition border border-royal-200">
+                                <i class="fa-solid fa-eye"></i> Preview / PDF
+                            </button>
+                            <button onclick="window.triggerDirectPrintByIndex(${data._origIndex}, this)" class="inline-flex items-center justify-center gap-1 bg-amber-500 hover:bg-amber-600 text-dark-950 px-3 py-2 rounded-xl text-xs font-black transition shadow-sm" title="Direct Print">
+                                <i class="fa-solid fa-print"></i> Print
                             </button>
                             <button onclick="window.deleteHistoryRecord('${data.id}')" class="w-9 h-9 inline-flex items-center justify-center bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition border border-red-100" title="Delete">
                                 <i class="fa-solid fa-trash"></i>
@@ -702,14 +833,21 @@
             finally { btn.innerHTML = origHTML; btn.disabled = false; }
         };
 
-        // ================= UNIFIED SINGLE-PAGE A4 HTML BUILDER FOR ALL 9 ANNEXURES =================
-        window.buildLocalAffidavitHtml = function(fileId, d = {}, withShadow = true) {
+        // ================= UNIFIED SINGLE-PAGE A4 HTML BUILDER FOR ALL 9 ANNEXURES (WITH STAMP OVERLAP SUPPORT) =================
+        window.buildLocalAffidavitHtml = function(fileId, d = {}, withShadow = true, withStamp = false) {
             const shadowClass = withShadow ? 'shadow-2xl' : '';
+            const stampImgSrc = window.cachedStampDataUrl || `https://drive.google.com/thumbnail?id=${STAMP_DOC_ID}&sz=w1600`;
+            const stampOverlayHtml = withStamp ? `
+                <div class="stamp-overlay-layer">
+                    <img src="${stampImgSrc}" crossorigin="anonymous" alt="Stamp Overlay" />
+                </div>
+            ` : '';
 
             // 1. ANNEXURE-I (FOR ADULTS - DOB UPDATE)
             if (fileId === 'LOCAL_HTML_ANNEXURE_1') {
                 return `
                     <div class="affidavit-paper ${shadowClass}">
+                        ${stampOverlayHtml}
                         <div>
                             <div style="text-align: center; font-weight: bold; font-size: 17px; text-decoration: underline; margin-bottom: 6px;">Annexure-I- For Adults</div>
                             <div style="text-align: center; font-weight: bold; font-size: 16px; text-decoration: underline; margin-bottom: 10px;">Affidavit for date of birth updation</div>
@@ -755,6 +893,7 @@
             if (fileId === 'LOCAL_HTML_ANNEXURE_1A') {
                 return `
                     <div class="affidavit-paper ${shadowClass}">
+                        ${stampOverlayHtml}
                         <div>
                             <div style="text-align: center; font-weight: bold; font-size: 17px; text-decoration: underline; margin-bottom: 6px;">Annexure IA- For children</div>
                             <div style="text-align: center; font-weight: bold; font-size: 16px; text-decoration: underline; margin-bottom: 8px;">Affidavit for date of birth updation</div>
@@ -802,6 +941,7 @@
             if (fileId === 'LOCAL_HTML_ANNEXURE_3') {
                 return `
                     <div class="affidavit-paper ${shadowClass}">
+                        ${stampOverlayHtml}
                         <div>
                             <div style="text-align: center; font-weight: bold; font-size: 17px; text-decoration: underline; margin-bottom: 6px;">Annexure III-For adults</div>
                             <div style="text-align: center; font-weight: bold; font-size: 16px; text-decoration: underline; margin-bottom: 8px;">Affidavit for reactivation of Aadhaar</div>
@@ -846,6 +986,7 @@
             if (fileId === 'LOCAL_HTML_ANNEXURE_3A') {
                 return `
                     <div class="affidavit-paper ${shadowClass}">
+                        ${stampOverlayHtml}
                         <div>
                             <div style="text-align: center; font-weight: bold; font-size: 17px; text-decoration: underline; margin-bottom: 6px;">Annexure IIIA-For children</div>
                             <div style="text-align: center; font-weight: bold; font-size: 16px; text-decoration: underline; margin-bottom: 8px;">Affidavit for reactivation of Aadhaar</div>
@@ -915,6 +1056,7 @@
 
                 return `
                     <div class="affidavit-paper ${shadowClass}">
+                        ${stampOverlayHtml}
                         <div>
                             <div style="display: flex; justify-content: space-between; font-family: Arial, sans-serif; font-size: 11px; color: #222; margin-bottom: 20px;">
                                 <span>HQ-16024/4/2020-EU-I-HQ</span>
@@ -948,6 +1090,7 @@
             if (fileId === 'LOCAL_HTML_ANNEXURE_F') {
                 return `
                     <div class="affidavit-paper ${shadowClass}">
+                        ${stampOverlayHtml}
                         <div>
                             <div style="display: flex; justify-content: space-between; font-family: Arial, sans-serif; font-size: 11px; color: #222; margin-bottom: 20px;">
                                 <span>HQ-16024/4/2020-EU-I-HQ</span>
@@ -989,6 +1132,7 @@
             // 9. ANNEXURE E (FOR ADULTS - URF/ALIAS REMOVAL)
             return `
                 <div class="affidavit-paper ${shadowClass}">
+                    ${stampOverlayHtml}
                     <div>
                         <div style="display: flex; justify-content: space-between; font-family: Arial, sans-serif; font-size: 11px; color: #222; margin-bottom: 20px;">
                             <span>HQ-16024/4/2020-EU-I-HQ</span>
@@ -1027,13 +1171,17 @@
                 </div>`;
         };
 
-        // 🔥 100% DESKTOP & MOBILE FIXED SINGLE-PAGE A4 PDF DOWNLOADER (ZERO LEFT CLIPPING)
-        window.downloadHtmlDocAsPdf = async function(fileId, formDataObj, fileName) {
+        // ================= 100% DESKTOP & MOBILE FIXED SINGLE-PAGE A4 PDF DOWNLOADER (WITH STAMP OVERLAP) =================
+        window.downloadHtmlDocAsPdf = async function(fileId, formDataObj, fileName, withStamp = false) {
             const btn = document.getElementById('modalDownloadBtn');
             const origHtml = btn ? btn.innerHTML : '';
             if (btn) {
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Downloading...';
                 btn.disabled = true;
+            }
+
+            if (withStamp && !window.cachedStampDataUrl) {
+                await window.preloadStampFromGoogleDoc();
             }
 
             const savedScrollX = window.scrollX;
@@ -1042,19 +1190,27 @@
 
             const tempWrapper = document.createElement('div');
             tempWrapper.style.cssText = 'position:fixed;top:0;left:0;width:794px;height:1122px;margin:0;padding:0;z-index:99999;background:#ffffff;overflow:hidden;';
-            tempWrapper.innerHTML = window.buildLocalAffidavitHtml(fileId, formDataObj, false);
+            tempWrapper.innerHTML = window.buildLocalAffidavitHtml(fileId, formDataObj, false, withStamp);
             document.body.appendChild(tempWrapper);
 
             const targetEl = tempWrapper.querySelector('.affidavit-paper');
+            const overlayImg = targetEl.querySelector('.stamp-overlay-layer img');
+            if (overlayImg && !overlayImg.complete) {
+                await new Promise(resolve => {
+                    overlayImg.onload = resolve;
+                    overlayImg.onerror = resolve;
+                });
+            }
 
             try {
                 const opt = {
                     margin: 0,
-                    filename: fileName,
+                    filename: withStamp ? fileName.replace('.pdf', ' (With Stamp).pdf') : fileName,
                     image: { type: 'jpeg', quality: 1.0 },
                     html2canvas: {
                         scale: 2,
                         useCORS: true,
+                        allowTaint: true,
                         x: 0,
                         y: 0,
                         scrollX: 0,
@@ -1072,7 +1228,7 @@
                 };
                 await html2pdf().set(opt).from(targetEl).save();
             } catch (err) {
-                alert("PDF डाउनलोड करने में समस्या आई।");
+                alert("PDF डाउनलोड करने में समस्या आई। कृपया Print बटन से Save as PDF का उपयोग करें।");
             } finally {
                 document.body.removeChild(tempWrapper);
                 window.scrollTo(savedScrollX, savedScrollY);
@@ -1083,10 +1239,22 @@
             }
         };
 
-        // 🖨️ DIRECT PRINT (EXACT SAME AS INDEX.HTML: DIRECT FOR ANNEXURES & GOOGLE DRIVE VIEW FOR DRIVE PDFs)
-        window.directPrintDocument = function(fileId, formDataObj, fileName) {
+        // 🖨️ DIRECT PRINT (SUPPORTS BOTH WITH/WITHOUT STAMP FOR ANNEXURES & GOOGLE DRIVE FILES)
+        window.directPrintDocument = async function(fileId, formDataObj, fileName, withStamp = false, btnEl = null) {
+            const targetBtn = btnEl || document.getElementById('modalPrintBtn');
+            const origHtml = targetBtn ? targetBtn.innerHTML : '';
+
             if (String(fileId).startsWith('LOCAL_HTML_')) {
-                const htmlContent = window.buildLocalAffidavitHtml(fileId, formDataObj, false);
+                if (targetBtn) {
+                    targetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing...';
+                    targetBtn.disabled = true;
+                }
+
+                if (withStamp && !window.cachedStampDataUrl) {
+                    await window.preloadStampFromGoogleDoc();
+                }
+
+                const htmlContent = window.buildLocalAffidavitHtml(fileId, formDataObj, false, withStamp);
                 let printFrame = document.getElementById('directPrintIframe');
                 if (printFrame) document.body.removeChild(printFrame);
 
@@ -1106,13 +1274,14 @@
                             @page { size: A4; margin: 0; }
                             html, body { margin: 0; padding: 0; background: #ffffff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                             .affidavit-paper {
+                                position: relative;
                                 font-family: 'Times New Roman', Times, serif;
-                                width: 210mm;
-                                height: 297mm;
-                                padding: 14mm 18mm;
+                                width: 794px;
+                                height: 1122px;
+                                padding: 46px 62px;
                                 background: #ffffff;
                                 color: #000000;
-                                font-size: 12pt;
+                                font-size: 15px;
                                 line-height: 1.55;
                                 box-sizing: border-box;
                                 display: flex;
@@ -1122,6 +1291,22 @@
                                 overflow: hidden;
                             }
                             .filled-val { font-weight: bold; color: #000000; }
+                            .stamp-overlay-layer {
+                                position: absolute;
+                                top: 0;
+                                left: 0;
+                                width: 794px;
+                                height: 1122px;
+                                pointer-events: none;
+                                z-index: 30;
+                                mix-blend-mode: multiply;
+                            }
+                            .stamp-overlay-layer img {
+                                width: 100%;
+                                height: 100%;
+                                object-fit: fill;
+                                mix-blend-mode: multiply;
+                            }
                         </style>
                     </head>
                     <body>${htmlContent}</body>
@@ -1129,53 +1314,118 @@
                 `);
                 frameDoc.close();
 
-                setTimeout(() => {
-                    printFrame.contentWindow.focus();
-                    printFrame.contentWindow.print();
-                }, 250);
+                const imgEl = frameDoc.querySelector('.stamp-overlay-layer img');
+                const triggerPrint = () => {
+                    if (targetBtn) {
+                        targetBtn.innerHTML = origHtml;
+                        targetBtn.disabled = false;
+                    }
+                    setTimeout(() => {
+                        printFrame.contentWindow.focus();
+                        printFrame.contentWindow.print();
+                    }, 150);
+                };
+
+                if (imgEl && !imgEl.complete) {
+                    imgEl.onload = triggerPrint;
+                    imgEl.onerror = triggerPrint;
+                } else {
+                    triggerPrint();
+                }
             } else {
-                // For Google Drive PDFs, open the direct print/view window (same as index.html)
+                // Google Drive PDFs (Domicile, Caste, DOB 18+) के लिए बिना एरर के सीधे प्रिंट विंडो खोलें
                 window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
             }
         };
 
-        // ================= IN-APP PREVIEW MODAL (WITH DIRECT PRINT + DOWNLOAD PDF) =================
-        window.openPdfViewer = function(fileId, fileName, historyIndex = -1) {
+        // हिस्ट्री लिस्ट से 1-क्लिक में डायरेक्ट प्रिंट करने का हेल्पर
+        window.triggerDirectPrintByIndex = function(historyIndex, btnEl) {
+            const record = window.adminAllHistoryData[historyIndex];
+            if (!record) return;
+            const withStamp = !!window.stampSelectionMap[historyIndex];
+            window.directPrintDocument(record.fileId, record.formData || {}, record.fileName || 'Document.pdf', withStamp, btnEl);
+        };
+
+        // प्रीव्यू मोडल के अंदर से With Stamp चेकबॉक्स बदलने पर लाइव अपडेट करें
+        window.toggleModalStampPreview = async function(isChecked) {
+            const ctx = window.currentModalContext;
+            if (!ctx || !String(ctx.fileId).startsWith('LOCAL_HTML_')) return;
+
+            ctx.withStamp = isChecked;
+            if (ctx.historyIndex >= 0) {
+                window.stampSelectionMap[ctx.historyIndex] = isChecked;
+                const rowChk = document.getElementById(`stampChk-${ctx.historyIndex}`);
+                if (rowChk) rowChk.checked = isChecked;
+            }
+
+            if (isChecked && !window.cachedStampDataUrl) {
+                await window.preloadStampFromGoogleDoc();
+            }
+
+            const record = window.adminAllHistoryData[ctx.historyIndex];
+            const fData = record?.formData || {};
+            const htmlPreviewContainer = document.getElementById('htmlDocPreviewContainer');
+            htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(ctx.fileId, fData, true, isChecked);
+        };
+
+        // ================= PREVIEW MODAL OPENER =================
+        window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
             document.getElementById('pdfViewerTitle').innerText = fileName;
             const iframe = document.getElementById('pdfIframe');
             const htmlPreviewContainer = document.getElementById('htmlDocPreviewContainer');
             const spinner = document.getElementById('pdfLoadingSpinner');
             const downloadBtn = document.getElementById('modalDownloadBtn');
             const printBtn = document.getElementById('modalPrintBtn');
+            const modalStampLabel = document.getElementById('modalStampToggleLabel');
+            const modalStampCheckbox = document.getElementById('modalStampCheckbox');
 
-            if (String(fileId).startsWith('LOCAL_HTML_') && historyIndex >= 0) {
+            const isAnnexure = String(fileId).startsWith('LOCAL_HTML_');
+            const initialWithStamp = historyIndex >= 0 ? !!window.stampSelectionMap[historyIndex] : false;
+
+            window.currentModalContext = {
+                fileId: fileId,
+                fileName: fileName,
+                historyIndex: historyIndex,
+                withStamp: initialWithStamp
+            };
+
+            if (isAnnexure && historyIndex >= 0) {
+                if (modalStampLabel) modalStampLabel.classList.remove('hidden');
+                if (modalStampCheckbox) modalStampCheckbox.checked = initialWithStamp;
+
+                if (initialWithStamp && !window.cachedStampDataUrl) {
+                    await window.preloadStampFromGoogleDoc();
+                }
+
                 const record = window.adminAllHistoryData[historyIndex];
                 const fData = record?.formData || {};
                 spinner.style.display = 'none';
                 iframe.style.display = 'none';
                 htmlPreviewContainer.style.display = 'flex';
-                htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true);
+                htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true, initialWithStamp);
 
                 downloadBtn.onclick = async function() {
-                    await window.downloadHtmlDocAsPdf(fileId, fData, fileName);
+                    await window.downloadHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp);
                 };
                 if (printBtn) {
                     printBtn.onclick = function() {
-                        window.directPrintDocument(fileId, fData, fileName);
+                        window.directPrintDocument(fileId, fData, fileName, window.currentModalContext.withStamp, printBtn);
                     };
                 }
             } else {
+                if (modalStampLabel) modalStampLabel.classList.add('hidden');
                 htmlPreviewContainer.style.display = 'none';
                 htmlPreviewContainer.innerHTML = '';
                 iframe.style.display = 'block';
                 spinner.style.display = 'flex';
                 iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
+                
                 downloadBtn.onclick = function() {
                     window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank');
                 };
                 if (printBtn) {
                     printBtn.onclick = function() {
-                        window.directPrintDocument(fileId, {}, fileName);
+                        window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
                     };
                 }
             }
@@ -1205,7 +1455,12 @@
             if(activeBtn) activeBtn.className = "flex-1 bg-dark-900 text-royal-300 font-black py-3 px-2 rounded-xl shadow-glow transition text-xs md:text-sm flex justify-center items-center gap-1.5 border border-royal-500/50";
             
             const activeSection = document.getElementById(`section-${tabName}`);
-            if(activeSection) activeSection.classList.remove('hidden');
+            if(activeSection) activeSection.removeAttribute('class');
+            if(activeSection) {
+                if (tabName === 'payments') activeSection.className = 'space-y-4';
+                if (tabName === 'users') activeSection.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
+                if (tabName === 'history') activeSection.className = 'space-y-4';
+            }
 
             if (tabName === 'payments') window.loadAllPayments();
             if (tabName === 'history') window.loadAdminHistory(); 
@@ -1220,15 +1475,20 @@
         <h2 class="text-lg font-black text-white tracking-widest uppercase">Admin Secure Access</h2>
     </div>
 
-    <!-- FULL SCREEN PDF & HTML VIEWER MODAL (WITH DIRECT PRINT + DOWNLOAD PDF) -->
+    <!-- FULL SCREEN PDF & HTML VIEWER MODAL (WITH STAMP CHECKBOX, DIRECT PRINT & FIXED A4 DOWNLOAD) -->
     <div id="pdfViewerModal" class="fixed inset-0 z-[100] hidden bg-dark-900/80 backdrop-blur-md flex items-center justify-center p-2 md:p-6">
         <div class="bg-white w-full max-w-6xl h-full flex flex-col rounded-2xl shadow-2xl overflow-hidden">
-            <div class="flex justify-between items-center p-3 md:p-4 border-b border-slate-200 bg-slate-50 gap-2">
+            <div class="flex flex-wrap justify-between items-center p-3 md:p-4 border-b border-slate-200 bg-slate-50 gap-2">
                 <div class="flex items-center gap-2 overflow-hidden">
                     <div class="w-7 h-7 bg-royal-100 text-royal-600 rounded-lg flex items-center justify-center shrink-0 text-xs"><i class="fa-solid fa-file-pdf"></i></div>
                     <h3 id="pdfViewerTitle" class="font-bold text-slate-800 text-xs md:text-sm truncate">Document Preview</h3>
                 </div>
-                <div class="flex items-center gap-2 shrink-0">
+                <div class="flex flex-wrap items-center gap-2 shrink-0">
+                    <!-- ☑️ WITH STAMP / WITHOUT STAMP CHECKBOX IN MODAL -->
+                    <label id="modalStampToggleLabel" class="hidden inline-flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-400 px-3 py-1.5 md:py-2 rounded-xl text-xs font-black cursor-pointer select-none transition shadow-sm">
+                        <input type="checkbox" id="modalStampCheckbox" onchange="window.toggleModalStampPreview(this.checked)" class="w-4 h-4 accent-amber-600 rounded cursor-pointer">
+                        <span><i class="fa-solid fa-stamp text-amber-700 mr-1"></i> With Stamp (स्टैम्प लगाएं)</span>
+                    </label>
                     <!-- 🖨️ DIRECT PRINT BUTTON -->
                     <button id="modalPrintBtn" class="bg-amber-500 hover:bg-amber-600 text-dark-950 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs font-black transition shadow-sm flex items-center gap-1.5">
                         <i class="fa-solid fa-print"></i> Print
