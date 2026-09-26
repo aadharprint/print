@@ -30,7 +30,7 @@
     </script>
 
     <style>
-        /* फिक्स सिंगल-पेज A4 लेआउट */
+        /* Fixed Single-Page A4 Layout */
         .affidavit-paper {
             position: relative;
             font-family: 'Times New Roman', Times, serif;
@@ -53,7 +53,7 @@
             font-weight: bold;
             color: #000000;
         }
-        /* स्टैम्प ओवरलैप लेयर */
+        /* Stamp Overlap Layer */
         .stamp-overlay-layer {
             position: absolute;
             top: 0;
@@ -96,13 +96,20 @@
         const ADMIN_EMAIL = "hkosiun1221@gmail.com";
         const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-        // ================= LOCAL GITHUB / VERCEL STAMP CONFIG =================
-        // GitHub में admin.html के साथ रखी गई फाइल का नाम:
-        const LOCAL_STAMP_FILE = "stamp.png";
+        // ================= 6 STAMP FILES AUTO-DETECT & RANDOM CONFIG =================
+        // GitHub/Vercel par aap in 6 mein se jo bhi files upload karenge, code unhe apne-aap detect kar lega:
+        const CANDIDATE_STAMP_FILES = [
+            "stamp.png",
+            "stamp1.png",
+            "stamp2.png",
+            "stamp3.png",
+            "stamp4.png",
+            "stamp5.png"
+        ];
         
-        window.cachedStampDataUrl = null;
-        window.stampSelectionMap = {}; 
-        window.currentModalContext = { fileId: '', fileName: '', historyIndex: -1, withStamp: false };
+        window.availableStampsList = []; // Sirf woh stamps jo server par sach mein maujood hain
+        window.stampSelectionMap = {};   // { historyIndex: { enabled: true/false, stampSrc: '...' } }
+        window.currentModalContext = { fileId: '', fileName: '', historyIndex: -1, withStamp: false, stampSrc: '' };
 
         window.currentUserData = null;
         window.allUsersMap = {}; 
@@ -113,13 +120,15 @@
         window.allPaymentsData = []; 
         window.currentPaymentFilter = 'Pending';
 
-        // ================= INSTANT LOCAL STAMP LOADER (WITH AUTO WHITE-BG REMOVAL) =================
-        window.preloadLocalStamp = function() {
-            if (window.cachedStampDataUrl) return Promise.resolve(window.cachedStampDataUrl);
-
+        // ================= AUTO-DETECT UPLOADED STAMPS & MAKE WHITE BG TRANSPARENT =================
+        window.loadSingleStampFile = function(fileName) {
             return new Promise((resolve) => {
                 const img = new Image();
                 img.onload = () => {
+                    // Check ki image sach mein load hui hai
+                    if (!img.naturalWidth || img.naturalWidth === 0) {
+                        return resolve(null);
+                    }
                     try {
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
@@ -127,7 +136,7 @@
                         canvas.height = img.naturalHeight || 1122;
                         ctx.drawImage(img, 0, 0);
 
-                        // सफेद बैकग्राउंड को पारदर्शी (Transparent) बनाएं ताकि PDF डाउनलोड में भी टेक्स्ट साफ दिखे
+                        // White background ko transparent banayein taki Annexure text aur stamp dono saaf dikhein
                         const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                         const data = imgData.data;
                         for (let i = 0; i < data.length; i += 4) {
@@ -136,19 +145,59 @@
                             }
                         }
                         ctx.putImageData(imgData, 0, 0);
-                        window.cachedStampDataUrl = canvas.toDataURL('image/png');
-                        resolve(window.cachedStampDataUrl);
+                        resolve({
+                            name: fileName,
+                            dataUrl: canvas.toDataURL('image/png')
+                        });
                     } catch (e) {
-                        window.cachedStampDataUrl = LOCAL_STAMP_FILE;
-                        resolve(LOCAL_STAMP_FILE);
+                        resolve({
+                            name: fileName,
+                            dataUrl: fileName
+                        });
                     }
                 };
                 img.onerror = () => {
-                    window.cachedStampDataUrl = LOCAL_STAMP_FILE;
-                    resolve(LOCAL_STAMP_FILE);
+                    // File server par maujood nahi hai, isliye ignore karein
+                    resolve(null);
                 };
-                img.src = LOCAL_STAMP_FILE;
+                img.src = fileName;
             });
+        };
+
+        window.preloadAllAvailableStamps = async function() {
+            if (window.availableStampsList.length > 0) return window.availableStampsList;
+
+            const results = await Promise.all(
+                CANDIDATE_STAMP_FILES.map(file => window.loadSingleStampFile(file))
+            );
+
+            window.availableStampsList = results.filter(item => item !== null);
+            window.updateStampCountBadge();
+            return window.availableStampsList;
+        };
+
+        window.updateStampCountBadge = function() {
+            const badge = document.getElementById('activeStampsBadge');
+            if (!badge) return;
+            const count = window.availableStampsList.length;
+            if (count > 0) {
+                const names = window.availableStampsList.map(s => s.name).join(', ');
+                badge.className = "text-[10px] font-black bg-green-100 text-green-800 border border-green-300 px-2.5 py-0.5 rounded-full";
+                badge.innerHTML = `<i class="fa-solid fa-stamp mr-1"></i>${count} Stamps Active`;
+                badge.title = `Loaded: ${names}`;
+            } else {
+                badge.className = "text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 rounded-full";
+                badge.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1"></i>No Stamp Uploaded`;
+            }
+        };
+
+        // Maujood stamps mein se koi bhi ek Random stamp chunein
+        window.pickRandomAvailableStamp = function() {
+            if (window.availableStampsList.length === 0) {
+                return "stamp.png";
+            }
+            const randomIndex = Math.floor(Math.random() * window.availableStampsList.length);
+            return window.availableStampsList[randomIndex].dataUrl;
         };
 
         onAuthStateChanged(auth, async (user) => {
@@ -160,8 +209,8 @@
                 document.getElementById('adminPanelContent').classList.remove('hidden');
                 document.getElementById('loadingScreen').classList.add('hidden');
                 
-                // पेज खुलते ही तुरंत लोकल stamp.png को मेमोरी में तैयार कर लें
-                window.preloadLocalStamp();
+                // Page khulte hi sabhi maujood stamp files (stamp.png, stamp1..5.png) check karke memory mein load kar lein
+                window.preloadAllAvailableStamps();
 
                 await window.loadAllUsersForDropdown(); 
                 window.switchAdminMainTab('payments');
@@ -659,10 +708,12 @@
             }
         };
 
-        // ================= SECTION 3: DATABASE RECORDS (HISTORY PREVIEW, STAMP CHECKBOX, DIRECT PRINT & DELETE) =================
+        // ================= SECTION 3: DATABASE RECORDS (HISTORY PREVIEW, RANDOM STAMP CHECKBOX, DIRECT PRINT & DELETE) =================
         window.loadAdminHistory = async function() {
             const container = document.getElementById('adminHistoryListContainer');
             container.innerHTML = `<div class="p-10 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>रिकॉर्ड्स लोड हो रहे हैं...</div>`;
+
+            window.updateStampCountBadge();
 
             try {
                 const filterUserDropdown = document.getElementById('filterUser');
@@ -690,8 +741,23 @@
             }
         };
 
-        window.toggleRowStampCheckbox = function(origIndex, isChecked) {
-            window.stampSelectionMap[origIndex] = isChecked;
+        // Jab row mein checkbox click ho, toh maujood stamps mein se randomly ek stamp chunein
+        window.toggleRowStampCheckbox = async function(origIndex, isChecked) {
+            if (isChecked) {
+                if (window.availableStampsList.length === 0) {
+                    await window.preloadAllAvailableStamps();
+                }
+                const chosenSrc = window.pickRandomAvailableStamp();
+                window.stampSelectionMap[origIndex] = {
+                    enabled: true,
+                    stampSrc: chosenSrc
+                };
+            } else {
+                window.stampSelectionMap[origIndex] = {
+                    enabled: false,
+                    stampSrc: ''
+                };
+            }
         };
 
         window.renderAdminHistory = function() {
@@ -724,10 +790,11 @@
 
                 const safeFileName = String(data.fileName || 'Document.pdf').replace(/'/g, "\\'");
                 const isAnnexure = String(data.fileId || '').startsWith('LOCAL_HTML_');
-                const isStampChecked = !!window.stampSelectionMap[data._origIndex];
+                const stampState = window.stampSelectionMap[data._origIndex];
+                const isStampChecked = !!(stampState && stampState.enabled);
 
                 const stampCheckboxHtml = isAnnexure ? `
-                    <label class="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-2 rounded-xl text-xs font-black cursor-pointer select-none transition shadow-sm" title="टिक करने पर स्टैम्प के साथ प्रिंट और डाउनलोड होगा">
+                    <label class="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-2 rounded-xl text-xs font-black cursor-pointer select-none transition shadow-sm" title="टिक करने पर उपलब्ध स्टैम्प्स में से कोई भी एक रैंडम स्टैम्प लग जाएगी">
                         <input type="checkbox" id="stampChk-${data._origIndex}" ${isStampChecked ? 'checked' : ''} onchange="window.toggleRowStampCheckbox(${data._origIndex}, this.checked)" class="w-4 h-4 accent-amber-600 rounded cursor-pointer">
                         <span><i class="fa-solid fa-stamp text-amber-600 mr-0.5"></i> With Stamp</span>
                     </label>
@@ -788,14 +855,14 @@
             finally { btn.innerHTML = origHTML; btn.disabled = false; }
         };
 
-        // ================= UNIFIED SINGLE-PAGE A4 HTML BUILDER FOR ALL 9 ANNEXURES (WITH INSTANT LOCAL STAMP) =================
-        window.buildLocalAffidavitHtml = function(fileId, d = {}, withShadow = true, withStamp = false) {
+        // ================= UNIFIED SINGLE-PAGE A4 HTML BUILDER FOR ALL 9 ANNEXURES (WITH RANDOM STAMP OVERLAP) =================
+        window.buildLocalAffidavitHtml = function(fileId, d = {}, withShadow = true, withStamp = false, customStampSrc = '') {
             const shadowClass = withShadow ? 'shadow-2xl' : '';
-            const stampSrc = window.cachedStampDataUrl || LOCAL_STAMP_FILE;
+            const finalStampSrc = customStampSrc || window.pickRandomAvailableStamp();
             
             const stampOverlayHtml = withStamp ? `
                 <div class="stamp-overlay-layer">
-                    <img src="${stampSrc}" onerror="this.style.display='none'" />
+                    <img src="${finalStampSrc}" onerror="this.style.display='none'" />
                 </div>
             ` : '';
 
@@ -808,7 +875,7 @@
                             <div style="text-align: center; font-weight: bold; font-size: 17px; text-decoration: underline; margin-bottom: 6px;">Annexure-I- For Adults</div>
                             <div style="text-align: center; font-weight: bold; font-size: 16px; text-decoration: underline; margin-bottom: 10px;">Affidavit for date of birth updation</div>
                             <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4; margin-bottom: 22px;">
-                                (Applicable for cases where the DoB is verified in Identification. To be printed on non-judicial<br>
+                                (Applicable for cases where the DoB is verified. To be printed on non-judicial<br>
                                 stamp paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)
                             </div>
                             <div style="text-align: justify; line-height: 1.75; margin-bottom: 14px;">
@@ -1128,7 +1195,7 @@
         };
 
         // ================= INSTANT SINGLE-PAGE A4 PDF DOWNLOADER =================
-        window.downloadHtmlDocAsPdf = async function(fileId, formDataObj, fileName, withStamp = false) {
+        window.downloadHtmlDocAsPdf = async function(fileId, formDataObj, fileName, withStamp = false, stampSrc = '') {
             const btn = document.getElementById('modalDownloadBtn');
             const origHtml = btn ? btn.innerHTML : '';
             if (btn) {
@@ -1136,9 +1203,11 @@
                 btn.disabled = true;
             }
 
-            if (withStamp && !window.cachedStampDataUrl) {
-                await window.preloadLocalStamp();
+            if (withStamp && window.availableStampsList.length === 0) {
+                await window.preloadAllAvailableStamps();
             }
+
+            const finalStampSrc = withStamp ? (stampSrc || window.pickRandomAvailableStamp()) : '';
 
             const savedScrollX = window.scrollX;
             const savedScrollY = window.scrollY;
@@ -1146,7 +1215,7 @@
 
             const tempWrapper = document.createElement('div');
             tempWrapper.style.cssText = 'position:fixed;top:0;left:0;width:794px;height:1122px;margin:0;padding:0;z-index:99999;background:#ffffff;overflow:hidden;';
-            tempWrapper.innerHTML = window.buildLocalAffidavitHtml(fileId, formDataObj, false, withStamp);
+            tempWrapper.innerHTML = window.buildLocalAffidavitHtml(fileId, formDataObj, false, withStamp, finalStampSrc);
             document.body.appendChild(tempWrapper);
 
             const targetEl = tempWrapper.querySelector('.affidavit-paper');
@@ -1188,13 +1257,14 @@
         };
 
         // 🖨️ 0-SECOND INSTANT DIRECT PRINT
-        window.directPrintDocument = async function(fileId, formDataObj, fileName, withStamp = false, btnEl = null) {
+        window.directPrintDocument = async function(fileId, formDataObj, fileName, withStamp = false, stampSrc = '', btnEl = null) {
             if (String(fileId).startsWith('LOCAL_HTML_')) {
-                if (withStamp && !window.cachedStampDataUrl) {
-                    await window.preloadLocalStamp();
+                if (withStamp && window.availableStampsList.length === 0) {
+                    await window.preloadAllAvailableStamps();
                 }
 
-                const htmlContent = window.buildLocalAffidavitHtml(fileId, formDataObj, false, withStamp);
+                const finalStampSrc = withStamp ? (stampSrc || window.pickRandomAvailableStamp()) : '';
+                const htmlContent = window.buildLocalAffidavitHtml(fileId, formDataObj, false, withStamp, finalStampSrc);
                 let printFrame = document.getElementById('directPrintIframe');
                 if (printFrame) document.body.removeChild(printFrame);
 
@@ -1266,32 +1336,53 @@
             }
         };
 
-        window.triggerDirectPrintByIndex = function(historyIndex, btnEl) {
+        window.triggerDirectPrintByIndex = async function(historyIndex, btnEl) {
             const record = window.adminAllHistoryData[historyIndex];
             if (!record) return;
-            const withStamp = !!window.stampSelectionMap[historyIndex];
-            window.directPrintDocument(record.fileId, record.formData || {}, record.fileName || 'Document.pdf', withStamp, btnEl);
+            const stampState = window.stampSelectionMap[historyIndex];
+            const withStamp = !!(stampState && stampState.enabled);
+            let chosenSrc = stampState?.stampSrc || '';
+
+            if (withStamp && !chosenSrc) {
+                if (window.availableStampsList.length === 0) {
+                    await window.preloadAllAvailableStamps();
+                }
+                chosenSrc = window.pickRandomAvailableStamp();
+                window.stampSelectionMap[historyIndex] = { enabled: true, stampSrc: chosenSrc };
+            }
+
+            window.directPrintDocument(record.fileId, record.formData || {}, record.fileName || 'Document.pdf', withStamp, chosenSrc, btnEl);
         };
 
+        // Modal ke andar checkbox click hone par random stamp chunein aur live dikhayein
         window.toggleModalStampPreview = async function(isChecked) {
             const ctx = window.currentModalContext;
             if (!ctx || !String(ctx.fileId).startsWith('LOCAL_HTML_')) return;
 
-            ctx.withStamp = isChecked;
-            if (ctx.historyIndex >= 0) {
-                window.stampSelectionMap[ctx.historyIndex] = isChecked;
-                const rowChk = document.getElementById(`stampChk-${ctx.historyIndex}`);
-                if (rowChk) rowChk.checked = isChecked;
+            if (isChecked) {
+                if (window.availableStampsList.length === 0) {
+                    await window.preloadAllAvailableStamps();
+                }
+                ctx.withStamp = true;
+                ctx.stampSrc = window.pickRandomAvailableStamp();
+            } else {
+                ctx.withStamp = false;
+                ctx.stampSrc = '';
             }
 
-            if (isChecked && !window.cachedStampDataUrl) {
-                await window.preloadLocalStamp();
+            if (ctx.historyIndex >= 0) {
+                window.stampSelectionMap[ctx.historyIndex] = {
+                    enabled: ctx.withStamp,
+                    stampSrc: ctx.stampSrc
+                };
+                const rowChk = document.getElementById(`stampChk-${ctx.historyIndex}`);
+                if (rowChk) rowChk.checked = isChecked;
             }
 
             const record = window.adminAllHistoryData[ctx.historyIndex];
             const fData = record?.formData || {};
             const htmlPreviewContainer = document.getElementById('htmlDocPreviewContainer');
-            htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(ctx.fileId, fData, true, isChecked);
+            htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(ctx.fileId, fData, true, ctx.withStamp, ctx.stampSrc);
         };
 
         // ================= PREVIEW MODAL OPENER =================
@@ -1306,36 +1397,58 @@
             const modalStampCheckbox = document.getElementById('modalStampCheckbox');
 
             const isAnnexure = String(fileId).startsWith('LOCAL_HTML_');
-            const initialWithStamp = historyIndex >= 0 ? !!window.stampSelectionMap[historyIndex] : false;
+            const existingState = historyIndex >= 0 ? window.stampSelectionMap[historyIndex] : null;
+            const initialWithStamp = !!(existingState && existingState.enabled);
+            let initialStampSrc = existingState?.stampSrc || '';
+
+            if (initialWithStamp && !initialStampSrc) {
+                if (window.availableStampsList.length === 0) {
+                    await window.preloadAllAvailableStamps();
+                }
+                initialStampSrc = window.pickRandomAvailableStamp();
+                if (historyIndex >= 0) {
+                    window.stampSelectionMap[historyIndex] = { enabled: true, stampSrc: initialStampSrc };
+                }
+            }
 
             window.currentModalContext = {
                 fileId: fileId,
                 fileName: fileName,
                 historyIndex: historyIndex,
-                withStamp: initialWithStamp
+                withStamp: initialWithStamp,
+                stampSrc: initialStampSrc
             };
 
             if (isAnnexure && historyIndex >= 0) {
                 if (modalStampLabel) modalStampLabel.classList.remove('hidden');
                 if (modalStampCheckbox) modalStampCheckbox.checked = initialWithStamp;
 
-                if (initialWithStamp && !window.cachedStampDataUrl) {
-                    await window.preloadLocalStamp();
-                }
-
                 const record = window.adminAllHistoryData[historyIndex];
                 const fData = record?.formData || {};
                 spinner.style.display = 'none';
                 iframe.style.display = 'none';
                 htmlPreviewContainer.style.display = 'flex';
-                htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true, initialWithStamp);
+                htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true, initialWithStamp, initialStampSrc);
 
                 downloadBtn.onclick = async function() {
-                    await window.downloadHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp);
+                    await window.downloadHtmlDocAsPdf(
+                        fileId,
+                        fData,
+                        fileName,
+                        window.currentModalContext.withStamp,
+                        window.currentModalContext.stampSrc
+                    );
                 };
                 if (printBtn) {
                     printBtn.onclick = function() {
-                        window.directPrintDocument(fileId, fData, fileName, window.currentModalContext.withStamp, printBtn);
+                        window.directPrintDocument(
+                            fileId,
+                            fData,
+                            fileName,
+                            window.currentModalContext.withStamp,
+                            window.currentModalContext.stampSrc,
+                            printBtn
+                        );
                     };
                 }
             } else {
@@ -1413,7 +1526,7 @@
                     <!-- ☑️ WITH STAMP / WITHOUT STAMP CHECKBOX IN MODAL -->
                     <label id="modalStampToggleLabel" class="hidden inline-flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-400 px-3 py-1.5 md:py-2 rounded-xl text-xs font-black cursor-pointer select-none transition shadow-sm">
                         <input type="checkbox" id="modalStampCheckbox" onchange="window.toggleModalStampPreview(this.checked)" class="w-4 h-4 accent-amber-600 rounded cursor-pointer">
-                        <span><i class="fa-solid fa-stamp text-amber-700 mr-1"></i> With Stamp (स्टैम्प लगाएं)</span>
+                        <span><i class="fa-solid fa-stamp text-amber-700 mr-1"></i> With Stamp (Random)</span>
                     </label>
                     <!-- 🖨️ DIRECT PRINT BUTTON -->
                     <button id="modalPrintBtn" class="bg-amber-500 hover:bg-amber-600 text-dark-950 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs font-black transition shadow-sm flex items-center gap-1.5">
@@ -1655,7 +1768,10 @@
             <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
                 <div class="flex flex-wrap justify-between items-center gap-2">
                     <div>
-                        <h3 class="text-base md:text-lg font-black text-dark-900">Generated Documents</h3>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-base md:text-lg font-black text-dark-900">Generated Documents</h3>
+                            <span id="activeStampsBadge" class="text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 rounded-full">Checking Stamps...</span>
+                        </div>
                         <p id="historyCount" class="text-xs font-bold text-royal-600">Total Files: 0</p>
                     </div>
                     <div class="flex gap-2">
