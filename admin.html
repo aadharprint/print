@@ -10,8 +10,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- html2pdf.js for Direct Single-Page A4 PDF Download -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <!-- PDF.js for Rendering Google Doc Stamp Overlay Crisply -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     
     <!-- Royal Theme Config -->
     <script>
@@ -55,7 +53,7 @@
             font-weight: bold;
             color: #000000;
         }
-        /* स्टैम्प ओवरलैप लेयर (बिना किसी ब्रोकन आइकन के) */
+        /* स्टैम्प ओवरलैप लेयर */
         .stamp-overlay-layer {
             position: absolute;
             top: 0;
@@ -98,16 +96,13 @@
         const ADMIN_EMAIL = "hkosiun1221@gmail.com";
         const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-        // ================= STAMP GOOGLE DOC CONFIG =================
-        const STAMP_DOC_ID = "1EyQ_mYyEpUSPue4PRPFxfvpBmpfXDhRRpTKmjIzxvhw";
+        // ================= LOCAL GITHUB / VERCEL STAMP CONFIG =================
+        // GitHub में admin.html के साथ रखी गई फाइल का नाम:
+        const LOCAL_STAMP_FILE = "stamp.png";
         
-        window.cachedStampDataUrl = localStorage.getItem('ojas_custom_stamp_b64') || null;
+        window.cachedStampDataUrl = null;
         window.stampSelectionMap = {}; 
         window.currentModalContext = { fileId: '', fileName: '', historyIndex: -1, withStamp: false };
-
-        if (window.pdfjsLib) {
-            window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        }
 
         window.currentUserData = null;
         window.allUsersMap = {}; 
@@ -118,175 +113,42 @@
         window.allPaymentsData = []; 
         window.currentPaymentFilter = 'Pending';
 
-        // सफेद बैकग्राउंड को पारदर्शी (Transparent) बनाने का हेल्पर
-        window.makeWhiteBgTransparent = function(imgElement, maxW = 794, maxH = 1122) {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = maxW;
-            canvas.height = maxH;
+        // ================= INSTANT LOCAL STAMP LOADER (WITH AUTO WHITE-BG REMOVAL) =================
+        window.preloadLocalStamp = function() {
+            if (window.cachedStampDataUrl) return Promise.resolve(window.cachedStampDataUrl);
 
-            // सफेद बैकग्राउंड हटाकर ड्रॉ करें
-            ctx.drawImage(imgElement, 0, 0, maxW, maxH);
-            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imgData.data;
-            for (let i = 0; i < data.length; i += 4) {
-                if (data[i] > 240 && data[i + 1] > 240 && data[i + 2] > 240) {
-                    data[i + 3] = 0;
-                }
-            }
-            ctx.putImageData(imgData, 0, 0);
-            return canvas.toDataURL('image/png');
-        };
-
-        // ================= UPLOAD / SAVE CUSTOM STAMP IMAGE TO FIREBASE =================
-        window.handleCustomStampUpload = async function(event) {
-            const file = event.target.files?.[0];
-            if (!file) return;
-
-            const statusBtn = document.getElementById('btnUploadStampLabel');
-            const origHtml = statusBtn ? statusBtn.innerHTML : '';
-            if (statusBtn) statusBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving Stamp...';
-
-            try {
-                const dataUrl = await new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        const img = new Image();
-                        img.onload = () => {
-                            const processed = window.makeWhiteBgTransparent(img, 794, 1122);
-                            resolve(processed);
-                        };
-                        img.onerror = reject;
-                        img.src = e.target.result;
-                    };
-                    reader.onerror = reject;
-                    reader.readAsDataURL(file);
-                });
-
-                window.cachedStampDataUrl = dataUrl;
-                try { localStorage.setItem('ojas_custom_stamp_b64', dataUrl); } catch (e) {}
-
-                await setDoc(doc(db, "settings", "stampConfig"), {
-                    stampDataUrl: dataUrl,
-                    updatedAt: new Date()
-                });
-
-                window.updateStampStatusBadge();
-                alert('स्टैम्प सफलतापूर्वक सेव हो गई है! अब With Stamp पर टिक करने पर यही स्टैम्प हर Annexure पर लगेगी।');
-            } catch (err) {
-                alert('स्टैम्प सेव करने में समस्या आई: ' + err.message);
-            } finally {
-                if (statusBtn) statusBtn.innerHTML = origHtml;
-                event.target.value = '';
-            }
-        };
-
-        window.updateStampStatusBadge = function() {
-            const badge = document.getElementById('stampReadyBadge');
-            if (!badge) return;
-            if (window.cachedStampDataUrl) {
-                badge.className = "text-[10px] font-black bg-green-100 text-green-800 border border-green-300 px-2 py-0.5 rounded-full";
-                badge.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i>Stamp Ready`;
-            } else {
-                badge.className = "text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full";
-                badge.innerHTML = `<i class="fa-solid fa-link mr-1"></i>Google Doc Stamp`;
-            }
-        };
-
-        // ================= PRELOAD STAMP FROM FIREBASE OR GOOGLE DOC =================
-        window.preloadStampFromGoogleDoc = async function() {
-            // 1. पहले Firebase में सेव की गई स्टैम्प चेक करें
-            try {
-                const snap = await getDoc(doc(db, "settings", "stampConfig"));
-                if (snap.exists() && snap.data().stampDataUrl) {
-                    window.cachedStampDataUrl = snap.data().stampDataUrl;
-                    try { localStorage.setItem('ojas_custom_stamp_b64', window.cachedStampDataUrl); } catch (e) {}
-                    window.updateStampStatusBadge();
-                    return window.cachedStampDataUrl;
-                }
-            } catch (e) {}
-
-            if (window.cachedStampDataUrl) {
-                window.updateStampStatusBadge();
-                return window.cachedStampDataUrl;
-            }
-
-            // 2. Google Doc के HTML Export से स्टैम्प इमेज निकालें
-            const htmlExportUrl = `https://docs.google.com/document/d/${STAMP_DOC_ID}/export?format=html`;
-            const htmlProxies = [
-                `https://api.allorigins.win/get?url=${encodeURIComponent(htmlExportUrl)}`,
-                `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(htmlExportUrl)}`,
-                `https://corsproxy.io/?${encodeURIComponent(htmlExportUrl)}`
-            ];
-
-            for (const pUrl of htmlProxies) {
-                try {
-                    const res = await fetch(pUrl);
-                    if (!res.ok) continue;
-                    let htmlText = '';
-                    if (pUrl.includes('allorigins.win/get')) {
-                        const json = await res.json();
-                        htmlText = json.contents || '';
-                    } else {
-                        htmlText = await res.text();
-                    }
-                    if (htmlText && htmlText.includes('<img')) {
-                        const parser = new DOMParser();
-                        const docEl = parser.parseFromString(htmlText, 'text/html');
-                        const firstImg = docEl.querySelector('img');
-                        if (firstImg && firstImg.src) {
-                            window.cachedStampDataUrl = firstImg.src;
-                            window.updateStampStatusBadge();
-                            return window.cachedStampDataUrl;
-                        }
-                    }
-                } catch (e) {}
-            }
-
-            // 3. Google Doc के PDF Export को PDF.js से रेंडर करें
-            const pdfExportUrl = `https://docs.google.com/document/d/${STAMP_DOC_ID}/export?format=pdf`;
-            if (window.pdfjsLib) {
-                for (const proxyUrl of [
-                    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(pdfExportUrl)}`,
-                    `https://corsproxy.io/?${encodeURIComponent(pdfExportUrl)}`,
-                    `https://api.allorigins.win/raw?url=${encodeURIComponent(pdfExportUrl)}`
-                ]) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
                     try {
-                        const res = await fetch(proxyUrl);
-                        if (!res.ok) continue;
-                        const arrayBuf = await res.arrayBuffer();
-                        if (!arrayBuf || arrayBuf.byteLength < 500) continue;
-
-                        const pdf = await window.pdfjsLib.getDocument({ data: arrayBuf }).promise;
-                        const page = await pdf.getPage(1);
-                        const viewport = page.getViewport({ scale: 2.0 });
-
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
-                        canvas.width = viewport.width;
-                        canvas.height = viewport.height;
+                        canvas.width = img.naturalWidth || 794;
+                        canvas.height = img.naturalHeight || 1122;
+                        ctx.drawImage(img, 0, 0);
 
-                        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-
+                        // सफेद बैकग्राउंड को पारदर्शी (Transparent) बनाएं ताकि PDF डाउनलोड में भी टेक्स्ट साफ दिखे
                         const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                         const data = imgData.data;
                         for (let i = 0; i < data.length; i += 4) {
-                            if (data[i] > 242 && data[i + 1] > 242 && data[i + 2] > 242) {
+                            if (data[i] > 240 && data[i + 1] > 240 && data[i + 2] > 240) {
                                 data[i + 3] = 0;
                             }
                         }
                         ctx.putImageData(imgData, 0, 0);
-
                         window.cachedStampDataUrl = canvas.toDataURL('image/png');
-                        window.updateStampStatusBadge();
-                        return window.cachedStampDataUrl;
-                    } catch (e) {}
-                }
-            }
-
-            // 4. Direct Google Drive Image URL (बिना crossorigin के ताकि कभी ब्लॉक न हो)
-            window.updateStampStatusBadge();
-            return `https://lh3.googleusercontent.com/d/${STAMP_DOC_ID}=w1600`;
+                        resolve(window.cachedStampDataUrl);
+                    } catch (e) {
+                        window.cachedStampDataUrl = LOCAL_STAMP_FILE;
+                        resolve(LOCAL_STAMP_FILE);
+                    }
+                };
+                img.onerror = () => {
+                    window.cachedStampDataUrl = LOCAL_STAMP_FILE;
+                    resolve(LOCAL_STAMP_FILE);
+                };
+                img.src = LOCAL_STAMP_FILE;
+            });
         };
 
         onAuthStateChanged(auth, async (user) => {
@@ -298,7 +160,8 @@
                 document.getElementById('adminPanelContent').classList.remove('hidden');
                 document.getElementById('loadingScreen').classList.add('hidden');
                 
-                window.preloadStampFromGoogleDoc();
+                // पेज खुलते ही तुरंत लोकल stamp.png को मेमोरी में तैयार कर लें
+                window.preloadLocalStamp();
 
                 await window.loadAllUsersForDropdown(); 
                 window.switchAdminMainTab('payments');
@@ -801,8 +664,6 @@
             const container = document.getElementById('adminHistoryListContainer');
             container.innerHTML = `<div class="p-10 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>रिकॉर्ड्स लोड हो रहे हैं...</div>`;
 
-            window.updateStampStatusBadge();
-
             try {
                 const filterUserDropdown = document.getElementById('filterUser');
                 const currUserFilter = filterUserDropdown.value; 
@@ -927,16 +788,14 @@
             finally { btn.innerHTML = origHTML; btn.disabled = false; }
         };
 
-        // ================= UNIFIED SINGLE-PAGE A4 HTML BUILDER FOR ALL 9 ANNEXURES (WITH CLEAN STAMP OVERLAP) =================
+        // ================= UNIFIED SINGLE-PAGE A4 HTML BUILDER FOR ALL 9 ANNEXURES (WITH INSTANT LOCAL STAMP) =================
         window.buildLocalAffidavitHtml = function(fileId, d = {}, withShadow = true, withStamp = false) {
             const shadowClass = withShadow ? 'shadow-2xl' : '';
-            const primaryStampSrc = window.cachedStampDataUrl || `https://lh3.googleusercontent.com/d/${STAMP_DOC_ID}=w1600`;
-            const fallbackDriveSrc = `https://drive.google.com/thumbnail?id=${STAMP_DOC_ID}&sz=w1600`;
+            const stampSrc = window.cachedStampDataUrl || LOCAL_STAMP_FILE;
             
-            // बिना crossorigin और बिना alt टेक्स्ट के ताकि कभी भी ब्रोकन आइकन या "Stamp Overlay" लिखा न आए
             const stampOverlayHtml = withStamp ? `
                 <div class="stamp-overlay-layer">
-                    <img src="${primaryStampSrc}" onerror="if(this.src!=='${fallbackDriveSrc}'){this.src='${fallbackDriveSrc}';}else{this.style.display='none';}" />
+                    <img src="${stampSrc}" onerror="this.style.display='none'" />
                 </div>
             ` : '';
 
@@ -949,23 +808,23 @@
                             <div style="text-align: center; font-weight: bold; font-size: 17px; text-decoration: underline; margin-bottom: 6px;">Annexure-I- For Adults</div>
                             <div style="text-align: center; font-weight: bold; font-size: 16px; text-decoration: underline; margin-bottom: 10px;">Affidavit for date of birth updation</div>
                             <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4; margin-bottom: 22px;">
-                                (Applicable for cases where the DoB is verified in Aadhaar. To be printed on non-judicial<br>
+                                (Applicable for cases where the DoB is verified in Identification. To be printed on non-judicial<br>
                                 stamp paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)
                             </div>
                             <div style="text-align: justify; line-height: 1.75; margin-bottom: 14px;">
-                                1. I, <span class="filled-val">${d.applicantName || ''}</span> ${d.rel || 'S/D/W/o'} <span class="filled-val">${d.relativeName || ''}</span> resident of <span class="filled-val">${d.address || ''}</span> holding Aadhaar number <span class="filled-val">${d.idNumber || ''}</span> do hereby solemnly affirm and declare as under:-
+                                1. I, <span class="filled-val">${d.applicantName || ''}</span> ${d.rel || 'S/D/W/o'} <span class="filled-val">${d.relativeName || ''}</span> resident of <span class="filled-val">${d.address || ''}</span> holding ID number <span class="filled-val">${d.idNumber || ''}</span> do hereby solemnly affirm and declare as under:-
                             </div>
                             <ol style="list-style-type: lower-roman; padding-left: 34px; margin-bottom: 18px; text-align: justify;">
                                 <li style="margin-bottom: 11px; padding-left: 6px;">That I am the resident of the above said address.</li>
                                 <li style="margin-bottom: 11px; padding-left: 6px;">That my correct date of birth is <span class="filled-val">${d.newDob || ''}</span>.</li>
-                                <li style="margin-bottom: 11px; padding-left: 6px;">That the earlier recorded date of birth in Aadhaar is <span class="filled-val">${d.oldDob || ''}</span> based on <span class="filled-val">${d.oldDoc || ''}</span> document submitted by me.</li>
-                                <li style="margin-bottom: 11px; padding-left: 6px;">That I have <span class="filled-val">${d.updateTimes || 'NEVER'}</span> (never/once/ more than once) updated my date of birth in Aadhaar.</li>
+                                <li style="margin-bottom: 11px; padding-left: 6px;">That the earlier recorded date of birth is <span class="filled-val">${d.oldDob || ''}</span> based on <span class="filled-val">${d.oldDoc || ''}</span> document submitted by me.</li>
+                                <li style="margin-bottom: 11px; padding-left: 6px;">That I have <span class="filled-val">${d.updateTimes || 'NEVER'}</span> (never/once/ more than once) updated my date of birth.</li>
                                 <li style="margin-bottom: 11px; padding-left: 6px;">That currently a corrected version of the same document as mentioned in (iii) above / birth certificate (choose as applicable) is being provided in support of DoB update request.</li>
-                                <li style="margin-bottom: 11px; padding-left: 6px;">That I wish to get my date of birth updated in the Aadhaar as <span class="filled-val">${d.newDob || ''}</span> for which I am submitting <span class="filled-val">${d.newDoc || ''}</span> as proof of date of birth.</li>
-                                <li style="margin-bottom: 11px; padding-left: 6px;">That I further undertake that I shall not be eligible for any further updation of my date of birth in Aadhaar.</li>
+                                <li style="margin-bottom: 11px; padding-left: 6px;">That I wish to get my date of birth updated as <span class="filled-val">${d.newDob || ''}</span> for which I am submitting <span class="filled-val">${d.newDoc || ''}</span> as proof of date of birth.</li>
+                                <li style="margin-bottom: 11px; padding-left: 6px;">That I further undertake that I shall not be eligible for any further updation of my date of birth.</li>
                             </ol>
                             <div style="text-align: justify; line-height: 1.65; margin-bottom: 14px;">
-                                2. I undertake that if the document submitted as proof of date of birth is found to be fraudulent/false/forged/non-genuine or I was not entitled for the said document, my Aadhaar number may be deactivated as per Regulation 28 of the Aadhaar (Enrolment and Update) Regulations, 2016 and I shall be liable to be prosecuted under provisions of the applicable law.
+                                2. I undertake that if the document submitted as proof of date of birth is found to be fraudulent/false/forged/non-genuine or I was not entitled for the said document, my ID number may be deactivated as per Regulation 28 of the (Enrolment and Update) Regulations, 2016 and I shall be liable to be prosecuted under provisions of the applicable law.
                             </div>
                             <div style="text-align: justify; line-height: 1.65; margin-bottom: 38px;">
                                 3. I hereby declare that all the information mentioned above is true to the best of my knowledge. In case of any discrepancies, the undersigned will be held responsible.
@@ -995,25 +854,25 @@
                             <div style="text-align: center; font-weight: bold; font-size: 17px; text-decoration: underline; margin-bottom: 6px;">Annexure IA- For children</div>
                             <div style="text-align: center; font-weight: bold; font-size: 16px; text-decoration: underline; margin-bottom: 8px;">Affidavit for date of birth updation</div>
                             <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4; margin-bottom: 18px;">
-                                (Applicable for cases where the DoB is verified in Aadhaar. To be printed on non-judicial<br>
+                                (Applicable for cases where the DoB is verified. To be printed on non-judicial<br>
                                 stamp paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)
                             </div>
                             <div style="text-align: justify; line-height: 1.7; margin-bottom: 12px;">
-                                1. I, <span class="filled-val">${d.parentName || ''}</span> ${d.rel || 'S/D/W/o'} <span class="filled-val">${d.relativeName || ''}</span> resident of <span class="filled-val">${d.address || ''}</span> holding Aadhaar number <span class="filled-val">${d.parentIdNumber || ''}</span> do hereby solemnly affirm and declare as under:-
+                                1. I, <span class="filled-val">${d.parentName || ''}</span> ${d.rel || 'S/D/W/o'} <span class="filled-val">${d.relativeName || ''}</span> resident of <span class="filled-val">${d.address || ''}</span> holding ID number <span class="filled-val">${d.parentIdNumber || ''}</span> do hereby solemnly affirm and declare as under:-
                             </div>
                             <ol style="list-style-type: lower-roman; padding-left: 34px; margin-bottom: 16px; text-align: justify;">
                                 <li style="margin-bottom: 9px; padding-left: 6px;">That I am the resident of the above said address.</li>
-                                <li style="margin-bottom: 9px; padding-left: 6px;">That I am parent/legal guardian of the <span class="filled-val">${d.childName || ''}</span> holding Aadhaar number <span class="filled-val">${d.childIdNumber || ''}</span>.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I am parent/legal guardian of the <span class="filled-val">${d.childName || ''}</span> holding ID number <span class="filled-val">${d.childIdNumber || ''}</span>.</li>
                                 <li style="margin-bottom: 9px; padding-left: 6px;">That correct date of birth of my child/ ward is <span class="filled-val">${d.newDob || ''}</span>.</li>
-                                <li style="margin-bottom: 9px; padding-left: 6px;">That the earlier recorded date of birth in Aadhaar of my child/ward is <span class="filled-val">${d.oldDob || ''}</span> based on <span class="filled-val">${d.oldDoc || ''}</span> document submitted by me.</li>
-                                <li style="margin-bottom: 9px; padding-left: 6px;">That I have <span class="filled-val">${d.updateTimes || 'NEVER'}</span> (never/once/more than once) updated my child/ward date of birth in Aadhaar.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That the earlier recorded date of birth of my child/ward is <span class="filled-val">${d.oldDob || ''}</span> based on <span class="filled-val">${d.oldDoc || ''}</span> document submitted by me.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I have <span class="filled-val">${d.updateTimes || 'NEVER'}</span> (never/once/more than once) updated my child/ward date of birth.</li>
                                 <li style="margin-bottom: 9px; padding-left: 6px;">That birth certificate of my child/ward is being provided in support of DoB update request.</li>
-                                <li style="margin-bottom: 9px; padding-left: 6px;">That I wish to get my child/ward date of birth updated in the Aadhaar as <span class="filled-val">${d.newDob || ''}</span> for which I am submitting his/her <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> as proof of date of birth.</li>
-                                <li style="margin-bottom: 9px; padding-left: 6px;">That I further undertake that my child/ward shall not be eligible for any further updation of date of birth in Aadhaar.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I wish to get my child/ward date of birth updated as <span class="filled-val">${d.newDob || ''}</span> for which I am submitting his/her <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> as proof of date of birth.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I further undertake that my child/ward shall not be eligible for any further updation of date of birth.</li>
                             </ol>
                             <div style="text-align: justify; line-height: 1.6; margin-bottom: 10px;">2. That I am the resident of the above said address.</div>
                             <div style="text-align: justify; line-height: 1.6; margin-bottom: 12px;">
-                                3. I undertake that if the document submitted as proof of date of birth is found to be fraudulent/false/forged/non-genuine or my child/ward was not entitled for the said document, the Aadhaar number of my child/ward may be deactivated as per Regulation 28 of the Aadhaar (Enrolment and Update) Regulations, 2016 and I shall be liable to be prosecuted under provisions of the applicable law.
+                                3. I undertake that if the document submitted as proof of date of birth is found to be fraudulent/false/forged/non-genuine or my child/ward was not entitled for the said document, the ID number of my child/ward may be deactivated as per Regulation 28 of the (Enrolment and Update) Regulations, 2016 and I shall be liable to be prosecuted under provisions of the applicable law.
                             </div>
                             <div style="text-align: justify; line-height: 1.6; margin-bottom: 28px;">
                                 4. I hereby declare that all the information mentioned above is true to the best of my knowledge. In case of any discrepancies, the undersigned will be held responsible.
@@ -1041,24 +900,24 @@
                         ${stampOverlayHtml}
                         <div>
                             <div style="text-align: center; font-weight: bold; font-size: 17px; text-decoration: underline; margin-bottom: 6px;">Annexure III-For adults</div>
-                            <div style="text-align: center; font-weight: bold; font-size: 16px; text-decoration: underline; margin-bottom: 8px;">Affidavit for reactivation of Aadhaar</div>
+                            <div style="text-align: center; font-weight: bold; font-size: 16px; text-decoration: underline; margin-bottom: 8px;">Affidavit for reactivation</div>
                             <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4; margin-bottom: 20px;">
                                 (To be printed on non-judicial stamp paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)
                             </div>
                             <div style="text-align: justify; line-height: 1.75; margin-bottom: 14px;">
-                                1. I, <span class="filled-val">${d.applicantName || ''}</span> ${d.rel || 'S/D/W/o'} <span class="filled-val">${d.relativeName || ''}</span> resident of <span class="filled-val">${d.address || ''}</span> holding Aadhaar number <span class="filled-val">${d.idNumber || ''}</span> do hereby solemnly affirm and declare as under: -
+                                1. I, <span class="filled-val">${d.applicantName || ''}</span> ${d.rel || 'S/D/W/o'} <span class="filled-val">${d.relativeName || ''}</span> resident of <span class="filled-val">${d.address || ''}</span> holding ID number <span class="filled-val">${d.idNumber || ''}</span> do hereby solemnly affirm and declare as under: -
                             </div>
                             <ol style="list-style-type: lower-roman; padding-left: 34px; margin-bottom: 18px; text-align: justify;">
                                 <li style="margin-bottom: 10px; padding-left: 6px;">That I am resident of the above said address.</li>
                                 <li style="margin-bottom: 10px; padding-left: 6px;">That I had earlier submitted an invalid document - <span class="filled-val">${d.invalidDocName || ''}</span> bearing number <span class="filled-val">${d.invalidDocNo || ''}</span> dated <span class="filled-val">${d.invalidDocDate || ''}</span> and provided false information, while enrolment/update through EID number <span class="filled-val">${d.eidNumber || ''}</span> as proof of date of birth.</li>
-                                <li style="margin-bottom: 10px; padding-left: 6px;">That I understand and accept that submission of such invalid document and false information is a violation of law and legal action may be taken against me for the same under Aadhaar Act and/or any other applicable laws.</li>
+                                <li style="margin-bottom: 10px; padding-left: 6px;">That I understand and accept that submission of such invalid document and false information is a violation of law and legal action may be taken against me for the same under applicable laws.</li>
                                 <li style="margin-bottom: 10px; padding-left: 6px;">That I sincerely regret this act and tenders an unconditional apology and ensures that such mistake shall not be repeated.</li>
-                                <li style="margin-bottom: 10px; padding-left: 6px;">That I humbly seek pardon and request UIDAI to kindly reactivate my Aadhaar number <span class="filled-val">${d.idNumber || ''}</span> to enable its continued usage.</li>
-                                <li style="margin-bottom: 10px; padding-left: 6px;">That I undertake to submit only genuine, correct and verifiable proof of date of birth document <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> in support of my request to reactivate my Aadhaar.</li>
-                                <li style="margin-bottom: 10px; padding-left: 6px;">That I further undertake that I shall not be eligible for any further updation of my date of birth in Aadhaar.</li>
+                                <li style="margin-bottom: 10px; padding-left: 6px;">That I humbly seek pardon and request to kindly reactivate my ID number <span class="filled-val">${d.idNumber || ''}</span> to enable its continued usage.</li>
+                                <li style="margin-bottom: 10px; padding-left: 6px;">That I undertake to submit only genuine, correct and verifiable proof of date of birth document <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> in support of my request to reactivate my ID.</li>
+                                <li style="margin-bottom: 10px; padding-left: 6px;">That I further undertake that I shall not be eligible for any further updation of my date of birth.</li>
                             </ol>
                             <div style="text-align: justify; line-height: 1.65; margin-bottom: 14px;">
-                                2. I undertake that if the document submitted as proof of date of birth is found to be fraudulent/false/forged/non-genuine or I was not entitled for the said document, my Aadhaar number may again be deactivated as per Regulation 28 of the Aadhaar (Enrolment and Update) Regulations, 2016 and I shall be liable to be prosecuted under provisions of the applicable laws.
+                                2. I undertake that if the document submitted as proof of date of birth is found to be fraudulent/false/forged/non-genuine or I was not entitled for the said document, my ID number may again be deactivated as per Regulation 28 of the (Enrolment and Update) Regulations, 2016 and I shall be liable to be prosecuted under provisions of the applicable laws.
                             </div>
                             <div style="text-align: justify; line-height: 1.65; margin-bottom: 34px;">
                                 3. I hereby declare that all the information mentioned above is true to the best of my knowledge. In case of any discrepancies if arises, the undersigned will be held responsible.
@@ -1086,25 +945,25 @@
                         ${stampOverlayHtml}
                         <div>
                             <div style="text-align: center; font-weight: bold; font-size: 17px; text-decoration: underline; margin-bottom: 6px;">Annexure IIIA-For children</div>
-                            <div style="text-align: center; font-weight: bold; font-size: 16px; text-decoration: underline; margin-bottom: 8px;">Affidavit for reactivation of Aadhaar</div>
+                            <div style="text-align: center; font-weight: bold; font-size: 16px; text-decoration: underline; margin-bottom: 8px;">Affidavit for reactivation</div>
                             <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4; margin-bottom: 18px;">
                                 (To be printed on non-judicial stamp paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)
                             </div>
                             <div style="text-align: justify; line-height: 1.7; margin-bottom: 12px;">
-                                1. I, <span class="filled-val">${d.parentName || ''}</span> ${d.rel || 'S/D/W/o'} <span class="filled-val">${d.relativeName || ''}</span> resident of <span class="filled-val">${d.address || ''}</span> holding Aadhaar number <span class="filled-val">${d.parentIdNumber || ''}</span> do hereby solemnly affirm and declare as under: -
+                                1. I, <span class="filled-val">${d.parentName || ''}</span> ${d.rel || 'S/D/W/o'} <span class="filled-val">${d.relativeName || ''}</span> resident of <span class="filled-val">${d.address || ''}</span> holding ID number <span class="filled-val">${d.parentIdNumber || ''}</span> do hereby solemnly affirm and declare as under: -
                             </div>
                             <ol style="list-style-type: lower-roman; padding-left: 34px; margin-bottom: 16px; text-align: justify;">
                                 <li style="margin-bottom: 9px; padding-left: 6px;">That I am resident of the above said address.</li>
-                                <li style="margin-bottom: 9px; padding-left: 6px;">That I am parent/legal guardian of the <span class="filled-val">${d.childName || ''}</span> holding Aadhaar No <span class="filled-val">${d.childIdNumber || ''}</span>.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I am parent/legal guardian of the <span class="filled-val">${d.childName || ''}</span> holding ID No <span class="filled-val">${d.childIdNumber || ''}</span>.</li>
                                 <li style="margin-bottom: 9px; padding-left: 6px;">That I had earlier submitted an invalid document- <span class="filled-val">${d.invalidDocName || ''}</span> bearing number <span class="filled-val">${d.invalidDocNo || ''}</span> dated <span class="filled-val">${d.invalidDocDate || ''}</span> or provided false information, while enrolment/update through EID number <span class="filled-val">${d.eidNumber || ''}</span> as proof of date of birth of my child/ward.</li>
-                                <li style="margin-bottom: 9px; padding-left: 6px;">That I understand and accepts that submission of such invalid document and false information is a violation of law and legal action may be taken against me for the same under Aadhaar Act and/or any other applicable laws.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I understand and accepts that submission of such invalid document and false information is a violation of law and legal action may be taken against me for the same under applicable laws.</li>
                                 <li style="margin-bottom: 9px; padding-left: 6px;">That I sincerely regret this act and tenders an unconditional apology and ensures that such mistake shall not be repeated.</li>
-                                <li style="margin-bottom: 9px; padding-left: 6px;">That I humbly seek pardon and request UIDAI to kindly reactivate my child/ward Aadhaar number <span class="filled-val">${d.childIdNumber || ''}</span> to enable its continued usage.</li>
-                                <li style="margin-bottom: 9px; padding-left: 6px;">That I undertake to submit only genuine, correct and verifiable proof of date of birth document <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> in support of my request to reactivate my child/ward Aadhaar.</li>
-                                <li style="margin-bottom: 9px; padding-left: 6px;">That I further undertake that my child/ward shall not be eligible for any further updation of date of birth in Aadhaar.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I humbly seek pardon and request to kindly reactivate my child/ward ID number <span class="filled-val">${d.childIdNumber || ''}</span> to enable its continued usage.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I undertake to submit only genuine, correct and verifiable proof of date of birth document <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> in support of my request to reactivate my child/ward ID.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I further undertake that my child/ward shall not be eligible for any further updation of date of birth.</li>
                             </ol>
                             <div style="text-align: justify; line-height: 1.6; margin-bottom: 12px;">
-                                2. I undertake that if the document submitted as proof of date of birth is found to be fraudulent/false/forged/non-genuine or my child/ward was not entitled for the same, Aadhaar number of my child/ward may again be deactivated as per Regulation 28 of the Aadhaar (Enrolment and Update) Regulations, 2016 and I shall be liable to be prosecuted under provisions of the applicable laws.
+                                2. I undertake that if the document submitted as proof of date of birth is found to be fraudulent/false/forged/non-genuine or my child/ward was not entitled for the same, ID number of my child/ward may again be deactivated as per Regulation 28 of the (Enrolment and Update) Regulations, 2016 and I shall be liable to be prosecuted under provisions of the applicable laws.
                             </div>
                             <div style="text-align: justify; line-height: 1.6; margin-bottom: 28px;">
                                 3. I hereby declare that all the information mentioned above is true to the best of my knowledge. In case of any discrepancies if arises, the undersigned will be held responsible.
@@ -1134,21 +993,21 @@
                     'LOCAL_HTML_ANNEXURE_D': 'Annexure D (for name update)'
                 };
                 const subTitleText = isChild
-                    ? '(Applicable for Name Change / Correction of Minor Child in Aadhaar by Parent/Legal Guardian)'
-                    : '(Applicable where the Aadhaar number holder seeks to update / change Name in Aadhaar)';
+                    ? '(Applicable for Name Change / Correction of Minor Child by Parent/Legal Guardian)'
+                    : '(Applicable where the ID number holder seeks to update / change Name)';
 
                 const bodyPoints = isChild ? `
-                    <li style="margin-bottom: 14px; padding-left: 6px;">That I am the parent/legal guardian of minor child <span class="filled-val">${d.childName || d.newName || ''}</span> holding Aadhaar Number <span class="filled-val">${d.childIdNumber || d.idNumber || ''}</span>.</li>
-                    <li style="margin-bottom: 14px; padding-left: 6px;">That the name of my child/ward is presently recorded in Aadhaar as <span class="filled-val">${d.oldName || ''}</span>.</li>
-                    <li style="margin-bottom: 14px; padding-left: 6px;">That I intend to update/change the name of my child/ward from <span class="filled-val">${d.oldName || ''}</span> to the correct name <span class="filled-val">${d.newName || ''}</span> in Aadhaar, both names referring to one and the same child.</li>
+                    <li style="margin-bottom: 14px; padding-left: 6px;">That I am the parent/legal guardian of minor child <span class="filled-val">${d.childName || d.newName || ''}</span> holding ID Number <span class="filled-val">${d.childIdNumber || d.idNumber || ''}</span>.</li>
+                    <li style="margin-bottom: 14px; padding-left: 6px;">That the name of my child/ward is presently recorded as <span class="filled-val">${d.oldName || ''}</span>.</li>
+                    <li style="margin-bottom: 14px; padding-left: 6px;">That I intend to update/change the name of my child/ward from <span class="filled-val">${d.oldName || ''}</span> to the correct name <span class="filled-val">${d.newName || ''}</span>, both names referring to one and the same child.</li>
                     <li style="margin-bottom: 14px; padding-left: 6px;">That I am submitting the prescribed supporting Proof of Identity (PoI) document (<span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span>) in support of the name sought to be updated.</li>
-                    <li style="margin-bottom: 14px; padding-left: 6px;">That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of Aadhaar number and prosecution under the applicable laws.</li>
+                    <li style="margin-bottom: 14px; padding-left: 6px;">That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of ID number and prosecution under the applicable laws.</li>
                 ` : `
-                    <li style="margin-bottom: 14px; padding-left: 6px;">That I am the holder of Aadhaar Number <span class="filled-val">${d.idNumber || ''}</span>.</li>
-                    <li style="margin-bottom: 14px; padding-left: 6px;">That my name is presently recorded in my Aadhaar as <span class="filled-val">${d.oldName || ''}</span>.</li>
-                    <li style="margin-bottom: 14px; padding-left: 6px;">That I have changed/updated my name and intend to record my correct name as <span class="filled-val">${d.newName || ''}</span> in place of <span class="filled-val">${d.oldName || ''}</span> in my Aadhaar, both names referring to one and the same person, i.e. myself.</li>
+                    <li style="margin-bottom: 14px; padding-left: 6px;">That I am the holder of ID Number <span class="filled-val">${d.idNumber || ''}</span>.</li>
+                    <li style="margin-bottom: 14px; padding-left: 6px;">That my name is presently recorded as <span class="filled-val">${d.oldName || ''}</span>.</li>
+                    <li style="margin-bottom: 14px; padding-left: 6px;">That I have changed/updated my name and intend to record my correct name as <span class="filled-val">${d.newName || ''}</span> in place of <span class="filled-val">${d.oldName || ''}</span>, both names referring to one and the same person, i.e. myself.</li>
                     <li style="margin-bottom: 14px; padding-left: 6px;">That I am submitting the prescribed supporting Proof of Identity (PoI) document (<span class="filled-val">${d.newDoc || 'POI CERTIFICATE'}</span>) in support of the name sought to be updated.</li>
-                    <li style="margin-bottom: 14px; padding-left: 6px;">That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of my Aadhaar number and prosecution under the applicable laws.</li>
+                    <li style="margin-bottom: 14px; padding-left: 6px;">That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of my ID number and prosecution under the applicable laws.</li>
                 `;
 
                 return `
@@ -1179,7 +1038,7 @@
                                 (This affidavit may be signed and attested in presence of a Judicial Magistrate or Executive<br>Magistrate/Notary Public)
                             </div>
                         </div>
-                        <div style="text-align: right; font-family: Arial, sans-serif; font-size: 12px;">UIDAI Standard Affidavit Format</div>
+                        <div style="text-align: right; font-family: Arial, sans-serif; font-size: 12px;">Standard Affidavit Format</div>
                     </div>`;
             }
 
@@ -1196,21 +1055,21 @@
                             <div style="text-align: right; font-weight: bold; font-size: 16px; margin-bottom: 12px;">Annexure F (for children)</div>
                             <div style="text-align: center; font-weight: bold; font-size: 17px; margin-bottom: 8px;">AFFIDAVIT</div>
                             <div style="text-align: center; font-size: 14.5px; line-height: 1.4; margin-bottom: 10px; padding: 0 10px;">
-                                (Applicable where the name of minor child is recorded in Aadhaar with “urf” or “alias” and the<br>parent/legal guardian seeks to retain one of the names)
+                                (Applicable where the name of minor child is recorded with “urf” or “alias” and the<br>parent/legal guardian seeks to retain one of the names)
                             </div>
                             <div style="text-align: center; font-size: 14.5px; margin-bottom: 22px;">(To be printed on Non-Judicial Stamp Paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)</div>
                             <div style="text-align: justify; line-height: 1.75; margin-bottom: 16px;">
                                 I, <span>${d.title || 'Shri'}</span> <span class="filled-val">${d.parentName || ''}</span>, 
                                 <span>${d.rel || 'S/o'}</span> <span class="filled-val">${d.relativeName || ''}</span>, 
-                                resident of <span class="filled-val">${d.address || ''}</span>, holding Aadhaar Number <span class="filled-val">${d.parentIdNumber || ''}</span>, do hereby solemnly affirm and declare as under:
+                                resident of <span class="filled-val">${d.address || ''}</span>, holding ID Number <span class="filled-val">${d.parentIdNumber || ''}</span>, do hereby solemnly affirm and declare as under:
                             </div>
                             <ol style="list-style-type: decimal; padding-left: 26px; margin-bottom: 20px; text-align: justify;">
-                                <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.55;">That I am the parent/legal guardian of minor child <span class="filled-val">${d.childName || ''}</span> who is the holder of Aadhaar Number <span class="filled-val">${d.childIdNumber || ''}</span>.</li>
-                                <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.55;">That the name of my child/ward is presently recorded/used as <span class="filled-val">${d.recorded1 || ''}</span> urf or alias <span class="filled-val">${d.recorded2 || ''}</span> in Aadhaar, both names referring to one and the same child.</li>
+                                <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.55;">That I am the parent/legal guardian of minor child <span class="filled-val">${d.childName || ''}</span> who is the holder of ID Number <span class="filled-val">${d.childIdNumber || ''}</span>.</li>
+                                <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.55;">That the name of my child/ward is presently recorded/used as <span class="filled-val">${d.recorded1 || ''}</span> urf or alias <span class="filled-val">${d.recorded2 || ''}</span>, both names referring to one and the same child.</li>
                                 <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.55;">That I intend to retain the name <span class="filled-val">${d.retainName || ''}</span> for my child/ward and discontinue the use of <span class="filled-val">${d.removeName || ''}</span> as an alias/urf.</li>
                                 <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.5;">That the requested update is limited to removal of the “urf or alias” and retention of the aforesaid name and does not amount to a change of identity or adoption of a different name.</li>
                                 <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.5;">That I am submitting the prescribed supporting document(s) in support of the name of my child/ward sought to be retained.</li>
-                                <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.5;">That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of Aadhaar number and prosecution under the applicable laws.</li>
+                                <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.5;">That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of ID number and prosecution under the applicable laws.</li>
                             </ol>
                             <div style="text-align: right; font-weight: bold; margin-top: 26px; margin-bottom: 14px;">Deponent (Parent/Guardian)</div>
                             <div style="font-weight: bold; margin-bottom: 8px;">Verification:</div>
@@ -1238,7 +1097,7 @@
                         <div style="text-align: right; font-weight: bold; font-size: 16px; margin-bottom: 12px;">Annexure E (for adults)</div>
                         <div style="text-align: center; font-weight: bold; font-size: 17px; margin-bottom: 8px;">AFFIDAVIT</div>
                         <div style="text-align: center; font-size: 14.5px; line-height: 1.4; margin-bottom: 10px; padding: 0 10px;">
-                            (Applicable where the name is recorded in Aadhaar with “urf” or “alias” and the Aadhaar<br>number holder seeks to retain one of the names)
+                            (Applicable where the name is recorded with “urf” or “alias” and the ID<br>number holder seeks to retain one of the names)
                         </div>
                         <div style="text-align: center; font-size: 14.5px; margin-bottom: 22px;">(To be printed on Non-Judicial Stamp Paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)</div>
                         <div style="text-align: justify; line-height: 1.75; margin-bottom: 16px;">
@@ -1247,12 +1106,12 @@
                             resident of <span class="filled-val">${d.address || ''}</span>, do hereby solemnly affirm and declare as under:
                         </div>
                         <ol style="list-style-type: decimal; padding-left: 26px; margin-bottom: 20px; text-align: justify;">
-                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">That I am the holder of Aadhaar Number <span class="filled-val">${d.idNumber || ''}</span>.</li>
-                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">That my name is presently recorded/used as <span class="filled-val">${d.recorded1 || ''}</span> urf or alias <span class="filled-val">${d.recorded2 || ''}</span> in my Aadhaar, both names referring to one and the same person, i.e. myself.</li>
+                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">That I am the holder of ID Number <span class="filled-val">${d.idNumber || ''}</span>.</li>
+                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">That my name is presently recorded/used as <span class="filled-val">${d.recorded1 || ''}</span> urf or alias <span class="filled-val">${d.recorded2 || ''}</span>, both names referring to one and the same person, i.e. myself.</li>
                             <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">That I intend to retain the name <span class="filled-val">${d.retainName || ''}</span> and discontinue the use of <span class="filled-val">${d.removeName || ''}</span> as an alias/urf.</li>
                             <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">That the requested update is limited to removal of the “urf or alias” and retention of the aforesaid name and does not amount to a change of identity or adoption of a different name.</li>
                             <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">That I am submitting the prescribed supporting document(s) in support of the name sought to be retained.</li>
-                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of my Aadhaar number and prosecution under the applicable laws.</li>
+                            <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of my ID number and prosecution under the applicable laws.</li>
                         </ol>
                         <div style="text-align: right; font-weight: bold; margin-top: 30px; margin-bottom: 16px;">Deponent</div>
                         <div style="font-weight: bold; margin-bottom: 8px;">Verification:</div>
@@ -1268,7 +1127,7 @@
                 </div>`;
         };
 
-        // ================= 100% DESKTOP & MOBILE FIXED SINGLE-PAGE A4 PDF DOWNLOADER =================
+        // ================= INSTANT SINGLE-PAGE A4 PDF DOWNLOADER =================
         window.downloadHtmlDocAsPdf = async function(fileId, formDataObj, fileName, withStamp = false) {
             const btn = document.getElementById('modalDownloadBtn');
             const origHtml = btn ? btn.innerHTML : '';
@@ -1278,7 +1137,7 @@
             }
 
             if (withStamp && !window.cachedStampDataUrl) {
-                await window.preloadStampFromGoogleDoc();
+                await window.preloadLocalStamp();
             }
 
             const savedScrollX = window.scrollX;
@@ -1291,14 +1150,6 @@
             document.body.appendChild(tempWrapper);
 
             const targetEl = tempWrapper.querySelector('.affidavit-paper');
-            const overlayImg = targetEl.querySelector('.stamp-overlay-layer img');
-            if (overlayImg && !overlayImg.complete) {
-                await new Promise(resolve => {
-                    overlayImg.onload = resolve;
-                    overlayImg.onerror = resolve;
-                    setTimeout(resolve, 1800);
-                });
-            }
 
             try {
                 const opt = {
@@ -1308,7 +1159,6 @@
                     html2canvas: {
                         scale: 2,
                         useCORS: true,
-                        allowTaint: true,
                         x: 0,
                         y: 0,
                         scrollX: 0,
@@ -1326,7 +1176,7 @@
                 };
                 await html2pdf().set(opt).from(targetEl).save();
             } catch (err) {
-                alert("PDF डाउनलोड करने में समस्या आई। कृपया Print बटन से Save as PDF का उपयोग करें।");
+                alert("PDF डाउनलोड करने में समस्या आई।");
             } finally {
                 document.body.removeChild(tempWrapper);
                 window.scrollTo(savedScrollX, savedScrollY);
@@ -1337,19 +1187,11 @@
             }
         };
 
-        // 🖨️ DIRECT PRINT (SUPPORTS BOTH WITH/WITHOUT STAMP FOR ANNEXURES & GOOGLE DRIVE FILES)
+        // 🖨️ 0-SECOND INSTANT DIRECT PRINT
         window.directPrintDocument = async function(fileId, formDataObj, fileName, withStamp = false, btnEl = null) {
-            const targetBtn = btnEl || document.getElementById('modalPrintBtn');
-            const origHtml = targetBtn ? targetBtn.innerHTML : '';
-
             if (String(fileId).startsWith('LOCAL_HTML_')) {
-                if (targetBtn) {
-                    targetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing...';
-                    targetBtn.disabled = true;
-                }
-
                 if (withStamp && !window.cachedStampDataUrl) {
-                    await window.preloadStampFromGoogleDoc();
+                    await window.preloadLocalStamp();
                 }
 
                 const htmlContent = window.buildLocalAffidavitHtml(fileId, formDataObj, false, withStamp);
@@ -1415,28 +1257,10 @@
                 `);
                 frameDoc.close();
 
-                const imgEl = frameDoc.querySelector('.stamp-overlay-layer img');
-                let printed = false;
-                const triggerPrint = () => {
-                    if (printed) return;
-                    printed = true;
-                    if (targetBtn) {
-                        targetBtn.innerHTML = origHtml;
-                        targetBtn.disabled = false;
-                    }
-                    setTimeout(() => {
-                        printFrame.contentWindow.focus();
-                        printFrame.contentWindow.print();
-                    }, 150);
-                };
-
-                if (imgEl && !imgEl.complete) {
-                    imgEl.onload = triggerPrint;
-                    imgEl.onerror = triggerPrint;
-                    setTimeout(triggerPrint, 2000);
-                } else {
-                    triggerPrint();
-                }
+                setTimeout(() => {
+                    printFrame.contentWindow.focus();
+                    printFrame.contentWindow.print();
+                }, 80);
             } else {
                 window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
             }
@@ -1461,7 +1285,7 @@
             }
 
             if (isChecked && !window.cachedStampDataUrl) {
-                await window.preloadStampFromGoogleDoc();
+                await window.preloadLocalStamp();
             }
 
             const record = window.adminAllHistoryData[ctx.historyIndex];
@@ -1496,7 +1320,7 @@
                 if (modalStampCheckbox) modalStampCheckbox.checked = initialWithStamp;
 
                 if (initialWithStamp && !window.cachedStampDataUrl) {
-                    await window.preloadStampFromGoogleDoc();
+                    await window.preloadLocalStamp();
                 }
 
                 const record = window.adminAllHistoryData[historyIndex];
@@ -1831,18 +1655,10 @@
             <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
                 <div class="flex flex-wrap justify-between items-center gap-2">
                     <div>
-                        <div class="flex items-center gap-2">
-                            <h3 class="text-base md:text-lg font-black text-dark-900">Generated Documents</h3>
-                            <span id="stampReadyBadge" class="text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full">Stamp</span>
-                        </div>
+                        <h3 class="text-base md:text-lg font-black text-dark-900">Generated Documents</h3>
                         <p id="historyCount" class="text-xs font-bold text-royal-600">Total Files: 0</p>
                     </div>
-                    <div class="flex flex-wrap items-center gap-2">
-                        <!-- 📤 1-TIME STAMP IMAGE UPLOAD BUTTON (SAVES TO FIREBASE FOR 100% RELIABILITY) -->
-                        <label id="btnUploadStampLabel" class="cursor-pointer bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-3 py-2 rounded-xl text-xs font-black transition flex items-center gap-1.5 shadow-sm" title="अपनी स्टैम्प इमेज अपलोड करें ताकि हमेशा 100% काम करे">
-                            <i class="fa-solid fa-stamp text-amber-600"></i> Set Stamp Image
-                            <input type="file" accept="image/*" onchange="window.handleCustomStampUpload(event)" class="hidden">
-                        </label>
+                    <div class="flex gap-2">
                         <button onclick="window.loadAdminHistory()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-bold transition"><i class="fa-solid fa-rotate-right"></i></button>
                         <button id="bulkDeleteBtn" onclick="window.bulkDeleteFilteredHistory()" class="bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
                             <i class="fa-solid fa-trash-can"></i> Delete Shown
