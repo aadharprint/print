@@ -78,7 +78,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBSiDAvDYyBG8hkmez7s900JHhlbenG2nU",
@@ -119,9 +119,10 @@
         window.allPaymentsData = []; 
         window.currentPaymentFilter = 'Pending';
 
-        // Support Tickets & Filter State
+        // Live 2-Way Support Chat State
         window.allSupportTickets = [];
-        window.currentSupportTicketFilter = 'Open';
+        window.selectedChatTicketId = null;
+        window.supportUnsubscribe = null;
         window.adminSupportWhatsapp = "919306437623";
 
         // ================= AUTO-DETECT UPLOADED STAMPS & MAKE WHITE BG TRANSPARENT =================
@@ -206,7 +207,7 @@
                 window.preloadAllAvailableStamps();
                 await window.loadAllUsersForDropdown(); 
                 await window.loadPortalSettingsForAdmin();
-                await window.loadSupportTickets();
+                window.startLiveSupportListener();
                 window.switchAdminMainTab('payments');
             }
         });
@@ -246,7 +247,7 @@
                     vipText = `👑 VIP Active`;
                 }
             }
-            return `🌟 *Ojas Print Service - Login Details* 🌟\n\nनमस्ते, आपका पोर्टल अकाउंट तैयार/अपडेट कर दिया गया है:\n\n👤 *User ID:* ${shortId}\n📧 *Full Email:* ${email}\n🔑 *Password:* ${pass || 'Not Set'}\n💰 *Credits Balance:* ${credits || 0} Cr\n✨ *Account Status:* ${vipText}\n\n🌐 *Login Portal Link:*\n${window.getPortalLoginUrl()}\n\n_(नोट: लॉगिन करने के बाद आप ⚙️ सेटिंग आइकन में जाकर अपना पासवर्ड कभी भी बदल सकते हैं)_`;
+            return `🌟 Ojas Print Service - Login Details 🌟\n\n👤 User ID: ${shortId}\n📧 Full Email: ${email}\n🔑 Password: ${pass || 'Not Set'}\n💰 Credits Balance: ${credits || 0} Cr\n✨ Status: ${vipText}\n\n🌐 Login Portal Link:\n${window.getPortalLoginUrl()}`;
         };
 
         window.shareSelectedUserCredentials = async function(channel) {
@@ -266,7 +267,7 @@
             const messageText = window.buildUserCredentialsText(uData.email, passToUse, uData.credits, uData.isVip, uData.vipExpiry);
 
             if (channel === 'copy') {
-                navigator.clipboard.writeText(messageText.replace(/\*/g, ''));
+                navigator.clipboard.writeText(messageText);
                 alert('यूज़र की ID और Password डिटेल्स कॉपी हो गई हैं!');
                 return;
             }
@@ -295,8 +296,7 @@
                 const targetEmail = uData.contactEmail || (uData.email.endsWith('@ovportal.com') ? prompt("यूज़र का असली Email एड्रेस डालें:", "") : uData.email);
                 if (!targetEmail) return;
                 const subject = "Ojas Print Service - Your Login ID & Password";
-                const cleanBody = messageText.replace(/\*/g, '');
-                window.open(`mailto:${targetEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(cleanBody)}`, '_self');
+                window.open(`mailto:${targetEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(messageText)}`, '_self');
             }
         };
 
@@ -313,7 +313,7 @@
             }
         };
 
-        // ================= SECTION 5: INCOMING SUPPORT & FORGOT PASSWORD TICKETS + DIRECT REPLY =================
+        // ================= SECTION 5: REAL-TIME 2-WAY SUPPORT CHAT SYSTEM =================
         window.findUserUidByIdentifier = function(identifier = '') {
             const clean = String(identifier).trim().toLowerCase();
             if (!clean) return '';
@@ -327,183 +327,278 @@
             return '';
         };
 
-        window.loadSupportTickets = async function() {
-            const container = document.getElementById('supportTicketsListContainer');
-            if (container) {
-                container.innerHTML = `<div class="col-span-1 md:col-span-2 p-8 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>Support और Forgot Password रिक्वेस्ट लोड हो रही हैं...</div>`;
+        window.getTicketMessagesArray = function(ticket) {
+            let arr = Array.isArray(ticket.messages) ? [...ticket.messages] : [];
+            if (arr.length === 0 && ticket.message) {
+                const sec = ticket.timestamp?.seconds || Math.floor(Date.now() / 1000);
+                arr.push({
+                    sender: 'user',
+                    text: ticket.message,
+                    time: sec * 1000
+                });
             }
+            return arr;
+        };
 
-            try {
-                const snap = await getDocs(collection(db, "supportTickets"));
+        window.startLiveSupportListener = function() {
+            if (window.supportUnsubscribe) window.supportUnsubscribe();
+
+            window.supportUnsubscribe = onSnapshot(collection(db, "supportTickets"), (snap) => {
                 window.allSupportTickets = [];
                 snap.forEach(docSnap => {
                     window.allSupportTickets.push({ id: docSnap.id, ...docSnap.data() });
                 });
-                window.allSupportTickets.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
 
-                window.updateSupportBadges();
-                window.renderSupportTickets();
-            } catch (err) {
-                if (container) {
-                    container.innerHTML = `<div class="col-span-1 md:col-span-2 p-6 text-center text-red-500 font-bold bg-white rounded-2xl">Error loading tickets: ${err.message}</div>`;
+                // Sort by latest activity (updatedAtMs or timestamp)
+                window.allSupportTickets.sort((a, b) => {
+                    const timeA = a.updatedAtMs || (a.timestamp?.seconds ? a.timestamp.seconds * 1000 : 0);
+                    const timeB = b.updatedAtMs || (b.timestamp?.seconds ? b.timestamp.seconds * 1000 : 0);
+                    return timeB - timeA;
+                });
+
+                window.updateSupportNavBadge();
+                window.renderSupportChatSidebar();
+                if (window.selectedChatTicketId) {
+                    window.renderActiveChatConversation(window.selectedChatTicketId, false);
                 }
-            }
+            });
         };
 
-        window.updateSupportBadges = function() {
-            let openCount = 0;
-            let resolvedCount = 0;
+        window.updateSupportNavBadge = function() {
+            let unreadCount = 0;
             window.allSupportTickets.forEach(t => {
-                if ((t.status || 'Open') === 'Open') openCount++;
-                else resolvedCount++;
-            });
-
-            const navBadge = document.getElementById('navSupportBadge');
-            if (navBadge) {
-                navBadge.innerText = openCount;
-                navBadge.style.display = openCount > 0 ? 'inline-flex' : 'none';
-            }
-
-            const pillOpen = document.getElementById('supCountOpen');
-            const pillResolved = document.getElementById('supCountResolved');
-            const pillAll = document.getElementById('supCountAll');
-            if (pillOpen) pillOpen.innerText = openCount;
-            if (pillResolved) pillResolved.innerText = resolvedCount;
-            if (pillAll) pillAll.innerText = window.allSupportTickets.length;
-        };
-
-        window.setSupportTicketFilter = function(filterVal) {
-            window.currentSupportTicketFilter = filterVal;
-            ['Open', 'Resolved', 'ALL'].forEach(f => {
-                const btn = document.getElementById(`supFilterBtn-${f}`);
-                if (!btn) return;
-                if (f === filterVal) {
-                    btn.className = "px-3 py-1.5 rounded-xl text-xs font-black bg-dark-900 text-royal-300 shadow-sm transition flex items-center gap-1.5";
-                } else {
-                    btn.className = "px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition flex items-center gap-1.5";
+                if (t.unreadByAdmin === true || (t.unreadByAdmin === undefined && (t.status || 'Open') === 'Open')) {
+                    unreadCount++;
                 }
             });
-            window.renderSupportTickets();
+            const badge = document.getElementById('navSupportBadge');
+            if (badge) {
+                badge.innerText = unreadCount;
+                badge.style.display = unreadCount > 0 ? 'inline-flex' : 'none';
+            }
         };
 
-        window.renderSupportTickets = function() {
-            const container = document.getElementById('supportTicketsListContainer');
-            if (!container) return;
+        window.renderSupportChatSidebar = function() {
+            const listEl = document.getElementById('supportChatThreadsList');
+            if (!listEl) return;
 
-            const activeFilter = window.currentSupportTicketFilter;
+            const searchVal = (document.getElementById('supportSearchInput')?.value || '').trim().toLowerCase();
             const filtered = window.allSupportTickets.filter(t => {
-                const st = t.status || 'Open';
-                if (activeFilter === 'Open') return st === 'Open';
-                if (activeFilter === 'Resolved') return st === 'Resolved';
-                return true;
+                if (!searchVal) return true;
+                const idMatch = (t.userIdentifier || '').toLowerCase().includes(searchVal);
+                const phoneMatch = (t.userPhone || '').toLowerCase().includes(searchVal);
+                return idMatch || phoneMatch;
             });
 
             if (filtered.length === 0) {
-                container.innerHTML = `
-                    <div class="col-span-1 md:col-span-2 p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 font-bold text-xs">
-                        <i class="fa-solid fa-check-double text-2xl text-green-500 mb-2"></i><br>
-                        ${activeFilter === 'Open' ? 'अभी कोई पेंडिंग Forgot Password या Help रिक्वेस्ट नहीं है!' : 'कोई रिकॉर्ड नहीं मिला।'}
+                listEl.innerHTML = `
+                    <div class="p-8 text-center text-slate-400 font-bold text-xs">
+                        <i class="fa-regular fa-comments text-3xl mb-2 text-slate-300"></i><br>
+                        अभी कोई यूज़र चैट या टिकट नहीं है।
                     </div>`;
                 return;
             }
 
-            container.innerHTML = '';
+            listEl.innerHTML = '';
             filtered.forEach(t => {
-                const sec = t.timestamp?.seconds || Math.floor(Date.now() / 1000);
-                const dObj = new Date(sec * 1000);
-                const dateStr = dObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+                const msgs = window.getTicketMessagesArray(t);
+                const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : { text: t.message || 'No message', sender: 'user' };
+                const isSelected = window.selectedChatTicketId === t.id;
+                const isUnread = t.unreadByAdmin === true || (t.unreadByAdmin === undefined && (t.status || 'Open') === 'Open');
                 const isForgot = t.type === 'FORGOT_PASSWORD';
-                const isOpen = (t.status || 'Open') === 'Open';
 
-                const matchedUid = t.userId || window.findUserUidByIdentifier(t.userIdentifier);
-                const matchedUser = matchedUid ? window.usersDataList[matchedUid] : null;
-                const savedPassText = matchedUser?.userPass ? `Current Pass: ${matchedUser.userPass}` : 'User Pass Not Synced';
+                const timeMs = t.updatedAtMs || (t.timestamp?.seconds ? t.timestamp.seconds * 1000 : Date.now());
+                const timeStr = new Date(timeMs).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
-                const typeBadge = isForgot
-                    ? `<span class="bg-red-100 text-red-700 border border-red-300 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase"><i class="fa-solid fa-key mr-1"></i>Forgot Password</span>`
-                    : `<span class="bg-green-100 text-green-800 border border-green-300 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase"><i class="fa-solid fa-headset mr-1"></i>Help Request</span>`;
+                const activeClass = isSelected
+                    ? 'bg-royal-50 border-royal-400 shadow-sm'
+                    : (isUnread ? 'bg-red-50/50 border-red-200 hover:bg-slate-50' : 'bg-white border-slate-200 hover:bg-slate-50');
 
-                const statusBadge = isOpen
-                    ? `<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[10px] font-black">⏳ Open</span>`
-                    : `<span class="bg-slate-200 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold">✅ Resolved</span>`;
-
-                container.innerHTML += `
-                    <div class="bg-white p-4 rounded-2xl border-2 ${isOpen ? (isForgot ? 'border-red-300' : 'border-green-300') : 'border-slate-200'} shadow-sm flex flex-col justify-between space-y-3">
-                        <div class="space-y-2">
-                            <div class="flex flex-wrap items-center justify-between gap-1 border-b border-slate-100 pb-2">
-                                <div class="flex items-center gap-1.5">${typeBadge} ${statusBadge}</div>
-                                <span class="text-[10px] font-bold text-slate-400">${dateStr}</span>
+                listEl.innerHTML += `
+                    <div onclick="window.selectSupportChatThread('${t.id}')" class="p-3 rounded-2xl border-2 ${activeClass} cursor-pointer transition space-y-1">
+                        <div class="flex items-center justify-between gap-1">
+                            <div class="flex items-center gap-1.5 overflow-hidden">
+                                ${isUnread ? `<span class="bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase shrink-0 animate-pulse">NEW</span>` : ''}
+                                ${isForgot ? `<i class="fa-solid fa-key text-amber-600 text-xs shrink-0" title="Forgot Password"></i>` : `<i class="fa-solid fa-user text-royal-600 text-xs shrink-0"></i>`}
+                                <span class="text-xs font-black text-dark-900 truncate">${t.userIdentifier || 'User'}</span>
                             </div>
-                            <div class="flex justify-between items-center">
-                                <div>
-                                    <p class="text-xs md:text-sm font-black text-dark-900"><i class="fa-solid fa-user text-royal-500 mr-1"></i> ${t.userIdentifier || 'Unknown'}</p>
-                                    <p class="text-[11px] font-bold text-green-700"><i class="fa-brands fa-whatsapp mr-1"></i> ${t.userPhone || 'No Phone'}</p>
-                                </div>
-                                <span class="text-[10px] font-mono font-bold bg-slate-100 text-slate-700 px-2 py-1 rounded-lg border border-slate-200">${savedPassText}</span>
-                            </div>
-                            <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700">
-                                "${t.message || ''}"
-                            </div>
+                            <span class="text-[10px] font-semibold text-slate-400 shrink-0">${timeStr}</span>
                         </div>
-
-                        <div class="flex flex-wrap items-center gap-2 pt-1">
-                            <button type="button" onclick="window.loadTicketIntoReplyBox('${t.id}')" class="flex-1 bg-dark-900 hover:bg-black text-royal-300 font-black py-2 px-3 rounded-xl text-[11px] transition flex items-center justify-center gap-1">
-                                <i class="fa-solid fa-reply"></i> Load in Reply / Reset Pass
-                            </button>
-                            ${isOpen ? `
-                                <button type="button" onclick="window.markTicketStatus('${t.id}', 'Resolved')" class="bg-green-600 hover:bg-green-700 text-white font-black py-2 px-3 rounded-xl text-[11px] transition">
-                                    <i class="fa-solid fa-check mr-1"></i> Resolve
-                                </button>
-                            ` : ''}
-                            <button type="button" onclick="window.deleteSupportTicket('${t.id}')" class="w-8 h-8 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-xl text-xs transition flex items-center justify-center" title="Delete Ticket">
-                                <i class="fa-solid fa-trash"></i>
-                            </button>
-                        </div>
+                        <p class="text-[11px] font-semibold ${isUnread ? 'text-slate-900 font-bold' : 'text-slate-500'} truncate">
+                            ${lastMsg.sender === 'admin' ? '<span class="text-indigo-600 font-black">You: </span>' : ''}${lastMsg.text}
+                        </p>
                     </div>
                 `;
             });
         };
 
-        window.loadTicketIntoReplyBox = function(ticketId) {
+        window.selectSupportChatThread = async function(ticketId) {
+            window.selectedChatTicketId = ticketId;
+            window.renderSupportChatSidebar();
+            window.renderActiveChatConversation(ticketId, true);
+
             const ticket = window.allSupportTickets.find(t => t.id === ticketId);
-            if (!ticket) return;
-
-            const matchedUid = ticket.userId || window.findUserUidByIdentifier(ticket.userIdentifier);
-            const sel = document.getElementById('supportUserSelect');
-            if (sel) {
-                sel.value = matchedUid || '';
+            if (ticket && (ticket.unreadByAdmin === true || ticket.unreadByAdmin === undefined)) {
+                try {
+                    await updateDoc(doc(db, "supportTickets", ticketId), { unreadByAdmin: false });
+                } catch (e) {}
             }
-
-            document.getElementById('supportTargetPhone').value = ticket.userPhone || (matchedUid && window.usersDataList[matchedUid]?.userPhone) || '';
-            document.getElementById('supportTargetEmail').value = (matchedUid && !window.usersDataList[matchedUid]?.email.endsWith('@ovportal.com')) ? window.usersDataList[matchedUid].email : '';
-
-            if (ticket.type === 'FORGOT_PASSWORD') {
-                window.applySupportTemplate('reset_done');
-            } else {
-                window.applySupportTemplate('custom');
-            }
-
-            const replyCard = document.getElementById('supportReplyCardBox');
-            if (replyCard) replyCard.scrollIntoView({ behavior: 'smooth' });
         };
 
-        // Quick Password Reset directly inside Support & Reply Tab
-        window.supportQuickResetPassword = async function() {
-            const uid = document.getElementById('supportUserSelect').value;
-            const newPass = document.getElementById('supportQuickNewPass').value.trim();
-            const btn = document.getElementById('btnSupportQuickPass');
+        window.renderActiveChatConversation = function(ticketId, scrollToBottom = true) {
+            const emptyState = document.getElementById('chatWindowEmptyState');
+            const activeBox = document.getElementById('chatWindowActiveBox');
+            const ticket = window.allSupportTickets.find(t => t.id === ticketId);
 
-            if (!uid || !window.usersDataList[uid]) {
-                return alert('कृपया पहले "1. Select Registered User" ड्रॉपडाउन से यूज़र सेलेक्ट करें!');
-            }
-            if (!newPass || newPass.length < 6) {
-                return alert('नया पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!');
+            if (!ticket) {
+                if (emptyState) emptyState.classList.remove('hidden');
+                if (activeBox) activeBox.classList.add('hidden');
+                return;
             }
 
-            const uData = window.usersDataList[uid];
+            if (emptyState) emptyState.classList.add('hidden');
+            if (activeBox) activeBox.classList.remove('hidden');
+
+            const matchedUid = ticket.userId || window.findUserUidByIdentifier(ticket.userIdentifier);
+            const matchedUser = matchedUid ? window.usersDataList[matchedUid] : null;
+
+            document.getElementById('chatHeaderUserTitle').innerText = ticket.userIdentifier || 'Unknown User';
+            document.getElementById('chatHeaderUserPhone').innerText = ticket.userPhone ? `WhatsApp: ${ticket.userPhone}` : 'No phone provided';
+
+            const passBadge = document.getElementById('chatHeaderSavedPassBadge');
+            if (matchedUser) {
+                passBadge.innerHTML = `Current Pass: <strong class="text-royal-300 font-mono">${matchedUser.userPass || 'Not Synced'}</strong> | Cr: <strong>${matchedUser.credits || 0}</strong>`;
+            } else {
+                passBadge.innerHTML = `<span class="text-amber-300">Unregistered / Guest ID</span>`;
+            }
+
+            // Render Messages
+            const msgContainer = document.getElementById('chatMessagesScrollBox');
+            const msgs = window.getTicketMessagesArray(ticket);
+            msgContainer.innerHTML = '';
+
+            msgs.forEach(m => {
+                const isAdmin = m.sender === 'admin';
+                const tStr = m.time ? new Date(m.time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '';
+                const safeText = String(m.text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+
+                if (isAdmin) {
+                    msgContainer.innerHTML += `
+                        <div class="flex flex-col items-end">
+                            <div class="max-w-[82%] bg-dark-900 text-white px-3.5 py-2.5 rounded-2xl rounded-br-none shadow-sm border border-royal-500/40">
+                                <span class="text-[9px] font-black text-royal-400 uppercase block mb-0.5"><i class="fa-solid fa-crown mr-1"></i>Admin Reply</span>
+                                <div class="text-xs font-semibold leading-relaxed">${safeText}</div>
+                            </div>
+                            <span class="text-[9px] font-bold text-slate-400 mt-0.5">${tStr}</span>
+                        </div>
+                    `;
+                } else {
+                    msgContainer.innerHTML += `
+                        <div class="flex flex-col items-start">
+                            <div class="max-w-[82%] bg-white text-slate-800 px-3.5 py-2.5 rounded-2xl rounded-bl-none shadow-sm border border-slate-200">
+                                <span class="text-[9px] font-black text-indigo-600 uppercase block mb-0.5"><i class="fa-solid fa-user mr-1"></i>${ticket.userIdentifier || 'User'}</span>
+                                <div class="text-xs font-bold leading-relaxed">${safeText}</div>
+                            </div>
+                            <span class="text-[9px] font-bold text-slate-400 mt-0.5">${tStr}</span>
+                        </div>
+                    `;
+                }
+            });
+
+            if (scrollToBottom) {
+                setTimeout(() => {
+                    msgContainer.scrollTop = msgContainer.scrollHeight;
+                }, 50);
+            }
+        };
+
+        // Send Admin Reply Directly to User's Support Tab in index.html
+        window.sendAdminChatReply = async function(event) {
+            if (event) event.preventDefault();
+            const ticketId = window.selectedChatTicketId;
+            if (!ticketId) return alert('कृपया पहले बाईं तरफ से किसी यूज़र की चैट पर क्लिक करें!');
+
+            const inp = document.getElementById('adminChatReplyInput');
+            const replyText = inp.value.trim();
+            if (!replyText) return;
+
+            const btn = document.getElementById('btnSendAdminChatReply');
             const origHtml = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Setting...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+            try {
+                const ticket = window.allSupportTickets.find(t => t.id === ticketId);
+                const existingMsgs = window.getTicketMessagesArray(ticket);
+                existingMsgs.push({
+                    sender: 'admin',
+                    text: replyText,
+                    time: Date.now()
+                });
+
+                await updateDoc(doc(db, "supportTickets", ticketId), {
+                    messages: existingMsgs,
+                    lastAdminReply: replyText,
+                    status: 'Replied',
+                    unreadByAdmin: false,
+                    unreadByUser: true,
+                    updatedAtMs: Date.now()
+                });
+
+                inp.value = '';
+                window.renderActiveChatConversation(ticketId, true);
+            } catch (err) {
+                alert('रिप्लाई भेजने में समस्या आई: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+            }
+        };
+
+        // Quick Template Fill into Chat Input
+        window.insertQuickChatReply = function(type) {
+            const ticket = window.allSupportTickets.find(t => t.id === window.selectedChatTicketId);
+            if (!ticket) return alert('कृपया पहले किसी यूज़र की चैट चुनें!');
+
+            const matchedUid = ticket.userId || window.findUserUidByIdentifier(ticket.userIdentifier);
+            const u = matchedUid ? window.usersDataList[matchedUid] : null;
+            const inp = document.getElementById('adminChatReplyInput');
+
+            const shortId = u ? (u.email.split('@')[0]) : (ticket.userIdentifier || 'User');
+            const pass = u ? (u.userPass || '[PASS]') : '[PASS]';
+            const cr = u ? (u.credits || 0) : 0;
+
+            if (type === 'id_pass') {
+                inp.value = `नमस्ते, आपकी लॉगिन डिटेल्स नीचे दी गई हैं:\nUser ID: ${shortId}\nPassword: ${pass}\nCredits: ${cr} Cr`;
+            } else if (type === 'payment_ok') {
+                inp.value = `नमस्ते ${shortId}, आपका पेमेंट वेरीफाई हो गया है और क्रेडिट्स/VIP आपके अकाउंट में जोड़ दिए गए हैं। पेमेंट स्टेटस रिफ्रेश कर लें।`;
+            } else if (type === 'fixed') {
+                inp.value = `नमस्ते ${shortId}, आपकी समस्या का समाधान कर दिया गया है। कृपया अब पोर्टल चेक करें।`;
+            }
+            inp.focus();
+        };
+
+        // 1-Click Password Reset + Auto Send in Chat
+        window.resetPassAndSendInChat = async function() {
+            const ticket = window.allSupportTickets.find(t => t.id === window.selectedChatTicketId);
+            if (!ticket) return alert('कृपया पहले किसी यूज़र की चैट चुनें!');
+
+            const matchedUid = ticket.userId || window.findUserUidByIdentifier(ticket.userIdentifier);
+            if (!matchedUid || !window.usersDataList[matchedUid]) {
+                return alert(`इस यूज़र (${ticket.userIdentifier}) का अकाउंट Users लिस्ट में नहीं मिला। कृपया 'Users & Pass' टैब से चेक करें।`);
+            }
+
+            const newPass = document.getElementById('chatQuickNewPassInput').value.trim();
+            if (!newPass || newPass.length < 6) {
+                return alert('नया पासवर्ड कम से कम 6 अक्षरों का लिखें!');
+            }
+
+            const btn = document.getElementById('btnChatQuickResetPass');
+            const origHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+            const uData = window.usersDataList[matchedUid];
 
             try {
                 if (uData.userPass) {
@@ -522,128 +617,111 @@
                     }
                 }
 
-                await updateDoc(doc(db, "users", uid), {
+                await updateDoc(doc(db, "users", matchedUid), {
                     userPass: newPass,
                     adminResetPass: newPass,
                     passUpdatedAt: new Date()
                 });
+                window.usersDataList[matchedUid].userPass = newPass;
 
-                window.usersDataList[uid].userPass = newPass;
-                document.getElementById('supportQuickNewPass').value = '';
-                window.applySupportTemplate('reset_done');
-                window.renderSupportTickets();
-                alert(`पासवर्ड "${newPass}" सेट हो गया है और नीचे रिप्लाई बॉक्स में भर दिया गया है! अब आप सीधे "Send on WhatsApp" दबा सकते हैं।`);
+                const autoReplyMsg = `🔑 आपका नया पासवर्ड सेट कर दिया गया है:\nUser ID: ${uData.email.split('@')[0]}\nNew Password: ${newPass}\n\nअब आप इस नए पासवर्ड से लॉगिन कर सकते हैं।`;
+                const existingMsgs = window.getTicketMessagesArray(ticket);
+                existingMsgs.push({
+                    sender: 'admin',
+                    text: autoReplyMsg,
+                    time: Date.now()
+                });
+
+                await updateDoc(doc(db, "supportTickets", ticket.id), {
+                    messages: existingMsgs,
+                    lastAdminReply: autoReplyMsg,
+                    status: 'Replied',
+                    unreadByAdmin: false,
+                    unreadByUser: true,
+                    updatedAtMs: Date.now()
+                });
+
+                document.getElementById('chatQuickNewPassInput').value = '';
+                window.renderActiveChatConversation(ticket.id, true);
             } catch (err) {
-                alert('Error: ' + err.message);
+                alert('Error resetting password: ' + err.message);
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = origHtml;
             }
         };
 
-        window.markTicketStatus = async function(ticketId, newStatus) {
+        // Optional: Also send current chat reply on WhatsApp if admin wants
+        window.alsoOpenChatUserWhatsApp = function() {
+            const ticket = window.allSupportTickets.find(t => t.id === window.selectedChatTicketId);
+            if (!ticket) return;
+            const cleanPhone = window.formatCleanPhone(ticket.userPhone || '');
+            const msgs = window.getTicketMessagesArray(ticket);
+            const lastAdmin = [...msgs].reverse().find(m => m.sender === 'admin');
+            const textToSend = document.getElementById('adminChatReplyInput').value.trim() || lastAdmin?.text || `नमस्ते ${ticket.userIdentifier}, Ojas Portal सपोर्ट से अपडेट:`;
+            const url = cleanPhone
+                ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(textToSend)}`
+                : `https://wa.me/?text=${encodeURIComponent(textToSend)}`;
+            window.open(url, '_blank');
+        };
+
+        window.deleteCurrentSupportChat = async function() {
+            const ticketId = window.selectedChatTicketId;
+            if (!ticketId) return;
+            if (!confirm('क्या आप इस पूरी चैट को डिलीट करना चाहते हैं?')) return;
             try {
-                await updateDoc(doc(db, "supportTickets", ticketId), { status: newStatus });
-                await window.loadSupportTickets();
+                await deleteDoc(doc(db, "supportTickets", ticketId));
+                window.selectedChatTicketId = null;
+                window.renderActiveChatConversation(null);
             } catch (err) {
-                alert('Error updating ticket: ' + err.message);
+                alert('Error deleting chat: ' + err.message);
             }
         };
 
-        window.deleteSupportTicket = async function(ticketId) {
-            if (!confirm('क्या आप इस सपोर्ट टिकट को डिलीट करना चाहते हैं?')) return;
+        // Start New Chat with any Registered User from Admin
+        window.startNewChatWithSelectedUser = async function() {
+            const uid = document.getElementById('newChatUserSelect').value;
+            if (!uid || !window.usersDataList[uid]) return alert('कृपया ड्रॉपडाउन से यूज़र चुनें!');
+            const u = window.usersDataList[uid];
+
+            // Check if a thread already exists for this user
+            const existing = window.allSupportTickets.find(t => t.userId === uid || (t.userIdentifier || '').toLowerCase() === u.email.toLowerCase());
+            if (existing) {
+                window.selectSupportChatThread(existing.id);
+                return;
+            }
+
             try {
-                await deleteDoc(doc(db, "supportTickets", ticketId));
-                await window.loadSupportTickets();
+                const newDocRef = doc(collection(db, "supportTickets"));
+                await setDoc(newDocRef, {
+                    type: 'ADMIN_MESSAGE',
+                    userId: uid,
+                    userIdentifier: u.email,
+                    userPhone: u.userPhone || '',
+                    message: 'Support Chat Started',
+                    messages: [{
+                        sender: 'admin',
+                        text: `नमस्ते ${u.email.split('@')[0]}, Ojas Portal एडमिन सपोर्ट में आपका स्वागत है।`,
+                        time: Date.now()
+                    }],
+                    status: 'Replied',
+                    unreadByAdmin: false,
+                    unreadByUser: true,
+                    timestamp: new Date(),
+                    updatedAtMs: Date.now()
+                });
+                window.selectSupportChatThread(newDocRef.id);
             } catch (err) {
-                alert('Error deleting ticket: ' + err.message);
+                alert('Error starting chat: ' + err.message);
             }
         };
 
         window.populateSupportUserDropdown = function() {
-            const sel = document.getElementById('supportUserSelect');
+            const sel = document.getElementById('newChatUserSelect');
             if (!sel) return;
-            const curr = sel.value;
-            sel.innerHTML = '<option value="">-- रजिस्टर्ड यूज़र चुनें (या नीचे सीधे नंबर/ईमेल लिखें) --</option>';
+            sel.innerHTML = '<option value="">-- किसी यूज़र के साथ नई चैट शुरू करें --</option>';
             for (const [uid, data] of Object.entries(window.usersDataList)) {
-                const phoneTag = data.userPhone ? ` [${data.userPhone}]` : '';
-                sel.innerHTML += `<option value="${uid}">${data.email}${phoneTag}</option>`;
-            }
-            if (curr && window.usersDataList[curr]) sel.value = curr;
-        };
-
-        window.onSupportUserChange = function() {
-            const uid = document.getElementById('supportUserSelect').value;
-            const phoneInp = document.getElementById('supportTargetPhone');
-            const emailInp = document.getElementById('supportTargetEmail');
-            if (uid && window.usersDataList[uid]) {
-                const u = window.usersDataList[uid];
-                phoneInp.value = u.userPhone || '';
-                emailInp.value = u.email.endsWith('@ovportal.com') ? (u.contactEmail || '') : u.email;
-                window.applySupportTemplate('credentials');
-            }
-        };
-
-        window.applySupportTemplate = function(type) {
-            const uid = document.getElementById('supportUserSelect').value;
-            const u = (uid && window.usersDataList[uid]) ? window.usersDataList[uid] : null;
-            const msgBox = document.getElementById('supportReplyMessage');
-            const subjBox = document.getElementById('supportReplySubject');
-
-            const userEmail = u ? u.email : '[USER_ID]';
-            const userPass = u ? (u.userPass || '[PASSWORD]') : '[PASSWORD]';
-            const userCr = u ? (u.credits || 0) : 0;
-
-            if (type === 'credentials') {
-                subjBox.value = "Ojas Print Service - Login ID & Password";
-                msgBox.value = window.buildUserCredentialsText(userEmail, userPass, userCr, u?.isVip, u?.vipExpiry);
-            } else if (type === 'reset_done') {
-                subjBox.value = "Ojas Print Service - Password Reset Successful";
-                msgBox.value = `🔑 *Password Reset Update - Ojas Portal*\n\nनमस्ते, आपकी रिक्वेस्ट पर आपका नया पासवर्ड सेट कर दिया गया है:\n\n👤 *User ID:* ${userEmail.split('@')[0]}\n🔑 *New Password:* ${userPass}\n💰 *Credits:* ${userCr} Cr\n\n🌐 *Login Here:* ${window.getPortalLoginUrl()}\n\nधन्यवाद!\n*Admin - Ojas Print Service*`;
-            } else if (type === 'payment_done') {
-                subjBox.value = "Ojas Print Service - Payment Approved";
-                msgBox.value = `✅ *Payment Approved - Ojas Portal*\n\nनमस्ते, आपका पेमेंट वेरीफाई कर लिया गया है और आपके अकाउंट (${userEmail.split('@')[0]}) में क्रेडिट्स/VIP प्लान जोड़ दिए गए हैं।\n\n💰 *Current Balance:* ${userCr} Credits\n🌐 *Portal Link:* ${window.getPortalLoginUrl()}\n\nधन्यवाद!`;
-            } else if (type === 'custom') {
-                subjBox.value = "Ojas Print Service - Support Reply";
-                msgBox.value = `नमस्ते (${userEmail.split('@')[0]}),\n\nआपकी समस्या के संबंध में अपडेट:\n`;
-                msgBox.focus();
-            }
-        };
-
-        window.sendSupportReplyNow = async function(channel) {
-            const uid = document.getElementById('supportUserSelect').value;
-            const phoneRaw = document.getElementById('supportTargetPhone').value.trim();
-            const emailRaw = document.getElementById('supportTargetEmail').value.trim();
-            const subject = document.getElementById('supportReplySubject').value.trim() || "Ojas Portal Support";
-            const msg = document.getElementById('supportReplyMessage').value.trim();
-
-            if (!msg) return alert('कृपया पहले मैसेज लिखें या ऊपर से टेम्पलेट चुनें!');
-
-            if (uid && window.usersDataList[uid]) {
-                const updateObj = {};
-                if (phoneRaw) updateObj.userPhone = phoneRaw;
-                if (emailRaw) updateObj.contactEmail = emailRaw;
-                if (Object.keys(updateObj).length > 0) {
-                    try {
-                        await updateDoc(doc(db, "users", uid), updateObj);
-                        Object.assign(window.usersDataList[uid], updateObj);
-                    } catch (e) {}
-                }
-            }
-
-            if (channel === 'whatsapp') {
-                const cleanPhone = window.formatCleanPhone(phoneRaw);
-                const waUrl = cleanPhone
-                    ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
-                    : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-                window.open(waUrl, '_blank');
-            } else if (channel === 'email') {
-                if (!emailRaw) return alert('कृपया Email पर भेजने के लिए यूज़र का Email एड्रेस दर्ज करें!');
-                const cleanBody = msg.replace(/\*/g, '');
-                window.open(`mailto:${emailRaw}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(cleanBody)}`, '_self');
-            } else if (channel === 'copy') {
-                navigator.clipboard.writeText(msg.replace(/\*/g, ''));
-                alert('मैसेज क्लिपबोर्ड पर कॉपी हो गया है!');
+                sel.innerHTML += `<option value="${uid}">${data.email}</option>`;
             }
         };
 
@@ -746,7 +824,7 @@
                 window.updateStealthStatusPill();
                 if (msg) {
                     msg.className = "p-3 bg-green-50 text-green-800 border border-green-300 rounded-xl text-xs font-black text-center";
-                    msg.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> पोर्टल सेटिंग्स, सपोर्ट नंबर और बैनर सफलतापूर्वक अपडेट हो गए हैं!`;
+                    msg.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> पोर्टल सेटिंग्स और बैनर सफलतापूर्वक अपडेट हो गए हैं!`;
                     msg.classList.remove('hidden');
                     setTimeout(() => msg.classList.add('hidden'), 4000);
                 }
@@ -1266,7 +1344,7 @@
                 const waLink = cleanPhone 
                     ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(credMsg)}`
                     : `https://wa.me/?text=${encodeURIComponent(credMsg)}`;
-                const mailLink = `mailto:${ rawUser.includes('@') ? rawUser : '' }?subject=${encodeURIComponent('Ojas Print Service - Your Login ID & Password')}&body=${encodeURIComponent(credMsg.replace(/\*/g, ''))}`;
+                const mailLink = `mailto:${ rawUser.includes('@') ? rawUser : '' }?subject=${encodeURIComponent('Ojas Print Service - Your Login ID & Password')}&body=${encodeURIComponent(credMsg)}`;
                 
                 msg.className = "mt-3 p-3.5 bg-green-50 text-green-900 rounded-2xl text-xs font-bold border border-green-300 space-y-2.5";
                 msg.innerHTML = `
@@ -2113,7 +2191,7 @@
                 activeSection.removeAttribute('class');
                 if (tabName === 'payments') activeSection.className = 'space-y-4';
                 if (tabName === 'users') activeSection.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
-                if (tabName === 'support') activeSection.className = 'space-y-5';
+                if (tabName === 'support') activeSection.className = 'space-y-4';
                 if (tabName === 'history') activeSection.className = 'space-y-4';
                 if (tabName === 'controls') activeSection.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
             }
@@ -2121,7 +2199,10 @@
             if (tabName === 'payments') window.loadAllPayments();
             if (tabName === 'support') {
                 window.populateSupportUserDropdown();
-                window.loadSupportTickets();
+                window.renderSupportChatSidebar();
+                if (!window.selectedChatTicketId && window.allSupportTickets.length > 0) {
+                    window.selectSupportChatThread(window.allSupportTickets[0].id);
+                }
             }
             if (tabName === 'history') window.loadAdminHistory(); 
             if (tabName === 'controls') window.loadPortalSettingsForAdmin();
@@ -2204,8 +2285,8 @@
                 <span>Users & Pass</span>
             </button>
             <button onclick="window.switchAdminMainTab('support')" id="tab-support">
-                <i class="fa-brands fa-whatsapp text-green-500"></i>
-                <span>Support & Reply</span>
+                <i class="fa-solid fa-comments text-green-500"></i>
+                <span>Support Chat</span>
                 <span id="navSupportBadge" style="display: none;" class="bg-red-600 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full animate-pulse">0</span>
             </button>
             <button onclick="window.switchAdminMainTab('history')" id="tab-history">
@@ -2307,7 +2388,7 @@
 
                     <div class="p-3 bg-green-50/70 rounded-xl border border-green-200 space-y-2">
                         <div class="flex gap-2">
-                            <input type="text" id="selectedUserPhoneInput" placeholder="यूज़र का WhatsApp नंबर (e.g. 9876543210)" class="flex-1 p-2 border border-green-300 rounded-xl text-xs font-bold bg-white outline-none">
+                            <input type="text" id="selectedUserPhoneInput" placeholder="यूज़र का WhatsApp नंबर (Optional)" class="flex-1 p-2 border border-green-300 rounded-xl text-xs font-bold bg-white outline-none">
                             <button type="button" onclick="window.saveSelectedUserPhone()" class="bg-slate-800 hover:bg-black text-white font-bold px-3 py-2 rounded-xl text-[11px] shrink-0">
                                 Save No.
                             </button>
@@ -2393,7 +2474,7 @@
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">User WhatsApp Number (Optional)</label>
-                            <input type="text" id="newAdminUserPhone" placeholder="e.g. 9876543210 (सीधे WhatsApp पर ID भेजने के लिए)" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 font-semibold outline-none focus:bg-white focus:border-royal-400">
+                            <input type="text" id="newAdminUserPhone" placeholder="सीधे WhatsApp पर ID भेजने के लिए नंबर डालें" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 font-semibold outline-none focus:bg-white focus:border-royal-400">
                         </div>
                         <div class="grid grid-cols-2 gap-2.5">
                             <div>
@@ -2420,123 +2501,116 @@
             </div>
         </div>
 
-        <!-- ================= SECTION 5: INCOMING SUPPORT / FORGOT PASS TICKETS & DIRECT REPLY CENTER ================= -->
-        <div id="section-support" class="space-y-5 hidden">
+        <!-- ================= SECTION 5: LIVE 2-WAY SUPPORT CHAT SYSTEM (REFLECTS DIRECTLY IN USER'S SUPPORT TAB) ================= -->
+        <div id="section-support" class="space-y-4 hidden">
             
-            <!-- Part A: Live Incoming Tickets from index.html -->
-            <div class="bg-white rounded-2xl p-4 md:p-5 shadow-card border border-slate-200 space-y-3">
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                    <div>
-                        <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-bell text-red-500 mr-1.5"></i> Incoming Forgot Password & Help Tickets</h3>
-                        <p class="text-[11px] font-bold text-slate-400">यूज़र्स द्वारा index.html से भेजी गई सभी पासवर्ड रीसेट और सहायता रिक्वेस्ट</p>
+            <!-- Top Bar: Start New Chat with any User -->
+            <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                    <div class="w-9 h-9 rounded-xl bg-green-50 text-green-600 flex items-center justify-center border border-green-200 font-black">
+                        <i class="fa-solid fa-comments"></i>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <button id="supFilterBtn-Open" onclick="window.setSupportTicketFilter('Open')" class="px-3 py-1.5 rounded-xl text-xs font-black bg-dark-900 text-royal-300 shadow-sm transition flex items-center gap-1.5">
-                            <span>Open</span>
-                            <span id="supCountOpen" class="bg-amber-400 text-dark-950 px-1.5 py-0.2 rounded-full text-[10px]">0</span>
-                        </button>
-                        <button id="supFilterBtn-Resolved" onclick="window.setSupportTicketFilter('Resolved')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition flex items-center gap-1.5">
-                            <span>Resolved</span>
-                            <span id="supCountResolved" class="bg-green-200 text-green-900 px-1.5 py-0.2 rounded-full text-[10px]">0</span>
-                        </button>
-                        <button id="supFilterBtn-ALL" onclick="window.setSupportTicketFilter('ALL')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition flex items-center gap-1.5">
-                            <span>All</span>
-                            <span id="supCountAll" class="bg-slate-300 text-slate-800 px-1.5 py-0.2 rounded-full text-[10px]">0</span>
-                        </button>
-                        <button onclick="window.loadSupportTickets()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-black transition">
-                            <i class="fa-solid fa-rotate-right"></i>
-                        </button>
+                    <div>
+                        <h3 class="text-sm md:text-base font-black text-dark-900">Live Support Chat Center</h3>
+                        <p class="text-[10px] font-bold text-slate-400">यहाँ से भेजा गया हर रिप्लाई सीधे यूज़र के पोर्टल Support Tab में दिखेगा</p>
                     </div>
                 </div>
-
-                <div id="supportTicketsListContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <select id="newChatUserSelect" class="flex-1 sm:w-64 p-2.5 border border-slate-300 rounded-xl text-xs bg-slate-50 font-bold outline-none">
+                        <option value="">-- किसी यूज़र के साथ नई चैट शुरू करें --</option>
+                    </select>
+                    <button type="button" onclick="window.startNewChatWithSelectedUser()" class="bg-dark-900 hover:bg-black text-royal-300 font-black px-3.5 py-2.5 rounded-xl text-xs shrink-0 transition">
+                        <i class="fa-solid fa-plus mr-1"></i> Open Chat
+                    </button>
+                </div>
             </div>
 
-            <!-- Part B: Direct Reply & Quick Password Reset Box -->
-            <div id="supportReplyCardBox" class="bg-white rounded-2xl p-4 md:p-6 shadow-card border-2 border-royal-400 space-y-4">
-                <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3">
-                    <div class="flex items-center gap-2.5">
-                        <div class="w-10 h-10 bg-green-50 text-green-600 rounded-xl flex items-center justify-center text-xl border border-green-200">
-                            <i class="fa-brands fa-whatsapp"></i>
+            <!-- Main 2-Column Chat Interface -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                
+                <!-- Left Column: User Chat Threads List -->
+                <div class="bg-white rounded-2xl p-3.5 shadow-card border border-slate-200 space-y-3">
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                        <input type="text" id="supportSearchInput" oninput="window.renderSupportChatSidebar()" placeholder="यूज़र ID या नंबर खोजें..." class="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
+                    </div>
+                    <div id="supportChatThreadsList" class="space-y-2 max-h-[520px] overflow-y-auto pr-1"></div>
+                </div>
+
+                <!-- Right Column (2 Cols Wide): Active Conversation Window -->
+                <div class="md:col-span-2 bg-white rounded-2xl shadow-card border-2 border-royal-400 overflow-hidden flex flex-col min-h-[540px]">
+                    
+                    <!-- Empty State when no chat selected -->
+                    <div id="chatWindowEmptyState" class="flex-1 flex flex-col items-center justify-center p-10 text-center text-slate-400">
+                        <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-3xl mb-3 text-slate-300">
+                            <i class="fa-solid fa-comments"></i>
                         </div>
-                        <div>
-                            <h3 class="text-base md:text-lg font-black text-dark-900">Direct Reply & Instant Password Reset</h3>
-                            <p class="text-[11px] font-bold text-slate-400">ऊपर किसी भी टिकट पर "Load in Reply" दबाएं या नीचे सीधे यूज़र चुनकर पासवर्ड बदलें व WhatsApp/Email भेजें</p>
+                        <h4 class="text-sm font-black text-slate-700">चैट शुरू करने के लिए बाईं तरफ से किसी यूज़र को चुनें</h4>
+                        <p class="text-xs font-semibold text-slate-400 mt-1">यूज़र द्वारा Support टैब से भेजा गया हर मैसेज यहाँ रियल-टाइम में दिखेगा।</p>
+                    </div>
+
+                    <!-- Active Chat Box -->
+                    <div id="chatWindowActiveBox" class="hidden flex-1 flex flex-col justify-between h-[560px]">
+                        
+                        <!-- Chat Header + Quick Password Reset Bar -->
+                        <div class="bg-dark-950 text-white p-3.5 border-b border-slate-800 space-y-2.5">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <h4 id="chatHeaderUserTitle" class="text-sm md:text-base font-black text-royal-300">User</h4>
+                                        <span id="chatHeaderSavedPassBadge" class="text-[10px] bg-dark-800 px-2 py-0.5 rounded-lg border border-slate-700"></span>
+                                    </div>
+                                    <p id="chatHeaderUserPhone" class="text-[11px] font-bold text-green-400"></p>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <button type="button" onclick="window.alsoOpenChatUserWhatsApp()" class="bg-green-600 hover:bg-green-700 text-white px-2.5 py-1.5 rounded-xl text-[11px] font-black transition flex items-center gap-1" title="WhatsApp पर भी भेजें">
+                                        <i class="fa-brands fa-whatsapp"></i> <span class="hidden sm:inline">WhatsApp</span>
+                                    </button>
+                                    <button type="button" onclick="window.deleteCurrentSupportChat()" class="bg-red-500/20 hover:bg-red-600 text-red-400 hover:text-white px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition" title="Delete Chat">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- 1-Click Password Reset & Auto-Send in Chat -->
+                            <div class="flex items-center gap-2 bg-dark-800 p-2 rounded-xl border border-slate-700">
+                                <span class="text-[10px] font-black text-royal-400 uppercase shrink-0"><i class="fa-solid fa-key mr-1"></i>New Pass:</span>
+                                <input type="text" id="chatQuickNewPassInput" placeholder="नया पासवर्ड लिखें (Min 6 chars)" class="flex-1 bg-dark-900 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold border border-slate-700 outline-none">
+                                <button type="button" id="btnChatQuickResetPass" onclick="window.resetPassAndSendInChat()" class="bg-royal-500 hover:bg-royal-400 text-dark-950 font-black px-3 py-1.5 rounded-lg text-[11px] shrink-0 transition">
+                                    Set & Send in Chat
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">1. Select Registered User (यूज़र चुनें)</label>
-                        <select id="supportUserSelect" onchange="window.onSupportUserChange()" class="w-full p-3 border border-slate-300 rounded-xl text-xs md:text-sm bg-slate-50 font-bold text-slate-800 outline-none focus:border-royal-500">
-                            <option value="">-- रजिस्टर्ड यूज़र चुनें --</option>
-                        </select>
-                    </div>
+                        <!-- Messages Scroll Area -->
+                        <div id="chatMessagesScrollBox" class="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50"></div>
 
-                    <!-- Instant Password Reset right inside Support Tab -->
-                    <div class="p-2.5 bg-indigo-50 rounded-xl border border-indigo-200">
-                        <label class="block text-[10px] font-black text-indigo-900 uppercase mb-1"><i class="fa-solid fa-key mr-1"></i>Quick Set New Password (सीधे यहीं से नया पासवर्ड सेट करें)</label>
-                        <div class="flex gap-2">
-                            <input type="text" id="supportQuickNewPass" placeholder="नया पासवर्ड लिखें (e.g. 123456)" class="flex-1 p-2 border border-indigo-300 rounded-xl text-xs font-bold bg-white outline-none">
-                            <button type="button" id="btnSupportQuickPass" onclick="window.supportQuickResetPassword()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-3 py-2 rounded-xl text-xs shrink-0 transition">
-                                Set & Fill Reply
-                            </button>
+                        <!-- Quick Reply Pills & Input Form -->
+                        <div class="p-3 bg-white border-t border-slate-200 space-y-2">
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <span class="text-[10px] font-black text-slate-400 uppercase mr-1">Quick Fill:</span>
+                                <button type="button" onclick="window.insertQuickChatReply('id_pass')" class="bg-royal-50 hover:bg-royal-100 text-royal-900 border border-royal-300 px-2.5 py-1 rounded-lg text-[10px] font-black transition">
+                                    <i class="fa-solid fa-id-card mr-1"></i>Send ID & Pass
+                                </button>
+                                <button type="button" onclick="window.insertQuickChatReply('payment_ok')" class="bg-green-50 hover:bg-green-100 text-green-900 border border-green-300 px-2.5 py-1 rounded-lg text-[10px] font-black transition">
+                                    <i class="fa-solid fa-check-circle mr-1"></i>Payment Approved
+                                </button>
+                                <button type="button" onclick="window.insertQuickChatReply('fixed')" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200 px-2.5 py-1 rounded-lg text-[10px] font-black transition">
+                                    <i class="fa-solid fa-thumbs-up mr-1"></i>Issue Resolved
+                                </button>
+                            </div>
+
+                            <form onsubmit="window.sendAdminChatReply(event)" class="flex gap-2">
+                                <textarea id="adminChatReplyInput" rows="2" placeholder="यहाँ अपना रिप्लाई लिखें (यह सीधे यूज़र के Support टैब में दिखेगा)..." class="flex-1 p-2.5 border border-slate-300 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none resize-none"></textarea>
+                                <button type="submit" id="btnSendAdminChatReply" class="bg-dark-900 hover:bg-black text-royal-300 font-black px-5 rounded-xl text-xs shadow-glow transition flex items-center justify-center gap-1.5 shrink-0">
+                                    <i class="fa-solid fa-paper-plane"></i> Send Reply
+                                </button>
+                            </form>
                         </div>
+
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">User WhatsApp Number</label>
-                        <input type="text" id="supportTargetPhone" placeholder="e.g. 9876543210" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
-                    </div>
-
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">User Email Address</label>
-                        <input type="email" id="supportTargetEmail" placeholder="e.g. user@gmail.com" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
-                    </div>
-
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Email Subject</label>
-                        <input type="text" id="supportReplySubject" value="Ojas Print Service - Login ID & Password" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
-                    </div>
-                </div>
-
-                <div class="space-y-1.5">
-                    <label class="block text-[10px] font-black text-slate-400 uppercase">2. Quick Reply Templates (1-Click में मैसेज तैयार करें):</label>
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        <button type="button" onclick="window.applySupportTemplate('credentials')" class="bg-royal-50 hover:bg-royal-100 text-royal-900 border border-royal-300 font-black py-2 px-2.5 rounded-xl text-xs transition">
-                            <i class="fa-solid fa-id-card mr-1"></i> Send ID & Pass
-                        </button>
-                        <button type="button" onclick="window.applySupportTemplate('reset_done')" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200 font-black py-2 px-2.5 rounded-xl text-xs transition">
-                            <i class="fa-solid fa-key mr-1"></i> Pass Reset Reply
-                        </button>
-                        <button type="button" onclick="window.applySupportTemplate('payment_done')" class="bg-green-50 hover:bg-green-100 text-green-900 border border-green-200 font-black py-2 px-2.5 rounded-xl text-xs transition">
-                            <i class="fa-solid fa-check-double mr-1"></i> Payment Approved
-                        </button>
-                        <button type="button" onclick="window.applySupportTemplate('custom')" class="bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 font-black py-2 px-2.5 rounded-xl text-xs transition">
-                            <i class="fa-solid fa-pen mr-1"></i> Custom Reply
-                        </button>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">3. Message Preview / Edit (मैसेज)</label>
-                    <textarea id="supportReplyMessage" rows="6" placeholder="ऊपर से कोई टिकट या टेम्पलेट चुनें, या अपना मैसेज यहाँ लिखें..." class="w-full p-3.5 border border-slate-300 rounded-2xl text-xs md:text-sm font-semibold bg-slate-50 focus:bg-white outline-none"></textarea>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-                    <button type="button" onclick="window.sendSupportReplyNow('whatsapp')" class="bg-green-600 hover:bg-green-700 text-white font-black py-3.5 px-4 rounded-xl text-xs md:text-sm shadow-md transition flex items-center justify-center gap-2">
-                        <i class="fa-brands fa-whatsapp text-base"></i> Send on WhatsApp
-                    </button>
-                    <button type="button" onclick="window.sendSupportReplyNow('email')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 px-4 rounded-xl text-xs md:text-sm shadow-md transition flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-envelope text-sm"></i> Send on Email
-                    </button>
-                    <button type="button" onclick="window.sendSupportReplyNow('copy')" class="bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 px-4 rounded-xl text-xs md:text-sm transition flex items-center justify-center gap-2">
-                        <i class="fa-regular fa-copy text-sm"></i> Copy Message
-                    </button>
-                </div>
             </div>
         </div>
 
@@ -2670,7 +2744,7 @@
                 <form onsubmit="window.savePortalSettings(event)" class="space-y-3">
                     <div class="p-3 bg-green-50 rounded-xl border border-green-200">
                         <label class="block text-[10px] font-black text-green-900 uppercase mb-1">
-                            <i class="fa-brands fa-whatsapp mr-1"></i> Portal Support WhatsApp Number (Forgot Pass & Help)
+                            <i class="fa-brands fa-whatsapp mr-1"></i> Portal Support WhatsApp Number
                         </label>
                         <input type="text" id="inpSupportWhatsapp" value="919306437623" placeholder="e.g. 919306437623" class="w-full p-2.5 border border-green-300 rounded-xl text-xs font-black bg-white outline-none">
                     </div>
@@ -2702,7 +2776,7 @@
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Button Text (Optional)</label>
-                            <input type="text" id="inpBannerBtnText" placeholder="e.g. WhatsApp Help" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50">
+                            <input type="text" id="inpBannerBtnText" placeholder="e.g. Support Chat" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50">
                         </div>
                         <div>
                             <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Button Link (Optional)</label>
