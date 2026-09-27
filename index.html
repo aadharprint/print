@@ -107,7 +107,7 @@
         window.vipCountdownInterval = null;
         window.portalSettingsUnsubscribe = null;
         window.userChatUnsubscribe = null;
-        window.currentUserChatData = { messages: [], unreadForUser: 0 };
+        window.currentUserChatData = { messages: [], unreadByUser: false };
 
         // Live Portal Control & Stealth Config
         window.portalConfigState = {
@@ -137,7 +137,7 @@
         };
         window.API_URLS = API_URLS;
 
-        // ================= 1. OUTSIDE LOGIN: FORGOT PASSWORD TICKET (TELEGRAM + ADMIN ALERT) =================
+        // ================= 1. OUTSIDE LOGIN: FORGOT PASSWORD TICKET (TELEGRAM + ADMIN PANEL SUPPORT CHAT) =================
         window.openForgotPasswordModal = function() {
             const modal = document.getElementById('forgotPasswordModal');
             const idInp = document.getElementById('forgotUserIdInput');
@@ -174,20 +174,42 @@
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Raising Ticket...';
 
+            const finalMessage = userNoteText || "मैं अपना पासवर्ड भूल गया हूँ, कृपया नया पासवर्ड जारी करें।";
+
             try {
-                // 1. Save Ticket in Firestore so it shows in Admin Panel
-                await addDoc(collection(db, "forgotTickets"), {
+                // 1. Save directly in "supportTickets" so it immediately appears in Admin Panel -> Support Chat Tab
+                await addDoc(collection(db, "supportTickets"), {
+                    type: "FORGOT_PASSWORD",
                     userIdentifier: userIdText,
                     userPhone: userPhoneText,
-                    note: userNoteText || "Password Reset Request",
-                    status: "Pending",
-                    timestamp: new Date()
+                    message: `🔑 Forgot Password Request: ${finalMessage} (WhatsApp: ${userPhoneText})`,
+                    messages: [{
+                        sender: 'user',
+                        text: `🔑 [FORGOT PASSWORD TICKET]\nUser ID: ${userIdText}\nWhatsApp: ${userPhoneText}\nNote: ${finalMessage}`,
+                        time: Date.now()
+                    }],
+                    status: "Open",
+                    unreadByAdmin: true,
+                    unreadByUser: false,
+                    timestamp: new Date(),
+                    updatedAtMs: Date.now()
                 });
 
-                // 2. Instant Notification to Admin Telegram first
+                // Backup save in forgotTickets as well
+                try {
+                    await addDoc(collection(db, "forgotTickets"), {
+                        userIdentifier: userIdText,
+                        userPhone: userPhoneText,
+                        note: finalMessage,
+                        status: "Pending",
+                        timestamp: new Date()
+                    });
+                } catch (e) {}
+
+                // 2. Instant Notification to Admin Telegram
                 const botToken = "8586078140:AAG-ydpakzFDAwHFtJC8AUanxZAODpGZDOk"; 
                 const chatId = "8942287807"; 
-                const tgMessage = `🔑 *FORGOT PASSWORD TICKET!*\n\n*Requested User ID:* \`${userIdText}\`\n*Mobile / WhatsApp:* \`${userPhoneText}\`\n*Message:* ${userNoteText || 'नया पासवर्ड जारी करने की रिक्वेस्ट'}\n\n*Action:* यह टिकट आपके Admin Panel -> Support टैब में भी आ गया है।`;
+                const tgMessage = `🔑 *FORGOT PASSWORD TICKET!*\n\n*Requested User ID:* \`${userIdText}\`\n*Mobile / WhatsApp:* \`${userPhoneText}\`\n*Message:* ${finalMessage}\n\n*Action:* यह टिकट आपके Admin Panel -> Support Chat टैब में भी आ गया है।`;
 
                 fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
                     method: 'POST',
@@ -214,41 +236,41 @@
             }
         };
 
-        // ================= 2. INSIDE PORTAL: REAL-TIME 2-WAY LIVE SUPPORT CHAT =================
+        // ================= 2. INSIDE PORTAL: REAL-TIME 2-WAY LIVE SUPPORT CHAT (SYNCED WITH ADMIN) =================
         function startUserSupportChatListener(uid) {
             if (window.userChatUnsubscribe) window.userChatUnsubscribe();
 
-            const chatDocRef = doc(db, "supportChats", uid);
+            const chatDocRef = doc(db, "supportTickets", uid);
             window.userChatUnsubscribe = onSnapshot(chatDocRef, async (snap) => {
                 if (snap.exists()) {
                     window.currentUserChatData = snap.data();
                 } else {
-                    window.currentUserChatData = { messages: [], unreadForUser: 0 };
+                    window.currentUserChatData = { messages: [], unreadByUser: false };
                 }
 
-                const unread = window.currentUserChatData.unreadForUser || 0;
+                const isUnread = window.currentUserChatData.unreadByUser === true;
                 const headerBadge = document.getElementById('headerSupportUnreadBadge');
                 const gearBadge = document.getElementById('gearSupportUnreadBadge');
 
                 if (window.currentActiveTab === 'support_chat') {
-                    // If user is currently viewing the chat tab, clear unread badge and render messages
-                    if (unread > 0) {
-                        try { await updateDoc(chatDocRef, { unreadForUser: 0 }); } catch (e) {}
+                    if (isUnread) {
+                        try { await updateDoc(chatDocRef, { unreadByUser: false }); } catch (e) {}
                     }
                     if (headerBadge) headerBadge.style.display = 'none';
                     if (gearBadge) gearBadge.style.display = 'none';
                     window.renderUserLiveChatMessages();
                 } else {
-                    // Show red unread badge on Support buttons
                     if (headerBadge) {
-                        headerBadge.innerText = unread;
-                        headerBadge.style.display = unread > 0 ? 'inline-flex' : 'none';
+                        headerBadge.innerText = '1';
+                        headerBadge.style.display = isUnread ? 'inline-flex' : 'none';
                     }
                     if (gearBadge) {
-                        gearBadge.innerText = `${unread} New`;
-                        gearBadge.style.display = unread > 0 ? 'inline-block' : 'none';
+                        gearBadge.innerText = 'New';
+                        gearBadge.style.display = isUnread ? 'inline-block' : 'none';
                     }
                 }
+            }, (err) => {
+                console.error("Support chat listener error:", err);
             });
         }
 
@@ -256,7 +278,15 @@
             const box = document.getElementById('userLiveChatMessagesBox');
             if (!box) return;
 
-            const msgs = window.currentUserChatData?.messages || [];
+            let msgs = Array.isArray(window.currentUserChatData?.messages) ? [...window.currentUserChatData.messages] : [];
+            if (msgs.length === 0 && window.currentUserChatData?.message) {
+                msgs.push({
+                    sender: 'user',
+                    text: window.currentUserChatData.message,
+                    time: Date.now()
+                });
+            }
+
             if (msgs.length === 0) {
                 box.innerHTML = `
                     <div class="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
@@ -273,11 +303,12 @@
             box.innerHTML = msgs.map(m => {
                 const isMe = m.sender === 'user';
                 const tStr = m.time ? new Date(m.time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) : '';
+                const safeText = String(m.text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 if (isMe) {
                     return `
                         <div class="flex justify-end">
                             <div class="max-w-[80%] bg-dark-900 text-white px-3.5 py-2.5 rounded-2xl rounded-br-none shadow-sm">
-                                <p class="text-xs font-semibold whitespace-pre-line leading-relaxed">${m.text}</p>
+                                <p class="text-xs font-semibold whitespace-pre-line leading-relaxed">${safeText}</p>
                                 <span class="block text-[9px] text-royal-300 text-right mt-1 opacity-80">${tStr} • You</span>
                             </div>
                         </div>
@@ -287,7 +318,7 @@
                         <div class="flex justify-start">
                             <div class="max-w-[80%] bg-amber-50 border border-amber-300 text-slate-900 px-3.5 py-2.5 rounded-2xl rounded-bl-none shadow-sm">
                                 <span class="text-[10px] font-black text-amber-800 uppercase block mb-0.5"><i class="fa-solid fa-crown text-amber-500 mr-1"></i>Admin Support</span>
-                                <p class="text-xs font-bold whitespace-pre-line leading-relaxed">${m.text}</p>
+                                <p class="text-xs font-bold whitespace-pre-line leading-relaxed">${safeText}</p>
                                 <span class="block text-[9px] text-slate-400 text-right mt-1">${tStr}</span>
                             </div>
                         </div>
@@ -311,7 +342,7 @@
             btn.disabled = true;
 
             const uid = window.currentUserData.uid;
-            const chatRef = doc(db, "supportChats", uid);
+            const chatRef = doc(db, "supportTickets", uid);
             const newMsg = {
                 sender: 'user',
                 text: text,
@@ -321,17 +352,18 @@
             try {
                 const existingMsgs = Array.isArray(window.currentUserChatData?.messages) ? [...window.currentUserChatData.messages] : [];
                 existingMsgs.push(newMsg);
-                const prevUnreadAdmin = window.currentUserChatData?.unreadForAdmin || 0;
 
                 await setDoc(chatRef, {
+                    type: 'USER_SUPPORT_CHAT',
                     userId: uid,
-                    userEmail: window.currentUserData.email,
+                    userIdentifier: window.currentUserData.email,
                     username: window.currentUserData.username,
-                    lastMessage: text,
-                    lastSender: 'user',
-                    unreadForAdmin: prevUnreadAdmin + 1,
-                    unreadForUser: 0,
-                    updatedAt: new Date(),
+                    message: text,
+                    status: 'Open',
+                    unreadByAdmin: true,
+                    unreadByUser: false,
+                    timestamp: new Date(),
+                    updatedAtMs: Date.now(),
                     messages: existingMsgs
                 }, { merge: true });
             } catch (err) {
@@ -431,13 +463,13 @@
 
             if (promoDesc) {
                 promoDesc.innerHTML = cfg.showDob18
-                    ? `VIP लें: <strong>8 Cr</strong> में फॉर्म + <strong>18+ DOB & सारे Annexures</strong> अनलॉक करें!`
-                    : `VIP लें: <strong>8 Cr</strong> में फॉर्म + <strong>सारे 9 Official Annexures</strong> अनलॉक करें!`;
+                    ? `VIP लें: <strong>18+ DOB & सारे 9 Official Annexures</strong> अनलॉक करें (सभी डॉक्यूमेंट 10 Cr)!`
+                    : `VIP लें: <strong>सारे 9 Official Annexures</strong> अनलॉक करें (सभी डॉक्यूमेंट 10 Cr)!`;
             }
             if (vipHeaderLabel) {
                 vipHeaderLabel.innerHTML = cfg.showDob18
-                    ? `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures)`
-                    : `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (All 9 Annexures)`;
+                    ? `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures - 10 Cr)`
+                    : `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (All 9 Annexures - 10 Cr)`;
             }
 
             if (
@@ -895,12 +927,20 @@
             errorMsg.style.display = 'none';
 
             try {
-                const q = query(collection(db, "payments"), where("utrNumber", "==", utr));
-                const duplicateCheck = await getDocs(q);
-                if (!duplicateCheck.empty) {
+                // सिक्योरिटी रूल #4 के अनुसार usedUtrs कलेक्शन से डुप्लीकेट UTR चेक करें
+                const utrRef = doc(db, "usedUtrs", utr);
+                const utrSnap = await getDoc(utrRef);
+                if (utrSnap.exists()) {
                     throw new Error("यह UTR नंबर पहले ही उपयोग किया जा चुका है!");
                 }
 
+                // पहले UTR लॉक करें
+                await setDoc(utrRef, {
+                    userId: window.currentUserData.uid,
+                    timestamp: new Date()
+                });
+
+                // फिर पेमेंट रिक्वेस्ट सेव करें
                 await addDoc(collection(db, "payments"), {
                     userId: window.currentUserData.uid,
                     email: window.currentUserData.email,
@@ -1004,7 +1044,7 @@
                             <div class="p-3.5 rounded-2xl bg-slate-100 border border-slate-200 text-slate-700 flex flex-wrap justify-between items-center gap-2">
                                 <div>
                                     <h4 class="text-xs md:text-sm font-black text-slate-800">अभी कोई VIP प्लान एक्टिव नहीं है (0 दिन)</h4>
-                                    <p class="text-[11px] text-slate-500">20%-25% छूट और सारे Annexures के लिए VIP लें।</p>
+                                    <p class="text-[11px] text-slate-500">DOB 18+ और सारे 9 Annexures अनलॉक करने के लिए VIP लें।</p>
                                 </div>
                                 <button onclick="window.jumpToVipUpgrade(30)" class="bg-dark-900 text-royal-300 font-black px-3 py-2 rounded-xl text-xs">
                                     👑 ₹100 में VIP लें
@@ -1611,13 +1651,15 @@
             }
         };
 
+        // ================= LOCAL ANNEXURE FORM SUBMISSION (FIXED 10 CREDITS FOR ALL) =================
         window.submitLocalAnnexureForm = async function(event, serviceType, fileIdKey) {
             event.preventDefault();
 
             if (!window.currentUserData) return alert('Please login first!');
             if (!window.currentUserData.isVip) return alert('यह सर्विस केवल VIP यूज़र्स के लिए है!');
 
-            const docCost = 8;
+            // सभी Annexures के लिए 10 Credits फिक्स
+            const docCost = 10;
             if (!window.currentUserData.isAdmin && window.currentUserData.credits < docCost) {
                 return alert(`Insufficient credits! You need ${docCost} credits to generate ${serviceType}. Please add credits.`);
             }
@@ -1749,7 +1791,7 @@
             });
         }
 
-        // ================= FORM SUBMISSION FOR GOOGLE DRIVE SERVICES =================
+        // ================= FORM SUBMISSION FOR GOOGLE DRIVE SERVICES (FIXED 10 CREDITS FOR ALL INCLUDING DOB) =================
         window.submitForm = async function(event, serviceType) {
             event.preventDefault();
 
@@ -1760,10 +1802,8 @@
             if (serviceType === 'Caste' && !cfg.showCaste) return alert('यह सर्विस वर्तमान में बंद है।');
             if ((serviceType === 'DOB' || serviceType === 'DOB 18+') && !cfg.showDob18) return alert('यह सर्विस वर्तमान में बंद है।');
 
-            let docCost = window.currentUserData.isVip ? 8 : 10;
-            if (serviceType === 'DOB' || serviceType === 'DOB 18+') {
-                docCost = 15;
-            }
+            // सभी सर्विसेज़ (Domicile, Caste, DOB 18+) के लिए 10 Credits फिक्स
+            const docCost = 10;
 
             if (!window.currentUserData.isAdmin && window.currentUserData.credits < docCost) {
                 return alert(`Insufficient credits! You need ${docCost} credits to generate this ${serviceType} document.`);
@@ -1973,7 +2013,7 @@
             `;
         }
 
-        // ================= MAIN SERVICE SWITCHER =================
+        // ================= MAIN SERVICE SWITCHER (FIXED 10 CREDITS EVERYWHERE) =================
         window.switchService = async function(serviceName) {
             const cfg = window.portalConfigState;
 
@@ -2008,17 +2048,16 @@
             const container = document.getElementById('formContainer');
             if (!container) return;
             
+            // सभी डॉक्यूमेंट्स के लिए 10 Credits फिक्स (Admin के लिए फ्री)
             const submitBtnText = window.currentUserData && window.currentUserData.isAdmin 
-                ? 'Generate Document <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' 
-                : (window.currentUserData && window.currentUserData.isVip 
-                    ? 'Generate Document (<del class="opacity-75 text-xs mr-1">10</del> 8 Credits - 20% VIP Off) <i class="fa-solid fa-crown ml-1"></i>' 
-                    : 'Generate Document (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>');
-                                
+                ? 'Generate Document (Admin Free) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' 
+                : 'Generate Document (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>';
+                                  
             const statusTagHtml = window.currentUserData && window.currentUserData.isAdmin 
                 ? '<span class="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-[10px] font-bold border border-green-200 uppercase">Admin Free</span>' 
                 : (window.currentUserData && window.currentUserData.isVip 
-                    ? '<span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-md text-[10px] font-black border border-amber-300 uppercase"><i class="fa-solid fa-crown mr-1"></i>VIP 20% OFF</span>' 
-                    : '<span onclick="window.jumpToVipUpgrade(30)" class="cursor-pointer bg-royal-100 hover:bg-royal-200 text-royal-900 px-2.5 py-1 rounded-md text-[10px] font-black border border-royal-300 uppercase"><i class="fa-solid fa-bolt text-amber-600 mr-1"></i>VIP लें: 20% बचाएं</span>');
+                    ? '<span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-md text-[10px] font-black border border-amber-300 uppercase"><i class="fa-solid fa-crown mr-1"></i>10 Credits</span>' 
+                    : '<span class="bg-royal-100 text-royal-900 px-2.5 py-1 rounded-md text-[10px] font-black border border-royal-300 uppercase">10 Credits</span>');
 
             const todayISO = new Date().toISOString().split('T')[0];
 
@@ -2036,7 +2075,7 @@
                                         Live Admin Support Chat
                                         <span class="w-2 h-2 rounded-full bg-green-400 animate-ping"></span>
                                     </h3>
-                                    <p class="text-[10px] text-slate-400 font-semibold">आपकीUser ID: <span class="text-royal-300 font-bold">${window.currentUserData?.email || ''}</span></p>
+                                    <p class="text-[10px] text-slate-400 font-semibold">आपकी User ID: <span class="text-royal-300 font-bold">${window.currentUserData?.email || ''}</span></p>
                                 </div>
                             </div>
                             <span class="text-[10px] bg-dark-800 text-royal-300 border border-slate-700 px-2.5 py-1 rounded-lg font-bold">2-Way Live</span>
@@ -2053,9 +2092,9 @@
                     </div>
                 `;
                 window.renderUserLiveChatMessages();
-                if (window.currentUserData && (window.currentUserChatData?.unreadForUser || 0) > 0) {
+                if (window.currentUserData && window.currentUserChatData?.unreadByUser === true) {
                     try {
-                        await updateDoc(doc(db, "supportChats", window.currentUserData.uid), { unreadForUser: 0 });
+                        await updateDoc(doc(db, "supportTickets", window.currentUserData.uid), { unreadByUser: false });
                     } catch (e) {}
                 }
                 const headerBadge = document.getElementById('headerSupportUnreadBadge');
@@ -2180,21 +2219,21 @@
                 window.updateTehsilsAndThanas();
             }
             
-            // DOB CERTIFICATE (18+ VIP)
+            // DOB CERTIFICATE (18+ VIP - 10 CREDITS)
             else if(serviceName === 'dob18') {
                 if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getFirstAllowedTab());
 
                 const dobSubmitBtnText = window.currentUserData && window.currentUserData.isAdmin 
                     ? 'Generate DOB Certificate (Admin Free)' 
-                    : 'Generate DOB Certificate (<del class="text-red-400 opacity-90 text-xs mr-1">20 Cr</del> 15 Credits - 25% VIP Off)';
+                    : 'Generate DOB Certificate (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>';
 
                 container.innerHTML = `
                     <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3 mb-4">
                         <div>
                             <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-cake-candles text-royal-500 mr-1.5"></i> Date of Birth Certificate (18+ VIP)</h3>
-                            <p class="text-[11px] font-bold text-green-600">25% VIP डिस्काउंट: <del class="text-red-500">20 Credits</del> की जगह सिर्फ 15 Credits!</p>
+                            <p class="text-[11px] font-bold text-slate-500">VIP एक्सक्लूसिव सर्विस (10 Credits प्रति डॉक्यूमेंट)</p>
                         </div>
-                        <span class="bg-green-100 text-green-800 px-2.5 py-1 rounded-md text-[10px] font-black border border-green-300 uppercase">25% OFF (15 Cr)</span>
+                        ${statusTagHtml}
                     </div>
                     <form onsubmit="window.submitForm(event, 'DOB 18+')" class="space-y-3.5">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
@@ -2537,7 +2576,7 @@
 
                             <div class="p-3.5 rounded-2xl bg-dark-900 text-white border border-royal-400 space-y-2.5">
                                 <div class="flex items-center justify-between">
-                                    <span class="text-[11px] font-black uppercase text-royal-300"><i class="fa-solid fa-crown text-yellow-400 mr-1"></i> VIP प्लान जोड़ें (20%-25% छूट)</span>
+                                    <span class="text-[11px] font-black uppercase text-royal-300"><i class="fa-solid fa-crown text-yellow-400 mr-1"></i> VIP प्लान जोड़ें (DOB 18+ व सारे Annexures अनलॉक)</span>
                                 </div>
                                 <div class="grid grid-cols-2 gap-2">
                                     <label class="flex items-center gap-2 p-2 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer">
@@ -2803,7 +2842,7 @@
         </div>
     </div>
 
-    <!-- OUTSIDE LOGIN: FORGOT PASSWORD TICKET MODAL (TELEGRAM + ADMIN ALERT) -->
+    <!-- OUTSIDE LOGIN: FORGOT PASSWORD TICKET MODAL (TELEGRAM + ADMIN PANEL SUPPORT CHAT) -->
     <div id="forgotPasswordModal" style="display: none;" class="fixed inset-0 z-[180] bg-dark-950/80 backdrop-blur-sm items-center justify-center p-4">
         <div class="bg-white text-slate-800 w-full max-w-md rounded-3xl shadow-2xl border-t-4 border-royal-500 p-5 md:p-6 space-y-4">
             <div class="flex justify-between items-start border-b border-slate-100 pb-3">
@@ -2899,7 +2938,7 @@
                         </button>
                         <button onclick="window.selectGearOption('support_chat')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-green-700 hover:bg-green-50 flex items-center justify-between">
                             <span class="flex items-center gap-2.5"><i class="fa-solid fa-comments text-green-600 w-4"></i> Live Support Chat</span>
-                            <span id="gearSupportUnreadBadge" style="display: none;" class="bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">0 New</span>
+                            <span id="gearSupportUnreadBadge" style="display: none;" class="bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">New</span>
                         </button>
                     </div>
                     <div class="border-t border-slate-100 pt-1">
@@ -2920,9 +2959,9 @@
             <div id="normalUserVipPromo" style="display: none;" class="mb-4 rounded-2xl vip-promo-shine border border-royal-400 p-3 text-white shadow-md">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <div class="flex items-center gap-2">
-                        <span class="bg-amber-400 text-dark-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase shrink-0"><i class="fa-solid fa-crown"></i> 20%-25% OFF</span>
+                        <span class="bg-amber-400 text-dark-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase shrink-0"><i class="fa-solid fa-crown"></i> VIP ACCESS</span>
                         <p id="normalPromoTextDesc" class="text-xs font-bold text-royal-100">
-                            VIP लें: <strong>8 Cr</strong> में फॉर्म + <strong>18+ DOB & सारे Annexures</strong> अनलॉक करें!
+                            VIP लें: <strong>18+ DOB & सारे 9 Official Annexures</strong> अनलॉक करें (सभी डॉक्यूमेंट 10 Cr)!
                         </p>
                     </div>
                     <div class="flex items-center gap-1.5 w-full sm:w-auto justify-end">
@@ -2943,7 +2982,7 @@
             <div id="vipServicesBar" style="display: none;" class="mb-4 p-3 md:p-4 rounded-2xl bg-dark-950/90 border border-royal-400 shadow-vip-glow">
                 <div class="flex items-center justify-between mb-2.5 pb-1.5 border-b border-slate-800">
                     <span id="vipBarTitleLabel" class="text-[11px] font-black uppercase tracking-wider text-royal-300 flex items-center gap-1.5">
-                        <i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures)
+                        <i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures - 10 Cr)
                     </span>
                     <button onclick="window.selectGearOption('history')" class="text-[10px] text-slate-300 hover:text-royal-300 font-bold">
                         <i class="fa-solid fa-folder-open mr-1"></i> Saved Files
