@@ -313,7 +313,7 @@
             }
         };
 
-        // ================= SECTION 5: REAL-TIME 2-WAY SUPPORT CHAT SYSTEM =================
+        // ================= SECTION 5: REAL-TIME 2-WAY SUPPORT CHAT & FORGOT PASSWORD TICKETS =================
         window.findUserUidByIdentifier = function(identifier = '') {
             const clean = String(identifier).trim().toLowerCase();
             if (!clean) return '';
@@ -419,7 +419,7 @@
                         <div class="flex items-center justify-between gap-1">
                             <div class="flex items-center gap-1.5 overflow-hidden">
                                 ${isUnread ? `<span class="bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase shrink-0 animate-pulse">NEW</span>` : ''}
-                                ${isForgot ? `<i class="fa-solid fa-key text-amber-600 text-xs shrink-0" title="Forgot Password"></i>` : `<i class="fa-solid fa-user text-royal-600 text-xs shrink-0"></i>`}
+                                ${isForgot ? `<span class="bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-black px-1.5 py-0.5 rounded uppercase shrink-0"><i class="fa-solid fa-key mr-0.5"></i>Pass Ticket</span>` : `<i class="fa-solid fa-user text-royal-600 text-xs shrink-0"></i>`}
                                 <span class="text-xs font-black text-dark-900 truncate">${t.userIdentifier || 'User'}</span>
                             </div>
                             <span class="text-[10px] font-semibold text-slate-400 shrink-0">${timeStr}</span>
@@ -463,7 +463,8 @@
             const matchedUser = matchedUid ? window.usersDataList[matchedUid] : null;
 
             document.getElementById('chatHeaderUserTitle').innerText = ticket.userIdentifier || 'Unknown User';
-            document.getElementById('chatHeaderUserPhone').innerText = ticket.userPhone ? `WhatsApp: ${ticket.userPhone}` : 'No phone provided';
+            const phoneToShow = ticket.userPhone || matchedUser?.userPhone || '';
+            document.getElementById('chatHeaderUserPhone').innerText = phoneToShow ? `WhatsApp: ${phoneToShow}` : 'No phone provided';
 
             const passBadge = document.getElementById('chatHeaderSavedPassBadge');
             if (matchedUser) {
@@ -530,11 +531,12 @@
             try {
                 const ticket = window.allSupportTickets.find(t => t.id === ticketId);
                 const existingMsgs = window.getTicketMessagesArray(ticket);
-                existingMsgs.push({
+                const newMsgObj = {
                     sender: 'admin',
                     text: replyText,
                     time: Date.now()
-                });
+                };
+                existingMsgs.push(newMsgObj);
 
                 await updateDoc(doc(db, "supportTickets", ticketId), {
                     messages: existingMsgs,
@@ -544,6 +546,27 @@
                     unreadByUser: true,
                     updatedAtMs: Date.now()
                 });
+
+                // If this was a Forgot Password ticket with a random ID, also sync reply to the user's actual UID doc so they see it inside portal
+                const matchedUid = ticket.userId || window.findUserUidByIdentifier(ticket.userIdentifier);
+                if (matchedUid && matchedUid !== ticketId) {
+                    try {
+                        const userChatRef = doc(db, "supportTickets", matchedUid);
+                        const userChatSnap = await getDoc(userChatRef);
+                        let uMsgs = userChatSnap.exists() && Array.isArray(userChatSnap.data().messages) ? [...userChatSnap.data().messages] : [];
+                        uMsgs.push(newMsgObj);
+                        await setDoc(userChatRef, {
+                            userId: matchedUid,
+                            userIdentifier: window.usersDataList[matchedUid]?.email || ticket.userIdentifier,
+                            messages: uMsgs,
+                            lastAdminReply: replyText,
+                            status: 'Replied',
+                            unreadByAdmin: false,
+                            unreadByUser: true,
+                            updatedAtMs: Date.now()
+                        }, { merge: true });
+                    } catch (e) {}
+                }
 
                 inp.value = '';
                 window.renderActiveChatConversation(ticketId, true);
@@ -617,20 +640,28 @@
                     }
                 }
 
-                await updateDoc(doc(db, "users", matchedUid), {
+                const updateUserPayload = {
                     userPass: newPass,
                     adminResetPass: newPass,
                     passUpdatedAt: new Date()
-                });
+                };
+                if (ticket.userPhone && !uData.userPhone) {
+                    updateUserPayload.userPhone = ticket.userPhone;
+                    window.usersDataList[matchedUid].userPhone = ticket.userPhone;
+                }
+
+                await updateDoc(doc(db, "users", matchedUid), updateUserPayload);
                 window.usersDataList[matchedUid].userPass = newPass;
 
                 const autoReplyMsg = `🔑 आपका नया पासवर्ड सेट कर दिया गया है:\nUser ID: ${uData.email.split('@')[0]}\nNew Password: ${newPass}\n\nअब आप इस नए पासवर्ड से लॉगिन कर सकते हैं।`;
-                const existingMsgs = window.getTicketMessagesArray(ticket);
-                existingMsgs.push({
+                const newMsgObj = {
                     sender: 'admin',
                     text: autoReplyMsg,
                     time: Date.now()
-                });
+                };
+
+                const existingMsgs = window.getTicketMessagesArray(ticket);
+                existingMsgs.push(newMsgObj);
 
                 await updateDoc(doc(db, "supportTickets", ticket.id), {
                     messages: existingMsgs,
@@ -640,6 +671,26 @@
                     unreadByUser: true,
                     updatedAtMs: Date.now()
                 });
+
+                // Also sync to user's UID supportTickets doc if ticket.id was a Forgot Password ticket
+                if (matchedUid !== ticket.id) {
+                    try {
+                        const userChatRef = doc(db, "supportTickets", matchedUid);
+                        const userChatSnap = await getDoc(userChatRef);
+                        let uMsgs = userChatSnap.exists() && Array.isArray(userChatSnap.data().messages) ? [...userChatSnap.data().messages] : [];
+                        uMsgs.push(newMsgObj);
+                        await setDoc(userChatRef, {
+                            userId: matchedUid,
+                            userIdentifier: uData.email,
+                            messages: uMsgs,
+                            lastAdminReply: autoReplyMsg,
+                            status: 'Replied',
+                            unreadByAdmin: false,
+                            unreadByUser: true,
+                            updatedAtMs: Date.now()
+                        }, { merge: true });
+                    } catch (e) {}
+                }
 
                 document.getElementById('chatQuickNewPassInput').value = '';
                 window.renderActiveChatConversation(ticket.id, true);
@@ -655,7 +706,9 @@
         window.alsoOpenChatUserWhatsApp = function() {
             const ticket = window.allSupportTickets.find(t => t.id === window.selectedChatTicketId);
             if (!ticket) return;
-            const cleanPhone = window.formatCleanPhone(ticket.userPhone || '');
+            const matchedUid = ticket.userId || window.findUserUidByIdentifier(ticket.userIdentifier);
+            const matchedUser = matchedUid ? window.usersDataList[matchedUid] : null;
+            const cleanPhone = window.formatCleanPhone(ticket.userPhone || matchedUser?.userPhone || '');
             const msgs = window.getTicketMessagesArray(ticket);
             const lastAdmin = [...msgs].reverse().find(m => m.sender === 'admin');
             const textToSend = document.getElementById('adminChatReplyInput').value.trim() || lastAdmin?.text || `नमस्ते ${ticket.userIdentifier}, Ojas Portal सपोर्ट से अपडेट:`;
@@ -678,21 +731,22 @@
             }
         };
 
-        // Start New Chat with any Registered User from Admin
+        // Start New Chat with any Registered User from Admin (Synced with User UID)
         window.startNewChatWithSelectedUser = async function() {
             const uid = document.getElementById('newChatUserSelect').value;
             if (!uid || !window.usersDataList[uid]) return alert('कृपया ड्रॉपडाउन से यूज़र चुनें!');
             const u = window.usersDataList[uid];
 
-            // Check if a thread already exists for this user
-            const existing = window.allSupportTickets.find(t => t.userId === uid || (t.userIdentifier || '').toLowerCase() === u.email.toLowerCase());
+            // Check if a thread already exists for this user's UID
+            const existing = window.allSupportTickets.find(t => t.id === uid || t.userId === uid);
             if (existing) {
                 window.selectSupportChatThread(existing.id);
                 return;
             }
 
             try {
-                const newDocRef = doc(collection(db, "supportTickets"));
+                // Document ID MUST be uid so index.html and Firestore rules allow 2-way chat
+                const newDocRef = doc(db, "supportTickets", uid);
                 await setDoc(newDocRef, {
                     type: 'ADMIN_MESSAGE',
                     userId: uid,
@@ -709,8 +763,8 @@
                     unreadByUser: true,
                     timestamp: new Date(),
                     updatedAtMs: Date.now()
-                });
-                window.selectSupportChatThread(newDocRef.id);
+                }, { merge: true });
+                window.selectSupportChatThread(uid);
             } catch (err) {
                 alert('Error starting chat: ' + err.message);
             }
@@ -2511,7 +2565,7 @@
                         <i class="fa-solid fa-comments"></i>
                     </div>
                     <div>
-                        <h3 class="text-sm md:text-base font-black text-dark-900">Live Support Chat Center</h3>
+                        <h3 class="text-sm md:text-base font-black text-dark-900">Live Support Chat & Forgot Tickets</h3>
                         <p class="text-[10px] font-bold text-slate-400">यहाँ से भेजा गया हर रिप्लाई सीधे यूज़र के पोर्टल Support Tab में दिखेगा</p>
                     </div>
                 </div>
@@ -2546,7 +2600,7 @@
                             <i class="fa-solid fa-comments"></i>
                         </div>
                         <h4 class="text-sm font-black text-slate-700">चैट शुरू करने के लिए बाईं तरफ से किसी यूज़र को चुनें</h4>
-                        <p class="text-xs font-semibold text-slate-400 mt-1">यूज़र द्वारा Support टैब से भेजा गया हर मैसेज यहाँ रियल-टाइम में दिखेगा।</p>
+                        <p class="text-xs font-semibold text-slate-400 mt-1">यूज़र द्वारा Support टैब या Forgot Password से भेजा गया हर मैसेज यहाँ रियल-टाइम में दिखेगा।</p>
                     </div>
 
                     <!-- Active Chat Box -->
