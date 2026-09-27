@@ -119,7 +119,9 @@
         window.allPaymentsData = []; 
         window.currentPaymentFilter = 'Pending';
 
-        // Support Center State
+        // Support Tickets & Filter State
+        window.allSupportTickets = [];
+        window.currentSupportTicketFilter = 'Open';
         window.adminSupportWhatsapp = "919306437623";
 
         // ================= AUTO-DETECT UPLOADED STAMPS & MAKE WHITE BG TRANSPARENT =================
@@ -204,6 +206,7 @@
                 window.preloadAllAvailableStamps();
                 await window.loadAllUsersForDropdown(); 
                 await window.loadPortalSettingsForAdmin();
+                await window.loadSupportTickets();
                 window.switchAdminMainTab('payments');
             }
         });
@@ -246,7 +249,6 @@
             return `🌟 *Ojas Print Service - Login Details* 🌟\n\nनमस्ते, आपका पोर्टल अकाउंट तैयार/अपडेट कर दिया गया है:\n\n👤 *User ID:* ${shortId}\n📧 *Full Email:* ${email}\n🔑 *Password:* ${pass || 'Not Set'}\n💰 *Credits Balance:* ${credits || 0} Cr\n✨ *Account Status:* ${vipText}\n\n🌐 *Login Portal Link:*\n${window.getPortalLoginUrl()}\n\n_(नोट: लॉगिन करने के बाद आप ⚙️ सेटिंग आइकन में जाकर अपना पासवर्ड कभी भी बदल सकते हैं)_`;
         };
 
-        // Direct Share from Manage User Card
         window.shareSelectedUserCredentials = async function(channel) {
             const uid = document.getElementById('userSelectDropdown').value;
             if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले ड्रॉपडाउन से यूज़र सेलेक्ट करें!');
@@ -298,7 +300,6 @@
             }
         };
 
-        // Save User Phone Number
         window.saveSelectedUserPhone = async function() {
             const uid = document.getElementById('userSelectDropdown').value;
             if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले यूज़र सेलेक्ट करें!');
@@ -312,7 +313,253 @@
             }
         };
 
-        // ================= SECTION 5: SUPPORT & DIRECT REPLY CENTER =================
+        // ================= SECTION 5: INCOMING SUPPORT & FORGOT PASSWORD TICKETS + DIRECT REPLY =================
+        window.findUserUidByIdentifier = function(identifier = '') {
+            const clean = String(identifier).trim().toLowerCase();
+            if (!clean) return '';
+            for (const [uid, uData] of Object.entries(window.usersDataList)) {
+                const emailLower = (uData.email || '').toLowerCase();
+                const unameLower = (uData.username || emailLower.split('@')[0]).toLowerCase();
+                if (emailLower === clean || unameLower === clean || `${clean}@ovportal.com` === emailLower) {
+                    return uid;
+                }
+            }
+            return '';
+        };
+
+        window.loadSupportTickets = async function() {
+            const container = document.getElementById('supportTicketsListContainer');
+            if (container) {
+                container.innerHTML = `<div class="col-span-1 md:col-span-2 p-8 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>Support और Forgot Password रिक्वेस्ट लोड हो रही हैं...</div>`;
+            }
+
+            try {
+                const snap = await getDocs(collection(db, "supportTickets"));
+                window.allSupportTickets = [];
+                snap.forEach(docSnap => {
+                    window.allSupportTickets.push({ id: docSnap.id, ...docSnap.data() });
+                });
+                window.allSupportTickets.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+
+                window.updateSupportBadges();
+                window.renderSupportTickets();
+            } catch (err) {
+                if (container) {
+                    container.innerHTML = `<div class="col-span-1 md:col-span-2 p-6 text-center text-red-500 font-bold bg-white rounded-2xl">Error loading tickets: ${err.message}</div>`;
+                }
+            }
+        };
+
+        window.updateSupportBadges = function() {
+            let openCount = 0;
+            let resolvedCount = 0;
+            window.allSupportTickets.forEach(t => {
+                if ((t.status || 'Open') === 'Open') openCount++;
+                else resolvedCount++;
+            });
+
+            const navBadge = document.getElementById('navSupportBadge');
+            if (navBadge) {
+                navBadge.innerText = openCount;
+                navBadge.style.display = openCount > 0 ? 'inline-flex' : 'none';
+            }
+
+            const pillOpen = document.getElementById('supCountOpen');
+            const pillResolved = document.getElementById('supCountResolved');
+            const pillAll = document.getElementById('supCountAll');
+            if (pillOpen) pillOpen.innerText = openCount;
+            if (pillResolved) pillResolved.innerText = resolvedCount;
+            if (pillAll) pillAll.innerText = window.allSupportTickets.length;
+        };
+
+        window.setSupportTicketFilter = function(filterVal) {
+            window.currentSupportTicketFilter = filterVal;
+            ['Open', 'Resolved', 'ALL'].forEach(f => {
+                const btn = document.getElementById(`supFilterBtn-${f}`);
+                if (!btn) return;
+                if (f === filterVal) {
+                    btn.className = "px-3 py-1.5 rounded-xl text-xs font-black bg-dark-900 text-royal-300 shadow-sm transition flex items-center gap-1.5";
+                } else {
+                    btn.className = "px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition flex items-center gap-1.5";
+                }
+            });
+            window.renderSupportTickets();
+        };
+
+        window.renderSupportTickets = function() {
+            const container = document.getElementById('supportTicketsListContainer');
+            if (!container) return;
+
+            const activeFilter = window.currentSupportTicketFilter;
+            const filtered = window.allSupportTickets.filter(t => {
+                const st = t.status || 'Open';
+                if (activeFilter === 'Open') return st === 'Open';
+                if (activeFilter === 'Resolved') return st === 'Resolved';
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-1 md:col-span-2 p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 font-bold text-xs">
+                        <i class="fa-solid fa-check-double text-2xl text-green-500 mb-2"></i><br>
+                        ${activeFilter === 'Open' ? 'अभी कोई पेंडिंग Forgot Password या Help रिक्वेस्ट नहीं है!' : 'कोई रिकॉर्ड नहीं मिला।'}
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = '';
+            filtered.forEach(t => {
+                const sec = t.timestamp?.seconds || Math.floor(Date.now() / 1000);
+                const dObj = new Date(sec * 1000);
+                const dateStr = dObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+                const isForgot = t.type === 'FORGOT_PASSWORD';
+                const isOpen = (t.status || 'Open') === 'Open';
+
+                const matchedUid = t.userId || window.findUserUidByIdentifier(t.userIdentifier);
+                const matchedUser = matchedUid ? window.usersDataList[matchedUid] : null;
+                const savedPassText = matchedUser?.userPass ? `Current Pass: ${matchedUser.userPass}` : 'User Pass Not Synced';
+
+                const typeBadge = isForgot
+                    ? `<span class="bg-red-100 text-red-700 border border-red-300 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase"><i class="fa-solid fa-key mr-1"></i>Forgot Password</span>`
+                    : `<span class="bg-green-100 text-green-800 border border-green-300 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase"><i class="fa-solid fa-headset mr-1"></i>Help Request</span>`;
+
+                const statusBadge = isOpen
+                    ? `<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[10px] font-black">⏳ Open</span>`
+                    : `<span class="bg-slate-200 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold">✅ Resolved</span>`;
+
+                container.innerHTML += `
+                    <div class="bg-white p-4 rounded-2xl border-2 ${isOpen ? (isForgot ? 'border-red-300' : 'border-green-300') : 'border-slate-200'} shadow-sm flex flex-col justify-between space-y-3">
+                        <div class="space-y-2">
+                            <div class="flex flex-wrap items-center justify-between gap-1 border-b border-slate-100 pb-2">
+                                <div class="flex items-center gap-1.5">${typeBadge} ${statusBadge}</div>
+                                <span class="text-[10px] font-bold text-slate-400">${dateStr}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <p class="text-xs md:text-sm font-black text-dark-900"><i class="fa-solid fa-user text-royal-500 mr-1"></i> ${t.userIdentifier || 'Unknown'}</p>
+                                    <p class="text-[11px] font-bold text-green-700"><i class="fa-brands fa-whatsapp mr-1"></i> ${t.userPhone || 'No Phone'}</p>
+                                </div>
+                                <span class="text-[10px] font-mono font-bold bg-slate-100 text-slate-700 px-2 py-1 rounded-lg border border-slate-200">${savedPassText}</span>
+                            </div>
+                            <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700">
+                                "${t.message || ''}"
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2 pt-1">
+                            <button type="button" onclick="window.loadTicketIntoReplyBox('${t.id}')" class="flex-1 bg-dark-900 hover:bg-black text-royal-300 font-black py-2 px-3 rounded-xl text-[11px] transition flex items-center justify-center gap-1">
+                                <i class="fa-solid fa-reply"></i> Load in Reply / Reset Pass
+                            </button>
+                            ${isOpen ? `
+                                <button type="button" onclick="window.markTicketStatus('${t.id}', 'Resolved')" class="bg-green-600 hover:bg-green-700 text-white font-black py-2 px-3 rounded-xl text-[11px] transition">
+                                    <i class="fa-solid fa-check mr-1"></i> Resolve
+                                </button>
+                            ` : ''}
+                            <button type="button" onclick="window.deleteSupportTicket('${t.id}')" class="w-8 h-8 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-xl text-xs transition flex items-center justify-center" title="Delete Ticket">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+        };
+
+        window.loadTicketIntoReplyBox = function(ticketId) {
+            const ticket = window.allSupportTickets.find(t => t.id === ticketId);
+            if (!ticket) return;
+
+            const matchedUid = ticket.userId || window.findUserUidByIdentifier(ticket.userIdentifier);
+            const sel = document.getElementById('supportUserSelect');
+            if (sel) {
+                sel.value = matchedUid || '';
+            }
+
+            document.getElementById('supportTargetPhone').value = ticket.userPhone || (matchedUid && window.usersDataList[matchedUid]?.userPhone) || '';
+            document.getElementById('supportTargetEmail').value = (matchedUid && !window.usersDataList[matchedUid]?.email.endsWith('@ovportal.com')) ? window.usersDataList[matchedUid].email : '';
+
+            if (ticket.type === 'FORGOT_PASSWORD') {
+                window.applySupportTemplate('reset_done');
+            } else {
+                window.applySupportTemplate('custom');
+            }
+
+            const replyCard = document.getElementById('supportReplyCardBox');
+            if (replyCard) replyCard.scrollIntoView({ behavior: 'smooth' });
+        };
+
+        // Quick Password Reset directly inside Support & Reply Tab
+        window.supportQuickResetPassword = async function() {
+            const uid = document.getElementById('supportUserSelect').value;
+            const newPass = document.getElementById('supportQuickNewPass').value.trim();
+            const btn = document.getElementById('btnSupportQuickPass');
+
+            if (!uid || !window.usersDataList[uid]) {
+                return alert('कृपया पहले "1. Select Registered User" ड्रॉपडाउन से यूज़र सेलेक्ट करें!');
+            }
+            if (!newPass || newPass.length < 6) {
+                return alert('नया पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!');
+            }
+
+            const uData = window.usersDataList[uid];
+            const origHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Setting...';
+
+            try {
+                if (uData.userPass) {
+                    const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: uData.email, password: uData.userPass, returnSecureToken: true })
+                    });
+                    const signInData = await signInRes.json();
+                    if (signInData.idToken) {
+                        await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${firebaseConfig.apiKey}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ idToken: signInData.idToken, password: newPass, returnSecureToken: true })
+                        });
+                    }
+                }
+
+                await updateDoc(doc(db, "users", uid), {
+                    userPass: newPass,
+                    adminResetPass: newPass,
+                    passUpdatedAt: new Date()
+                });
+
+                window.usersDataList[uid].userPass = newPass;
+                document.getElementById('supportQuickNewPass').value = '';
+                window.applySupportTemplate('reset_done');
+                window.renderSupportTickets();
+                alert(`पासवर्ड "${newPass}" सेट हो गया है और नीचे रिप्लाई बॉक्स में भर दिया गया है! अब आप सीधे "Send on WhatsApp" दबा सकते हैं।`);
+            } catch (err) {
+                alert('Error: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+            }
+        };
+
+        window.markTicketStatus = async function(ticketId, newStatus) {
+            try {
+                await updateDoc(doc(db, "supportTickets", ticketId), { status: newStatus });
+                await window.loadSupportTickets();
+            } catch (err) {
+                alert('Error updating ticket: ' + err.message);
+            }
+        };
+
+        window.deleteSupportTicket = async function(ticketId) {
+            if (!confirm('क्या आप इस सपोर्ट टिकट को डिलीट करना चाहते हैं?')) return;
+            try {
+                await deleteDoc(doc(db, "supportTickets", ticketId));
+                await window.loadSupportTickets();
+            } catch (err) {
+                alert('Error deleting ticket: ' + err.message);
+            }
+        };
+
         window.populateSupportUserDropdown = function() {
             const sel = document.getElementById('supportUserSelect');
             if (!sel) return;
@@ -372,7 +619,6 @@
 
             if (!msg) return alert('कृपया पहले मैसेज लिखें या ऊपर से टेम्पलेट चुनें!');
 
-            // Save phone/email back to user profile if a user is selected
             if (uid && window.usersDataList[uid]) {
                 const updateObj = {};
                 if (phoneRaw) updateObj.userPhone = phoneRaw;
@@ -870,7 +1116,6 @@
             }
         };
 
-        // 🔑 ADMIN DIRECT PASSWORD SET / RESET FOR USER
         window.adminSetNewUserPassword = async function() {
             const uid = document.getElementById('userSelectDropdown').value;
             const newPass = document.getElementById('adminNewResetPass').value.trim();
@@ -886,7 +1131,6 @@
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Setting...';
 
             try {
-                // 1. If user's old password is saved in Firestore, update Firebase Auth via REST API without logging out Admin
                 if (uData.userPass) {
                     const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, {
                         method: 'POST',
@@ -903,7 +1147,6 @@
                     }
                 }
 
-                // 2. Save new password to Firestore
                 await updateDoc(doc(db, "users", uid), {
                     userPass: newPass,
                     adminResetPass: newPass,
@@ -1092,7 +1335,7 @@
             }
         };
 
-        // ================= SECTION 3: DATABASE RECORDS (HISTORY PREVIEW, RANDOM STAMP CHECKBOX, DIRECT PRINT & DELETE) =================
+        // ================= SECTION 3: DATABASE RECORDS (HISTORY) =================
         window.loadAdminHistory = async function() {
             const container = document.getElementById('adminHistoryListContainer');
             container.innerHTML = `<div class="p-10 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>रिकॉर्ड्स लोड हो रहे हैं...</div>`;
@@ -1870,13 +2113,16 @@
                 activeSection.removeAttribute('class');
                 if (tabName === 'payments') activeSection.className = 'space-y-4';
                 if (tabName === 'users') activeSection.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
-                if (tabName === 'support') activeSection.className = 'space-y-4';
+                if (tabName === 'support') activeSection.className = 'space-y-5';
                 if (tabName === 'history') activeSection.className = 'space-y-4';
                 if (tabName === 'controls') activeSection.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
             }
 
             if (tabName === 'payments') window.loadAllPayments();
-            if (tabName === 'support') window.populateSupportUserDropdown();
+            if (tabName === 'support') {
+                window.populateSupportUserDropdown();
+                window.loadSupportTickets();
+            }
             if (tabName === 'history') window.loadAdminHistory(); 
             if (tabName === 'controls') window.loadPortalSettingsForAdmin();
         };
@@ -1960,6 +2206,7 @@
             <button onclick="window.switchAdminMainTab('support')" id="tab-support">
                 <i class="fa-brands fa-whatsapp text-green-500"></i>
                 <span>Support & Reply</span>
+                <span id="navSupportBadge" style="display: none;" class="bg-red-600 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full animate-pulse">0</span>
             </button>
             <button onclick="window.switchAdminMainTab('history')" id="tab-history">
                 <i class="fa-solid fa-folder-tree"></i>
@@ -2030,7 +2277,6 @@
         <!-- ================= SECTION 2: USER, VIP VALIDITY, PASSWORD RESET & 1-CLICK WHATSAPP/EMAIL SHARE ================= -->
         <div id="section-users" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
             
-            <!-- Manage Existing User Credits, VIP, Password & Direct Share -->
             <div class="bg-white rounded-2xl p-4 md:p-6 shadow-card border border-slate-200 flex flex-col justify-between">
                 <div class="space-y-3.5">
                     <div class="flex items-center gap-2.5 border-b border-slate-100 pb-3">
@@ -2059,7 +2305,6 @@
                         </div>
                     </div>
 
-                    <!-- User WhatsApp Number Save & 1-Click Send Credentials -->
                     <div class="p-3 bg-green-50/70 rounded-xl border border-green-200 space-y-2">
                         <div class="flex gap-2">
                             <input type="text" id="selectedUserPhoneInput" placeholder="यूज़र का WhatsApp नंबर (e.g. 9876543210)" class="flex-1 p-2 border border-green-300 rounded-xl text-xs font-bold bg-white outline-none">
@@ -2080,7 +2325,6 @@
                         </div>
                     </div>
 
-                    <!-- 🔑 SET NEW PASSWORD FOR FORGOTTEN USER -->
                     <div class="p-3 bg-indigo-50/70 rounded-xl border border-indigo-200 space-y-2">
                         <div class="flex justify-between items-center">
                             <span class="text-[10px] font-black text-indigo-900 uppercase"><i class="fa-solid fa-key mr-1"></i>User Password Reset</span>
@@ -2094,7 +2338,6 @@
                         </div>
                     </div>
 
-                    <!-- 1-Tap VIP Validity Buttons -->
                     <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
                         <label class="block text-[10px] font-black text-slate-500 uppercase">Add VIP Validity (Stacks on Remaining Days)</label>
                         <div class="grid grid-cols-4 gap-1.5">
@@ -2116,7 +2359,6 @@
                         </button>
                     </div>
 
-                    <!-- Manual Credit Add/Sub -->
                     <div class="pt-1 space-y-2">
                         <label class="block text-[10px] font-black text-slate-500 uppercase">Add / Subtract Credits</label>
                         <div class="flex gap-2">
@@ -2178,29 +2420,73 @@
             </div>
         </div>
 
-        <!-- ================= SECTION 5: USER SUPPORT & DIRECT REPLY CENTER (WHATSAPP & EMAIL) ================= -->
-        <div id="section-support" class="space-y-4 hidden">
-            <div class="bg-white rounded-2xl p-4 md:p-6 shadow-card border border-slate-200 space-y-4 max-w-3xl mx-auto">
+        <!-- ================= SECTION 5: INCOMING SUPPORT / FORGOT PASS TICKETS & DIRECT REPLY CENTER ================= -->
+        <div id="section-support" class="space-y-5 hidden">
+            
+            <!-- Part A: Live Incoming Tickets from index.html -->
+            <div class="bg-white rounded-2xl p-4 md:p-5 shadow-card border border-slate-200 space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                    <div>
+                        <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-bell text-red-500 mr-1.5"></i> Incoming Forgot Password & Help Tickets</h3>
+                        <p class="text-[11px] font-bold text-slate-400">यूज़र्स द्वारा index.html से भेजी गई सभी पासवर्ड रीसेट और सहायता रिक्वेस्ट</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="supFilterBtn-Open" onclick="window.setSupportTicketFilter('Open')" class="px-3 py-1.5 rounded-xl text-xs font-black bg-dark-900 text-royal-300 shadow-sm transition flex items-center gap-1.5">
+                            <span>Open</span>
+                            <span id="supCountOpen" class="bg-amber-400 text-dark-950 px-1.5 py-0.2 rounded-full text-[10px]">0</span>
+                        </button>
+                        <button id="supFilterBtn-Resolved" onclick="window.setSupportTicketFilter('Resolved')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition flex items-center gap-1.5">
+                            <span>Resolved</span>
+                            <span id="supCountResolved" class="bg-green-200 text-green-900 px-1.5 py-0.2 rounded-full text-[10px]">0</span>
+                        </button>
+                        <button id="supFilterBtn-ALL" onclick="window.setSupportTicketFilter('ALL')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition flex items-center gap-1.5">
+                            <span>All</span>
+                            <span id="supCountAll" class="bg-slate-300 text-slate-800 px-1.5 py-0.2 rounded-full text-[10px]">0</span>
+                        </button>
+                        <button onclick="window.loadSupportTickets()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-black transition">
+                            <i class="fa-solid fa-rotate-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="supportTicketsListContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+            </div>
+
+            <!-- Part B: Direct Reply & Quick Password Reset Box -->
+            <div id="supportReplyCardBox" class="bg-white rounded-2xl p-4 md:p-6 shadow-card border-2 border-royal-400 space-y-4">
                 <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3">
                     <div class="flex items-center gap-2.5">
                         <div class="w-10 h-10 bg-green-50 text-green-600 rounded-xl flex items-center justify-center text-xl border border-green-200">
                             <i class="fa-brands fa-whatsapp"></i>
                         </div>
                         <div>
-                            <h3 class="text-base md:text-lg font-black text-dark-900">User Support & Credential Sender</h3>
-                            <p class="text-[11px] font-bold text-slate-400">यहीं से किसी भी यूज़र को ID/Password या सहायता का रिप्लाई WhatsApp व Email पर भेजें</p>
+                            <h3 class="text-base md:text-lg font-black text-dark-900">Direct Reply & Instant Password Reset</h3>
+                            <p class="text-[11px] font-bold text-slate-400">ऊपर किसी भी टिकट पर "Load in Reply" दबाएं या नीचे सीधे यूज़र चुनकर पासवर्ड बदलें व WhatsApp/Email भेजें</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div class="md:col-span-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
                         <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">1. Select Registered User (यूज़र चुनें)</label>
                         <select id="supportUserSelect" onchange="window.onSupportUserChange()" class="w-full p-3 border border-slate-300 rounded-xl text-xs md:text-sm bg-slate-50 font-bold text-slate-800 outline-none focus:border-royal-500">
                             <option value="">-- रजिस्टर्ड यूज़र चुनें --</option>
                         </select>
                     </div>
 
+                    <!-- Instant Password Reset right inside Support Tab -->
+                    <div class="p-2.5 bg-indigo-50 rounded-xl border border-indigo-200">
+                        <label class="block text-[10px] font-black text-indigo-900 uppercase mb-1"><i class="fa-solid fa-key mr-1"></i>Quick Set New Password (सीधे यहीं से नया पासवर्ड सेट करें)</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="supportQuickNewPass" placeholder="नया पासवर्ड लिखें (e.g. 123456)" class="flex-1 p-2 border border-indigo-300 rounded-xl text-xs font-bold bg-white outline-none">
+                            <button type="button" id="btnSupportQuickPass" onclick="window.supportQuickResetPassword()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-3 py-2 rounded-xl text-xs shrink-0 transition">
+                                Set & Fill Reply
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                         <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">User WhatsApp Number</label>
                         <input type="text" id="supportTargetPhone" placeholder="e.g. 9876543210" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
@@ -2217,7 +2503,6 @@
                     </div>
                 </div>
 
-                <!-- Quick Message Templates -->
                 <div class="space-y-1.5">
                     <label class="block text-[10px] font-black text-slate-400 uppercase">2. Quick Reply Templates (1-Click में मैसेज तैयार करें):</label>
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -2238,7 +2523,7 @@
 
                 <div>
                     <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">3. Message Preview / Edit (मैसेज)</label>
-                    <textarea id="supportReplyMessage" rows="7" placeholder="ऊपर से कोई यूज़र या टेम्पलेट चुनें, या अपना मैसेज यहाँ लिखें..." class="w-full p-3.5 border border-slate-300 rounded-2xl text-xs md:text-sm font-semibold bg-slate-50 focus:bg-white outline-none"></textarea>
+                    <textarea id="supportReplyMessage" rows="6" placeholder="ऊपर से कोई टिकट या टेम्पलेट चुनें, या अपना मैसेज यहाँ लिखें..." class="w-full p-3.5 border border-slate-300 rounded-2xl text-xs md:text-sm font-semibold bg-slate-50 focus:bg-white outline-none"></textarea>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
@@ -2308,7 +2593,6 @@
         <!-- ================= SECTION 4: PORTAL CONTROL (STEALTH HIDE SERVICES + LIVE UPDATE BANNER + SUPPORT NUMBER) ================= -->
         <div id="section-controls" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
             
-            <!-- Card 1: Stealth Hide / Show Services Control -->
             <div class="bg-white rounded-2xl p-4 md:p-6 shadow-card border border-slate-200 space-y-4">
                 <div class="flex justify-between items-start border-b border-slate-100 pb-3">
                     <div class="flex items-center gap-2.5">
@@ -2372,7 +2656,6 @@
                 </div>
             </div>
 
-            <!-- Card 2: Custom Live Update Banner & Support WhatsApp Control -->
             <div class="bg-white rounded-2xl p-4 md:p-6 shadow-card border border-slate-200 space-y-4">
                 <div class="flex items-center gap-2.5 border-b border-slate-100 pb-3">
                     <div class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-lg border border-indigo-200">
