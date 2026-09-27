@@ -98,20 +98,17 @@
         const db = getFirestore(app);
 
         const ADMIN_EMAIL = "hkosiun1221@gmail.com"; 
-        const TG_BOT_TOKEN = "8586078140:AAG-ydpakzFDAwHFtJC8AUanxZAODpGZDOk";
-        const TG_CHAT_ID = "8942287807";
+        const SUPPORT_WHATSAPP = "919306437623";
         const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
         window.currentUserData = null;
         window.historyData = []; 
         window.userPaymentsData = [];
-        window.userSupportMessages = [];
         window.currentActiveTab = 'domicile';
         window.vipCountdownInterval = null;
         window.portalSettingsUnsubscribe = null;
-        window.supportChatUnsubscribe = null;
 
-        // Live Portal Control & Stealth Config
+        // Live Portal Control & Stealth Config (Synced from admin.html -> settings/portalConfig)
         window.portalConfigState = {
             showDomicile: true,
             showCaste: true,
@@ -121,7 +118,8 @@
             bannerTitle: "",
             bannerMessage: "",
             bannerBtnText: "",
-            bannerBtnLink: ""
+            bannerBtnLink: "",
+            supportWhatsapp: SUPPORT_WHATSAPP
         };
 
         // Payment State Variables
@@ -139,193 +137,109 @@
         };
         window.API_URLS = API_URLS;
 
-        // ================= TELEGRAM HELPER =================
-        async function sendTelegramAlert(textMsg) {
-            try {
-                await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        chat_id: TG_CHAT_ID,
-                        text: textMsg,
-                        parse_mode: 'Markdown'
-                    })
-                });
-            } catch (e) {
-                console.log("Telegram notification error:", e);
+        // ================= SUPPORT & FORGOT PASSWORD TICKET SYSTEM (SENDS DIRECTLY TO ADMIN.HTML) =================
+        window.openSupportTicketModal = function(ticketType = 'HELP_SUPPORT') {
+            const modal = document.getElementById('supportTicketModal');
+            const titleEl = document.getElementById('supModalTitle');
+            const subEl = document.getElementById('supModalSubtitle');
+            const typeInp = document.getElementById('supTicketType');
+            const idInp = document.getElementById('supUserIdentifier');
+            const msgInp = document.getElementById('supUserMessage');
+            const msgBox = document.getElementById('supModalResultBox');
+
+            if (!modal) return;
+            msgBox.style.display = 'none';
+            typeInp.value = ticketType;
+
+            if (ticketType === 'FORGOT_PASSWORD') {
+                titleEl.innerHTML = `<i class="fa-solid fa-key text-royal-500 mr-1.5"></i> Forgot Password Request`;
+                subEl.innerText = "अपनी User ID और WhatsApp नंबर लिखें, एडमिन आपका नया पासवर्ड जारी कर देंगे।";
+                idInp.value = document.getElementById('loginUsername')?.value.trim() || (window.currentUserData ? window.currentUserData.email : '');
+                msgInp.value = "मैं अपना पासवर्ड भूल गया हूँ, कृपया मेरा नया पासवर्ड सेट करके मेरे WhatsApp/Email पर भेज दें।";
+            } else {
+                titleEl.innerHTML = `<i class="fa-solid fa-headset text-green-600 mr-1.5"></i> Help & Support Request`;
+                subEl.innerText = "अपनी समस्या नीचे लिखें, आपकी रिक्वेस्ट सीधे एडमिन पैनल में पहुँच जाएगी।";
+                idInp.value = window.currentUserData ? window.currentUserData.email : (document.getElementById('loginUsername')?.value.trim() || '');
+                msgInp.value = "";
             }
-        }
 
-        // ================= FORGOT PASSWORD MODAL (NO WHATSAPP REDIRECT - DIRECT TELEGRAM & DB) =================
-        window.openForgotPasswordModal = function() {
-            const loginIdVal = document.getElementById('loginUsername')?.value.trim() || '';
-            const resetIdInput = document.getElementById('resetReqUserId');
-            if (resetIdInput && loginIdVal) resetIdInput.value = loginIdVal;
-            
-            document.getElementById('forgotPassFormStep').style.display = 'block';
-            document.getElementById('forgotPassSuccessStep').style.display = 'none';
-            document.getElementById('forgotPasswordModal').style.display = 'flex';
+            modal.style.display = 'flex';
         };
 
-        window.closeForgotPasswordModal = function() {
-            document.getElementById('forgotPasswordModal').style.display = 'none';
+        window.closeSupportTicketModal = function() {
+            const modal = document.getElementById('supportTicketModal');
+            if (modal) modal.style.display = 'none';
         };
 
-        window.submitForgotPasswordRequest = async function(event) {
+        window.openWhatsAppSupport = function() {
+            const menu = document.getElementById('gearDropdownMenu');
+            if (menu) menu.classList.add('hidden');
+            window.openSupportTicketModal('HELP_SUPPORT');
+        };
+
+        window.handleForgotPasswordWhatsApp = function() {
+            window.openSupportTicketModal('FORGOT_PASSWORD');
+        };
+
+        window.submitSupportTicketToAdmin = async function(event) {
             event.preventDefault();
-            const userIdOrEmail = document.getElementById('resetReqUserId').value.trim();
-            const mobileNo = document.getElementById('resetReqMobile').value.trim();
-            const emailId = document.getElementById('resetReqEmail').value.trim();
-            const note = document.getElementById('resetReqNote').value.trim();
-            const btn = document.getElementById('btnSubmitForgotReq');
+            const ticketType = document.getElementById('supTicketType').value;
+            const userIdentifier = document.getElementById('supUserIdentifier').value.trim();
+            const userPhone = document.getElementById('supUserPhone').value.trim();
+            const userMessage = document.getElementById('supUserMessage').value.trim();
+            const btn = document.getElementById('btnSubmitSupportTicket');
+            const msgBox = document.getElementById('supModalResultBox');
 
-            if (!userIdOrEmail || !mobileNo) {
-                return alert('कृपया अपनी User ID और मोबाइल नंबर ज़रूर दर्ज करें!');
+            if (!userIdentifier || !userPhone) {
+                return alert("कृपया अपनी User ID और WhatsApp नंबर ज़रूर डालें!");
             }
 
             const origHtml = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Sending Request...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Sending to Admin...';
 
             try {
-                // 1. Send Instant Notification to Admin Telegram
-                const tgText = `🔑 *Password Reset Request!*\n\n👤 *User ID:* \`${userIdOrEmail}\`\n📱 *Mobile:* \`${mobileNo}\`\n📧 *Email:* ${emailId || 'N/A'}\n📝 *Message:* ${note || 'मेरा पासवर्ड रीसेट कर दें।'}\n\n_(एडमिन पैनल में जाकर नया पासवर्ड सेट करें और यूज़र को सूचित करें)_`;
-                await sendTelegramAlert(tgText);
-
-                // 2. Save in Firestore support collection so Admin also sees it in Admin Panel
-                try {
-                    await addDoc(collection(db, "support"), {
-                        userId: window.currentUserData?.uid || "GUEST_RESET",
-                        email: userIdOrEmail,
-                        contactMobile: mobileNo,
-                        contactEmail: emailId || "",
-                        message: `[PASSWORD RESET REQUEST] ${note || 'कृपया मेरा नया पासवर्ड जारी करें।'}`,
-                        adminReply: "",
-                        status: "Pending",
-                        type: "PASSWORD_RESET",
-                        timestamp: new Date()
-                    });
-                } catch (dbErr) {
-                    console.log("Guest DB log skipped, Telegram sent:", dbErr);
-                }
-
-                event.target.reset();
-                document.getElementById('forgotPassFormStep').style.display = 'none';
-                document.getElementById('forgotPassSuccessStep').style.display = 'block';
-            } catch (err) {
-                alert('रिक्वेस्ट भेजने में समस्या आई, कृपया दोबारा प्रयास करें।');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = origHtml;
-            }
-        };
-
-        // ================= IN-APP SUPPORT CHAT SYSTEM (USER <-> ADMIN) =================
-        window.submitSupportMessage = async function(event) {
-            event.preventDefault();
-            if (!window.currentUserData) return;
-
-            const msgInput = document.getElementById('supportMsgInput');
-            const mobInput = document.getElementById('supportMobileInput');
-            const btn = document.getElementById('btnSendSupportMsg');
-
-            const text = msgInput.value.trim();
-            const mobile = mobInput.value.trim();
-
-            if (!text) return alert('कृपया अपना मैसेज या समस्या लिखें!');
-
-            const origHtml = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> भेज रहे हैं...';
-
-            try {
-                await addDoc(collection(db, "support"), {
-                    userId: window.currentUserData.uid,
-                    email: window.currentUserData.email,
-                    contactMobile: mobile,
-                    message: text,
-                    adminReply: "",
-                    status: "Pending",
-                    type: "SUPPORT_CHAT",
+                await addDoc(collection(db, "supportTickets"), {
+                    type: ticketType,
+                    userId: window.currentUserData?.uid || '',
+                    userIdentifier: userIdentifier,
+                    userPhone: userPhone,
+                    message: userMessage || (ticketType === 'FORGOT_PASSWORD' ? 'Password Reset Request' : 'Help Request'),
+                    status: 'Open',
                     timestamp: new Date()
                 });
 
-                const tgText = `💬 *New Portal Support Message!*\n\n👤 *User:* \`${window.currentUserData.email}\`\n📱 *Mobile:* ${mobile || 'Not provided'}\n✉️ *Message:* ${text}\n\n_(Admin Panel के Support टैब से इसका रिप्लाई दें)_`;
-                await sendTelegramAlert(tgText);
+                // Telegram Instant Alert to Admin
+                const botToken = "8586078140:AAG-ydpakzFDAwHFtJC8AUanxZAODpGZDOk"; 
+                const chatId = "8942287807"; 
+                const typeLabel = ticketType === 'FORGOT_PASSWORD' ? '🔑 *FORGOT PASSWORD REQUEST*' : '💬 *NEW SUPPORT REQUEST*';
+                const tgText = `${typeLabel}\n*User ID:* ${userIdentifier}\n*WhatsApp:* ${userPhone}\n*Message:* ${userMessage}\n\n_(Admin Panel -> Support & Reply टैब में जाकर रिप्लाई करें)_`;
 
-                msgInput.value = '';
-                alert('आपका मैसेज एडमिन को भेज दिया गया है! एडमिन का जवाब आने पर आपको नीचे चैट बॉक्स में दिखाई देगा।');
-                window.loadUserSupportChat();
+                fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: chatId, text: tgText, parse_mode: 'Markdown' })
+                }).catch(() => {});
+
+                const activeSupportWa = window.portalConfigState?.supportWhatsapp || SUPPORT_WHATSAPP;
+                const waText = `${ticketType === 'FORGOT_PASSWORD' ? '🔑 *Password Reset Request*' : '💬 *Portal Support Request*'}\n*User ID:* ${userIdentifier}\n*My WhatsApp:* ${userPhone}\n*Message:* ${userMessage}`;
+                const directWaUrl = `https://wa.me/${activeSupportWa}?text=${encodeURIComponent(waText)}`;
+
+                msgBox.className = "p-3.5 rounded-2xl bg-green-50 border border-green-300 text-green-900 text-xs font-bold space-y-2 text-center";
+                msgBox.innerHTML = `
+                    <div><i class="fa-solid fa-circle-check text-green-600 text-base mr-1"></i> आपकी रिक्वेस्ट सीधे एडमिन पैनल में भेज दी गई है!</div>
+                    <p class="text-[11px] text-green-700">तुरंत चैट करने के लिए आप नीचे क्लिक करके सीधे WhatsApp पर भी भेज सकते हैं:</p>
+                    <a href="${directWaUrl}" target="_blank" class="w-full bg-green-600 hover:bg-green-700 text-white font-black py-2.5 px-4 rounded-xl inline-flex items-center justify-center gap-1.5 text-xs shadow-sm">
+                        <i class="fa-brands fa-whatsapp text-sm"></i> एडमिन को WhatsApp पर भी भेजें
+                    </a>
+                `;
+                msgBox.style.display = 'block';
+                document.getElementById('supUserMessage').value = '';
             } catch (err) {
-                alert('मैसेज भेजने में समस्या आई: ' + err.message);
+                alert("रिक्वेस्ट भेजने में समस्या आई: " + err.message);
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = origHtml;
-            }
-        };
-
-        window.loadUserSupportChat = async function() {
-            const listBox = document.getElementById('userSupportChatList');
-            if (!listBox || !window.currentUserData) return;
-
-            listBox.innerHTML = `<div class="p-6 text-center text-slate-400 font-bold text-xs"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>आपके मैसेज लोड हो रहे हैं...</div>`;
-
-            try {
-                const q = query(collection(db, "support"), where("userId", "==", window.currentUserData.uid));
-                const snap = await getDocs(q);
-                
-                window.userSupportMessages = [];
-                snap.forEach(docSnap => {
-                    window.userSupportMessages.push({ id: docSnap.id, ...docSnap.data() });
-                });
-
-                window.userSupportMessages.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
-
-                if (window.userSupportMessages.length === 0) {
-                    listBox.innerHTML = `
-                        <div class="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 text-slate-400 text-xs font-bold">
-                            <i class="fa-regular fa-comments text-3xl mb-2 text-slate-300"></i><br>
-                            अभी तक कोई मैसेज नहीं भेजा गया है। ऊपर बॉक्स में अपनी समस्या लिखकर भेजें।
-                        </div>`;
-                    return;
-                }
-
-                listBox.innerHTML = '';
-                window.userSupportMessages.forEach(item => {
-                    const sec = item.timestamp?.seconds || Math.floor(Date.now() / 1000);
-                    const dObj = new Date(sec * 1000);
-                    const dateStr = dObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-                    const hasReply = item.adminReply && item.adminReply.trim() !== '';
-                    const statusBadge = hasReply
-                        ? `<span class="bg-green-100 text-green-800 border border-green-300 px-2.5 py-0.5 rounded-full text-[10px] font-black"><i class="fa-solid fa-check-double mr-1"></i>Admin Replied</span>`
-                        : `<span class="bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 rounded-full text-[10px] font-black animate-pulse"><i class="fa-solid fa-clock mr-1"></i>Waiting for Reply</span>`;
-
-                    const adminReplyHtml = hasReply
-                        ? `<div class="mt-3 p-3 rounded-xl bg-green-50 border-l-4 border-green-600 text-slate-800">
-                               <div class="flex items-center gap-1.5 text-[10px] font-black text-green-800 uppercase mb-1">
-                                   <i class="fa-solid fa-crown text-amber-500"></i> Admin Reply (समाधान):
-                               </div>
-                               <p class="text-xs font-bold text-slate-900 whitespace-pre-line">${item.adminReply}</p>
-                           </div>`
-                        : '';
-
-                    listBox.innerHTML += `
-                        <div class="p-3.5 rounded-2xl bg-white border ${hasReply ? 'border-green-300 shadow-sm' : 'border-slate-200'} space-y-2">
-                            <div class="flex justify-between items-center border-b border-slate-100 pb-2">
-                                <span class="text-[10px] font-bold text-slate-400"><i class="fa-regular fa-clock mr-1"></i>${dateStr}</span>
-                                ${statusBadge}
-                            </div>
-                            <div>
-                                <span class="text-[10px] font-black text-slate-400 uppercase block">आपका मैसेज:</span>
-                                <p class="text-xs font-bold text-slate-800 whitespace-pre-line mt-0.5">${item.message}</p>
-                            </div>
-                            ${adminReplyHtml}
-                        </div>
-                    `;
-                });
-            } catch (err) {
-                listBox.innerHTML = `<div class="p-4 text-center text-red-500 font-bold text-xs">मैसेज लोड करने में समस्या आई।</div>`;
             }
         };
 
@@ -346,7 +260,8 @@
                         bannerTitle: data.bannerTitle || "",
                         bannerMessage: data.bannerMessage || "",
                         bannerBtnText: data.bannerBtnText || "",
-                        bannerBtnLink: data.bannerBtnLink || ""
+                        bannerBtnLink: data.bannerBtnLink || "",
+                        supportWhatsapp: data.supportWhatsapp || SUPPORT_WHATSAPP
                     };
                 }
                 window.applyLivePortalControls();
@@ -406,6 +321,7 @@
                 btnCas.style.setProperty('display', cfg.showCaste ? 'flex' : 'none', 'important');
             }
 
+            // Adjust Standard Services Grid layout cleanly
             if (stdGrid) {
                 if (!cfg.showDomicile && !cfg.showCaste) {
                     stdGrid.style.setProperty('display', 'none', 'important');
@@ -418,6 +334,7 @@
                 }
             }
 
+            // Adjust DOB 18+ inside VIP Bar
             if (btnDob) {
                 btnDob.style.setProperty('display', cfg.showDob18 ? 'flex' : 'none', 'important');
             }
@@ -432,6 +349,7 @@
                     : `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (All 9 Annexures)`;
             }
 
+            // 3. If current active tab was just hidden by Admin, immediately switch to next allowed tab
             if (
                 (window.currentActiveTab === 'domicile' && !cfg.showDomicile) ||
                 (window.currentActiveTab === 'caste' && !cfg.showCaste) ||
@@ -480,6 +398,7 @@
 
             if (user) {
                 try {
+                    // Fetch portalConfig first so Stealth Mode is ready before rendering dashboard
                     try {
                         const cfgSnap = await getDoc(doc(db, "settings", "portalConfig"));
                         if (cfgSnap.exists()) {
@@ -493,7 +412,8 @@
                                 bannerTitle: d.bannerTitle || "",
                                 bannerMessage: d.bannerMessage || "",
                                 bannerBtnText: d.bannerBtnText || "",
-                                bannerBtnLink: d.bannerBtnLink || ""
+                                bannerBtnLink: d.bannerBtnLink || "",
+                                supportWhatsapp: d.supportWhatsapp || SUPPORT_WHATSAPP
                             };
                         }
                     } catch (e) { console.log("Initial config fetch skipped", e); }
@@ -540,7 +460,15 @@
                 }
             } else {
                 if (window.vipCountdownInterval) clearInterval(window.vipCountdownInterval);
-                if (window.portalSettingsUnsubscribe) window.portalSettingsUnsubscribe();
+                let unsub = window.portalSettingsUnsubscribe;
+                if (unsub) unsub();
+                // Load supportWhatsapp even on Login Screen so Forgot Password uses updated number
+                getDoc(doc(db, "settings", "portalConfig")).then(snap => {
+                    if (snap.exists() && snap.data().supportWhatsapp) {
+                        window.portalConfigState.supportWhatsapp = snap.data().supportWhatsapp;
+                    }
+                }).catch(() => {});
+
                 window.currentUserData = null;
                 document.body.classList.remove('vip-body-bg');
                 document.getElementById('vipCornerAlert').style.display = 'none';
@@ -566,6 +494,7 @@
 
             try {
                 const userCred = await signInWithEmailAndPassword(auth, email, passInput);
+                // Sync password to Firestore so Admin can view/reset it from admin.html
                 try {
                     await updateDoc(doc(db, "users", userCred.user.uid), { userPass: passInput });
                 } catch (e) {}
@@ -578,7 +507,7 @@
             }
         };
 
-        // ================= LIVE VIP COUNTDOWN & GEAR MENU DAYS DISPLAY =================
+        // ================= LIVE VIP COUNTDOWN & HEADER DAYS LEFT DISPLAY =================
         function startVipCountdownLoop() {
             if (window.vipCountdownInterval) clearInterval(window.vipCountdownInterval);
             updateVipTimerAndAlerts();
@@ -587,17 +516,24 @@
 
         async function updateVipTimerAndAlerts() {
             const userData = window.currentUserData;
+            const timerBox = document.getElementById('vipHeaderTimerBox');
+            const timerText = document.getElementById('vipHeaderTimerText');
             const gearVipDaysText = document.getElementById('gearVipDaysText');
             const cornerAlert = document.getElementById('vipCornerAlert');
             const cornerAlertDaysText = document.getElementById('cornerAlertDaysText');
 
             if (!userData || !userData.isVip || userData.isAdmin) {
+                if (timerBox) timerBox.style.display = 'none';
                 if (cornerAlert) cornerAlert.style.display = 'none';
                 if (gearVipDaysText) gearVipDaysText.innerText = userData?.isAdmin ? 'Admin' : 'Normal User (0 Days)';
                 return;
             }
 
             if (!userData.vipExpiry || userData.vipExpiry <= 0) {
+                if (timerBox) {
+                    timerBox.style.display = 'inline-flex';
+                    timerText.innerHTML = `VIP Active`;
+                }
                 if (gearVipDaysText) gearVipDaysText.innerText = 'VIP Active';
                 if (cornerAlert) cornerAlert.style.display = 'none';
                 return;
@@ -615,6 +551,7 @@
                     await updateDoc(doc(db, "users", userData.uid), { isVip: false, vipExpiry: 0 });
                 } catch (e) { console.error("Auto downgrade update error:", e); }
 
+                if (timerBox) timerBox.style.display = 'none';
                 if (cornerAlert) cornerAlert.style.display = 'none';
 
                 setupDashboard(userData);
@@ -625,9 +562,20 @@
             const totalDaysCeil = Math.ceil(diff / MS_PER_DAY);
             const days = Math.floor(diff / MS_PER_DAY);
             const hours = Math.floor((diff % MS_PER_DAY) / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
 
             if (gearVipDaysText) {
                 gearVipDaysText.innerText = `👑 VIP: ${totalDaysCeil} दिन बाकी (${days}d ${hours}h)`;
+            }
+
+            if (timerBox && timerText) {
+                timerBox.style.display = 'inline-flex';
+                if (totalDaysCeil <= 5) {
+                    timerBox.className = "cursor-pointer items-center gap-1 bg-red-600 text-white border border-yellow-300 px-2.5 py-1 rounded-lg text-[11px] font-black shadow-sm animate-pulse transition";
+                } else {
+                    timerBox.className = "cursor-pointer items-center gap-1 bg-amber-400/20 border border-royal-400 text-royal-300 px-2.5 py-1 rounded-lg text-[11px] font-black shadow-sm hover:bg-amber-400/30 transition";
+                }
+                timerText.innerHTML = `<span class="text-yellow-300">VIP: ${totalDaysCeil} दिन</span> <span class="hidden md:inline font-mono text-[10px] text-white opacity-90">(${days}d:${String(hours).padStart(2, '0')}h:${String(minutes).padStart(2, '0')}m)</span>`;
             }
 
             if (totalDaysCeil <= 5 && totalDaysCeil >= 1) {
@@ -711,7 +659,7 @@
             }, 50);
         };
 
-        // ================= PASSWORD CHANGE LOGIC =================
+        // ================= PASSWORD CHANGE LOGIC (SYNCED WITH ADMIN PANEL) =================
         window.handleChangePassword = async function(event) {
             event.preventDefault();
             const currentPass = document.getElementById('currentPassword').value;
@@ -746,6 +694,7 @@
                 await reauthenticateWithCredential(user, credential);
                 await updatePassword(user, newPass);
 
+                // Sync updated password to Firestore so Admin can reset it in future if user forgets
                 try {
                     await updateDoc(doc(db, "users", user.uid), {
                         userPass: newPass,
@@ -904,12 +853,23 @@
                     status: "Pending"
                 });
 
+                const botToken = "8586078140:AAG-ydpakzFDAwHFtJC8AUanxZAODpGZDOk"; 
+                const chatId = "8942287807"; 
                 const vipAlertLine = wantsVip 
                     ? `\n👑 *VIP PLAN:* +${vipDays} Days (₹${vipFee} Included)` 
                     : `\n👤 *Request Type:* Normal Credit Recharge`;
                 
                 const tgMessage = `🚨 *New Payment Request!*\n*User:* ${window.currentUserData.email}\n*Total Paid:* ₹${totalPaid}\n*Credits to Add:* +${creditsToAdd} Credits${vipAlertLine}\n*UTR:* \`${utr}\`\n\n*Status:* Pending Approval in Admin Panel.`;
-                await sendTelegramAlert(tgMessage);
+
+                fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: chatId,
+                        text: tgMessage,
+                        parse_mode: 'Markdown'
+                    })
+                }).catch(err => console.log("Telegram alert failed", err));
 
                 const successSubText = wantsVip 
                     ? `आपकी UTR डिटेल और <strong>👑 +${vipDays} Days VIP Access</strong> की रिक्वेस्ट भेज दी गई है।`
@@ -1734,6 +1694,7 @@
 
             if (!window.currentUserData) return alert('Please login first!');
             
+            // Check Stealth Lock before submitting
             const cfg = window.portalConfigState;
             if (serviceType === 'Domicile' && !cfg.showDomicile) return alert('यह सर्विस वर्तमान में बंद है।');
             if (serviceType === 'Caste' && !cfg.showCaste) return alert('यह सर्विस वर्तमान में बंद है।');
@@ -1956,6 +1917,7 @@
         window.switchService = function(serviceName) {
             const cfg = window.portalConfigState;
 
+            // 🔒 STEALTH LOCK: Block access if Admin turned off the service
             if (serviceName === 'domicile' && !cfg.showDomicile) {
                 serviceName = window.getFirstAllowedTab();
             } else if (serviceName === 'caste' && !cfg.showCaste) {
@@ -1982,6 +1944,7 @@
                 }
             }
 
+            // Re-enforce stealth visibility on buttons after class reset
             window.applyLivePortalControls();
 
             const container = document.getElementById('formContainer');
@@ -2165,7 +2128,7 @@
                                 <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="S/o">S/o</option><option value="D/o">D/o</option><option value="W/o">W/o</option></select></div>
                                 <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पिता / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. SURESH CHAND" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             </div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">12-Digit ID Number</label><input type="text" name="idNumber" placeholder="Enter 12-digit number" maxlength="14" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">12-Digit ID Number</label><input type="text" name="idNumber" placeholder="Enter ID Number" maxlength="14" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">कितनी बार DoB अपडेट किया?</label><select name="updateTimes" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="NEVER">NEVER (कभी नहीं)</option><option value="ONCE">ONCE (एक बार)</option><option value="MORE THAN ONCE">MORE THAN ONCE</option></select></div>
                             <div><label class="block text-[11px] font-bold text-green-700 uppercase mb-1">सही जन्मतिथि (Correct DoB)</label><input type="date" name="newDob" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold bg-green-50"></div>
                             <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">पहले दर्ज जन्मतिथि (Old DoB)</label><input type="date" name="oldDob" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold bg-amber-50"></div>
@@ -2197,10 +2160,10 @@
                                 <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="S/o">S/o</option><option value="W/o">W/o</option><option value="D/o">D/o</option></select></div>
                                 <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">दादा / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. RAMPHAL" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             </div>
-                            <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का 12-Digit ID</label><input type="text" name="parentIdNumber" placeholder="Parent 12-digit ID" maxlength="14" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
+                            <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का 12-Digit ID</label><input type="text" name="parentIdNumber" placeholder="Parent ID Number" maxlength="14" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का नाम (Child Name)</label><input type="text" name="childName" placeholder="e.g. AARAV KUMAR" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
-                            <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का 12-Digit ID</label><input type="text" name="childIdNumber" placeholder="Child 12-digit ID" maxlength="14" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
+                            <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का 12-Digit ID</label><input type="text" name="childIdNumber" placeholder="Child ID Number" maxlength="14" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
                             <div><label class="block text-[11px] font-bold text-green-800 uppercase mb-1">बच्चे की सही जन्मतिथि (Correct DoB)</label><input type="date" name="newDob" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold bg-green-50"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पहले दर्ज गलत जन्मतिथि (Old DoB)</label><input type="date" name="oldDob" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पहले दिया गया दस्तावेज़ (Old Doc)</label><input type="text" name="oldDoc" value="BIRTH CERTIFICATE" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
@@ -2231,12 +2194,12 @@
                                 <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="S/o">S/o</option><option value="D/o">D/o</option><option value="W/o">W/o</option></select></div>
                                 <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पिता / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. SURESH CHAND" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             </div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">12-Digit ID Number</label><input type="text" name="idNumber" placeholder="Enter 12-digit number" maxlength="14" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">12-Digit ID Number</label><input type="text" name="idNumber" placeholder="Enter ID Number" maxlength="14" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">पहले दिया गया अमान्य दस्तावेज़ (Invalid Doc)</label><input type="text" name="invalidDocName" value="BIRTH CERTIFICATE" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
-                            <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">अमान्य दस्तावेज़ का नंबर (Doc Number)</label><input type="text" name="invalidDocNo" placeholder="e.g. B-2021-12345" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
+                            <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">अमान्य दस्तावेज़ का नंबर (Doc Number)</label><input type="text" name="invalidDocNo" placeholder="e.g. B-2021-XX" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
                             <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">अमान्य दस्तावेज़ की तारीख (Doc Date)</label><input type="date" name="invalidDocDate" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold bg-amber-50"></div>
-                            <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">EID Number (एनरोलमेंट आईडी)</label><input type="text" name="eidNumber" placeholder="e.g. 1234/12345/12345" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
+                            <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">EID Number (एनरोलमेंट आईडी)</label><input type="text" name="eidNumber" placeholder="Enter EID Number" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
                             <div><label class="block text-[11px] font-bold text-green-800 uppercase mb-1">अभी दिया जा रहा सही दस्तावेज़ (New Genuine Doc)</label><input type="text" name="newDoc" value="BIRTH CERTIFICATE" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-green-50"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">शपथ पत्र की तारीख (Date)</label><input type="date" name="date" value="${todayISO}" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"></div>
                         </div>
@@ -2263,14 +2226,14 @@
                                 <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="S/o">S/o</option><option value="W/o">W/o</option><option value="D/o">D/o</option></select></div>
                                 <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">दादा / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. RAMPHAL" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             </div>
-                            <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का 12-Digit ID</label><input type="text" name="parentIdNumber" placeholder="Parent 12-digit ID" maxlength="14" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
+                            <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का 12-Digit ID</label><input type="text" name="parentIdNumber" placeholder="Parent ID Number" maxlength="14" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का नाम (Child Name)</label><input type="text" name="childName" placeholder="e.g. AARAV KUMAR" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
-                            <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का 12-Digit ID</label><input type="text" name="childIdNumber" placeholder="Child 12-digit ID" maxlength="14" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
+                            <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का 12-Digit ID</label><input type="text" name="childIdNumber" placeholder="Child ID Number" maxlength="14" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पहले दिया गया अमान्य दस्तावेज़ (Invalid Doc)</label><input type="text" name="invalidDocName" value="BIRTH CERTIFICATE" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">अमान्य दस्तावेज़ का नंबर (Doc Number)</label><input type="text" name="invalidDocNo" placeholder="e.g. B-2021-12345" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">अमान्य दस्तावेज़ का नंबर (Doc Number)</label><input type="text" name="invalidDocNo" placeholder="e.g. B-2021-XX" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">अमान्य दस्तावेज़ की तारीख (Doc Date)</label><input type="date" name="invalidDocDate" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">EID Number (एनरोलमेंट आईडी)</label><input type="text" name="eidNumber" placeholder="e.g. 1234/12345/12345" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">EID Number (एनरोलमेंट आईडी)</label><input type="text" name="eidNumber" placeholder="Enter EID Number" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             <div><label class="block text-[11px] font-bold text-green-800 uppercase mb-1">अभी दिया जा रहा सही दस्तावेज़ (New Genuine Doc)</label><input type="text" name="newDoc" value="BIRTH CERTIFICATE" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-green-50"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">शपथ पत्र की तारीख (Date)</label><input type="date" name="date" value="${todayISO}" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"></div>
                         </div>
@@ -2290,7 +2253,7 @@
                 }[serviceName];
 
                 const childFieldsHtml = isChild ? `
-                    <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का 12-Digit ID</label><input type="text" name="childIdNumber" placeholder="Child 12-digit ID" maxlength="14" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
+                    <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का 12-Digit ID</label><input type="text" name="childIdNumber" placeholder="Child ID Number" maxlength="14" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
                 ` : '';
 
                 container.innerHTML = `
@@ -2353,7 +2316,7 @@
                                 <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पिता / पति का नाम</label><input type="text" id="inpRelativeName" name="relativeName" placeholder="e.g. SURESH CHAND" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             </div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Resident of)</label><input type="text" id="inpAddress" name="address" placeholder="e.g. VILL BARAUT, DISTT BAGHPAT" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">12-Digit ID Number</label><input type="text" id="inpIdNumber" name="idNumber" placeholder="Enter 12-digit number" maxlength="14" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">12-Digit ID Number</label><input type="text" id="inpIdNumber" name="idNumber" placeholder="Enter ID Number" maxlength="14" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
@@ -2412,10 +2375,10 @@
                                 <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="S/o">S/o</option><option value="W/o">W/o</option><option value="D/o">D/o</option></select></div>
                                 <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">दादा / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. RAMPHAL" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             </div>
-                            <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का 12-Digit ID</label><input type="text" name="parentIdNumber" placeholder="Parent 12-digit ID" maxlength="14" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
+                            <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का 12-Digit ID</label><input type="text" name="parentIdNumber" placeholder="Parent ID Number" maxlength="14" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Resident of)</label><input type="text" name="address" placeholder="VILL BARAUT, DISTT BAGHPAT" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का नाम (Child Name)</label><input type="text" id="inpApplicantName" name="childName" oninput="window.syncAnnexureENames()" placeholder="e.g. AARAV URF GOLU" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
-                            <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का 12-Digit ID</label><input type="text" name="childIdNumber" placeholder="Child 12-digit ID" maxlength="14" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
+                            <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का 12-Digit ID</label><input type="text" name="childIdNumber" placeholder="Child ID Number" maxlength="14" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
@@ -2576,48 +2539,6 @@
                 window.loadUserPayments();
             }
 
-            // 💬 IN-APP SUPPORT CHAT & HELP DESK (NO WHATSAPP EXPOSURE)
-            else if(serviceName === 'support') {
-                container.innerHTML = `
-                    <div class="max-w-2xl mx-auto space-y-5">
-                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                            <div class="flex items-center gap-2.5">
-                                <div class="w-10 h-10 bg-royal-100 text-royal-600 rounded-xl flex items-center justify-center text-lg font-bold">
-                                    <i class="fa-solid fa-headset"></i>
-                                </div>
-                                <div>
-                                    <h3 class="text-base md:text-lg font-black text-dark-900">Help & Support Box</h3>
-                                    <p class="text-[11px] text-slate-500">अपनी समस्या नीचे लिखें, एडमिन का रिप्लाई यहीं नीचे दिखाई देगा</p>
-                                </div>
-                            </div>
-                            <button onclick="window.loadUserSupportChat()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold transition">
-                                <i class="fa-solid fa-rotate-right mr-1"></i> Refresh
-                            </button>
-                        </div>
-
-                        <form onsubmit="window.submitSupportMessage(event)" class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
-                            <div>
-                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">मोबाइल नंबर (वैकल्पिक - संपर्क हेतु)</label>
-                                <input type="tel" id="supportMobileInput" placeholder="अपना 10 अंकों का मोबाइल नंबर लिखें" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold bg-white outline-none focus:border-royal-500">
-                            </div>
-                            <div>
-                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">अपनी समस्या या मैसेज लिखें (Type Message)</label>
-                                <textarea id="supportMsgInput" rows="3" required placeholder="यहाँ अपनी समस्या विस्तार से लिखें..." class="w-full p-3 border border-slate-300 rounded-xl text-xs font-semibold bg-white outline-none focus:border-royal-500"></textarea>
-                            </div>
-                            <button type="submit" id="btnSendSupportMsg" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3 rounded-xl shadow-glow transition text-xs md:text-sm">
-                                <i class="fa-solid fa-paper-plane mr-1.5"></i> Send Message to Admin
-                            </button>
-                        </form>
-
-                        <div class="space-y-2.5">
-                            <h4 class="text-xs font-black text-slate-500 uppercase tracking-wider"><i class="fa-solid fa-comments text-royal-500 mr-1"></i> आपके भेजे गए मैसेज और एडमिन रिप्लाई:</h4>
-                            <div id="userSupportChatList" class="space-y-3"></div>
-                        </div>
-                    </div>
-                `;
-                window.loadUserSupportChat();
-            }
-
             else if(serviceName === 'password') {
                 container.innerHTML = `
                     <div class="max-w-md mx-auto">
@@ -2629,7 +2550,7 @@
                                     <p class="text-[11px] text-slate-400">पुराना पासवर्ड डालकर नया पासवर्ड सेट करें</p>
                                 </div>
                             </div>
-                            <button type="button" onclick="window.openForgotPasswordModal()" class="text-[11px] font-bold text-royal-700 bg-royal-50 hover:bg-royal-100 border border-royal-200 px-2.5 py-1.5 rounded-xl">
+                            <button type="button" onclick="window.handleForgotPasswordWhatsApp()" class="text-[11px] font-bold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 px-2.5 py-1.5 rounded-xl">
                                 <i class="fa-solid fa-key mr-1"></i> Forgot?
                             </button>
                         </div>
@@ -2716,64 +2637,6 @@
         <p class="text-xs text-royal-300 mt-1 font-bold animate-pulse">Checking Security...</p>
     </div>
 
-    <!-- 🔑 FORGOT PASSWORD REQUEST MODAL (NO WHATSAPP EXPOSURE - SENDS TO TELEGRAM & ADMIN PANEL) -->
-    <div id="forgotPasswordModal" style="display: none;" class="fixed inset-0 z-[180] bg-dark-950/80 backdrop-blur-sm items-center justify-center p-4">
-        <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl border-t-4 border-royal-500 p-6 text-slate-800 relative">
-            <button type="button" onclick="window.closeForgotPasswordModal()" class="absolute top-4 right-4 w-8 h-8 rounded-xl bg-slate-100 hover:bg-red-500 text-slate-500 hover:text-white flex items-center justify-center transition">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-
-            <!-- Step 1: Request Form -->
-            <div id="forgotPassFormStep">
-                <div class="flex items-center gap-2.5 mb-4">
-                    <div class="w-10 h-10 bg-royal-100 text-royal-600 rounded-xl flex items-center justify-center text-lg font-bold">
-                        <i class="fa-solid fa-key"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-base font-black text-dark-900">Password Reset Request</h3>
-                        <p class="text-[11px] text-slate-400 font-semibold">अपना विवरण भरें, एडमिन नया पासवर्ड भेज देंगे</p>
-                    </div>
-                </div>
-
-                <form onsubmit="window.submitForgotPasswordRequest(event)" class="space-y-3">
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">User ID (आपकी पोर्टल आईडी) *</label>
-                        <input type="text" id="resetReqUserId" required placeholder="अपनी User ID लिखें" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">मोबाइल नंबर (WhatsApp / Call) *</label>
-                        <input type="tel" id="resetReqMobile" required placeholder="10 अंकों का मोबाइल नंबर (जिस पर पासवर्ड मिलेगा)" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">ईमेल आईडी (वैकल्पिक)</label>
-                        <input type="email" id="resetReqEmail" placeholder="आपकी Email ID (यदि हो)" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">मैसेज (वैकल्पिक)</label>
-                        <textarea id="resetReqNote" rows="2" placeholder="कोई अतिरिक्त जानकारी या समस्या..." class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-semibold bg-slate-50 focus:bg-white outline-none"></textarea>
-                    </div>
-                    <button type="submit" id="btnSubmitForgotReq" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-glow transition text-xs">
-                        Submit Reset Request <i class="fa-solid fa-paper-plane ml-1"></i>
-                    </button>
-                </form>
-            </div>
-
-            <!-- Step 2: Confirmation Message -->
-            <div id="forgotPassSuccessStep" style="display: none;" class="text-center py-4 space-y-3">
-                <div class="w-14 h-14 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto text-2xl">
-                    <i class="fa-solid fa-circle-check"></i>
-                </div>
-                <h4 class="text-base font-black text-dark-900">रिक्वेस्ट सबमिट हो गई है!</h4>
-                <p class="text-xs font-semibold text-slate-600 leading-relaxed">
-                    आपकी पासवर्ड रीसेट रिक्वेस्ट एडमिन के पास भेज दी गई है। कुछ समय बाद आपके दिए गए <strong>मोबाइल नंबर या ईमेल</strong> पर नया पासवर्ड भेज दिया जाएगा।
-                </p>
-                <button type="button" onclick="window.closeForgotPasswordModal()" class="w-full bg-dark-900 text-royal-300 font-black py-2.5 rounded-xl text-xs mt-2">
-                    ठीक है (Close)
-                </button>
-            </div>
-        </div>
-    </div>
-
     <!-- COMPACT FLOATING CORNER ALERT WHEN 5 DAYS OR LESS REMAINING IN VIP -->
     <div id="vipCornerAlert" style="display: none;" class="fixed bottom-3 right-3 z-[150] w-72 bg-amber-50 border-l-4 border-amber-500 rounded-xl p-3 shadow-xl text-slate-800 corner-alert-anim">
         <div class="flex justify-between items-center mb-1">
@@ -2813,7 +2676,7 @@
         </div>
     </div>
 
-    <!-- CLEAN LOGIN SCREEN (ONLY FORGOT PASSWORD MODAL TRIGGER) -->
+    <!-- CLEAN LOGIN SCREEN (WITH FORGOT PASSWORD TICKET TRIGGER) -->
     <div id="loginSection" style="display: none;" class="items-center justify-center flex-grow p-4 min-h-screen bg-dark-900 relative overflow-hidden">
         <div class="bg-white p-6 md:p-8 rounded-3xl shadow-2xl border-t-4 border-royal-500 w-full max-w-sm relative z-10 text-slate-800">
             <div class="text-center mb-6">
@@ -2828,7 +2691,7 @@
                 <div class="space-y-1.5">
                     <input type="password" id="loginPassword" placeholder="Password" required class="w-full px-4 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-royal-500 outline-none bg-slate-50 text-sm font-semibold">
                     <div class="flex justify-end">
-                        <button type="button" onclick="window.openForgotPasswordModal()" class="text-[11px] font-bold text-royal-600 hover:text-royal-900 transition">
+                        <button type="button" onclick="window.handleForgotPasswordWhatsApp()" class="text-[11px] font-bold text-royal-600 hover:text-royal-900 transition">
                             <i class="fa-solid fa-key mr-1"></i>Forgot Password?
                         </button>
                     </div>
@@ -2841,7 +2704,7 @@
 
     <!-- DASHBOARD SCREEN -->
     <div id="dashboardSection" style="display: none;" class="flex-grow flex-col">
-        <!-- COMPACT HEADER (CLEAN FOR MOBILE) -->
+        <!-- COMPACT HEADER WITH HELP & GEAR MENU -->
         <header class="bg-dark-950 shadow-lg px-3 md:px-6 py-2.5 flex justify-between items-center sticky top-0 z-40 border-b border-royal-500">
             <div class="flex items-center gap-2">
                 <div id="portalHeaderIcon" class="w-8 h-8 bg-gradient-to-br from-royal-400 to-royal-600 text-white rounded-xl flex items-center justify-center">
@@ -2855,7 +2718,7 @@
                 </div>
             </div>
 
-            <!-- RIGHT CONTROLS: CREDITS + IN-APP SUPPORT CHAT + GEAR ICON MENU -->
+            <!-- RIGHT CONTROLS: CREDITS + HELP + GEAR ICON MENU -->
             <div class="flex items-center gap-2 relative">
                 <!-- Admin Panel Link -->
                 <a href="admin.html" id="adminPanelLink" style="display: none;" class="bg-dark-800 border border-slate-700 text-royal-300 hover:text-white px-2.5 py-1.5 rounded-xl text-xs font-bold"><i class="fa-solid fa-shield-halved"></i> <span class="hidden sm:inline ml-1">Admin</span></a>
@@ -2865,9 +2728,9 @@
                     <i class="fa-solid fa-wallet mr-1 text-royal-400"></i> <span id="displayCredits" class="font-black text-white">0</span> <span class="hidden sm:inline ml-1 text-[10px]">Cr</span>
                 </div>
 
-                <!-- 💬 IN-APP SUPPORT CHAT BUTTON -->
-                <button onclick="window.selectGearOption('support')" class="bg-royal-500/15 hover:bg-royal-500 text-royal-300 hover:text-dark-950 border border-royal-500/40 px-2.5 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1" title="Help & Support Box">
-                    <i class="fa-solid fa-headset text-xs"></i> <span class="hidden md:inline">Help</span>
+                <!-- 💬 DIRECT SUPPORT BUTTON -->
+                <button onclick="window.openWhatsAppSupport()" class="bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white border border-green-500/40 px-2.5 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1" title="Help & Support">
+                    <i class="fa-brands fa-whatsapp text-sm"></i> <span class="hidden md:inline">Help</span>
                 </button>
                 
                 <!-- ⚙️ GEAR ICON BUTTON -->
@@ -2895,8 +2758,8 @@
                         <button onclick="window.selectGearOption('password')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5">
                             <i class="fa-solid fa-key text-indigo-500 w-4"></i> Change Password
                         </button>
-                        <button onclick="window.selectGearOption('support')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-royal-700 hover:bg-royal-50 flex items-center gap-2.5">
-                            <i class="fa-solid fa-headset text-royal-600 w-4"></i> Help & Support Box
+                        <button onclick="window.openWhatsAppSupport()" class="w-full px-4 py-2.5 text-left text-xs font-bold text-green-700 hover:bg-green-50 flex items-center gap-2.5">
+                            <i class="fa-brands fa-whatsapp text-green-600 w-4 text-sm"></i> Help & Support
                         </button>
                     </div>
                     <div class="border-t border-slate-100 pt-1">
@@ -2910,7 +2773,7 @@
 
         <main class="max-w-5xl mx-auto w-full p-3 md:p-6 flex-grow">
             
-            <!-- 📢 ADMIN CONTROLLED LIVE UPDATE BANNER -->
+            <!-- 📢 ADMIN CONTROLLED LIVE UPDATE BANNER (Visible to Both Normal & VIP when ON) -->
             <div id="liveUpdateBannerContainer" style="display: none;" class="mb-3.5"></div>
 
             <!-- ✨ COMPACT MOBILE-FRIENDLY VIP PROMO STRIP FOR NORMAL USERS ✨ -->
@@ -2930,7 +2793,7 @@
                 </div>
             </div>
 
-            <!-- Standard Services -->
+            <!-- Standard Services (Automatically hides when Admin turns off Domicile & Caste) -->
             <div id="standardServicesGrid" class="grid grid-cols-2 gap-2.5 mb-3">
                 <button onclick="window.switchService('domicile')" id="btn-domicile" class="service-tab"><i class="fa-solid fa-house-chimney"></i> Domicile (मूल निवास)</button>
                 <button onclick="window.switchService('caste')" id="btn-caste" class="service-tab"><i class="fa-solid fa-users"></i> Caste (जाति प्रमाण पत्र)</button>
@@ -2965,6 +2828,43 @@
                 <div id="formContainer"></div>
             </div>
         </main>
+    </div>
+
+    <!-- 💬 SUPPORT & FORGOT PASSWORD MODAL (SENDS TICKET DIRECTLY TO ADMIN.HTML) -->
+    <div id="supportTicketModal" style="display: none;" class="fixed inset-0 z-[180] bg-dark-950/80 backdrop-blur-sm items-center justify-center p-4">
+        <div class="bg-white text-slate-800 w-full max-w-md rounded-3xl shadow-2xl border-t-4 border-royal-500 p-5 md:p-6 space-y-4">
+            <div class="flex justify-between items-start border-b border-slate-100 pb-3">
+                <div>
+                    <h3 id="supModalTitle" class="text-base font-black text-dark-900"><i class="fa-solid fa-headset text-royal-500 mr-1.5"></i> Support Request</h3>
+                    <p id="supModalSubtitle" class="text-[11px] font-semibold text-slate-400 mt-0.5">आपकी रिक्वेस्ट सीधे एडमिन को भेजी जाएगी</p>
+                </div>
+                <button type="button" onclick="window.closeSupportTicketModal()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-red-500 text-slate-500 hover:text-white flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form onsubmit="window.submitSupportTicketToAdmin(event)" class="space-y-3">
+                <input type="hidden" id="supTicketType" value="HELP_SUPPORT">
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आपकी User ID या Email</label>
+                    <input type="text" id="supUserIdentifier" required placeholder="e.g. rahul123" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आपका WhatsApp नंबर (रिप्लाई पाने के लिए)</label>
+                    <input type="tel" id="supUserPhone" required placeholder="10-Digit WhatsApp Number" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">समस्या / विवरण (Message)</label>
+                    <textarea id="supUserMessage" rows="3" required placeholder="अपनी समस्या या पासवर्ड रीसेट रिक्वेस्ट यहाँ लिखें..." class="w-full p-3 border border-slate-200 rounded-xl text-xs font-semibold bg-slate-50 focus:bg-white outline-none"></textarea>
+                </div>
+
+                <div id="supModalResultBox" style="display: none;"></div>
+
+                <button type="submit" id="btnSubmitSupportTicket" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl text-xs md:text-sm shadow-glow transition">
+                    <i class="fa-solid fa-paper-plane mr-1"></i> Send Request to Admin
+                </button>
+            </form>
+        </div>
     </div>
     
     <footer class="bg-dark-950 border-t border-slate-800 text-center py-3.5 text-[10px] font-bold text-slate-400 mt-auto uppercase tracking-widest">
