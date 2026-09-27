@@ -98,24 +98,23 @@
         const db = getFirestore(app);
 
         const ADMIN_EMAIL = "hkosiun1221@gmail.com"; 
-        const SUPPORT_WHATSAPP = "919306437623"; // 9306437623
+        const SUPPORT_WHATSAPP = "919306437623";
         const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
         window.currentUserData = null;
         window.historyData = []; 
         window.userPaymentsData = [];
-        window.currentActiveTab = '';
+        window.currentActiveTab = 'domicile';
         window.vipCountdownInterval = null;
-        window.portalConfigUnsubscribe = null;
+        window.portalSettingsUnsubscribe = null;
 
-        // Live Portal Config (Synced from Admin Panel)
-        window.portalConfig = {
-            enableDomicile: true,
-            enableCaste: true,
-            enableDob18: true,
+        // Live Portal Control & Stealth Config (Synced from admin.html -> settings/portalConfig)
+        window.portalConfigState = {
+            showDomicile: true,
+            showCaste: true,
+            showDob18: true,
             bannerEnabled: false,
             bannerBadge: "UPDATE",
-            bannerTheme: "royal",
             bannerTitle: "",
             bannerMessage: "",
             bannerBtnText: "",
@@ -137,35 +136,146 @@
         };
         window.API_URLS = API_URLS;
 
-        // ================= WHATSAPP SUPPORT & FORGOT PASSWORD HELPERS =================
-        window.openWhatsAppSupport = function(customMsg = '') {
-            const userTag = window.currentUserData ? `\nUser ID: ${window.currentUserData.email}` : '';
-            const defaultMsg = customMsg || `नमस्ते एडमिन, मुझे Ojas Portal पर सहायता चाहिए।${userTag}\nमेरी समस्या: `;
-            const url = `https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(defaultMsg)}`;
-            window.open(url, '_blank');
+        // ================= WHATSAPP HELP & FORGOT PASSWORD FUNCTIONS =================
+        window.openWhatsAppSupport = function(customText = '') {
+            const userTag = window.currentUserData ? ` (User ID: ${window.currentUserData.email})` : '';
+            const msg = customText || `नमस्ते एडमिन, मुझे Ojas Portal पर सहायता चाहिए।${userTag}`;
+            window.open(`https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(msg)}`, '_blank');
         };
 
-        window.toggleForgotPassModal = function(show) {
-            const modal = document.getElementById('forgotPassModal');
-            if (!modal) return;
-            if (show) {
-                const typedUser = document.getElementById('loginUsername')?.value.trim() || '';
-                const resetInput = document.getElementById('forgotUserIdInput');
-                if (resetInput && typedUser) resetInput.value = typedUser;
-                modal.style.display = 'flex';
-            } else {
-                modal.style.display = 'none';
+        window.handleForgotPasswordWhatsApp = function() {
+            const enteredId = document.getElementById('loginUsername')?.value.trim() || '';
+            const userPromptId = enteredId || prompt("कृपया अपनी User ID या रजिस्टर्ड नाम लिखें ताकि एडमिन आपका नया पासवर्ड जारी कर सकें:");
+            if (userPromptId === null) return;
+            const cleanId = userPromptId.trim() || 'Not Provided';
+            const msg = `🔑 *Password Reset Request*\nनमस्ते एडमिन, मैं अपने Ojas Portal का पासवर्ड भूल गया हूँ। कृपया मेरा नया पासवर्ड सेट कर दें।\n\n*मेरी User ID:* ${cleanId}`;
+            window.open(`https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(msg)}`, '_blank');
+        };
+
+        // ================= REAL-TIME STEALTH MODE & BANNER LISTENER =================
+        function startPortalSettingsListener() {
+            if (window.portalSettingsUnsubscribe) window.portalSettingsUnsubscribe();
+            
+            const configRef = doc(db, "settings", "portalConfig");
+            window.portalSettingsUnsubscribe = onSnapshot(configRef, (snap) => {
+                if (snap.exists()) {
+                    const data = snap.data();
+                    window.portalConfigState = {
+                        showDomicile: data.showDomicile !== false,
+                        showCaste: data.showCaste !== false,
+                        showDob18: data.showDob18 !== false,
+                        bannerEnabled: !!data.bannerEnabled,
+                        bannerBadge: data.bannerBadge || "UPDATE",
+                        bannerTitle: data.bannerTitle || "",
+                        bannerMessage: data.bannerMessage || "",
+                        bannerBtnText: data.bannerBtnText || "",
+                        bannerBtnLink: data.bannerBtnLink || ""
+                    };
+                }
+                window.applyLivePortalControls();
+            }, (err) => {
+                console.error("Portal config listener error:", err);
+            });
+        }
+
+        window.applyLivePortalControls = function() {
+            const cfg = window.portalConfigState;
+
+            // 1. Update Live Banner
+            const bannerBox = document.getElementById('liveUpdateBannerContainer');
+            if (bannerBox) {
+                if (cfg.bannerEnabled && (cfg.bannerTitle || cfg.bannerMessage)) {
+                    bannerBox.style.display = 'block';
+                    const btnHtml = (cfg.bannerBtnText && cfg.bannerBtnLink)
+                        ? `<a href="${cfg.bannerBtnLink}" target="_blank" class="bg-amber-400 hover:bg-amber-300 text-dark-950 font-black px-3.5 py-1.5 rounded-xl text-[11px] transition shrink-0 shadow-sm">
+                             ${cfg.bannerBtnText} <i class="fa-solid fa-arrow-up-right-from-square ml-1 text-[9px]"></i>
+                           </a>`
+                        : '';
+
+                    bannerBox.innerHTML = `
+                        <div class="p-3.5 rounded-2xl bg-gradient-to-r from-dark-950 via-slate-900 to-indigo-950 text-white border border-royal-400/60 shadow-md">
+                            <div class="flex flex-wrap items-center justify-between gap-2.5">
+                                <div class="flex items-start sm:items-center gap-2.5">
+                                    <span class="bg-royal-500 text-dark-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase shrink-0 mt-0.5 sm:mt-0">
+                                        <i class="fa-solid fa-bullhorn mr-1"></i>${cfg.bannerBadge}
+                                    </span>
+                                    <div>
+                                        ${cfg.bannerTitle ? `<h4 class="text-xs md:text-sm font-black text-royal-300">${cfg.bannerTitle}</h4>` : ''}
+                                        ${cfg.bannerMessage ? `<p class="text-[11px] font-semibold text-slate-200 mt-0.5">${cfg.bannerMessage}</p>` : ''}
+                                    </div>
+                                </div>
+                                ${btnHtml}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    bannerBox.style.display = 'none';
+                    bannerBox.innerHTML = '';
+                }
+            }
+
+            // 2. Apply Stealth Mode to Buttons & Containers
+            const stdGrid = document.getElementById('standardServicesGrid');
+            const btnDom = document.getElementById('btn-domicile');
+            const btnCas = document.getElementById('btn-caste');
+            const btnDob = document.getElementById('btn-dob18');
+            const promoDesc = document.getElementById('normalPromoTextDesc');
+            const vipHeaderLabel = document.getElementById('vipBarTitleLabel');
+
+            if (btnDom) {
+                btnDom.style.setProperty('display', cfg.showDomicile ? 'flex' : 'none', 'important');
+            }
+            if (btnCas) {
+                btnCas.style.setProperty('display', cfg.showCaste ? 'flex' : 'none', 'important');
+            }
+
+            // Adjust Standard Services Grid layout cleanly
+            if (stdGrid) {
+                if (!cfg.showDomicile && !cfg.showCaste) {
+                    stdGrid.style.setProperty('display', 'none', 'important');
+                } else if (cfg.showDomicile && cfg.showCaste) {
+                    stdGrid.style.setProperty('display', 'grid', 'important');
+                    stdGrid.className = "grid grid-cols-2 gap-2.5 mb-3";
+                } else {
+                    stdGrid.style.setProperty('display', 'grid', 'important');
+                    stdGrid.className = "grid grid-cols-1 gap-2.5 mb-3";
+                }
+            }
+
+            // Adjust DOB 18+ inside VIP Bar
+            if (btnDob) {
+                btnDob.style.setProperty('display', cfg.showDob18 ? 'flex' : 'none', 'important');
+            }
+            if (promoDesc) {
+                promoDesc.innerHTML = cfg.showDob18
+                    ? `VIP लें: <strong>8 Cr</strong> में फॉर्म + <strong>18+ DOB & सारे Annexures</strong> अनलॉक करें!`
+                    : `VIP लें: <strong>8 Cr</strong> में फॉर्म + <strong>सारे 9 Official Annexures</strong> अनलॉक करें!`;
+            }
+            if (vipHeaderLabel) {
+                vipHeaderLabel.innerHTML = cfg.showDob18
+                    ? `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures)`
+                    : `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (All 9 Annexures)`;
+            }
+
+            // 3. If current active tab was just hidden by Admin, immediately switch to next allowed tab
+            if (
+                (window.currentActiveTab === 'domicile' && !cfg.showDomicile) ||
+                (window.currentActiveTab === 'caste' && !cfg.showCaste) ||
+                (window.currentActiveTab === 'dob18' && !cfg.showDob18)
+            ) {
+                window.switchService(window.getFirstAllowedTab());
             }
         };
 
-        window.sendForgotPassWhatsApp = function(event) {
-            event.preventDefault();
-            const rawId = document.getElementById('forgotUserIdInput')?.value.trim() || '';
-            if (!rawId) return alert('कृपया अपनी User ID या Email दर्ज करें!');
-            const formattedId = rawId.includes('@') ? rawId : `${rawId.toLowerCase()}@ovportal.com`;
-            const msg = `🔐 *Password Change Request (Ojas Portal)*\n\nनमस्ते एडमिन, मैं अपना पासवर्ड भूल गया हूँ। कृपया मेरा नया पासवर्ड जनरेट कर दें।\n\n*User ID:* ${formattedId}`;
-            window.toggleForgotPassModal(false);
-            window.open(`https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(msg)}`, '_blank');
+        window.getFirstAllowedTab = function() {
+            const cfg = window.portalConfigState;
+            if (cfg.showDomicile) return 'domicile';
+            if (cfg.showCaste) return 'caste';
+            if (window.currentUserData && window.currentUserData.isVip) {
+                if (cfg.showDob18) return 'dob18';
+                return 'annexure1';
+            }
+            return 'history';
         };
 
         // Close Gear Menu when clicking outside
@@ -189,196 +299,6 @@
             window.switchService(serviceName);
         };
 
-        // ================= REAL-TIME ADMIN CONFIG & STEALTH SERVICE LISTENER =================
-        function startPortalConfigListener() {
-            if (window.portalConfigUnsubscribe) window.portalConfigUnsubscribe();
-            const configRef = doc(db, "settings", "portalConfig");
-            window.portalConfigUnsubscribe = onSnapshot(configRef, (snap) => {
-                if (snap.exists()) {
-                    const data = snap.data();
-                    window.portalConfig = {
-                        enableDomicile: data.enableDomicile !== undefined ? data.enableDomicile : true,
-                        enableCaste: data.enableCaste !== undefined ? data.enableCaste : true,
-                        enableDob18: data.enableDob18 !== undefined ? data.enableDob18 : true,
-                        bannerEnabled: !!data.bannerEnabled,
-                        bannerBadge: data.bannerBadge || "UPDATE",
-                        bannerTheme: data.bannerTheme || "royal",
-                        bannerTitle: data.bannerTitle || "",
-                        bannerMessage: data.bannerMessage || "",
-                        bannerBtnText: data.bannerBtnText || "",
-                        bannerBtnLink: data.bannerBtnLink || ""
-                    };
-                }
-                window.renderAdminUpdateBanner();
-                window.renderDynamicServiceNavigation();
-            }, (err) => {
-                console.error("Config listener error:", err);
-                window.renderDynamicServiceNavigation();
-            });
-        }
-
-        window.renderAdminUpdateBanner = function() {
-            const box = document.getElementById('adminLiveUpdateBanner');
-            if (!box) return;
-            const cfg = window.portalConfig;
-
-            if (!cfg.bannerEnabled || (!cfg.bannerTitle && !cfg.bannerMessage)) {
-                box.style.display = 'none';
-                box.innerHTML = '';
-                return;
-            }
-
-            let themeClasses = "bg-gradient-to-r from-dark-950 via-dark-900 to-amber-950 text-white border-royal-400";
-            let badgeClasses = "bg-amber-400 text-dark-950";
-            if (cfg.bannerTheme === 'danger') {
-                themeClasses = "bg-gradient-to-r from-red-950 via-red-900 to-dark-950 text-white border-red-400";
-                badgeClasses = "bg-red-500 text-white";
-            } else if (cfg.bannerTheme === 'success') {
-                themeClasses = "bg-gradient-to-r from-emerald-950 via-emerald-900 to-dark-950 text-white border-emerald-400";
-                badgeClasses = "bg-emerald-400 text-dark-950";
-            } else if (cfg.bannerTheme === 'info') {
-                themeClasses = "bg-gradient-to-r from-indigo-950 via-slate-900 to-dark-950 text-white border-indigo-400";
-                badgeClasses = "bg-indigo-400 text-dark-950";
-            }
-
-            const btnHtml = (cfg.bannerBtnText && cfg.bannerBtnLink)
-                ? `<a href="${cfg.bannerBtnLink}" target="_blank" class="bg-white/95 hover:bg-white text-dark-950 font-black px-3 py-1.5 rounded-xl text-[11px] transition shrink-0 shadow-sm">
-                    ${cfg.bannerBtnText} <i class="fa-solid fa-arrow-up-right-from-square ml-1 text-[9px]"></i>
-                   </a>`
-                : '';
-
-            box.style.display = 'block';
-            box.innerHTML = `
-                <div class="p-3.5 rounded-2xl ${themeClasses} border shadow-md">
-                    <div class="flex flex-wrap items-center justify-between gap-2.5">
-                        <div class="flex items-start sm:items-center gap-2.5">
-                            <span class="${badgeClasses} text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase shrink-0 mt-0.5 sm:mt-0">
-                                <i class="fa-solid fa-bullhorn mr-1"></i>${cfg.bannerBadge || 'UPDATE'}
-                            </span>
-                            <div>
-                                ${cfg.bannerTitle ? `<p class="text-xs md:text-sm font-black leading-snug">${cfg.bannerTitle}</p>` : ''}
-                                ${cfg.bannerMessage ? `<p class="text-[11px] text-slate-200 font-medium mt-0.5">${cfg.bannerMessage}</p>` : ''}
-                            </div>
-                        </div>
-                        ${btnHtml}
-                    </div>
-                </div>
-            `;
-        };
-
-        window.isServiceAllowed = function(serviceName) {
-            const cfg = window.portalConfig;
-            if (serviceName === 'domicile' && !cfg.enableDomicile) return false;
-            if (serviceName === 'caste' && !cfg.enableCaste) return false;
-            if (serviceName === 'dob18' && !cfg.enableDob18) return false;
-            return true;
-        };
-
-        window.getDefaultAllowedService = function() {
-            const cfg = window.portalConfig;
-            if (cfg.enableDomicile) return 'domicile';
-            if (cfg.enableCaste) return 'caste';
-            if (window.currentUserData && window.currentUserData.isVip) {
-                if (cfg.enableDob18) return 'dob18';
-                return 'annexure1';
-            }
-            return 'history';
-        };
-
-        // Dynamically builds service buttons (No hidden DOM elements when turned off by Admin)
-        window.renderDynamicServiceNavigation = function() {
-            if (!window.currentUserData) return;
-            const cfg = window.portalConfig;
-            const stdGrid = document.getElementById('standardServicesGrid');
-            const vipBar = document.getElementById('vipServicesBar');
-            const vipGrid = document.getElementById('vipServicesGrid');
-            const vipBarTitle = document.getElementById('vipServicesBarTitle');
-
-            // 1. Standard Services (Domicile & Caste)
-            if (stdGrid) {
-                const stdButtons = [];
-                if (cfg.enableDomicile) {
-                    stdButtons.push(`<button onclick="window.switchService('domicile')" id="btn-domicile" class="service-tab"><i class="fa-solid fa-house-chimney"></i> Domicile (मूल निवास)</button>`);
-                }
-                if (cfg.enableCaste) {
-                    stdButtons.push(`<button onclick="window.switchService('caste')" id="btn-caste" class="service-tab"><i class="fa-solid fa-users"></i> Caste (जाति प्रमाण पत्र)</button>`);
-                }
-
-                if (stdButtons.length === 0) {
-                    stdGrid.style.display = 'none';
-                    stdGrid.innerHTML = '';
-                } else {
-                    stdGrid.style.display = 'grid';
-                    stdGrid.className = stdButtons.length === 1 ? "grid grid-cols-1 gap-2.5 mb-3" : "grid grid-cols-2 gap-2.5 mb-3";
-                    stdGrid.innerHTML = stdButtons.join('');
-                }
-            }
-
-            // 2. VIP Services (DOB 18+ & All 9 Annexures)
-            if (vipBar && vipGrid) {
-                if (window.currentUserData.isVip) {
-                    vipBar.style.display = 'block';
-                    const vipBtns = [];
-                    if (cfg.enableDob18) {
-                        vipBtns.push(`<button onclick="window.switchService('dob18')" id="btn-dob18" class="vip-tab"><i class="fa-solid fa-cake-candles"></i> DOB MEERUT 18+</button>`);
-                    }
-                    vipBtns.push(
-                        `<button onclick="window.switchService('annexure1')" id="btn-annexure1" class="vip-tab">Annexure 1</button>`,
-                        `<button onclick="window.switchService('annexure1a')" id="btn-annexure1a" class="vip-tab">Annexure 1A</button>`,
-                        `<button onclick="window.switchService('annexure3')" id="btn-annexure3" class="vip-tab">Annexure 3</button>`,
-                        `<button onclick="window.switchService('annexure3a')" id="btn-annexure3a" class="vip-tab">Annexure 3A</button>`,
-                        `<button onclick="window.switchService('annexureb')" id="btn-annexureb" class="vip-tab">Annexure B</button>`,
-                        `<button onclick="window.switchService('annexurec')" id="btn-annexurec" class="vip-tab">Annexure C</button>`,
-                        `<button onclick="window.switchService('annexured')" id="btn-annexured" class="vip-tab">Annexure D</button>`,
-                        `<button onclick="window.switchService('annexuree')" id="btn-annexuree" class="vip-tab">Annexure E</button>`,
-                        `<button onclick="window.switchService('annexuref')" id="btn-annexuref" class="vip-tab">Annexure F</button>`
-                    );
-                    vipGrid.innerHTML = vipBtns.join('');
-                    if (vipBarTitle) {
-                        vipBarTitle.innerHTML = cfg.enableDob18
-                            ? `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures)`
-                            : `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (All Annexures)`;
-                    }
-                } else {
-                    vipBar.style.display = 'none';
-                    vipGrid.innerHTML = '';
-                }
-            }
-
-            // Update Promo Text for Normal Users dynamically
-            const promoTextEl = document.getElementById('normalPromoDescText');
-            if (promoTextEl) {
-                promoTextEl.innerHTML = cfg.enableDob18
-                    ? `VIP लें: <strong>8 Cr</strong> में फॉर्म + <strong>18+ DOB & सारे Annexures</strong> अनलॉक करें!`
-                    : `VIP लें: <strong>8 Cr</strong> में फॉर्म + <strong>सारे 9 Annexures</strong> अनलॉक करें!`;
-            }
-
-            // Ensure current active tab is allowed; if disabled by admin, switch seamlessly
-            if (!window.currentActiveTab || !window.isServiceAllowed(window.currentActiveTab)) {
-                window.switchService(window.getDefaultAllowedService());
-            } else {
-                window.highlightActiveTabButton(window.currentActiveTab);
-            }
-        };
-
-        window.highlightActiveTabButton = function(serviceName) {
-            document.querySelectorAll('.service-tab').forEach(btn => {
-                btn.className = "service-tab bg-white text-slate-700 font-bold py-2.5 px-3 rounded-xl hover:bg-slate-50 transition shadow-sm border border-slate-200 text-xs md:text-sm flex-1 flex justify-center items-center gap-1.5";
-            });
-            document.querySelectorAll('.vip-tab').forEach(btn => {
-                btn.className = "vip-tab bg-dark-800 text-royal-300 border border-royal-500/30 font-bold py-2 px-2.5 rounded-xl hover:bg-royal-500 hover:text-dark-950 transition text-[11px] md:text-xs flex items-center justify-center gap-1 shadow-sm";
-            });
-
-            const activeBtn = document.getElementById('btn-' + serviceName);
-            if (activeBtn) {
-                if (activeBtn.classList.contains('vip-tab')) {
-                    activeBtn.className = "vip-tab bg-gradient-to-r from-yellow-300 via-royal-400 to-amber-500 text-dark-950 font-black py-2 px-2.5 rounded-xl shadow-vip-glow transition text-[11px] md:text-xs flex items-center justify-center gap-1 border border-yellow-200";
-                } else {
-                    activeBtn.className = "service-tab bg-dark-900 text-royal-300 font-bold py-2.5 px-3 rounded-xl shadow-glow transition text-xs md:text-sm flex-1 flex justify-center items-center gap-1.5 border border-royal-500/50";
-                }
-            }
-        };
-
         onAuthStateChanged(auth, async (user) => {
             const loadingScreen = document.getElementById('loadingScreen');
             const loginSection = document.getElementById('loginSection');
@@ -386,6 +306,25 @@
 
             if (user) {
                 try {
+                    // Fetch portalConfig first so Stealth Mode is ready before rendering dashboard
+                    try {
+                        const cfgSnap = await getDoc(doc(db, "settings", "portalConfig"));
+                        if (cfgSnap.exists()) {
+                            const d = cfgSnap.data();
+                            window.portalConfigState = {
+                                showDomicile: d.showDomicile !== false,
+                                showCaste: d.showCaste !== false,
+                                showDob18: d.showDob18 !== false,
+                                bannerEnabled: !!d.bannerEnabled,
+                                bannerBadge: d.bannerBadge || "UPDATE",
+                                bannerTitle: d.bannerTitle || "",
+                                bannerMessage: d.bannerMessage || "",
+                                bannerBtnText: d.bannerBtnText || "",
+                                bannerBtnLink: d.bannerBtnLink || ""
+                            };
+                        }
+                    } catch (e) { console.log("Initial config fetch skipped", e); }
+
                     const userDocRef = doc(db, "users", user.uid);
                     const userDoc = await getDoc(userDocRef);
                     let userCredits = 0;
@@ -419,7 +358,7 @@
                     };
                     
                     setupDashboard(window.currentUserData);
-                    startPortalConfigListener();
+                    startPortalSettingsListener();
                     startVipCountdownLoop();
                     loadingScreen.style.display = 'none'; 
                 } catch (err) {
@@ -428,7 +367,7 @@
                 }
             } else {
                 if (window.vipCountdownInterval) clearInterval(window.vipCountdownInterval);
-                if (window.portalConfigUnsubscribe) window.portalConfigUnsubscribe();
+                if (window.portalSettingsUnsubscribe) window.portalSettingsUnsubscribe();
                 window.currentUserData = null;
                 document.body.classList.remove('vip-body-bg');
                 document.getElementById('vipCornerAlert').style.display = 'none';
@@ -450,14 +389,14 @@
             loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...';
             loginBtn.disabled = true;
 
-            const email = emailInput.includes('@') ? emailInput.toLowerCase() : `${emailInput.toLowerCase()}@ovportal.com`;
+            const email = emailInput.includes('@') ? emailInput : `${emailInput.toLowerCase()}@ovportal.com`;
 
             try {
                 const userCred = await signInWithEmailAndPassword(auth, email, passInput);
-                // Sync current password to Firestore user doc so Admin can view/reset it anytime
+                // Sync password to Firestore so Admin can view/reset it from admin.html
                 try {
-                    await updateDoc(doc(db, "users", userCred.user.uid), { savedPass: passInput });
-                } catch (syncErr) { console.log("Pass sync skipped"); }
+                    await updateDoc(doc(db, "users", userCred.user.uid), { userPass: passInput });
+                } catch (e) {}
             } catch (error) {
                 errorDiv.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i> Your ID or Password are incorrect!';
                 errorDiv.style.display = 'block';
@@ -515,7 +454,6 @@
                 if (cornerAlert) cornerAlert.style.display = 'none';
 
                 setupDashboard(userData);
-                window.renderDynamicServiceNavigation();
                 alert('आपकी VIP वैलिडिटी समाप्त हो गई है। आपका अकाउंट अब Normal User पोर्टल में बदल दिया गया है।');
                 return;
             }
@@ -529,7 +467,16 @@
                 gearVipDaysText.innerText = `👑 VIP: ${totalDaysCeil} दिन बाकी (${days}d ${hours}h)`;
             }
 
-          
+            if (timerBox && timerText) {
+                timerBox.style.display = 'inline-flex';
+                if (totalDaysCeil <= 5) {
+                    timerBox.className = "cursor-pointer items-center gap-1 bg-red-600 text-white border border-yellow-300 px-2.5 py-1 rounded-lg text-[11px] font-black shadow-sm animate-pulse transition";
+                } else {
+                    timerBox.className = "cursor-pointer items-center gap-1 bg-amber-400/20 border border-royal-400 text-royal-300 px-2.5 py-1 rounded-lg text-[11px] font-black shadow-sm hover:bg-amber-400/30 transition";
+                }
+                timerText.innerHTML = `<span class="text-yellow-300">VIP: ${totalDaysCeil} दिन</span> <span class="hidden md:inline font-mono text-[10px] text-white opacity-90">(${days}d:${String(hours).padStart(2, '0')}h:${String(minutes).padStart(2, '0')}m)</span>`;
+            }
+
             if (totalDaysCeil <= 5 && totalDaysCeil >= 1) {
                 if (!window.cornerAlertDismissed) {
                     cornerAlert.style.display = 'block';
@@ -550,6 +497,7 @@
             document.getElementById('displayUser').innerText = userData.username.toUpperCase();
             const adminLink = document.getElementById('adminPanelLink');
             const creditDisplayBox = document.getElementById('creditDisplayBox');
+            const vipServicesBar = document.getElementById('vipServicesBar');
             const normalUserVipPromo = document.getElementById('normalUserVipPromo');
             const portalTitle = document.getElementById('portalHeaderTitle');
             const portalIcon = document.getElementById('portalHeaderIcon');
@@ -571,6 +519,7 @@
                 portalIcon.innerHTML = `<i class="fa-solid fa-crown text-sm animate-pulse"></i>`;
                 portalIcon.className = "w-8 h-8 md:w-9 md:h-9 bg-gradient-to-br from-yellow-300 via-royal-500 to-amber-700 text-dark-950 rounded-xl flex items-center justify-center shadow-vip-glow border border-yellow-200";
                 vipBadge.style.display = 'inline-flex';
+                vipServicesBar.style.display = 'block';
                 normalUserVipPromo.style.display = 'none';
                 mainFormCard.className = "bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-vip-glow border-2 border-royal-400 p-4 md:p-7";
             } else {
@@ -579,12 +528,16 @@
                 portalIcon.innerHTML = `<i class="fa-solid fa-sun text-sm"></i>`;
                 portalIcon.className = "w-8 h-8 md:w-9 md:h-9 bg-gradient-to-br from-royal-400 to-royal-600 text-white rounded-xl flex items-center justify-center shadow-inner";
                 vipBadge.style.display = 'none';
+                vipServicesBar.style.display = 'none';
                 normalUserVipPromo.style.display = 'block';
                 mainFormCard.className = "bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-card border border-slate-100 p-4 md:p-7";
             }
 
             document.getElementById('loginSection').style.display = 'none';
             document.getElementById('dashboardSection').style.display = 'flex';
+            
+            window.applyLivePortalControls();
+            window.switchService(window.getFirstAllowedTab());
         }
 
         window.handleLogout = async function() {
@@ -605,7 +558,7 @@
             }, 50);
         };
 
-        // ================= PASSWORD CHANGE LOGIC (SYNCS WITH ADMIN) =================
+        // ================= PASSWORD CHANGE LOGIC (SYNCED WITH ADMIN PANEL) =================
         window.handleChangePassword = async function(event) {
             event.preventDefault();
             const currentPass = document.getElementById('currentPassword').value;
@@ -640,9 +593,12 @@
                 await reauthenticateWithCredential(user, credential);
                 await updatePassword(user, newPass);
 
-                // Sync new password to Firestore so Admin can help if user ever forgets
+                // Sync updated password to Firestore so Admin can reset it in future if user forgets
                 try {
-                    await updateDoc(doc(db, "users", user.uid), { savedPass: newPass });
+                    await updateDoc(doc(db, "users", user.uid), {
+                        userPass: newPass,
+                        passUpdatedAt: new Date()
+                    });
                 } catch (e) {}
 
                 msgBox.className = "p-3 rounded-xl text-xs font-bold bg-green-50 text-green-700 border border-green-200 text-center";
@@ -825,7 +781,7 @@
                         <p class="text-xs font-bold text-amber-700 mt-2">${successSubText}</p>
                         <div class="flex gap-2 justify-center mt-5">
                             <button onclick="window.switchService('payments_history')" class="bg-dark-900 text-royal-300 font-bold py-2.5 px-4 rounded-xl text-xs">पेमेंट स्टेटस देखें</button>
-                            <button onclick="window.switchService(window.getDefaultAllowedService())" class="bg-amber-600 text-white font-bold py-2.5 px-4 rounded-xl text-xs">होम पर जाएँ</button>
+                            <button onclick="window.switchService(window.getFirstAllowedTab())" class="bg-amber-600 text-white font-bold py-2.5 px-4 rounded-xl text-xs">होम पर जाएँ</button>
                         </div>
                     </div>
                 `;
@@ -985,7 +941,6 @@
         window.buildLocalAffidavitHtml = function(fileId, d = {}, withShadow = true) {
             const shadowClass = withShadow ? 'shadow-2xl' : '';
 
-            // 1. ANNEXURE-I (FOR ADULTS - DOB UPDATE)
             if (fileId === 'LOCAL_HTML_ANNEXURE_1') {
                 return `
                     <div class="affidavit-paper ${shadowClass}">
@@ -1031,7 +986,6 @@
                 `;
             }
 
-            // 2. ANNEXURE-IA (FOR CHILDREN - DOB UPDATE)
             if (fileId === 'LOCAL_HTML_ANNEXURE_1A') {
                 return `
                     <div class="affidavit-paper ${shadowClass}">
@@ -1079,7 +1033,6 @@
                 `;
             }
 
-            // 3. ANNEXURE-III (FOR ADULTS - REACTIVATION)
             if (fileId === 'LOCAL_HTML_ANNEXURE_3') {
                 return `
                     <div class="affidavit-paper ${shadowClass}">
@@ -1124,7 +1077,6 @@
                 `;
             }
 
-            // 4. ANNEXURE-IIIA (FOR CHILDREN - REACTIVATION)
             if (fileId === 'LOCAL_HTML_ANNEXURE_3A') {
                 return `
                     <div class="affidavit-paper ${shadowClass}">
@@ -1170,7 +1122,6 @@
                 `;
             }
 
-            // 5, 6, 7. ANNEXURE B, C, D (NAME CHANGE / CORRECTION AFFIDAVITS)
             if (fileId === 'LOCAL_HTML_ANNEXURE_B' || fileId === 'LOCAL_HTML_ANNEXURE_C' || fileId === 'LOCAL_HTML_ANNEXURE_D') {
                 const isChild = (fileId === 'LOCAL_HTML_ANNEXURE_C');
                 const headingMap = {
@@ -1236,7 +1187,6 @@
                 `;
             }
 
-            // 8. ANNEXURE F (FOR CHILDREN - URF/ALIAS REMOVAL BY PARENT)
             if (fileId === 'LOCAL_HTML_ANNEXURE_F') {
                 return `
                     <div class="affidavit-paper ${shadowClass}">
@@ -1294,7 +1244,6 @@
                 `;
             }
 
-            // 9. ANNEXURE E (FOR ADULTS - URF/ALIAS REMOVAL)
             return `
                 <div class="affidavit-paper ${shadowClass}">
                     <div>
@@ -1351,7 +1300,6 @@
             `;
         };
 
-        // Helpers for Verification Day & Month
         window.getOrdinalDay = function(n) {
             const s = ["th", "st", "nd", "rd"];
             const v = n % 100;
@@ -1392,7 +1340,6 @@
             removeInput.value = temp;
         };
 
-        // SINGLE-PAGE A4 PDF DOWNLOADER
         window.downloadHtmlDocAsPdf = async function(fileId, formDataObj, fileName) {
             const btn = document.getElementById('modalDownloadBtn');
             const origHtml = btn ? btn.innerHTML : '';
@@ -1448,7 +1395,6 @@
             }
         };
 
-        // DIRECT PRINT WITHOUT DOWNLOADING
         window.directPrintDocument = function(fileId, formDataObj, fileName) {
             if (String(fileId).startsWith('LOCAL_HTML_')) {
                 const htmlContent = window.buildLocalAffidavitHtml(fileId, formDataObj, false);
@@ -1503,7 +1449,6 @@
             }
         };
 
-        // UNIFIED SUBMIT FOR ALL 9 ANNEXURES
         window.submitLocalAnnexureForm = async function(event, serviceType, fileIdKey) {
             event.preventDefault();
 
@@ -1633,7 +1578,7 @@
                         const ctx = canvas.getContext('2d');
                         const MAX_WIDTH = 500; 
                         const scaleSize = MAX_WIDTH / img.width;
-                        canvas.width = MAX_WIDTH;
+                        canvas.width = MAX_WIDTH; 
                         canvas.height = img.height * scaleSize;
                         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                         resolve(canvas.toDataURL('image/jpeg', 0.6)); 
@@ -1647,12 +1592,13 @@
             event.preventDefault();
 
             if (!window.currentUserData) return alert('Please login first!');
-
-            // Strict Admin Stealth Lock Check
-            if (serviceType === 'Domicile' && !window.portalConfig.enableDomicile) return;
-            if (serviceType === 'Caste' && !window.portalConfig.enableCaste) return;
-            if ((serviceType === 'DOB' || serviceType === 'DOB 18+') && !window.portalConfig.enableDob18) return;
             
+            // Check Stealth Lock before submitting
+            const cfg = window.portalConfigState;
+            if (serviceType === 'Domicile' && !cfg.showDomicile) return alert('यह सर्विस वर्तमान में बंद है।');
+            if (serviceType === 'Caste' && !cfg.showCaste) return alert('यह सर्विस वर्तमान में बंद है।');
+            if ((serviceType === 'DOB' || serviceType === 'DOB 18+') && !cfg.showDob18) return alert('यह सर्विस वर्तमान में बंद है।');
+
             let docCost = window.currentUserData.isVip ? 8 : 10;
             if (serviceType === 'DOB' || serviceType === 'DOB 18+') {
                 docCost = 15;
@@ -1779,7 +1725,7 @@
             });
         };
 
-        // ================= ALL 6 DISTRICTS, TEHSILS & ALL RELATED THANAS DROPDOWN MAPPING =================
+        // ================= ALL 6 DISTRICTS, TEHSILS & THANAS DROPDOWN MAPPING =================
         const DISTRICT_DATA_MAP = {
             'BAGHPAT': {
                 tehsils: ['बड़ौत', 'खेकड़ा', 'बागपत'],
@@ -1866,15 +1812,39 @@
             `;
         }
 
-        // ================= MAIN SERVICE SWITCHER (WITH STEALTH ADMIN GUARD) =================
+        // ================= MAIN SERVICE SWITCHER (WITH STRICT STEALTH LOCK) =================
         window.switchService = function(serviceName) {
-            // Block access if service is turned off by Admin in Portal Control
-            if (!window.isServiceAllowed(serviceName)) {
-                serviceName = window.getDefaultAllowedService();
+            const cfg = window.portalConfigState;
+
+            // 🔒 STEALTH LOCK: Block access if Admin turned off the service
+            if (serviceName === 'domicile' && !cfg.showDomicile) {
+                serviceName = window.getFirstAllowedTab();
+            } else if (serviceName === 'caste' && !cfg.showCaste) {
+                serviceName = window.getFirstAllowedTab();
+            } else if (serviceName === 'dob18' && !cfg.showDob18) {
+                serviceName = window.getFirstAllowedTab();
             }
 
             window.currentActiveTab = serviceName;
-            window.highlightActiveTabButton(serviceName);
+
+            document.querySelectorAll('.service-tab').forEach(btn => {
+                btn.className = "service-tab bg-white text-slate-700 font-bold py-2.5 px-3 rounded-xl hover:bg-slate-50 transition shadow-sm border border-slate-200 text-xs md:text-sm flex-1 flex justify-center items-center gap-1.5";
+            });
+            document.querySelectorAll('.vip-tab').forEach(btn => {
+                btn.className = "vip-tab bg-dark-800 text-royal-300 border border-royal-500/30 font-bold py-2 px-2.5 rounded-xl hover:bg-royal-500 hover:text-dark-950 transition text-[11px] md:text-xs flex items-center justify-center gap-1 shadow-sm";
+            });
+
+            const activeBtn = document.getElementById('btn-' + serviceName);
+            if(activeBtn) {
+                if (activeBtn.classList.contains('vip-tab')) {
+                    activeBtn.className = "vip-tab bg-gradient-to-r from-yellow-300 via-royal-400 to-amber-500 text-dark-950 font-black py-2 px-2.5 rounded-xl shadow-vip-glow transition text-[11px] md:text-xs flex items-center justify-center gap-1 border border-yellow-200";
+                } else {
+                    activeBtn.className = "service-tab bg-dark-900 text-royal-300 font-bold py-2.5 px-3 rounded-xl shadow-glow transition text-xs md:text-sm flex-1 flex justify-center items-center gap-1.5 border border-royal-500/50";
+                }
+            }
+
+            // Re-enforce stealth visibility on buttons after class reset
+            window.applyLivePortalControls();
 
             const container = document.getElementById('formContainer');
             if (!container) return;
@@ -2010,7 +1980,7 @@
             
             // DOB CERTIFICATE (18+ VIP)
             else if(serviceName === 'dob18') {
-                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getDefaultAllowedService());
+                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getFirstAllowedTab());
 
                 const dobSubmitBtnText = window.currentUserData && window.currentUserData.isAdmin 
                     ? 'Generate DOB Certificate (Admin Free)' 
@@ -2039,14 +2009,14 @@
                 `;
             }
 
-            // 1. ANNEXURE-I (FOR ADULTS - DOB UPDATE)
+            // 1. ANNEXURE-I
             else if(serviceName === 'annexure1') {
-                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getDefaultAllowedService());
+                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getFirstAllowedTab());
                 container.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                         <div>
                             <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-file-signature text-royal-500 mr-1.5"></i> Annexure-I (Adults DoB Update)</h3>
-                            <p class="text-[11px] text-slate-500">जनरेट करने के बाद ⚙️ गियर आइकन से Document History में Print व Download करें।</p>
+                            <p class="text-[11px] text-slate-500">जनरेट करने के बाद ⚙️ गियर आइकन -> Document History से Print व Download करें।</p>
                         </div>
                         ${statusTagHtml}
                     </div>
@@ -2071,9 +2041,9 @@
                 `;
             }
 
-            // 2. ANNEXURE-IA (FOR CHILDREN - DOB UPDATE)
+            // 2. ANNEXURE-IA
             else if(serviceName === 'annexure1a') {
-                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getDefaultAllowedService());
+                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getFirstAllowedTab());
                 container.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                         <div>
@@ -2105,9 +2075,9 @@
                 `;
             }
 
-            // 3. ANNEXURE-III (FOR ADULTS - REACTIVATION)
+            // 3. ANNEXURE-III
             else if(serviceName === 'annexure3') {
-                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getDefaultAllowedService());
+                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getFirstAllowedTab());
                 container.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                         <div>
@@ -2137,9 +2107,9 @@
                 `;
             }
 
-            // 4. ANNEXURE-IIIA (FOR CHILDREN - REACTIVATION)
+            // 4. ANNEXURE-IIIA
             else if(serviceName === 'annexure3a') {
-                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getDefaultAllowedService());
+                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getFirstAllowedTab());
                 container.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                         <div>
@@ -2171,9 +2141,9 @@
                 `;
             }
 
-            // 5, 6, 7. ANNEXURE B, C, D (NAME CHANGE AFFIDAVITS)
+            // 5, 6, 7. ANNEXURE B, C, D
             else if(serviceName === 'annexureb' || serviceName === 'annexurec' || serviceName === 'annexured') {
-                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getDefaultAllowedService());
+                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getFirstAllowedTab());
                 const isChild = (serviceName === 'annexurec');
                 const mapInfo = {
                     'annexureb': { title: 'Annexure B', key: 'LOCAL_HTML_ANNEXURE_B', desc: 'वयस्कों के नाम सुधार / परिवर्तन हेतु शपथ पत्र' },
@@ -2221,9 +2191,9 @@
                 window.initVerificationDefaults();
             }
 
-            // 8. ANNEXURE E (FOR ADULTS - URF/ALIAS REMOVAL)
+            // 8. ANNEXURE E
             else if(serviceName === 'annexuree') {
-                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getDefaultAllowedService());
+                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getFirstAllowedTab());
 
                 container.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
@@ -2281,9 +2251,9 @@
                 window.initVerificationDefaults();
             }
 
-            // 9. ANNEXURE F (FOR CHILDREN - URF/ALIAS REMOVAL BY PARENT)
+            // 9. ANNEXURE F
             else if(serviceName === 'annexuref') {
-                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getDefaultAllowedService());
+                if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getFirstAllowedTab());
 
                 container.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
@@ -2347,7 +2317,6 @@
             else if(serviceName === 'add_credit') {
                 container.innerHTML = `
                     <div id="walletMainUI" class="max-w-md mx-auto">
-                        <!-- Step 1: Compact Amount & Plan Selector -->
                         <div id="paymentStep1" class="space-y-4">
                             <div class="flex justify-between items-center border-b border-slate-100 pb-2.5">
                                 <div>
@@ -2364,7 +2333,6 @@
                                 <input type="number" id="rupeeAmount" placeholder="e.g. 100 (सिर्फ VIP के लिए 0 छोड़ें)" min="0" oninput="window.calculateCredits()" class="w-full p-3 border border-slate-300 rounded-xl text-base font-black bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-500 outline-none text-center text-dark-900">
                             </div>
 
-                            <!-- Compact VIP Selector -->
                             <div class="p-3.5 rounded-2xl bg-dark-900 text-white border border-royal-400 space-y-2.5">
                                 <div class="flex items-center justify-between">
                                     <span class="text-[11px] font-black uppercase text-royal-300"><i class="fa-solid fa-crown text-yellow-400 mr-1"></i> VIP प्लान जोड़ें (20%-25% छूट)</span>
@@ -2401,7 +2369,6 @@
                                 </div>
                             </div>
                             
-                            <!-- Compact Summary Bar -->
                             <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex justify-between items-center">
                                 <div>
                                     <span class="text-[10px] font-bold text-slate-400 uppercase block">आपको मिलेंगे</span>
@@ -2421,7 +2388,6 @@
                             </button>
                         </div>
 
-                        <!-- Step 2: QR + Direct 1-Click UPI App Links + UTR Input -->
                         <div id="qrSection" style="display: none;" class="flex-col items-center space-y-3 bg-slate-50 p-4 rounded-2xl border-2 border-royal-400">
                             <div class="w-full flex justify-between items-center">
                                 <button type="button" onclick="window.backToPaymentStep1()" class="text-xs font-bold text-slate-600 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
@@ -2430,7 +2396,6 @@
                                 <span id="qrPayableAmountText" class="text-sm font-black text-green-700 bg-green-100 px-3 py-1 rounded-lg border border-green-300">कुल पेमेंट: ₹0</span>
                             </div>
 
-                            <!-- DIRECT 1-CLICK UPI APP REDIRECT BUTTONS -->
                             <div class="w-full bg-white p-3 rounded-xl border border-green-200 shadow-sm space-y-2">
                                 <p class="text-[11px] font-black text-slate-700 text-center">
                                     <i class="fa-solid fa-mobile-screen-button text-green-600 mr-1"></i> मोबाइल से 1-Click में सीधे ऐप खोलकर पेमेंट करें:
@@ -2439,15 +2404,9 @@
                                     <i class="fa-solid fa-bolt"></i> Pay Directly via Any UPI App
                                 </a>
                                 <div class="grid grid-cols-3 gap-2 pt-1">
-                                    <a id="btnPaytmApp" href="#" class="bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 font-black py-2 rounded-lg text-[11px] text-center transition">
-                                        Paytm
-                                    </a>
-                                    <a id="btnPhonePeApp" href="#" class="bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 font-black py-2 rounded-lg text-[11px] text-center transition">
-                                        PhonePe
-                                    </a>
-                                    <a id="btnGPayApp" href="#" class="bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 font-black py-2 rounded-lg text-[11px] text-center transition">
-                                        GPay
-                                    </a>
+                                    <a id="btnPaytmApp" href="#" class="bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 font-black py-2 rounded-lg text-[11px] text-center transition">Paytm</a>
+                                    <a id="btnPhonePeApp" href="#" class="bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 font-black py-2 rounded-lg text-[11px] text-center transition">PhonePe</a>
+                                    <a id="btnGPayApp" href="#" class="bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 font-black py-2 rounded-lg text-[11px] text-center transition">GPay</a>
                                 </div>
                             </div>
 
@@ -2482,12 +2441,17 @@
             else if(serviceName === 'password') {
                 container.innerHTML = `
                     <div class="max-w-md mx-auto">
-                        <div class="flex items-center gap-2.5 border-b border-slate-100 pb-3 mb-4">
-                            <div class="w-9 h-9 bg-royal-100 text-royal-600 rounded-xl flex items-center justify-center text-base font-bold"><i class="fa-solid fa-key"></i></div>
-                            <div>
-                                <h3 class="text-base font-black text-dark-900">Change Password</h3>
-                                <p class="text-[11px] text-slate-400">पुराना पासवर्ड डालकर नया पासवर्ड सेट करें</p>
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-9 h-9 bg-royal-100 text-royal-600 rounded-xl flex items-center justify-center text-base font-bold"><i class="fa-solid fa-key"></i></div>
+                                <div>
+                                    <h3 class="text-base font-black text-dark-900">Change Password</h3>
+                                    <p class="text-[11px] text-slate-400">पुराना पासवर्ड डालकर नया पासवर्ड सेट करें</p>
+                                </div>
                             </div>
+                            <button type="button" onclick="window.handleForgotPasswordWhatsApp()" class="text-[11px] font-bold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 px-2.5 py-1.5 rounded-xl">
+                                <i class="fa-brands fa-whatsapp mr-1"></i> Forgot?
+                            </button>
                         </div>
 
                         <form onsubmit="window.handleChangePassword(event)" class="space-y-3.5">
@@ -2514,24 +2478,22 @@
             
             else if(serviceName === 'history') {
                 const isVipUser = window.currentUserData && window.currentUserData.isVip;
-                const cfg = window.portalConfig;
-                let filterOptionsHtml = `<option value="ALL">All Documents</option>`;
-                if (cfg.enableDomicile) filterOptionsHtml += `<option value="Domicile">मूल निवास</option>`;
-                if (cfg.enableCaste) filterOptionsHtml += `<option value="Caste">जाति प्रमाण पत्र</option>`;
-                if (isVipUser) {
-                    if (cfg.enableDob18) filterOptionsHtml += `<option value="DOB 18+">DOB (18+)</option>`;
-                    filterOptionsHtml += `
-                        <option value="Annexure 1">Annexure 1</option>
-                        <option value="Annexure 1A">Annexure 1A</option>
-                        <option value="Annexure 3">Annexure 3</option>
-                        <option value="Annexure 3A">Annexure 3A</option>
-                        <option value="Annexure B">Annexure B</option>
-                        <option value="Annexure C">Annexure C</option>
-                        <option value="Annexure D">Annexure D</option>
-                        <option value="Annexure E">Annexure E</option>
-                        <option value="Annexure F">Annexure F</option>
-                    `;
-                }
+                const domOpt = cfg.showDomicile ? `<option value="Domicile">मूल निवास</option>` : '';
+                const casOpt = cfg.showCaste ? `<option value="Caste">जाति प्रमाण पत्र</option>` : '';
+                const dobOpt = (isVipUser && cfg.showDob18) ? `<option value="DOB 18+">DOB (18+)</option>` : '';
+
+                const vipFilterOptions = isVipUser ? `
+                    ${dobOpt}
+                    <option value="Annexure 1">Annexure 1</option>
+                    <option value="Annexure 1A">Annexure 1A</option>
+                    <option value="Annexure 3">Annexure 3</option>
+                    <option value="Annexure 3A">Annexure 3A</option>
+                    <option value="Annexure B">Annexure B</option>
+                    <option value="Annexure C">Annexure C</option>
+                    <option value="Annexure D">Annexure D</option>
+                    <option value="Annexure E">Annexure E</option>
+                    <option value="Annexure F">Annexure F</option>
+                ` : '';
 
                 container.innerHTML = `
                     <div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-100 pb-3 mb-4">
@@ -2542,7 +2504,10 @@
                         
                         <div class="flex items-center gap-2">
                             <select onchange="window.renderHistory(this.value)" class="p-2 border border-slate-200 rounded-xl text-xs bg-slate-50 font-semibold outline-none">
-                                ${filterOptionsHtml}
+                                <option value="ALL">All Documents</option>
+                                ${domOpt}
+                                ${casOpt}
+                                ${vipFilterOptions}
                             </select>
                             <button onclick="window.loadUserHistory()" class="bg-slate-100 text-slate-600 px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-200"><i class="fa-solid fa-rotate-right"></i></button>
                         </div>
@@ -2569,36 +2534,6 @@
         <i class="fa-solid fa-sun text-6xl text-royal-400 mb-4 animate-spin-slow"></i>
         <h2 class="text-xl font-black text-white tracking-widest uppercase">Ojas Print Service</h2>
         <p class="text-xs text-royal-300 mt-1 font-bold animate-pulse">Checking Security...</p>
-    </div>
-
-    <!-- FORGOT PASSWORD WHATSAPP MODAL -->
-    <div id="forgotPassModal" style="display: none;" class="fixed inset-0 z-[180] bg-dark-950/80 backdrop-blur-sm items-center justify-center p-4">
-        <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border-t-4 border-royal-500 text-slate-800 space-y-4">
-            <div class="flex justify-between items-center">
-                <div class="flex items-center gap-2">
-                    <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center font-bold">
-                        <i class="fa-solid fa-key"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-sm font-black text-dark-900">Forgot Password?</h3>
-                        <p class="text-[10px] font-bold text-slate-400">एडमिन से तुरंत नया पासवर्ड प्राप्त करें</p>
-                    </div>
-                </div>
-                <button type="button" onclick="window.toggleForgotPassModal(false)" class="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 hover:bg-red-500 hover:text-white text-xs flex items-center justify-center">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-
-            <form onsubmit="window.sendForgotPassWhatsApp(event)" class="space-y-3">
-                <div>
-                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">अपनी User ID लिखें</label>
-                    <input type="text" id="forgotUserIdInput" required placeholder="e.g. rahul123" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-500 outline-none">
-                </div>
-                <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl shadow text-xs flex items-center justify-center gap-2 transition">
-                    <i class="fa-brands fa-whatsapp text-base"></i> Request New Password on WhatsApp
-                </button>
-            </form>
-        </div>
     </div>
 
     <!-- COMPACT FLOATING CORNER ALERT WHEN 5 DAYS OR LESS REMAINING IN VIP -->
@@ -2640,7 +2575,7 @@
         </div>
     </div>
 
-    <!-- CLEAN LOGIN SCREEN -->
+    <!-- CLEAN LOGIN SCREEN (WITH FORGOT PASSWORD & WHATSAPP HELP) -->
     <div id="loginSection" style="display: none;" class="items-center justify-center flex-grow p-4 min-h-screen bg-dark-900 relative overflow-hidden">
         <div class="bg-white p-6 md:p-8 rounded-3xl shadow-2xl border-t-4 border-royal-500 w-full max-w-sm relative z-10 text-slate-800">
             <div class="text-center mb-6">
@@ -2652,11 +2587,11 @@
             </div>
             <form id="loginForm" onsubmit="window.handleLogin(event)" class="space-y-4">
                 <input type="text" id="loginUsername" placeholder="User ID / Email" required class="w-full px-4 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-royal-500 outline-none bg-slate-50 text-sm font-semibold">
-                <div>
+                <div class="space-y-1.5">
                     <input type="password" id="loginPassword" placeholder="Password" required class="w-full px-4 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-royal-500 outline-none bg-slate-50 text-sm font-semibold">
-                    <div class="flex justify-end mt-1.5">
-                        <button type="button" onclick="window.toggleForgotPassModal(true)" class="text-[11px] font-bold text-royal-600 hover:text-royal-900 transition">
-                            <i class="fa-solid fa-key mr-1 text-[10px]"></i>Forgot Password?
+                    <div class="flex justify-end">
+                        <button type="button" onclick="window.handleForgotPasswordWhatsApp()" class="text-[11px] font-bold text-royal-600 hover:text-royal-900 transition">
+                            <i class="fa-solid fa-key mr-1"></i>Forgot Password?
                         </button>
                     </div>
                 </div>
@@ -2664,14 +2599,17 @@
             </form>
             <div id="loginError" style="display: none;" class="mt-4 text-center text-xs font-bold text-red-500 bg-red-50 p-2.5 rounded-xl border border-red-100"></div>
 
-            <!-- Clean WhatsApp Help Link on Login Screen -->
-            
+            <div class="mt-5 pt-4 border-t border-slate-100 text-center">
+                <button type="button" onclick="window.openWhatsAppSupport('नमस्ते एडमिन, मुझे Ojas Portal लॉगिन या नई ID के संबंध में सहायता चाहिए।')" class="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 px-4 py-2 rounded-xl transition w-full">
+                    <i class="fa-brands fa-whatsapp text-base text-green-600"></i> किसी भी समस्या के लिए WhatsApp करें
+                </button>
+            </div>
         </div>
     </div>
 
     <!-- DASHBOARD SCREEN -->
     <div id="dashboardSection" style="display: none;" class="flex-grow flex-col">
-        <!-- COMPACT HEADER WITH WHATSAPP SUPPORT & GEAR MENU -->
+        <!-- COMPACT HEADER WITH WHATSAPP HELP & GEAR MENU -->
         <header class="bg-dark-950 shadow-lg px-3 md:px-6 py-2.5 flex justify-between items-center sticky top-0 z-40 border-b border-royal-500">
             <div class="flex items-center gap-2">
                 <div id="portalHeaderIcon" class="w-8 h-8 bg-gradient-to-br from-royal-400 to-royal-600 text-white rounded-xl flex items-center justify-center">
@@ -2685,18 +2623,13 @@
                 </div>
             </div>
 
-            <!-- RIGHT CONTROLS: VIP TIMER + WHATSAPP HELP + CREDITS + GEAR ICON MENU -->
+            <!-- RIGHT CONTROLS: VIP TIMER + CREDITS + WHATSAPP HELP + GEAR ICON MENU -->
             <div class="flex items-center gap-2 relative">
                 <!-- VIP Days Remaining Badge -->
                 <div id="vipHeaderTimerBox" style="display: none;" onclick="window.selectGearOption('payments_history')" title="VIP वैलिडिटी देखें" class="cursor-pointer items-center gap-1 bg-amber-400/20 border border-royal-400 text-royal-300 px-2.5 py-1 rounded-lg text-[11px] font-black">
                     <i class="fa-solid fa-crown text-yellow-400 text-[10px]"></i>
                     <span id="vipHeaderTimerText">VIP</span>
                 </div>
-
-                <!-- Direct WhatsApp Support Button -->
-                <button onclick="window.openWhatsAppSupport()" title="WhatsApp सहायता" class="bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white border border-green-500/40 px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1">
-                    <i class="fa-brands fa-whatsapp text-sm"></i> <span class="hidden sm:inline">Help</span>
-                </button>
 
                 <!-- Admin Panel Link -->
                 <a href="admin.html" id="adminPanelLink" style="display: none;" class="bg-dark-800 border border-slate-700 text-royal-300 hover:text-white px-2.5 py-1.5 rounded-xl text-xs font-bold"><i class="fa-solid fa-shield-halved"></i> <span class="hidden sm:inline ml-1">Admin</span></a>
@@ -2705,13 +2638,18 @@
                 <div id="creditDisplayBox" style="display: none;" class="bg-royal-500/15 border border-royal-500/40 px-2.5 py-1 rounded-xl text-xs font-bold text-royal-300 items-center cursor-pointer hover:bg-royal-500/25 transition" onclick="window.selectGearOption('add_credit')">
                     <i class="fa-solid fa-wallet mr-1 text-royal-400"></i> <span id="displayCredits" class="font-black text-white">0</span> <span class="hidden sm:inline ml-1 text-[10px]">Cr</span>
                 </div>
+
+                <!-- 💬 DIRECT WHATSAPP SUPPORT BUTTON -->
+                <button onclick="window.openWhatsAppSupport()" class="bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white border border-green-500/40 px-2.5 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1" title="WhatsApp Support">
+                    <i class="fa-brands fa-whatsapp text-sm"></i> <span class="hidden md:inline">Help</span>
+                </button>
                 
-                <!-- GEAR ICON BUTTON -->
+                <!-- ⚙️ GEAR ICON BUTTON -->
                 <button id="gearMenuBtn" onclick="window.toggleGearMenu(event)" class="w-9 h-9 rounded-xl bg-dark-800 hover:bg-royal-500 text-royal-300 hover:text-dark-950 border border-slate-700 flex items-center justify-center transition shadow-sm" title="Settings & History Menu">
                     <i class="fa-solid fa-gear text-sm"></i>
                 </button>
 
-                <!-- GEAR DROPDOWN MENU -->
+                <!-- ⚙️ GEAR DROPDOWN MENU -->
                 <div id="gearDropdownMenu" class="hidden absolute right-0 top-12 w-60 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200 py-2 z-50">
                     <div class="px-4 py-2 border-b border-slate-100 bg-slate-50">
                         <p class="text-[10px] font-bold text-slate-400 uppercase">Logged in as</p>
@@ -2746,15 +2684,15 @@
 
         <main class="max-w-5xl mx-auto w-full p-3 md:p-6 flex-grow">
             
-            <!-- 📢 ADMIN CONTROLLED LIVE UPDATE BANNER (Visible to Normal & VIP when enabled by Admin) -->
-            <div id="adminLiveUpdateBanner" style="display: none;" class="mb-3.5"></div>
+            <!-- 📢 ADMIN CONTROLLED LIVE UPDATE BANNER (Visible to Both Normal & VIP when ON) -->
+            <div id="liveUpdateBannerContainer" style="display: none;" class="mb-3.5"></div>
 
             <!-- ✨ COMPACT MOBILE-FRIENDLY VIP PROMO STRIP FOR NORMAL USERS ✨ -->
             <div id="normalUserVipPromo" style="display: none;" class="mb-4 rounded-2xl vip-promo-shine border border-royal-400 p-3 text-white shadow-md">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <div class="flex items-center gap-2">
                         <span class="bg-amber-400 text-dark-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase shrink-0"><i class="fa-solid fa-crown"></i> 20%-25% OFF</span>
-                        <p id="normalPromoDescText" class="text-xs font-bold text-royal-100">
+                        <p id="normalPromoTextDesc" class="text-xs font-bold text-royal-100">
                             VIP लें: <strong>8 Cr</strong> में फॉर्म + <strong>18+ DOB & सारे Annexures</strong> अनलॉक करें!
                         </p>
                     </div>
@@ -2766,20 +2704,34 @@
                 </div>
             </div>
 
-            <!-- Standard Services Container (Rendered Dynamically by Admin Config) -->
-            <div id="standardServicesGrid" style="display: none;"></div>
+            <!-- Standard Services (Automatically hides when Admin turns off Domicile & Caste) -->
+            <div id="standardServicesGrid" class="grid grid-cols-2 gap-2.5 mb-3">
+                <button onclick="window.switchService('domicile')" id="btn-domicile" class="service-tab"><i class="fa-solid fa-house-chimney"></i> Domicile (मूल निवास)</button>
+                <button onclick="window.switchService('caste')" id="btn-caste" class="service-tab"><i class="fa-solid fa-users"></i> Caste (जाति प्रमाण पत्र)</button>
+            </div>
 
-            <!-- 👑 VIP EXCLUSIVE SERVICES PANEL (Rendered Dynamically by Admin Config) -->
+            <!-- 👑 VIP EXCLUSIVE SERVICES PANEL -->
             <div id="vipServicesBar" style="display: none;" class="mb-4 p-3 md:p-4 rounded-2xl bg-dark-950/90 border border-royal-400 shadow-vip-glow">
                 <div class="flex items-center justify-between mb-2.5 pb-1.5 border-b border-slate-800">
-                    <span id="vipServicesBarTitle" class="text-[11px] font-black uppercase tracking-wider text-royal-300 flex items-center gap-1.5">
+                    <span id="vipBarTitleLabel" class="text-[11px] font-black uppercase tracking-wider text-royal-300 flex items-center gap-1.5">
                         <i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures)
                     </span>
                     <button onclick="window.selectGearOption('history')" class="text-[10px] text-slate-300 hover:text-royal-300 font-bold">
                         <i class="fa-solid fa-folder-open mr-1"></i> Saved Files
                     </button>
                 </div>
-                <div id="vipServicesGrid" class="grid grid-cols-2 sm:grid-cols-5 gap-2"></div>
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    <button onclick="window.switchService('dob18')" id="btn-dob18" class="vip-tab"><i class="fa-solid fa-cake-candles"></i> DOB MEERUT 18+</button>
+                    <button onclick="window.switchService('annexure1')" id="btn-annexure1" class="vip-tab">Annexure 1</button>
+                    <button onclick="window.switchService('annexure1a')" id="btn-annexure1a" class="vip-tab">Annexure 1A</button>
+                    <button onclick="window.switchService('annexure3')" id="btn-annexure3" class="vip-tab">Annexure 3</button>
+                    <button onclick="window.switchService('annexure3a')" id="btn-annexure3a" class="vip-tab">Annexure 3A</button>
+                    <button onclick="window.switchService('annexureb')" id="btn-annexureb" class="vip-tab">Annexure B</button>
+                    <button onclick="window.switchService('annexurec')" id="btn-annexurec" class="vip-tab">Annexure C</button>
+                    <button onclick="window.switchService('annexured')" id="btn-annexured" class="vip-tab">Annexure D</button>
+                    <button onclick="window.switchService('annexuree')" id="btn-annexuree" class="vip-tab">Annexure E</button>
+                    <button onclick="window.switchService('annexuref')" id="btn-annexuref" class="vip-tab">Annexure F</button>
+                </div>
             </div>
             
             <!-- Dynamic Form Container -->
@@ -2789,11 +2741,8 @@
         </main>
     </div>
     
-    <footer class="bg-dark-950 border-t border-slate-800 text-center py-3.5 px-4 text-[10px] font-bold text-slate-400 mt-auto flex flex-wrap justify-between items-center max-w-full">
-        <span class="uppercase tracking-widest mx-auto sm:mx-0">© 2026 Ojas Print Service | Secure Portal</span>
-        <button onclick="window.openWhatsAppSupport()" class="text-green-400 hover:text-green-300 flex items-center gap-1 mx-auto sm:mx-0 mt-1 sm:mt-0">
-            <i class="fa-brands fa-whatsapp text-xs"></i> Support: 9306437623
-        </button>
+    <footer class="bg-dark-950 border-t border-slate-800 text-center py-3.5 text-[10px] font-bold text-slate-400 mt-auto uppercase tracking-widest">
+        © 2026 Ojas Print Service | Secure Portal
     </footer>
 </body>
 </html>
