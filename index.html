@@ -424,7 +424,7 @@
             if (!userData || !userData.isVip || userData.isAdmin) {
                 if (timerBox) timerBox.style.display = 'none';
                 if (cornerAlert) cornerAlert.style.display = 'none';
-                if (gearVipDaysText) gearVipDaysText.innerText = userData?.isAdmin ? 'Admin Unlimited' : 'Normal User (0 Days)';
+                if (gearVipDaysText) gearVipDaysText.innerText = userData?.isAdmin ? 'Admin' : 'Normal User (0 Days)';
                 return;
             }
 
@@ -2599,11 +2599,6 @@
             </form>
             <div id="loginError" style="display: none;" class="mt-4 text-center text-xs font-bold text-red-500 bg-red-50 p-2.5 rounded-xl border border-red-100"></div>
 
-            <div class="mt-5 pt-4 border-t border-slate-100 text-center">
-                <button type="button" onclick="window.openWhatsAppSupport('नमस्ते एडमिन, मुझे Ojas Portal लॉगिन या नई ID के संबंध में सहायता चाहिए।')" class="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 px-4 py-2 rounded-xl transition w-full">
-                    <i class="fa-brands fa-whatsapp text-base text-green-600"></i> किसी भी समस्या के लिए WhatsApp करें
-                </button>
-            </div>
         </div>
     </div>
 
