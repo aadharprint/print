@@ -866,7 +866,7 @@
                 return alert('न्यूनतम पेमेंट राशि ₹100 होनी चाहिए!');
             }
 
-            const upiId = "8279650137@ptyes"; 
+            const upiId = "8279650137@amazonpay"; 
             const payeeName = "Ojas Print Service";
             const txnNote = wantsVip ? `Ojas VIP ${window.currentVipDays}d` : `Ojas Credits`;
             const queryParams = `pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${totalPayable}&cu=INR&tn=${encodeURIComponent(txnNote)}`;
