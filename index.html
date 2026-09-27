@@ -982,7 +982,7 @@
 
             const utr = rawUtr.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
 
-            if (!totalPaid || totalPaid < 1) {
+            if (!totalPaid || totalPaid < 100) {
                 errorMsg.innerText = 'न्यूनतम पेमेंट ₹100 होना चाहिए, कृपया दोबारा QR जनरेट करें।';
                 errorMsg.style.display = 'block';
                 return;
