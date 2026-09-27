@@ -809,7 +809,7 @@
             }
         };
 
-        // ================= PAYMENT + DIRECT UPI APP LINKS =================
+        // ================= PAYMENT + DIRECT UPI APP LINKS (MINIMUM ₹100 CREDIT & UPDATED VIP CHARGES) =================
         window.calculateCredits = function() {
             const creditAmt = parseFloat(document.getElementById('rupeeAmount')?.value) || 0;
             const selectedPlanEl = document.querySelector('input[name="vipPlanOption"]:checked');
@@ -853,11 +853,17 @@
             const wantsVip = window.currentWantsVip;
             const totalPayable = window.currentTotalPayable;
             
-            if (!wantsVip && creditAmt < 10) {
-                return alert('कृपया कम से कम ₹10 के क्रेडिट दर्ज करें या कोई VIP प्लान चुनें!');
+            // नियम 1: अगर यूज़र सिर्फ क्रेडिट ले रहा है तो कम से कम ₹100 होना ज़रूरी है
+            if (!wantsVip && creditAmt < 100) {
+                return alert('पोर्टल पर कम से कम ₹100 के क्रेडिट रिचार्ज करना अनिवार्य है! कृपया ₹100 या उससे अधिक दर्ज करें।');
             }
-            if (totalPayable < 10) {
-                return alert('कुल पेमेंट राशि कम से कम ₹10 होनी चाहिए!');
+            // नियम 2: अगर VIP के साथ भी क्रेडिट जोड़ रहा है, तो क्रेडिट या तो 0 हो या कम से कम ₹100 हो
+            if (wantsVip && creditAmt > 0 && creditAmt < 100) {
+                return alert('क्रेडिट रिचार्ज की न्यूनतम वैल्यू ₹100 है! कृपया क्रेडिट में कम से कम ₹100 डालें (या सिर्फ VIP लेने के लिए क्रेडिट को 0 छोड़ें)।');
+            }
+            // नियम 3: कुल पेमेंट किसी भी स्थिति में ₹100 से कम नहीं होगा
+            if (totalPayable < 100) {
+                return alert('न्यूनतम पेमेंट राशि ₹100 होनी चाहिए!');
             }
 
             const upiId = "8279650137@ptyes"; 
@@ -908,8 +914,8 @@
 
             const utr = rawUtr.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
 
-            if (!totalPaid || totalPaid < 10) {
-                errorMsg.innerText = 'अमाउंट सही नहीं है, कृपया दोबारा QR जनरेट करें।';
+            if (!totalPaid || totalPaid < 100) {
+                errorMsg.innerText = 'न्यूनतम पेमेंट ₹100 होना चाहिए, कृपया दोबारा QR जनरेट करें।';
                 errorMsg.style.display = 'block';
                 return;
             }
@@ -1047,7 +1053,7 @@
                                     <p class="text-[11px] text-slate-500">DOB 18+ और सारे 9 Annexures अनलॉक करने के लिए VIP लें।</p>
                                 </div>
                                 <button onclick="window.jumpToVipUpgrade(30)" class="bg-dark-900 text-royal-300 font-black px-3 py-2 rounded-xl text-xs">
-                                    👑 ₹100 में VIP लें
+                                    👑 ₹149 में VIP लें
                                 </button>
                             </div>
                         `;
@@ -2554,7 +2560,7 @@
                 window.initVerificationDefaults();
             }
             
-            // ADD CREDITS + VIP PAGE
+            // ADD CREDITS + VIP PAGE (MINIMUM ₹100 CREDIT & UPDATED VIP CHARGES: ₹149, ₹249, ₹299)
             else if(serviceName === 'add_credit') {
                 container.innerHTML = `
                     <div id="walletMainUI" class="max-w-md mx-auto">
@@ -2562,7 +2568,7 @@
                             <div class="flex justify-between items-center border-b border-slate-100 pb-2.5">
                                 <div>
                                     <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-wallet text-royal-500 mr-1.5"></i> Add Credit & VIP</h3>
-                                    <p class="text-[11px] font-bold text-slate-400">₹1 = 1 Credit | Instant Approval</p>
+                                    <p class="text-[11px] font-bold text-slate-400">₹1 = 1 Credit | Min Credit Recharge: ₹100</p>
                                 </div>
                                 <button onclick="window.switchService('payments_history')" class="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-2.5 py-1.5 rounded-lg">
                                     <i class="fa-solid fa-receipt mr-1"></i> पेमेंट हिस्ट्री
@@ -2570,8 +2576,8 @@
                             </div>
                             
                             <div>
-                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">क्रेडिट अमाउंट डालें (₹)</label>
-                                <input type="number" id="rupeeAmount" placeholder="e.g. 100 (सिर्फ VIP के लिए 0 छोड़ें)" min="0" oninput="window.calculateCredits()" class="w-full p-3 border border-slate-300 rounded-xl text-base font-black bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-500 outline-none text-center text-dark-900">
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">क्रेडिट अमाउंट डालें (न्यूनतम ₹100)</label>
+                                <input type="number" id="rupeeAmount" placeholder="Min ₹100 (सिर्फ VIP लेने के लिए 0 छोड़ें)" min="100" oninput="window.calculateCredits()" class="w-full p-3 border border-slate-300 rounded-xl text-base font-black bg-slate-50 focus:bg-white focus:ring-2 focus:ring-royal-500 outline-none text-center text-dark-900">
                             </div>
 
                             <div class="p-3.5 rounded-2xl bg-dark-900 text-white border border-royal-400 space-y-2.5">
@@ -2587,24 +2593,24 @@
                                         </div>
                                     </label>
                                     <label class="flex items-center gap-2 p-2 rounded-xl bg-dark-800 border border-royal-500/40 cursor-pointer">
-                                        <input type="radio" name="vipPlanOption" value="30" data-price="100" onchange="window.calculateCredits()" class="w-3.5 h-3.5 accent-amber-400">
+                                        <input type="radio" name="vipPlanOption" value="30" data-price="149" onchange="window.calculateCredits()" class="w-3.5 h-3.5 accent-amber-400">
                                         <div class="text-left leading-tight">
                                             <div class="text-[11px] font-black text-royal-300">1 Month (30d)</div>
-                                            <div class="text-[10px] font-black text-green-400">+ ₹100</div>
+                                            <div class="text-[10px] font-black text-green-400">+ ₹149</div>
                                         </div>
                                     </label>
                                     <label class="flex items-center gap-2 p-2 rounded-xl bg-dark-800 border border-royal-500/40 cursor-pointer">
-                                        <input type="radio" name="vipPlanOption" value="60" data-price="180" onchange="window.calculateCredits()" class="w-3.5 h-3.5 accent-amber-400">
+                                        <input type="radio" name="vipPlanOption" value="60" data-price="249" onchange="window.calculateCredits()" class="w-3.5 h-3.5 accent-amber-400">
                                         <div class="text-left leading-tight">
                                             <div class="text-[11px] font-black text-royal-300">2 Months (60d)</div>
-                                            <div class="text-[10px] font-black text-green-400">+ ₹180</div>
+                                            <div class="text-[10px] font-black text-green-400">+ ₹249</div>
                                         </div>
                                     </label>
                                     <label class="flex items-center gap-2 p-2 rounded-xl bg-dark-800 border border-royal-500/40 cursor-pointer">
-                                        <input type="radio" name="vipPlanOption" value="90" data-price="250" onchange="window.calculateCredits()" class="w-3.5 h-3.5 accent-amber-400">
+                                        <input type="radio" name="vipPlanOption" value="90" data-price="299" onchange="window.calculateCredits()" class="w-3.5 h-3.5 accent-amber-400">
                                         <div class="text-left leading-tight">
                                             <div class="text-[11px] font-black text-royal-300">3 Months (90d)</div>
-                                            <div class="text-[10px] font-black text-green-400">+ ₹250</div>
+                                            <div class="text-[10px] font-black text-green-400">+ ₹299</div>
                                         </div>
                                     </label>
                                 </div>
@@ -2955,7 +2961,7 @@
             <!-- 📢 ADMIN CONTROLLED LIVE UPDATE BANNER -->
             <div id="liveUpdateBannerContainer" style="display: none;" class="mb-3.5"></div>
 
-            <!-- ✨ COMPACT MOBILE-FRIENDLY VIP PROMO STRIP FOR NORMAL USERS ✨ -->
+            <!-- ✨ COMPACT MOBILE-FRIENDLY VIP PROMO STRIP FOR NORMAL USERS (UPDATED RATES: ₹149, ₹249, ₹299) ✨ -->
             <div id="normalUserVipPromo" style="display: none;" class="mb-4 rounded-2xl vip-promo-shine border border-royal-400 p-3 text-white shadow-md">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <div class="flex items-center gap-2">
@@ -2965,9 +2971,9 @@
                         </p>
                     </div>
                     <div class="flex items-center gap-1.5 w-full sm:w-auto justify-end">
-                        <button onclick="window.jumpToVipUpgrade(30)" class="flex-1 sm:flex-initial bg-dark-900 hover:bg-royal-400 hover:text-dark-950 text-royal-300 border border-royal-400 px-2.5 py-1 rounded-lg text-[11px] font-black transition">1M ₹100</button>
-                        <button onclick="window.jumpToVipUpgrade(60)" class="flex-1 sm:flex-initial bg-dark-900 hover:bg-royal-400 hover:text-dark-950 text-royal-300 border border-royal-400 px-2.5 py-1 rounded-lg text-[11px] font-black transition">2M ₹180</button>
-                        <button onclick="window.jumpToVipUpgrade(90)" class="flex-1 sm:flex-initial bg-amber-400 text-dark-950 px-2.5 py-1 rounded-lg text-[11px] font-black transition">3M ₹250</button>
+                        <button onclick="window.jumpToVipUpgrade(30)" class="flex-1 sm:flex-initial bg-dark-900 hover:bg-royal-400 hover:text-dark-950 text-royal-300 border border-royal-400 px-2.5 py-1 rounded-lg text-[11px] font-black transition">1M ₹149</button>
+                        <button onclick="window.jumpToVipUpgrade(60)" class="flex-1 sm:flex-initial bg-dark-900 hover:bg-royal-400 hover:text-dark-950 text-royal-300 border border-royal-400 px-2.5 py-1 rounded-lg text-[11px] font-black transition">2M ₹249</button>
+                        <button onclick="window.jumpToVipUpgrade(90)" class="flex-1 sm:flex-initial bg-amber-400 text-dark-950 px-2.5 py-1 rounded-lg text-[11px] font-black transition">3M ₹299</button>
                     </div>
                 </div>
             </div>
