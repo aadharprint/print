@@ -78,7 +78,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBSiDAvDYyBG8hkmez7s900JHhlbenG2nU",
@@ -118,6 +118,9 @@
         // Payment History & Filter State
         window.allPaymentsData = []; 
         window.currentPaymentFilter = 'Pending';
+
+        // Support Center State
+        window.adminSupportWhatsapp = "919306437623";
 
         // ================= AUTO-DETECT UPLOADED STAMPS & MAKE WHITE BG TRANSPARENT =================
         window.loadSingleStampFile = function(fileName) {
@@ -217,7 +220,188 @@
             setTimeout(() => { btnEl.innerHTML = orig; }, 1500);
         };
 
-        // ================= SECTION 4: PORTAL CONTROL (STEALTH HIDE & CUSTOM BANNER) =================
+        // ================= HELPER: BUILD CREDENTIAL MESSAGE & SEND VIA WHATSAPP / EMAIL =================
+        window.getPortalLoginUrl = function() {
+            return window.location.origin + window.location.pathname.replace('admin.html', 'index.html');
+        };
+
+        window.formatCleanPhone = function(rawPhone = '') {
+            let digits = String(rawPhone).replace(/\D/g, '');
+            if (digits.length === 10) digits = '91' + digits;
+            return digits;
+        };
+
+        window.buildUserCredentialsText = function(email, pass, credits, isVip, vipExpiry) {
+            const shortId = email.endsWith('@ovportal.com') ? email.split('@')[0] : email;
+            const now = Date.now();
+            let vipText = "Normal User";
+            if (isVip) {
+                if (vipExpiry && vipExpiry > now) {
+                    const remDays = Math.ceil((vipExpiry - now) / MS_PER_DAY);
+                    vipText = `👑 VIP Active (${remDays} Days)`;
+                } else {
+                    vipText = `👑 VIP Active`;
+                }
+            }
+            return `🌟 *Ojas Print Service - Login Details* 🌟\n\nनमस्ते, आपका पोर्टल अकाउंट तैयार/अपडेट कर दिया गया है:\n\n👤 *User ID:* ${shortId}\n📧 *Full Email:* ${email}\n🔑 *Password:* ${pass || 'Not Set'}\n💰 *Credits Balance:* ${credits || 0} Cr\n✨ *Account Status:* ${vipText}\n\n🌐 *Login Portal Link:*\n${window.getPortalLoginUrl()}\n\n_(नोट: लॉगिन करने के बाद आप ⚙️ सेटिंग आइकन में जाकर अपना पासवर्ड कभी भी बदल सकते हैं)_`;
+        };
+
+        // Direct Share from Manage User Card
+        window.shareSelectedUserCredentials = async function(channel) {
+            const uid = document.getElementById('userSelectDropdown').value;
+            if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले ड्रॉपडाउन से यूज़र सेलेक्ट करें!');
+            
+            const uData = window.usersDataList[uid];
+            const phoneInput = document.getElementById('selectedUserPhoneInput')?.value.trim() || '';
+            if (phoneInput && phoneInput !== uData.userPhone) {
+                try {
+                    await updateDoc(doc(db, "users", uid), { userPhone: phoneInput });
+                    uData.userPhone = phoneInput;
+                } catch (e) {}
+            }
+
+            const passToUse = uData.userPass || '[कृपया पहले नीचे नया पासवर्ड सेट करें]';
+            const messageText = window.buildUserCredentialsText(uData.email, passToUse, uData.credits, uData.isVip, uData.vipExpiry);
+
+            if (channel === 'copy') {
+                navigator.clipboard.writeText(messageText.replace(/\*/g, ''));
+                alert('यूज़र की ID और Password डिटेल्स कॉपी हो गई हैं!');
+                return;
+            }
+
+            if (channel === 'whatsapp') {
+                let targetPhone = window.formatCleanPhone(phoneInput || uData.userPhone || '');
+                if (!targetPhone) {
+                    const askPhone = prompt("यूज़र का 10 अंकों का WhatsApp नंबर डालें (या बिना नंबर सीधे WhatsApp खोलने के लिए खाली छोड़कर OK दबाएं):", "");
+                    if (askPhone === null) return;
+                    if (askPhone.trim()) {
+                        targetPhone = window.formatCleanPhone(askPhone.trim());
+                        try {
+                            await updateDoc(doc(db, "users", uid), { userPhone: askPhone.trim() });
+                            uData.userPhone = askPhone.trim();
+                            if (document.getElementById('selectedUserPhoneInput')) {
+                                document.getElementById('selectedUserPhoneInput').value = askPhone.trim();
+                            }
+                        } catch (e) {}
+                    }
+                }
+                const waUrl = targetPhone 
+                    ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(messageText)}`
+                    : `https://wa.me/?text=${encodeURIComponent(messageText)}`;
+                window.open(waUrl, '_blank');
+            } else if (channel === 'email') {
+                const targetEmail = uData.contactEmail || (uData.email.endsWith('@ovportal.com') ? prompt("यूज़र का असली Email एड्रेस डालें:", "") : uData.email);
+                if (!targetEmail) return;
+                const subject = "Ojas Print Service - Your Login ID & Password";
+                const cleanBody = messageText.replace(/\*/g, '');
+                window.open(`mailto:${targetEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(cleanBody)}`, '_self');
+            }
+        };
+
+        // Save User Phone Number
+        window.saveSelectedUserPhone = async function() {
+            const uid = document.getElementById('userSelectDropdown').value;
+            if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले यूज़र सेलेक्ट करें!');
+            const phoneVal = document.getElementById('selectedUserPhoneInput').value.trim();
+            try {
+                await updateDoc(doc(db, "users", uid), { userPhone: phoneVal });
+                window.usersDataList[uid].userPhone = phoneVal;
+                alert('यूज़र का WhatsApp नंबर सेव हो गया!');
+            } catch (err) {
+                alert('Error saving phone: ' + err.message);
+            }
+        };
+
+        // ================= SECTION 5: SUPPORT & DIRECT REPLY CENTER =================
+        window.populateSupportUserDropdown = function() {
+            const sel = document.getElementById('supportUserSelect');
+            if (!sel) return;
+            const curr = sel.value;
+            sel.innerHTML = '<option value="">-- रजिस्टर्ड यूज़र चुनें (या नीचे सीधे नंबर/ईमेल लिखें) --</option>';
+            for (const [uid, data] of Object.entries(window.usersDataList)) {
+                const phoneTag = data.userPhone ? ` [${data.userPhone}]` : '';
+                sel.innerHTML += `<option value="${uid}">${data.email}${phoneTag}</option>`;
+            }
+            if (curr && window.usersDataList[curr]) sel.value = curr;
+        };
+
+        window.onSupportUserChange = function() {
+            const uid = document.getElementById('supportUserSelect').value;
+            const phoneInp = document.getElementById('supportTargetPhone');
+            const emailInp = document.getElementById('supportTargetEmail');
+            if (uid && window.usersDataList[uid]) {
+                const u = window.usersDataList[uid];
+                phoneInp.value = u.userPhone || '';
+                emailInp.value = u.email.endsWith('@ovportal.com') ? (u.contactEmail || '') : u.email;
+                window.applySupportTemplate('credentials');
+            }
+        };
+
+        window.applySupportTemplate = function(type) {
+            const uid = document.getElementById('supportUserSelect').value;
+            const u = (uid && window.usersDataList[uid]) ? window.usersDataList[uid] : null;
+            const msgBox = document.getElementById('supportReplyMessage');
+            const subjBox = document.getElementById('supportReplySubject');
+
+            const userEmail = u ? u.email : '[USER_ID]';
+            const userPass = u ? (u.userPass || '[PASSWORD]') : '[PASSWORD]';
+            const userCr = u ? (u.credits || 0) : 0;
+
+            if (type === 'credentials') {
+                subjBox.value = "Ojas Print Service - Login ID & Password";
+                msgBox.value = window.buildUserCredentialsText(userEmail, userPass, userCr, u?.isVip, u?.vipExpiry);
+            } else if (type === 'reset_done') {
+                subjBox.value = "Ojas Print Service - Password Reset Successful";
+                msgBox.value = `🔑 *Password Reset Update - Ojas Portal*\n\nनमस्ते, आपकी रिक्वेस्ट पर आपका नया पासवर्ड सेट कर दिया गया है:\n\n👤 *User ID:* ${userEmail.split('@')[0]}\n🔑 *New Password:* ${userPass}\n💰 *Credits:* ${userCr} Cr\n\n🌐 *Login Here:* ${window.getPortalLoginUrl()}\n\nधन्यवाद!\n*Admin - Ojas Print Service*`;
+            } else if (type === 'payment_done') {
+                subjBox.value = "Ojas Print Service - Payment Approved";
+                msgBox.value = `✅ *Payment Approved - Ojas Portal*\n\nनमस्ते, आपका पेमेंट वेरीफाई कर लिया गया है और आपके अकाउंट (${userEmail.split('@')[0]}) में क्रेडिट्स/VIP प्लान जोड़ दिए गए हैं।\n\n💰 *Current Balance:* ${userCr} Credits\n🌐 *Portal Link:* ${window.getPortalLoginUrl()}\n\nधन्यवाद!`;
+            } else if (type === 'custom') {
+                subjBox.value = "Ojas Print Service - Support Reply";
+                msgBox.value = `नमस्ते (${userEmail.split('@')[0]}),\n\nआपकी समस्या के संबंध में अपडेट:\n`;
+                msgBox.focus();
+            }
+        };
+
+        window.sendSupportReplyNow = async function(channel) {
+            const uid = document.getElementById('supportUserSelect').value;
+            const phoneRaw = document.getElementById('supportTargetPhone').value.trim();
+            const emailRaw = document.getElementById('supportTargetEmail').value.trim();
+            const subject = document.getElementById('supportReplySubject').value.trim() || "Ojas Portal Support";
+            const msg = document.getElementById('supportReplyMessage').value.trim();
+
+            if (!msg) return alert('कृपया पहले मैसेज लिखें या ऊपर से टेम्पलेट चुनें!');
+
+            // Save phone/email back to user profile if a user is selected
+            if (uid && window.usersDataList[uid]) {
+                const updateObj = {};
+                if (phoneRaw) updateObj.userPhone = phoneRaw;
+                if (emailRaw) updateObj.contactEmail = emailRaw;
+                if (Object.keys(updateObj).length > 0) {
+                    try {
+                        await updateDoc(doc(db, "users", uid), updateObj);
+                        Object.assign(window.usersDataList[uid], updateObj);
+                    } catch (e) {}
+                }
+            }
+
+            if (channel === 'whatsapp') {
+                const cleanPhone = window.formatCleanPhone(phoneRaw);
+                const waUrl = cleanPhone
+                    ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
+                    : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+                window.open(waUrl, '_blank');
+            } else if (channel === 'email') {
+                if (!emailRaw) return alert('कृपया Email पर भेजने के लिए यूज़र का Email एड्रेस दर्ज करें!');
+                const cleanBody = msg.replace(/\*/g, '');
+                window.open(`mailto:${emailRaw}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(cleanBody)}`, '_self');
+            } else if (channel === 'copy') {
+                navigator.clipboard.writeText(msg.replace(/\*/g, ''));
+                alert('मैसेज क्लिपबोर्ड पर कॉपी हो गया है!');
+            }
+        };
+
+        // ================= SECTION 4: PORTAL CONTROL (STEALTH HIDE, CUSTOM BANNER & SUPPORT WHATSAPP) =================
         window.loadPortalSettingsForAdmin = async function() {
             try {
                 const snap = await getDoc(doc(db, "settings", "portalConfig"));
@@ -230,7 +414,8 @@
                     bannerTitle: "",
                     bannerMessage: "",
                     bannerBtnText: "",
-                    bannerBtnLink: ""
+                    bannerBtnLink: "",
+                    supportWhatsapp: "919306437623"
                 };
                 if (snap.exists()) {
                     cfg = { ...cfg, ...snap.data() };
@@ -245,6 +430,10 @@
                 document.getElementById('inpBannerMessage').value = cfg.bannerMessage || '';
                 document.getElementById('inpBannerBtnText').value = cfg.bannerBtnText || '';
                 document.getElementById('inpBannerBtnLink').value = cfg.bannerBtnLink || '';
+
+                const supWaEl = document.getElementById('inpSupportWhatsapp');
+                if (supWaEl) supWaEl.value = cfg.supportWhatsapp || '919306437623';
+                window.adminSupportWhatsapp = cfg.supportWhatsapp || '919306437623';
 
                 window.updateStealthStatusPill();
             } catch (err) {
@@ -288,6 +477,9 @@
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...';
             }
 
+            const rawSupWa = document.getElementById('inpSupportWhatsapp')?.value.trim() || '919306437623';
+            const cleanSupWa = window.formatCleanPhone(rawSupWa) || '919306437623';
+
             const payload = {
                 showDomicile: document.getElementById('chkShowDomicile').checked,
                 showCaste: document.getElementById('chkShowCaste').checked,
@@ -298,15 +490,17 @@
                 bannerMessage: document.getElementById('inpBannerMessage').value.trim(),
                 bannerBtnText: document.getElementById('inpBannerBtnText').value.trim(),
                 bannerBtnLink: document.getElementById('inpBannerBtnLink').value.trim(),
+                supportWhatsapp: cleanSupWa,
                 updatedAt: new Date()
             };
 
             try {
                 await setDoc(doc(db, "settings", "portalConfig"), payload, { merge: true });
+                window.adminSupportWhatsapp = cleanSupWa;
                 window.updateStealthStatusPill();
                 if (msg) {
                     msg.className = "p-3 bg-green-50 text-green-800 border border-green-300 rounded-xl text-xs font-black text-center";
-                    msg.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> पोर्टल सेटिंग्स और बैनर सफलतापूर्वक अपडेट हो गए हैं!`;
+                    msg.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> पोर्टल सेटिंग्स, सपोर्ट नंबर और बैनर सफलतापूर्वक अपडेट हो गए हैं!`;
                     msg.classList.remove('hidden');
                     setTimeout(() => msg.classList.add('hidden'), 4000);
                 }
@@ -627,6 +821,7 @@
                     select.value = currentSelected;
                     window.handleUserSelection();
                 }
+                window.populateSupportUserDropdown();
             } catch(err) { console.error("Error loading users:", err); }
         };
 
@@ -635,12 +830,16 @@
             const display = document.getElementById('currentUserCreditsDisplay');
             const vipBadge = document.getElementById('selectedUserVipBadge');
             const passDisplay = document.getElementById('selectedUserSavedPass');
+            const phoneInp = document.getElementById('selectedUserPhoneInput');
 
             if(uid && window.usersDataList[uid]) {
                 const uData = window.usersDataList[uid];
                 display.innerText = uData.credits || 0;
                 if (passDisplay) {
                     passDisplay.innerText = uData.userPass ? uData.userPass : 'Not synced yet (Set new below)';
+                }
+                if (phoneInp) {
+                    phoneInp.value = uData.userPhone || '';
                 }
 
                 const now = Date.now();
@@ -667,6 +866,7 @@
                 display.innerText = '--';
                 vipBadge.innerHTML = '--';
                 if (passDisplay) passDisplay.innerText = '--';
+                if (phoneInp) phoneInp.value = '';
             }
         };
 
@@ -686,9 +886,7 @@
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Setting...';
 
             try {
-                let updatedInFirebaseAuth = false;
-
-                // 1. Agar user ka purana password Firestore mein saved hai, toh Firebase REST API se bina Admin logout kiye Auth password update karein
+                // 1. If user's old password is saved in Firestore, update Firebase Auth via REST API without logging out Admin
                 if (uData.userPass) {
                     const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, {
                         method: 'POST',
@@ -697,19 +895,15 @@
                     });
                     const signInData = await signInRes.json();
                     if (signInData.idToken) {
-                        const updateRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${firebaseConfig.apiKey}`, {
+                        await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${firebaseConfig.apiKey}`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ idToken: signInData.idToken, password: newPass, returnSecureToken: true })
                         });
-                        const updateData = await updateRes.json();
-                        if (!updateData.error) {
-                            updatedInFirebaseAuth = true;
-                        }
                     }
                 }
 
-                // 2. Firestore mein naya password aur override save karein (index.html isse turant login allow kar dega aur Auth sync kar lega)
+                // 2. Save new password to Firestore
                 await updateDoc(doc(db, "users", uid), {
                     userPass: newPass,
                     adminResetPass: newPass,
@@ -720,8 +914,18 @@
                 document.getElementById('selectedUserSavedPass').innerText = newPass;
                 document.getElementById('adminNewResetPass').value = '';
 
-                msg.className = "mt-3 p-3 bg-green-50 text-green-800 rounded-xl text-xs font-bold border border-green-300 text-center";
-                msg.innerHTML = `<i class="fa-solid fa-key mr-1"></i> <strong>${uData.email}</strong> का नया पासवर्ड <strong>${newPass}</strong> सेट कर दिया गया है!`;
+                msg.className = "mt-3 p-3 bg-green-50 text-green-800 rounded-xl text-xs font-bold border border-green-300 text-center space-y-2";
+                msg.innerHTML = `
+                    <div><i class="fa-solid fa-circle-check mr-1"></i> <strong>${uData.email}</strong> का नया पासवर्ड <strong>${newPass}</strong> सेट हो गया!</div>
+                    <div class="flex justify-center gap-2 pt-1">
+                        <button type="button" onclick="window.shareSelectedUserCredentials('whatsapp')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-[11px] font-black">
+                            <i class="fa-brands fa-whatsapp mr-1"></i> WhatsApp पर भेजें
+                        </button>
+                        <button type="button" onclick="window.shareSelectedUserCredentials('email')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-[11px] font-black">
+                            <i class="fa-solid fa-envelope mr-1"></i> Email पर भेजें
+                        </button>
+                    </div>
+                `;
                 msg.classList.remove('hidden');
             } catch (err) {
                 alert("Error setting new password: " + err.message);
@@ -778,6 +982,7 @@
             const rawUser = document.getElementById('newAdminUserEmail').value.trim().toLowerCase();
             const newUserEmail = rawUser.includes('@') ? rawUser : `${rawUser}@ovportal.com`;
             const newUserPass = document.getElementById('newAdminUserPass').value.trim();
+            const newUserPhone = document.getElementById('newAdminUserPhone')?.value.trim() || '';
             
             const creditsInputVal = parseInt(document.getElementById('newAdminUserCredits').value);
             const initialCredits = isNaN(creditsInputVal) ? 30 : creditsInputVal;
@@ -806,14 +1011,35 @@
                     email: newUserEmail, 
                     username: newUserEmail.split('@')[0], 
                     userPass: newUserPass,
+                    userPhone: newUserPhone,
                     credits: initialCredits, 
                     isVip: isVip, 
                     vipExpiry: vipExpiry,
                     createdAt: new Date()
                 });
+
+                const credMsg = window.buildUserCredentialsText(newUserEmail, newUserPass, initialCredits, isVip, vipExpiry);
+                const cleanPhone = window.formatCleanPhone(newUserPhone);
+                const waLink = cleanPhone 
+                    ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(credMsg)}`
+                    : `https://wa.me/?text=${encodeURIComponent(credMsg)}`;
+                const mailLink = `mailto:${ rawUser.includes('@') ? rawUser : '' }?subject=${encodeURIComponent('Ojas Print Service - Your Login ID & Password')}&body=${encodeURIComponent(credMsg.replace(/\*/g, ''))}`;
                 
-                msg.className = "mt-3 p-3 bg-green-50 text-green-800 rounded-xl text-xs font-bold border border-green-300 text-center";
-                msg.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> ID Created: <strong>${newUserEmail}</strong> | Pass: <strong>${newUserPass}</strong>`;
+                msg.className = "mt-3 p-3.5 bg-green-50 text-green-900 rounded-2xl text-xs font-bold border border-green-300 space-y-2.5";
+                msg.innerHTML = `
+                    <div class="text-center">
+                        <i class="fa-solid fa-circle-check text-green-600 mr-1"></i> नया अकाउंट बन गया!<br>
+                        ID: <strong>${newUserEmail.split('@')[0]}</strong> | Pass: <strong>${newUserPass}</strong>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <a href="${waLink}" target="_blank" class="bg-green-600 hover:bg-green-700 text-white font-black py-2 px-3 rounded-xl text-center text-[11px] flex items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-brands fa-whatsapp text-sm"></i> WhatsApp पर भेजें
+                        </a>
+                        <a href="${mailLink}" class="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-2 px-3 rounded-xl text-center text-[11px] flex items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-solid fa-envelope"></i> Email पर भेजें
+                        </a>
+                    </div>
+                `;
                 
                 event.target.reset();
                 document.getElementById('newAdminUserCredits').value = 30;
@@ -1626,9 +1852,9 @@
             document.body.style.overflow = 'auto'; 
         };
 
-        // ================= 4-TAB NAVIGATION SWITCHER =================
+        // ================= 5-TAB NAVIGATION SWITCHER =================
         window.switchAdminMainTab = function(tabName) {
-            const tabs = ['payments', 'users', 'history', 'controls'];
+            const tabs = ['payments', 'users', 'support', 'history', 'controls'];
             tabs.forEach(t => {
                 const btn = document.getElementById(`tab-${t}`);
                 if(btn) btn.className = "flex-1 bg-white text-slate-500 font-bold py-3 px-2 rounded-xl hover:bg-slate-50 transition border border-slate-200 text-xs md:text-sm flex justify-center items-center gap-1.5";
@@ -1644,11 +1870,13 @@
                 activeSection.removeAttribute('class');
                 if (tabName === 'payments') activeSection.className = 'space-y-4';
                 if (tabName === 'users') activeSection.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
+                if (tabName === 'support') activeSection.className = 'space-y-4';
                 if (tabName === 'history') activeSection.className = 'space-y-4';
                 if (tabName === 'controls') activeSection.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
             }
 
             if (tabName === 'payments') window.loadAllPayments();
+            if (tabName === 'support') window.populateSupportUserDropdown();
             if (tabName === 'history') window.loadAdminHistory(); 
             if (tabName === 'controls') window.loadPortalSettingsForAdmin();
         };
@@ -1718,8 +1946,8 @@
 
     <main id="adminPanelContent" class="max-w-5xl mx-auto w-full p-3 md:p-6 flex-grow hidden">
         
-        <!-- Clean 4-Tab Navigation Bar -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 md:gap-3 mb-4 sticky top-[61px] z-30 bg-slate-100/95 backdrop-blur py-1.5">
+        <!-- Clean 5-Tab Navigation Bar -->
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 md:gap-2.5 mb-4 sticky top-[61px] z-30 bg-slate-100/95 backdrop-blur py-1.5">
             <button onclick="window.switchAdminMainTab('payments')" id="tab-payments">
                 <i class="fa-solid fa-money-bill-transfer text-amber-400"></i>
                 <span>Payments</span>
@@ -1729,11 +1957,15 @@
                 <i class="fa-solid fa-users-gear"></i>
                 <span>Users & Pass</span>
             </button>
+            <button onclick="window.switchAdminMainTab('support')" id="tab-support">
+                <i class="fa-brands fa-whatsapp text-green-500"></i>
+                <span>Support & Reply</span>
+            </button>
             <button onclick="window.switchAdminMainTab('history')" id="tab-history">
                 <i class="fa-solid fa-folder-tree"></i>
                 <span>Doc Records</span>
             </button>
-            <button onclick="window.switchAdminMainTab('controls')" id="tab-controls">
+            <button onclick="window.switchAdminMainTab('controls')" id="tab-controls" class="col-span-2 sm:col-span-1">
                 <i class="fa-solid fa-sliders text-royal-400"></i>
                 <span>Portal Control</span>
             </button>
@@ -1795,17 +2027,17 @@
             <div id="adminPaymentsCardsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3.5"></div>
         </div>
 
-        <!-- ================= SECTION 2: USER, VIP VALIDITY & PASSWORD RESET MANAGEMENT ================= -->
+        <!-- ================= SECTION 2: USER, VIP VALIDITY, PASSWORD RESET & 1-CLICK WHATSAPP/EMAIL SHARE ================= -->
         <div id="section-users" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
             
-            <!-- Manage Existing User Credits, VIP & Password Reset -->
+            <!-- Manage Existing User Credits, VIP, Password & Direct Share -->
             <div class="bg-white rounded-2xl p-4 md:p-6 shadow-card border border-slate-200 flex flex-col justify-between">
-                <div class="space-y-4">
+                <div class="space-y-3.5">
                     <div class="flex items-center gap-2.5 border-b border-slate-100 pb-3">
                         <div class="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-lg border border-amber-200"><i class="fa-solid fa-crown"></i></div>
                         <div>
-                            <h3 class="text-base font-black text-dark-900">Manage User, VIP & Password</h3>
-                            <p class="text-[10px] font-bold text-slate-400 uppercase">Credits, VIP Days & Set New Password</p>
+                            <h3 class="text-base font-black text-dark-900">Manage User, Pass & Share</h3>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase">Reset Pass & Send on WhatsApp / Email</p>
                         </div>
                     </div>
                     
@@ -1816,7 +2048,7 @@
                         </select>
                     </div>
                     
-                    <div class="p-3.5 bg-royal-50 rounded-xl flex justify-between items-center border border-royal-200">
+                    <div class="p-3 bg-royal-50 rounded-xl flex justify-between items-center border border-royal-200">
                         <div>
                             <span class="text-[10px] font-bold text-royal-800 uppercase block">Credits Balance</span>
                             <span class="text-2xl font-black text-royal-600" id="currentUserCreditsDisplay">--</span>
@@ -1824,6 +2056,27 @@
                         <div class="text-right">
                             <span class="text-[10px] font-bold text-royal-800 uppercase block mb-0.5">Account Status</span>
                             <div id="selectedUserVipBadge">--</div>
+                        </div>
+                    </div>
+
+                    <!-- User WhatsApp Number Save & 1-Click Send Credentials -->
+                    <div class="p-3 bg-green-50/70 rounded-xl border border-green-200 space-y-2">
+                        <div class="flex gap-2">
+                            <input type="text" id="selectedUserPhoneInput" placeholder="यूज़र का WhatsApp नंबर (e.g. 9876543210)" class="flex-1 p-2 border border-green-300 rounded-xl text-xs font-bold bg-white outline-none">
+                            <button type="button" onclick="window.saveSelectedUserPhone()" class="bg-slate-800 hover:bg-black text-white font-bold px-3 py-2 rounded-xl text-[11px] shrink-0">
+                                Save No.
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-3 gap-1.5">
+                            <button type="button" onclick="window.shareSelectedUserCredentials('whatsapp')" class="bg-green-600 hover:bg-green-700 text-white font-black py-2 px-2 rounded-xl text-[11px] flex items-center justify-center gap-1 shadow-sm transition">
+                                <i class="fa-brands fa-whatsapp text-sm"></i> WhatsApp ID/Pass
+                            </button>
+                            <button type="button" onclick="window.shareSelectedUserCredentials('email')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-2 px-2 rounded-xl text-[11px] flex items-center justify-center gap-1 shadow-sm transition">
+                                <i class="fa-solid fa-envelope"></i> Email ID/Pass
+                            </button>
+                            <button type="button" onclick="window.shareSelectedUserCredentials('copy')" class="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-black py-2 px-2 rounded-xl text-[11px] flex items-center justify-center gap-1 transition">
+                                <i class="fa-regular fa-copy"></i> Copy Details
+                            </button>
                         </div>
                     </div>
 
@@ -1883,18 +2136,22 @@
                         <div class="w-10 h-10 bg-royal-50 text-royal-600 rounded-xl flex items-center justify-center text-lg border border-royal-200"><i class="fa-solid fa-user-plus"></i></div>
                         <div>
                             <h3 class="text-base font-black text-dark-900">Create New User</h3>
-                            <p class="text-[10px] font-bold text-green-600 uppercase">Auto: 30 Credits + 2 Days VIP Trial</p>
+                            <p class="text-[10px] font-bold text-green-600 uppercase">Auto: 30 Credits + 2 Days VIP + Instant Share</p>
                         </div>
                     </div>
 
                     <form id="adminCreateUserForm" onsubmit="window.createNewUserByAdmin(event)" class="space-y-3.5">
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">User ID or Email</label>
-                            <input type="text" id="newAdminUserEmail" placeholder="e.g. rahul123 या rahul@ovportal.com" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 font-semibold outline-none focus:bg-white focus:border-royal-400">
+                            <input type="text" id="newAdminUserEmail" placeholder="e.g. rahul123 या rahul@gmail.com" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 font-semibold outline-none focus:bg-white focus:border-royal-400">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Password</label>
                             <input type="text" id="newAdminUserPass" placeholder="Minimum 6 characters" required minlength="6" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 font-semibold outline-none focus:bg-white focus:border-royal-400">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">User WhatsApp Number (Optional)</label>
+                            <input type="text" id="newAdminUserPhone" placeholder="e.g. 9876543210 (सीधे WhatsApp पर ID भेजने के लिए)" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 font-semibold outline-none focus:bg-white focus:border-royal-400">
                         </div>
                         <div class="grid grid-cols-2 gap-2.5">
                             <div>
@@ -1918,6 +2175,83 @@
                     </form>
                 </div>
                 <div id="adminCreateMsg" class="hidden"></div>
+            </div>
+        </div>
+
+        <!-- ================= SECTION 5: USER SUPPORT & DIRECT REPLY CENTER (WHATSAPP & EMAIL) ================= -->
+        <div id="section-support" class="space-y-4 hidden">
+            <div class="bg-white rounded-2xl p-4 md:p-6 shadow-card border border-slate-200 space-y-4 max-w-3xl mx-auto">
+                <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-10 h-10 bg-green-50 text-green-600 rounded-xl flex items-center justify-center text-xl border border-green-200">
+                            <i class="fa-brands fa-whatsapp"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base md:text-lg font-black text-dark-900">User Support & Credential Sender</h3>
+                            <p class="text-[11px] font-bold text-slate-400">यहीं से किसी भी यूज़र को ID/Password या सहायता का रिप्लाई WhatsApp व Email पर भेजें</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="md:col-span-3">
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">1. Select Registered User (यूज़र चुनें)</label>
+                        <select id="supportUserSelect" onchange="window.onSupportUserChange()" class="w-full p-3 border border-slate-300 rounded-xl text-xs md:text-sm bg-slate-50 font-bold text-slate-800 outline-none focus:border-royal-500">
+                            <option value="">-- रजिस्टर्ड यूज़र चुनें --</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">User WhatsApp Number</label>
+                        <input type="text" id="supportTargetPhone" placeholder="e.g. 9876543210" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">User Email Address</label>
+                        <input type="email" id="supportTargetEmail" placeholder="e.g. user@gmail.com" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Email Subject</label>
+                        <input type="text" id="supportReplySubject" value="Ojas Print Service - Login ID & Password" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
+                    </div>
+                </div>
+
+                <!-- Quick Message Templates -->
+                <div class="space-y-1.5">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase">2. Quick Reply Templates (1-Click में मैसेज तैयार करें):</label>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <button type="button" onclick="window.applySupportTemplate('credentials')" class="bg-royal-50 hover:bg-royal-100 text-royal-900 border border-royal-300 font-black py-2 px-2.5 rounded-xl text-xs transition">
+                            <i class="fa-solid fa-id-card mr-1"></i> Send ID & Pass
+                        </button>
+                        <button type="button" onclick="window.applySupportTemplate('reset_done')" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200 font-black py-2 px-2.5 rounded-xl text-xs transition">
+                            <i class="fa-solid fa-key mr-1"></i> Pass Reset Reply
+                        </button>
+                        <button type="button" onclick="window.applySupportTemplate('payment_done')" class="bg-green-50 hover:bg-green-100 text-green-900 border border-green-200 font-black py-2 px-2.5 rounded-xl text-xs transition">
+                            <i class="fa-solid fa-check-double mr-1"></i> Payment Approved
+                        </button>
+                        <button type="button" onclick="window.applySupportTemplate('custom')" class="bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 font-black py-2 px-2.5 rounded-xl text-xs transition">
+                            <i class="fa-solid fa-pen mr-1"></i> Custom Reply
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">3. Message Preview / Edit (मैसेज)</label>
+                    <textarea id="supportReplyMessage" rows="7" placeholder="ऊपर से कोई यूज़र या टेम्पलेट चुनें, या अपना मैसेज यहाँ लिखें..." class="w-full p-3.5 border border-slate-300 rounded-2xl text-xs md:text-sm font-semibold bg-slate-50 focus:bg-white outline-none"></textarea>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                    <button type="button" onclick="window.sendSupportReplyNow('whatsapp')" class="bg-green-600 hover:bg-green-700 text-white font-black py-3.5 px-4 rounded-xl text-xs md:text-sm shadow-md transition flex items-center justify-center gap-2">
+                        <i class="fa-brands fa-whatsapp text-base"></i> Send on WhatsApp
+                    </button>
+                    <button type="button" onclick="window.sendSupportReplyNow('email')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 px-4 rounded-xl text-xs md:text-sm shadow-md transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-envelope text-sm"></i> Send on Email
+                    </button>
+                    <button type="button" onclick="window.sendSupportReplyNow('copy')" class="bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 px-4 rounded-xl text-xs md:text-sm transition flex items-center justify-center gap-2">
+                        <i class="fa-regular fa-copy text-sm"></i> Copy Message
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -1971,7 +2305,7 @@
             <div id="adminHistoryListContainer" class="space-y-2.5"></div>
         </div>
 
-        <!-- ================= SECTION 4: PORTAL CONTROL (STEALTH HIDE SERVICES + LIVE UPDATE BANNER) ================= -->
+        <!-- ================= SECTION 4: PORTAL CONTROL (STEALTH HIDE SERVICES + LIVE UPDATE BANNER + SUPPORT NUMBER) ================= -->
         <div id="section-controls" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
             
             <!-- Card 1: Stealth Hide / Show Services Control -->
@@ -1990,7 +2324,7 @@
                 </div>
 
                 <p class="text-xs font-semibold text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                    <i class="fa-solid fa-shield-halved text-royal-600 mr-1"></i> अनचेक (OFF) करने पर वह सर्विस और उसका फॉर्म पोर्टल के कोड से पूरी तरह हट जाएगा और UI अपने-आप बदल जाएगा।
+                    <i class="fa-solid fa-shield-halved text-royal-600 mr-1"></i> अनचेक (OFF) करने पर वह सर्विस और उसका फॉर्म पोर्टल से तुरंत हट जाएगा और UI अपने-आप बदल जाएगा।
                 </p>
 
                 <div class="space-y-2.5">
@@ -2038,19 +2372,26 @@
                 </div>
             </div>
 
-            <!-- Card 2: Custom Live Update Banner Control -->
+            <!-- Card 2: Custom Live Update Banner & Support WhatsApp Control -->
             <div class="bg-white rounded-2xl p-4 md:p-6 shadow-card border border-slate-200 space-y-4">
                 <div class="flex items-center gap-2.5 border-b border-slate-100 pb-3">
                     <div class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-lg border border-indigo-200">
                         <i class="fa-solid fa-bullhorn"></i>
                     </div>
                     <div>
-                        <h3 class="text-base font-black text-dark-900">Live Update / Alert Banner</h3>
-                        <p class="text-[10px] font-bold text-slate-400 uppercase">Normal & VIP दोनों को ऊपर दिखेगा</p>
+                        <h3 class="text-base font-black text-dark-900">Live Update Banner & Support No.</h3>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">बैनर और पोर्टल का WhatsApp हेल्प नंबर</p>
                     </div>
                 </div>
 
                 <form onsubmit="window.savePortalSettings(event)" class="space-y-3">
+                    <div class="p-3 bg-green-50 rounded-xl border border-green-200">
+                        <label class="block text-[10px] font-black text-green-900 uppercase mb-1">
+                            <i class="fa-brands fa-whatsapp mr-1"></i> Portal Support WhatsApp Number (Forgot Pass & Help)
+                        </label>
+                        <input type="text" id="inpSupportWhatsapp" value="919306437623" placeholder="e.g. 919306437623" class="w-full p-2.5 border border-green-300 rounded-xl text-xs font-black bg-white outline-none">
+                    </div>
+
                     <label class="flex items-center justify-between p-3 rounded-xl bg-amber-50 border border-amber-300 cursor-pointer">
                         <div>
                             <div class="text-xs font-black text-amber-900">Show Banner on Portal (ON / OFF)</div>
