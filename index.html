@@ -107,6 +107,7 @@
         window.vipCountdownInterval = null;
         window.portalSettingsUnsubscribe = null;
         window.userChatUnsubscribe = null;
+        window.activePaymentUnsubscribe = null;
         window.currentUserChatData = { messages: [], unreadByUser: false };
 
         // Live Portal Control & Stealth Config
@@ -137,7 +138,7 @@
         };
         window.API_URLS = API_URLS;
 
-        // ================= 1. OUTSIDE LOGIN: FORGOT PASSWORD TICKET (TELEGRAM + ADMIN PANEL SUPPORT CHAT) =================
+        // ================= 1. OUTSIDE LOGIN: FORGOT PASSWORD TICKET =================
         window.openForgotPasswordModal = function() {
             const modal = document.getElementById('forgotPasswordModal');
             const idInp = document.getElementById('forgotUserIdInput');
@@ -177,7 +178,6 @@
             const finalMessage = userNoteText || "मैं अपना पासवर्ड भूल गया हूँ, कृपया नया पासवर्ड जारी करें।";
 
             try {
-                // 1. Save directly in "supportTickets" so it immediately appears in Admin Panel -> Support Chat Tab
                 await addDoc(collection(db, "supportTickets"), {
                     type: "FORGOT_PASSWORD",
                     userIdentifier: userIdText,
@@ -195,7 +195,6 @@
                     updatedAtMs: Date.now()
                 });
 
-                // Backup save in forgotTickets as well
                 try {
                     await addDoc(collection(db, "forgotTickets"), {
                         userIdentifier: userIdText,
@@ -206,7 +205,6 @@
                     });
                 } catch (e) {}
 
-                // 2. Instant Notification to Admin Telegram
                 const botToken = "8586078140:AAG-ydpakzFDAwHFtJC8AUanxZAODpGZDOk"; 
                 const chatId = "8942287807"; 
                 const tgMessage = `🔑 *FORGOT PASSWORD TICKET!*\n\n*Requested User ID:* \`${userIdText}\`\n*Mobile / WhatsApp:* \`${userPhoneText}\`\n*Message:* ${finalMessage}\n\n*Action:* यह टिकट आपके Admin Panel -> Support Chat टैब में भी आ गया है।`;
@@ -236,7 +234,7 @@
             }
         };
 
-        // ================= 2. INSIDE PORTAL: REAL-TIME 2-WAY LIVE SUPPORT CHAT (SYNCED WITH ADMIN) =================
+        // ================= 2. INSIDE PORTAL: REAL-TIME 2-WAY LIVE SUPPORT CHAT =================
         function startUserSupportChatListener(uid) {
             if (window.userChatUnsubscribe) window.userChatUnsubscribe();
 
@@ -403,7 +401,6 @@
         window.applyLivePortalControls = function() {
             const cfg = window.portalConfigState;
 
-            // 1. Update Live Banner
             const bannerBox = document.getElementById('liveUpdateBannerContainer');
             if (bannerBox) {
                 if (cfg.bannerEnabled && (cfg.bannerTitle || cfg.bannerMessage)) {
@@ -436,7 +433,6 @@
                 }
             }
 
-            // 2. Apply Stealth Mode to Buttons & Containers
             const stdGrid = document.getElementById('standardServicesGrid');
             const btnDom = document.getElementById('btn-domicile');
             const btnCas = document.getElementById('btn-caste');
@@ -492,7 +488,6 @@
             return 'history';
         };
 
-        // Close Gear Menu when clicking outside
         document.addEventListener('click', (e) => {
             const menu = document.getElementById('gearDropdownMenu');
             const btn = document.getElementById('gearMenuBtn');
@@ -583,6 +578,7 @@
                 if (window.vipCountdownInterval) clearInterval(window.vipCountdownInterval);
                 if (window.portalSettingsUnsubscribe) window.portalSettingsUnsubscribe();
                 if (window.userChatUnsubscribe) window.userChatUnsubscribe();
+                if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe();
 
                 window.currentUserData = null;
                 document.body.classList.remove('vip-body-bg');
@@ -809,7 +805,7 @@
             }
         };
 
-        // ================= PAYMENT + DIRECT UPI APP LINKS (MINIMUM ₹100 CREDIT & UPDATED VIP CHARGES) =================
+        // ================= PAYMENT + AUTO-VERIFICATION VIA WEBHOOK =================
         window.calculateCredits = function() {
             const creditAmt = parseFloat(document.getElementById('rupeeAmount')?.value) || 0;
             const selectedPlanEl = document.querySelector('input[name="vipPlanOption"]:checked');
@@ -847,23 +843,27 @@
             if (totalPayableDisplay) totalPayableDisplay.innerText = `₹${totalPayable}`;
         };
 
-        window.generateQR = function() {
+        window.generateQR = async function() {
             window.calculateCredits();
             const creditAmt = window.currentRechargeCredits;
             const wantsVip = window.currentWantsVip;
             const totalPayable = window.currentTotalPayable;
             
-            // नियम 1: अगर यूज़र सिर्फ क्रेडिट ले रहा है तो कम से कम ₹100 होना ज़रूरी है
             if (!wantsVip && creditAmt < 100) {
                 return alert('पोर्टल पर कम से कम ₹100 के क्रेडिट रिचार्ज करना अनिवार्य है! कृपया ₹100 या उससे अधिक दर्ज करें।');
             }
-            // नियम 2: अगर VIP के साथ भी क्रेडिट जोड़ रहा है, तो क्रेडिट या तो 0 हो या कम से कम ₹100 हो
             if (wantsVip && creditAmt > 0 && creditAmt < 100) {
                 return alert('क्रेडिट रिचार्ज की न्यूनतम वैल्यू ₹100 है! कृपया क्रेडिट में कम से कम ₹100 डालें (या सिर्फ VIP लेने के लिए क्रेडिट को 0 छोड़ें)।');
             }
-            // नियम 3: कुल पेमेंट किसी भी स्थिति में ₹100 से कम नहीं होगा
             if (totalPayable < 100) {
                 return alert('न्यूनतम पेमेंट राशि ₹100 होनी चाहिए!');
+            }
+
+            const btn = document.getElementById('btnGenerateQR');
+            const origBtnHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> पेमेंट लिंक बन रहा है...';
             }
 
             const upiId = "8279650137@amazonpay"; 
@@ -871,12 +871,79 @@
             const txnNote = wantsVip ? `Ojas VIP ${window.currentVipDays}d` : `Ojas Credits`;
             const queryParams = `pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${totalPayable}&cu=INR&tn=${encodeURIComponent(txnNote)}`;
 
-            const universalUpiUrl = `upi://pay?${queryParams}`;
-            const paytmUrl = `paytmmp://pay?${queryParams}`;
-            const phonepeUrl = `phonepe://pay?${queryParams}`;
-            const gpayUrl = `tez://upi/pay?${queryParams}`;
+            let universalUpiUrl = `upi://pay?${queryParams}`;
+            let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`;
 
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`;
+            try {
+                const res = await fetch('/api/create-order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: window.currentUserData.uid,
+                        email: window.currentUserData.email,
+                        username: window.currentUserData.username,
+                        totalPayable: totalPayable,
+                        creditsRequested: creditAmt,
+                        wantsVip: wantsVip,
+                        vipDaysRequested: window.currentVipDays,
+                        vipPlanFee: window.currentVipPlanFee
+                    })
+                });
+                const orderData = await res.json();
+
+                if (orderData.status && orderData.orderId) {
+                    if (orderData.upi_string) {
+                        universalUpiUrl = orderData.upi_string;
+                        qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`;
+                    }
+                    if (orderData.qr_code && orderData.qr_code.startsWith('http')) {
+                        qrUrl = orderData.qr_code;
+                    }
+
+                    // Live Auto-Verification Listener
+                    if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe();
+                    window.activePaymentUnsubscribe = onSnapshot(doc(db, "payments", orderData.orderId), async (snap) => {
+                        if (snap.exists()) {
+                            const pData = snap.data();
+                            if (pData.status === 'Auto-Approved' || pData.status === 'Approved') {
+                                if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe();
+                                
+                                const uSnap = await getDoc(doc(db, "users", window.currentUserData.uid));
+                                if (uSnap.exists()) {
+                                    const updatedUser = uSnap.data();
+                                    window.currentUserData.credits = updatedUser.credits || 0;
+                                    window.currentUserData.isVip = updatedUser.isVip || window.currentUserData.isAdmin;
+                                    window.currentUserData.vipExpiry = updatedUser.vipExpiry || 0;
+                                    const crEl = document.getElementById('displayCredits');
+                                    if (crEl) crEl.innerText = window.currentUserData.credits;
+                                }
+
+                                document.getElementById('walletMainUI').innerHTML = `
+                                    <div class="p-6 bg-green-50 rounded-2xl border-2 border-green-400 text-center space-y-2">
+                                        <i class="fa-solid fa-circle-check text-5xl text-green-600 mb-2 animate-bounce"></i>
+                                        <h2 class="text-xl font-black text-green-900">पेमेंट सफल! (Auto-Verified)</h2>
+                                        <p class="text-xs font-bold text-green-700">आपका ₹${totalPayable} का पेमेंट वेरीफाई हो गया है और आपके अकाउंट में तुरंत क्रेडिट्स/VIP जोड़ दिए गए हैं!</p>
+                                        <div class="pt-3">
+                                            <button onclick="window.location.reload()" class="bg-green-600 hover:bg-green-700 text-white font-black py-2.5 px-6 rounded-xl text-xs shadow">डैशबोर्ड पर जाएँ</button>
+                                        </div>
+                                    </div>
+                                `;
+                            }
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error("Order creation fallback:", err);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = origBtnHtml;
+                }
+            }
+
+            const paytmUrl = universalUpiUrl.replace('upi://pay?', 'paytmmp://pay?');
+            const phonepeUrl = universalUpiUrl.replace('upi://pay?', 'phonepe://pay?');
+            const gpayUrl = universalUpiUrl.replace('upi://pay?', 'tez://upi/pay?');
 
             document.getElementById('upiQRCode').src = qrUrl;
             document.getElementById('qrPayableAmountText').innerText = `कुल पेमेंट: ₹${totalPayable}`;
@@ -898,6 +965,7 @@
         };
 
         window.backToPaymentStep1 = function() {
+            if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe();
             document.getElementById('qrSection').style.display = 'none';
             document.getElementById('paymentStep1').style.display = 'block';
         };
@@ -933,20 +1001,17 @@
             errorMsg.style.display = 'none';
 
             try {
-                // सिक्योरिटी रूल #4 के अनुसार usedUtrs कलेक्शन से डुप्लीकेट UTR चेक करें
                 const utrRef = doc(db, "usedUtrs", utr);
                 const utrSnap = await getDoc(utrRef);
                 if (utrSnap.exists()) {
                     throw new Error("यह UTR नंबर पहले ही उपयोग किया जा चुका है!");
                 }
 
-                // पहले UTR लॉक करें
                 await setDoc(utrRef, {
                     userId: window.currentUserData.uid,
                     timestamp: new Date()
                 });
 
-                // फिर पेमेंट रिक्वेस्ट सेव करें
                 await addDoc(collection(db, "payments"), {
                     userId: window.currentUserData.uid,
                     email: window.currentUserData.email,
@@ -1137,7 +1202,6 @@
                 tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500 font-bold text-xs">लोड करने में समस्या आई।</td></tr>`;
             }
         };
-
         // ================= UNIFIED SINGLE-PAGE A4 HTML BUILDER FOR ALL 9 ANNEXURES =================
         window.formatDateIN = function(dateStr) {
             if (!dateStr) return '';
@@ -1664,7 +1728,6 @@
             if (!window.currentUserData) return alert('Please login first!');
             if (!window.currentUserData.isVip) return alert('यह सर्विस केवल VIP यूज़र्स के लिए है!');
 
-            // सभी Annexures के लिए 10 Credits फिक्स
             const docCost = 10;
             if (!window.currentUserData.isAdmin && window.currentUserData.credits < docCost) {
                 return alert(`Insufficient credits! You need ${docCost} credits to generate ${serviceType}. Please add credits.`);
@@ -1797,7 +1860,7 @@
             });
         }
 
-        // ================= FORM SUBMISSION FOR GOOGLE DRIVE SERVICES (FIXED 10 CREDITS FOR ALL INCLUDING DOB) =================
+        // ================= FORM SUBMISSION FOR GOOGLE DRIVE SERVICES =================
         window.submitForm = async function(event, serviceType) {
             event.preventDefault();
 
@@ -1808,7 +1871,6 @@
             if (serviceType === 'Caste' && !cfg.showCaste) return alert('यह सर्विस वर्तमान में बंद है।');
             if ((serviceType === 'DOB' || serviceType === 'DOB 18+') && !cfg.showDob18) return alert('यह सर्विस वर्तमान में बंद है।');
 
-            // सभी सर्विसेज़ (Domicile, Caste, DOB 18+) के लिए 10 Credits फिक्स
             const docCost = 10;
 
             if (!window.currentUserData.isAdmin && window.currentUserData.credits < docCost) {
@@ -2018,7 +2080,6 @@
                 </div>
             `;
         }
-
         // ================= MAIN SERVICE SWITCHER (FIXED 10 CREDITS EVERYWHERE) =================
         window.switchService = async function(serviceName) {
             const cfg = window.portalConfigState;
@@ -2560,7 +2621,7 @@
                 window.initVerificationDefaults();
             }
             
-            // ADD CREDITS + VIP PAGE (MINIMUM ₹100 CREDIT & UPDATED VIP CHARGES: ₹149, ₹249, ₹299)
+            // ADD CREDITS + VIP PAGE (AUTO-VERIFIED + MANUAL FALLBACK)
             else if(serviceName === 'add_credit') {
                 container.innerHTML = `
                     <div id="walletMainUI" class="max-w-md mx-auto">
@@ -2643,6 +2704,10 @@
                                 <span id="qrPayableAmountText" class="text-sm font-black text-green-700 bg-green-100 px-3 py-1 rounded-lg border border-green-300">कुल पेमेंट: ₹0</span>
                             </div>
 
+                            <div class="w-full p-2.5 bg-green-50 border border-green-300 rounded-xl text-center text-[11px] font-bold text-green-800 animate-pulse">
+                                <i class="fa-solid fa-satellite-dish mr-1"></i> Auto-Verification चालू है! पेमेंट करते ही क्रेडिट्स अपने-आप जुड़ जाएंगे।
+                            </div>
+
                             <div class="w-full bg-white p-3 rounded-xl border border-green-200 shadow-sm space-y-2">
                                 <p class="text-[11px] font-black text-slate-700 text-center">
                                     <i class="fa-solid fa-mobile-screen-button text-green-600 mr-1"></i> मोबाइल से 1-Click में सीधे ऐप खोलकर पेमेंट करें:
@@ -2668,7 +2733,7 @@
                             </div>
                             
                             <div class="w-full pt-1 space-y-2">
-                                <label class="block text-[11px] font-black text-slate-600 text-center">पेमेंट करने के बाद UTR नंबर यहाँ डालें:</label>
+                                <label class="block text-[11px] font-black text-slate-600 text-center">अगर ऑटो-वेरीफाई न हो, तो यहाँ UTR नंबर डालें:</label>
                                 <input type="text" id="utrNumber" placeholder="Enter UTR / Ref No" class="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold bg-white focus:ring-2 focus:ring-amber-500 outline-none text-center tracking-widest uppercase">
                                 <button onclick="window.submitPayment()" id="btnSubmitPayment" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-3.5 rounded-xl shadow transition text-sm">
                                     Submit UTR For Verification <i class="fa-solid fa-paper-plane ml-1"></i>
@@ -2961,7 +3026,7 @@
             <!-- 📢 ADMIN CONTROLLED LIVE UPDATE BANNER -->
             <div id="liveUpdateBannerContainer" style="display: none;" class="mb-3.5"></div>
 
-            <!-- ✨ COMPACT MOBILE-FRIENDLY VIP PROMO STRIP FOR NORMAL USERS (UPDATED RATES: ₹149, ₹249, ₹299) ✨ -->
+            <!-- ✨ COMPACT MOBILE-FRIENDLY VIP PROMO STRIP FOR NORMAL USERS ✨ -->
             <div id="normalUserVipPromo" style="display: none;" class="mb-4 rounded-2xl vip-promo-shine border border-royal-400 p-3 text-white shadow-md">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <div class="flex items-center gap-2">
