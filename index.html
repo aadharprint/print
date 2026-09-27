@@ -529,16 +529,7 @@
                 gearVipDaysText.innerText = `👑 VIP: ${totalDaysCeil} दिन बाकी (${days}d ${hours}h)`;
             }
 
-            if (timerBox && timerText) {
-                timerBox.style.display = 'inline-flex';
-                if (totalDaysCeil <= 5) {
-                    timerBox.className = "cursor-pointer items-center gap-1 bg-red-600 text-white border border-yellow-300 px-2.5 py-1 rounded-lg text-[11px] font-black shadow-sm animate-pulse transition";
-                } else {
-                    timerBox.className = "cursor-pointer items-center gap-1 bg-amber-400/20 border border-royal-400 text-royal-300 px-2.5 py-1 rounded-lg text-[11px] font-black shadow-sm hover:bg-amber-400/30 transition";
-                }
-                timerText.innerHTML = `<span class="text-yellow-300">VIP: ${totalDaysCeil} दिन</span> <span class="hidden md:inline font-mono text-[10px] text-white opacity-90">(${days}d:${String(hours).padStart(2, '0')}h:${String(minutes).padStart(2, '0')}m)</span>`;
-            }
-
+          
             if (totalDaysCeil <= 5 && totalDaysCeil >= 1) {
                 if (!window.cornerAlertDismissed) {
                     cornerAlert.style.display = 'block';
