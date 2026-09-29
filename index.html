@@ -108,7 +108,64 @@
         window.portalSettingsUnsubscribe = null;
         window.userChatUnsubscribe = null;
         window.activePaymentUnsubscribe = null;
+        window.currentActiveOrderId = null;
         window.currentUserChatData = { messages: [], unreadByUser: false };
+
+        // ================= GLOBAL DROPDOWN OPTIONS LISTS =================
+        window.DOC_OPTIONS_LIST = [
+            "BIRTH CERTIFICATE",
+            "INVALID DATE OF BIRTH CERTIFICATE",
+            "INVALID BIRTH CERTIFICATE",
+            "MARKSHEET",
+            "SCHOOL LEAVING CERTIFICATE",
+            "TRANSFER CERTIFICATE",
+            "PASSPORT",
+            "DRIVING LICENSE",
+            "PAN CARD"
+        ];
+
+        window.VLE_NAMES_LIST = [
+            "कपिल",
+            "सचिन",
+            "नसीम",
+            "शौकीन",
+            "राहुल",
+            "अमन",
+            "मोहित"
+        ];
+
+        // 'जाट' हटा दिया गया है और अन्य जातियाँ जोड़ी गई हैं
+        window.CASTE_OPTIONS_LIST = [
+            "गुर्जर",
+            "कश्यप",
+            "अहीर",
+            "ब्राह्मण",
+            "सैनी",
+            "प्रजापति",
+            "राजपूत",
+            "त्यागी",
+            "वाल्मीकि"
+        ];
+
+        window.buildDocSelectOptions = function(defaultVal = "BIRTH CERTIFICATE") {
+            return window.DOC_OPTIONS_LIST.map(docName => 
+                `<option value="${docName}" ${docName === defaultVal ? 'selected' : ''}>${docName}</option>`
+            ).join('') + `<option value="OTHER">OTHER (खुद टाइप करें)</option>`;
+        };
+
+        window.toggleCustomInput = function(selectEl, customInputId) {
+            const customInp = document.getElementById(customInputId);
+            if (!customInp) return;
+            if (selectEl.value === 'OTHER') {
+                customInp.style.display = 'block';
+                customInp.required = true;
+                customInp.focus();
+            } else {
+                customInp.style.display = 'none';
+                customInp.required = false;
+                customInp.value = '';
+            }
+        };
 
         // Live Portal Control & Stealth Config
         window.portalConfigState = {
@@ -137,6 +194,17 @@
             "CASTE": "https://script.google.com/macros/s/AKfycbzUs_e_ga3Ly3SQ9qq5inqHgfC23-jzav8sjUES7XnPw7cyUn3DHhVEBFdgxqUejU5Y/exec"
         };
         window.API_URLS = API_URLS;
+
+        // Secure Backend Notification Helper (No Exposed Token in Browser)
+        async function notifyAdminSecurely(payload) {
+            try {
+                await fetch('/api/notify-admin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            } catch (e) {}
+        }
 
         // ================= 1. OUTSIDE LOGIN: FORGOT PASSWORD TICKET =================
         window.openForgotPasswordModal = function() {
@@ -205,19 +273,12 @@
                     });
                 } catch (e) {}
 
-                const botToken = "8586078140:AAG-ydpakzFDAwHFtJC8AUanxZAODpGZDOk"; 
-                const chatId = "8942287807"; 
-                const tgMessage = `🔑 *FORGOT PASSWORD TICKET!*\n\n*Requested User ID:* \`${userIdText}\`\n*Mobile / WhatsApp:* \`${userPhoneText}\`\n*Message:* ${finalMessage}\n\n*Action:* यह टिकट आपके Admin Panel -> Support Chat टैब में भी आ गया है।`;
-
-                fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        chat_id: chatId,
-                        text: tgMessage,
-                        parse_mode: 'Markdown'
-                    })
-                }).catch(() => {});
+                notifyAdminSecurely({
+                    type: "FORGOT_PASSWORD",
+                    userId: userIdText,
+                    phone: userPhoneText,
+                    message: finalMessage
+                });
 
                 resBox.className = "p-3.5 rounded-2xl bg-green-50 border border-green-300 text-green-900 text-xs font-bold text-center space-y-1";
                 resBox.innerHTML = `
@@ -604,10 +665,7 @@
             const email = emailInput.includes('@') ? emailInput : `${emailInput.toLowerCase()}@ovportal.com`;
 
             try {
-                const userCred = await signInWithEmailAndPassword(auth, email, passInput);
-                try {
-                    await updateDoc(doc(db, "users", userCred.user.uid), { userPass: passInput });
-                } catch (e) {}
+                await signInWithEmailAndPassword(auth, email, passInput);
             } catch (error) {
                 errorDiv.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i> Your ID or Password are incorrect!';
                 errorDiv.style.display = 'block';
@@ -786,7 +844,6 @@
 
                 try {
                     await updateDoc(doc(db, "users", user.uid), {
-                        userPass: newPass,
                         passUpdatedAt: new Date()
                     });
                 } catch (e) {}
@@ -805,7 +862,7 @@
             }
         };
 
-        // ================= PAYMENT + AUTO-VERIFICATION VIA WEBHOOK =================
+        // ================= PAYMENT + AUTO-CANCEL + 24-HOUR UTR TICKET SYSTEM =================
         window.calculateCredits = function() {
             const creditAmt = parseFloat(document.getElementById('rupeeAmount')?.value) || 0;
             const selectedPlanEl = document.querySelector('input[name="vipPlanOption"]:checked');
@@ -873,6 +930,7 @@
 
             let universalUpiUrl = `upi://pay?${queryParams}`;
             let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`;
+            window.currentActiveOrderId = null;
 
             try {
                 const res = await fetch('/api/create-order', {
@@ -892,6 +950,8 @@
                 const orderData = await res.json();
 
                 if (orderData.status && orderData.orderId) {
+                    window.currentActiveOrderId = orderData.orderId;
+
                     if (orderData.upi_string) {
                         universalUpiUrl = orderData.upi_string;
                         qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`;
@@ -907,6 +967,7 @@
                             const pData = snap.data();
                             if (pData.status === 'Auto-Approved' || pData.status === 'Approved') {
                                 if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe();
+                                window.currentActiveOrderId = null;
                                 
                                 const uSnap = await getDoc(doc(db, "users", window.currentUserData.uid));
                                 if (uSnap.exists()) {
@@ -934,6 +995,22 @@
                 }
             } catch (err) {
                 console.error("Order creation fallback:", err);
+                // अगर लोकल/ऑफलाइन हो तो पेमेंट डॉक्यूमेंट बनाकर ट्रैक करें ताकि कैंसिल काम करे
+                try {
+                    const fallbackDoc = await addDoc(collection(db, "payments"), {
+                        userId: window.currentUserData.uid,
+                        email: window.currentUserData.email,
+                        amountPaid: totalPayable,
+                        creditsRequested: creditAmt,
+                        wantsVip: wantsVip,
+                        vipDaysRequested: window.currentVipDays,
+                        vipPlanFee: window.currentVipPlanFee,
+                        utrNumber: "ONLINE_UPI",
+                        timestamp: new Date(),
+                        status: "Pending"
+                    });
+                    window.currentActiveOrderId = fallbackDoc.id;
+                } catch (e) {}
             } finally {
                 if (btn) {
                     btn.disabled = false;
@@ -960,116 +1037,123 @@
             const btnGPay = document.getElementById('btnGPayApp');
             if (btnGPay) btnGPay.href = gpayUrl;
 
+            const ticketBox = document.getElementById('paymentIssueTicketBox');
+            if (ticketBox) ticketBox.style.display = 'none';
+            const ticketResult = document.getElementById('paymentTicketResultMsg');
+            if (ticketResult) ticketResult.style.display = 'none';
+
             document.getElementById('paymentStep1').style.display = 'none';
             document.getElementById('qrSection').style.display = 'flex';
         };
 
-        window.backToPaymentStep1 = function() {
-            if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe();
+        // बिना पेमेंट किए Back करने पर ऑटोमैटिक पेमेंट Cancel हो जाएगी
+        window.cancelAndBackToPaymentStep1 = async function() {
+            if (window.activePaymentUnsubscribe) {
+                window.activePaymentUnsubscribe();
+                window.activePaymentUnsubscribe = null;
+            }
+
+            if (window.currentActiveOrderId) {
+                const orderIdToCancel = window.currentActiveOrderId;
+                window.currentActiveOrderId = null;
+                try {
+                    await updateDoc(doc(db, "payments", orderIdToCancel), {
+                        status: "Cancelled",
+                        cancelledBy: "User (Back without Payment)",
+                        cancelledAt: new Date()
+                    });
+                } catch (e) {}
+            }
+
             document.getElementById('qrSection').style.display = 'none';
             document.getElementById('paymentStep1').style.display = 'block';
+            alert("पेमेंट प्रोसेस कैंसिल कर दिया गया है (Payment Cancelled)।");
         };
 
-        window.submitPayment = async function() {
-            const totalPaid = window.currentTotalPayable;
-            const creditsToAdd = window.currentRechargeCredits;
-            const wantsVip = window.currentWantsVip;
-            const vipDays = window.currentVipDays;
-            const vipFee = window.currentVipPlanFee;
+        window.togglePaymentTicketBox = function() {
+            const box = document.getElementById('paymentIssueTicketBox');
+            if (!box) return;
+            box.style.display = box.style.display === 'none' ? 'block' : 'none';
+        };
 
-            const rawUtr = document.getElementById('utrNumber').value.trim();
-            const errorMsg = document.getElementById('paymentErrorMsg');
-
+        // ऑनलाइन पेमेंट अटकने पर UTR के साथ टिकट रेज़ करने का फंक्शन (24 घंटे में समाधान)
+        window.submitPaymentIssueTicket = async function() {
+            const rawUtr = document.getElementById('ticketUtrInput')?.value.trim() || '';
             const utr = rawUtr.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-
-            if (!totalPaid || totalPaid < 100) {
-                errorMsg.innerText = 'न्यूनतम पेमेंट ₹100 होना चाहिए, कृपया दोबारा QR जनरेट करें।';
-                errorMsg.style.display = 'block';
-                return;
-            }
+            const resMsg = document.getElementById('paymentTicketResultMsg');
+            const btn = document.getElementById('btnRaisePaymentTicket');
 
             if (!utr || utr.length < 10) {
-                errorMsg.innerText = 'कृपया पेमेंट के बाद सही UTR / Ref No दर्ज करें।';
-                errorMsg.style.display = 'block';
-                return;
+                return alert("कृपया अपना 12-अंकों का सही UTR / Reference नंबर दर्ज करें!");
             }
 
-            const btn = document.getElementById('btnSubmitPayment');
             const origHtml = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> सबमिट हो रहा है...';
             btn.disabled = true;
-            errorMsg.style.display = 'none';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> टिकट सबमिट हो रहा है...';
+
+            const totalPaid = window.currentTotalPayable;
+            const creditsReq = window.currentRechargeCredits;
+            const vipDays = window.currentVipDays;
+
+            const ticketMsgText = `💳 [PAYMENT UTR TICKET]\nAmount: ₹${totalPaid}\nCredits: +${creditsReq} Cr${vipDays > 0 ? ` | VIP: +${vipDays}d` : ''}\nUTR No: ${utr}\nOrder ID: ${window.currentActiveOrderId || 'N/A'}\nNote: ऑनलाइन पेमेंट ऑटो-वेरीफाई नहीं हुआ, कृपया चेक करके क्रेडिट जोड़ें।`;
 
             try {
-                const utrRef = doc(db, "usedUtrs", utr);
-                const utrSnap = await getDoc(utrRef);
-                if (utrSnap.exists()) {
-                    throw new Error("यह UTR नंबर पहले ही उपयोग किया जा चुका है!");
+                // अगर ऑर्डर पहले से बना है तो उसमें UTR और Ticket Status अपडेट करें
+                if (window.currentActiveOrderId) {
+                    try {
+                        await updateDoc(doc(db, "payments", window.currentActiveOrderId), {
+                            utrNumber: utr,
+                            status: "Pending (Ticket Raised)",
+                            ticketRaisedAt: new Date()
+                        });
+                    } catch (e) {}
                 }
 
-                await setDoc(utrRef, {
-                    userId: window.currentUserData.uid,
-                    timestamp: new Date()
+                const uid = window.currentUserData.uid;
+                const chatRef = doc(db, "supportTickets", uid);
+                const existingMsgs = Array.isArray(window.currentUserChatData?.messages) ? [...window.currentUserChatData.messages] : [];
+                existingMsgs.push({
+                    sender: 'user',
+                    text: ticketMsgText,
+                    time: Date.now()
                 });
 
-                await addDoc(collection(db, "payments"), {
-                    userId: window.currentUserData.uid,
-                    email: window.currentUserData.email,
-                    amountPaid: totalPaid,
-                    creditsRequested: creditsToAdd,
-                    wantsVip: wantsVip,
-                    vipDaysRequested: vipDays,
-                    vipPlanFee: vipFee,
-                    utrNumber: utr,
+                await setDoc(chatRef, {
+                    type: 'PAYMENT_ISSUE_TICKET',
+                    userId: uid,
+                    userIdentifier: window.currentUserData.email,
+                    username: window.currentUserData.username,
+                    message: `💳 Payment UTR Ticket: ₹${totalPaid} (UTR: ${utr})`,
+                    status: 'Open',
+                    unreadByAdmin: true,
+                    unreadByUser: false,
                     timestamp: new Date(),
-                    status: "Pending"
+                    updatedAtMs: Date.now(),
+                    messages: existingMsgs
+                }, { merge: true });
+
+                notifyAdminSecurely({
+                    type: "PAYMENT_UTR_TICKET",
+                    user: window.currentUserData.email,
+                    amount: totalPaid,
+                    utr: utr
                 });
 
-                const botToken = "8586078140:AAG-ydpakzFDAwHFtJC8AUanxZAODpGZDOk"; 
-                const chatId = "8942287807"; 
-                const vipAlertLine = wantsVip 
-                    ? `\n👑 *VIP PLAN:* +${vipDays} Days (₹${vipFee} Included)` 
-                    : `\n👤 *Request Type:* Normal Credit Recharge`;
-                
-                const tgMessage = `🚨 *New Payment Request!*\n*User:* ${window.currentUserData.email}\n*Total Paid:* ₹${totalPaid}\n*Credits to Add:* +${creditsToAdd} Credits${vipAlertLine}\n*UTR:* \`${utr}\`\n\n*Status:* Pending Approval in Admin Panel.`;
-
-                fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        chat_id: chatId,
-                        text: tgMessage,
-                        parse_mode: 'Markdown'
-                    })
-                }).catch(err => console.log("Telegram alert failed", err));
-
-                const successSubText = wantsVip 
-                    ? `आपकी UTR डिटेल और <strong>👑 +${vipDays} Days VIP Access</strong> की रिक्वेस्ट भेज दी गई है।`
-                    : `आपकी UTR डिटेल भेज दी गई है। पेमेंट वेरीफाई होते ही ${creditsToAdd} क्रेडिट्स जुड़ जाएंगे।`;
-
-                document.getElementById('walletMainUI').innerHTML = `
-                    <div class="p-6 bg-amber-50 rounded-2xl border border-amber-200 text-center">
-                        <i class="fa-solid fa-clock-rotate-left text-4xl text-amber-500 mb-3 animate-pulse"></i>
-                        <h2 class="text-xl font-black text-amber-800">वेरिफिकेशन पेंडिंग (Pending)</h2>
-                        <p class="text-xs font-bold text-amber-700 mt-2">${successSubText}</p>
-                        <div class="flex gap-2 justify-center mt-5">
-                            <button onclick="window.switchService('payments_history')" class="bg-dark-900 text-royal-300 font-bold py-2.5 px-4 rounded-xl text-xs">पेमेंट स्टेटस देखें</button>
-                            <button onclick="window.switchService(window.getFirstAllowedTab())" class="bg-amber-600 text-white font-bold py-2.5 px-4 rounded-xl text-xs">होम पर जाएँ</button>
-                        </div>
-                    </div>
+                resMsg.className = "p-3.5 rounded-xl bg-green-50 border border-green-300 text-green-900 text-xs font-bold text-center space-y-1 mt-2";
+                resMsg.innerHTML = `
+                    <div><i class="fa-solid fa-circle-check text-green-600 text-base mr-1"></i> आपका पेमेंट टिकट सफलतापूर्वक रेज़ हो गया है!</div>
+                    <p class="text-[11px] text-green-800">आपका UTR नंबर (<strong>${utr}</strong>) दर्ज कर लिया गया है। <strong>24 घंटे के अंदर</strong> आपकी समस्या का समाधान (Resolution) कर दिया जाएगा और क्रेडिट्स आपके वॉलेट में जोड़ दिए जाएंगे।</p>
                 `;
-            } catch(error) {
-                errorMsg.innerText = error.message;
-                errorMsg.style.display = 'block';
+                resMsg.style.display = 'block';
+                document.getElementById('ticketUtrInput').value = '';
+            } catch (err) {
+                alert("टिकट रेज़ करने में समस्या आई: " + err.message);
             } finally {
-                if (btn) {
-                    btn.innerHTML = origHtml;
-                    btn.disabled = false;
-                }
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
             }
         };
-
-        // ================= USER PAYMENT HISTORY =================
+        4// ================= USER PAYMENT HISTORY =================
         window.loadUserPayments = async function() {
             const tbody = document.getElementById('userPaymentsTableBody');
             if (!tbody) return;
@@ -1145,7 +1229,7 @@
                     const st = (item.status || 'Pending').toLowerCase();
                     if (st === 'approved' || st === 'auto-approved') {
                         approvedAmount += amt;
-                    } else if (st === 'pending') {
+                    } else if (st.includes('pending')) {
                         pendingAmount += amt;
                         pendingCount++;
                     }
@@ -1184,6 +1268,10 @@
                         statusBadgeHtml = `<span class="bg-green-100 text-green-800 border border-green-300 px-2.5 py-1 rounded-full text-[11px] font-black">सफल (Approved)</span>`;
                     } else if (rawStatus === 'Rejected') {
                         statusBadgeHtml = `<span class="bg-red-100 text-red-700 border border-red-300 px-2.5 py-1 rounded-full text-[11px] font-black">रद्द (Rejected)</span>`;
+                    } else if (rawStatus === 'Cancelled') {
+                        statusBadgeHtml = `<span class="bg-slate-200 text-slate-700 border border-slate-300 px-2.5 py-1 rounded-full text-[11px] font-black">कैंसिल (Cancelled)</span>`;
+                    } else if (rawStatus.includes('Ticket')) {
+                        statusBadgeHtml = `<span class="bg-indigo-100 text-indigo-800 border border-indigo-300 px-2.5 py-1 rounded-full text-[11px] font-black">टिकट रेज़्ड (24h Resolution)</span>`;
                     } else {
                         statusBadgeHtml = `<span class="bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-1 rounded-full text-[11px] font-black animate-pulse">पेंडिंग (Pending)</span>`;
                     }
@@ -1193,7 +1281,7 @@
                             <td class="p-3 text-slate-600 font-bold">${dateStr}<br><span class="text-[10px] text-slate-400">${timeStr}</span></td>
                             <td class="p-3 font-black text-sm text-slate-900">₹${item.amountPaid || 0}</td>
                             <td class="p-3">${detailsHtml}</td>
-                            <td class="p-3 font-mono font-bold text-slate-700">${item.utrNumber || 'N/A'}</td>
+                            <td class="p-3 font-mono font-bold text-slate-700">${item.utrNumber || 'ONLINE'}</td>
                             <td class="p-3 text-right whitespace-nowrap">${statusBadgeHtml}</td>
                         </tr>
                     `;
@@ -1202,6 +1290,7 @@
                 tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500 font-bold text-xs">लोड करने में समस्या आई।</td></tr>`;
             }
         };
+
         // ================= UNIFIED SINGLE-PAGE A4 HTML BUILDER FOR ALL 9 ANNEXURES =================
         window.formatDateIN = function(dateStr) {
             if (!dateStr) return '';
@@ -1230,8 +1319,8 @@
                                 <li style="margin-bottom: 11px; padding-left: 6px;">That I am the resident of the above said address.</li>
                                 <li style="margin-bottom: 11px; padding-left: 6px;">That my correct date of birth is <span class="filled-val">${d.newDob || ''}</span>.</li>
                                 <li style="margin-bottom: 11px; padding-left: 6px;">That the earlier recorded date of birth is <span class="filled-val">${d.oldDob || ''}</span> based on <span class="filled-val">${d.oldDoc || ''}</span> document submitted by me.</li>
-                                <li style="margin-bottom: 11px; padding-left: 6px;">That I have <span class="filled-val">${d.updateTimes || 'NEVER'}</span> (never/once/ more than once) updated my date of birth.</li>
-                                <li style="margin-bottom: 11px; padding-left: 6px;">That currently a corrected version of the same document as mentioned in (iii) above / birth certificate (choose as applicable) is being provided in support of DoB update request.</li>
+                                <li style="margin-bottom: 11px; padding-left: 6px;">That I have <span class="filled-val">${d.updateTimes || 'NEVER'}</span> updated my date of birth.</li>
+                                <li style="margin-bottom: 11px; padding-left: 6px;">That currently a corrected version of the same document as mentioned in (iii) above / <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> is being provided in support of DoB update request.</li>
                                 <li style="margin-bottom: 11px; padding-left: 6px;">That I wish to get my date of birth updated as <span class="filled-val">${d.newDob || ''}</span> for which I am submitting <span class="filled-val">${d.newDoc || ''}</span> as proof of date of birth.</li>
                                 <li style="margin-bottom: 11px; padding-left: 6px;">That I further undertake that I shall not be eligible for any further updation of my date of birth.</li>
                             </ol>
@@ -1276,8 +1365,8 @@
                                 <li style="margin-bottom: 9px; padding-left: 6px;">That I am parent/legal guardian of the <span class="filled-val">${d.childName || ''}</span> holding ID number <span class="filled-val">${d.childIdNumber || ''}</span>.</li>
                                 <li style="margin-bottom: 9px; padding-left: 6px;">That correct date of birth of my child/ ward is <span class="filled-val">${d.newDob || ''}</span>.</li>
                                 <li style="margin-bottom: 9px; padding-left: 6px;">That the earlier recorded date of birth of my child/ward is <span class="filled-val">${d.oldDob || ''}</span> based on <span class="filled-val">${d.oldDoc || ''}</span> document submitted by me.</li>
-                                <li style="margin-bottom: 9px; padding-left: 6px;">That I have <span class="filled-val">${d.updateTimes || 'NEVER'}</span> (never/once/more than once) updated my child/ward date of birth.</li>
-                                <li style="margin-bottom: 9px; padding-left: 6px;">That birth certificate of my child/ward is being provided in support of DoB update request.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I have <span class="filled-val">${d.updateTimes || 'NEVER'}</span> updated my child/ward date of birth.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> of my child/ward is being provided in support of DoB update request.</li>
                                 <li style="margin-bottom: 9px; padding-left: 6px;">That I wish to get my child/ward date of birth updated as <span class="filled-val">${d.newDob || ''}</span> for which I am submitting his/her <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> as proof of date of birth.</li>
                                 <li style="margin-bottom: 9px; padding-left: 6px;">That I further undertake that my child/ward shall not be eligible for any further updation of date of birth.</li>
                             </ol>
@@ -1415,7 +1504,7 @@
                     <li style="margin-bottom: 14px; padding-left: 6px;">That I am the holder of ID Number <span class="filled-val">${d.idNumber || ''}</span>.</li>
                     <li style="margin-bottom: 14px; padding-left: 6px;">That my name is presently recorded as <span class="filled-val">${d.oldName || ''}</span>.</li>
                     <li style="margin-bottom: 14px; padding-left: 6px;">That I have changed/updated my name and intend to record my correct name as <span class="filled-val">${d.newName || ''}</span> in place of <span class="filled-val">${d.oldName || ''}</span>, both names referring to one and the same person, i.e. myself.</li>
-                    <li style="margin-bottom: 14px; padding-left: 6px;">That I am submitting the prescribed supporting Proof of Identity (PoI) document (<span class="filled-val">${d.newDoc || 'GAZETTE / MARRIAGE / POI CERTIFICATE'}</span>) in support of the name sought to be updated.</li>
+                    <li style="margin-bottom: 14px; padding-left: 6px;">That I am submitting the prescribed supporting Proof of Identity (PoI) document (<span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span>) in support of the name sought to be updated.</li>
                     <li style="margin-bottom: 14px; padding-left: 6px;">That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of my ID number and prosecution under the applicable laws.</li>
                 `;
 
@@ -1586,6 +1675,7 @@
             if (myEl) myEl.value = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase();
         };
 
+        // FIXED URF / ALIAS SMART SPLITTER FOR ANNEXURE E & F
         window.syncAnnexureENames = function() {
             const appName = document.getElementById('inpApplicantName')?.value.trim().toUpperCase() || '';
             const rec1Input = document.getElementById('inpRecorded1');
@@ -1594,8 +1684,18 @@
             const removeInput = document.getElementById('inpRemoveName');
 
             if (appName && document.activeElement?.id === 'inpApplicantName') {
-                if (rec1Input) rec1Input.value = appName;
-                if (retainInput) retainInput.value = appName;
+                const urfSplit = appName.split(/\s+(?:URF|ALIAS|उर्फ|उर्फ़)\s+/i);
+                if (urfSplit.length >= 2) {
+                    const firstName = urfSplit[0].trim();
+                    const aliasName = urfSplit.slice(1).join(' ').trim();
+                    if (rec1Input) rec1Input.value = firstName;
+                    if (rec2Input) rec2Input.value = aliasName;
+                    if (retainInput) retainInput.value = firstName;
+                    if (removeInput) removeInput.value = aliasName;
+                } else {
+                    if (rec1Input) rec1Input.value = appName;
+                    if (retainInput) retainInput.value = appName;
+                }
             } else if (document.activeElement?.id === 'inpRecorded1' && retainInput) {
                 retainInput.value = rec1Input.value.toUpperCase();
             } else if (document.activeElement?.id === 'inpRecorded2' && removeInput) {
@@ -1752,19 +1852,22 @@
                 }
             });
 
+            // अगर यूज़र ने डॉक्यूमेंट में 'OTHER' चुनकर कस्टम नाम लिखा हो, तो उसे सेट करें
+            if (formDataObj.oldDoc === 'OTHER' && formDataObj.oldDocCustom) {
+                formDataObj.oldDoc = formDataObj.oldDocCustom;
+            }
+            if (formDataObj.newDoc === 'OTHER' && formDataObj.newDocCustom) {
+                formDataObj.newDoc = formDataObj.newDocCustom;
+            }
+            if (formDataObj.invalidDocName === 'OTHER' && formDataObj.invalidDocNameCustom) {
+                formDataObj.invalidDocName = formDataObj.invalidDocNameCustom;
+            }
+
             const mainPersonName = formDataObj.childName || formDataObj.applicantName || formDataObj.parentName || 'CUSTOMER';
             const cleanName = mainPersonName.replace(/[^a-zA-Z0-9]/g, '_');
             const pdfFileName = `${cleanName} - ${serviceType}.pdf`;
 
             try {
-                if (!window.currentUserData.isAdmin) {
-                    const userDocRef = doc(db, "users", window.currentUserData.uid);
-                    const newCredits = window.currentUserData.credits - docCost;
-                    await updateDoc(userDocRef, { credits: newCredits });
-                    window.currentUserData.credits = newCredits;
-                    document.getElementById('displayCredits').innerText = newCredits;
-                }
-
                 await addDoc(collection(db, "history"), {
                     userId: window.currentUserData.uid,
                     fileName: pdfFileName,
@@ -1773,6 +1876,14 @@
                     formData: formDataObj,
                     timestamp: new Date()
                 });
+
+                if (!window.currentUserData.isAdmin) {
+                    const userDocRef = doc(db, "users", window.currentUserData.uid);
+                    const newCredits = window.currentUserData.credits - docCost;
+                    await updateDoc(userDocRef, { credits: newCredits });
+                    window.currentUserData.credits = newCredits;
+                    document.getElementById('displayCredits').innerText = newCredits;
+                }
 
                 alert(`आपका डॉक्यूमेंट (${serviceType}) जनरेट हो चुका है! अब आप यहाँ History से इसे Preview, Print और Download कर सकते हैं।`);
                 formEl.reset();
@@ -1860,7 +1971,7 @@
             });
         }
 
-        // ================= FORM SUBMISSION FOR GOOGLE DRIVE SERVICES =================
+        // ================= FORM SUBMISSION FOR GOOGLE DRIVE SERVICES (CREDITS DEDUCTED AFTER SUCCESS) =================
         window.submitForm = async function(event, serviceType) {
             event.preventDefault();
 
@@ -1893,14 +2004,6 @@
             else if (serviceType === 'DOB' || serviceType === 'DOB 18+') targetUrl = API_URLS["DOB"];
 
             try {
-                if (!window.currentUserData.isAdmin) {
-                    const userDocRef = doc(db, "users", window.currentUserData.uid);
-                    const newCredits = window.currentUserData.credits - docCost;
-                    await updateDoc(userDocRef, { credits: newCredits });
-                    window.currentUserData.credits = newCredits;
-                    document.getElementById('displayCredits').innerText = newCredits;
-                }
-
                 const photoInput = formElement.querySelector('input[type="file"]');
                 let base64Photo = "";
                 if (photoInput && photoInput.files[0]) {
@@ -1908,16 +2011,35 @@
                     formData.set('PHOTO', base64Photo);
                 }
 
-                const dataObj = {}; formData.forEach((v, k) => { dataObj[k] = v; });
+                const dataObj = {};
+                formData.forEach((v, k) => { dataObj[k] = v; });
+
+                // Custom Caste या Custom VLE चुनने पर उसकी वैल्यू सेट करें
+                if (dataObj.CAST === 'OTHER' && dataObj.CAST_CUSTOM) {
+                    dataObj.CAST = dataObj.CAST_CUSTOM.trim();
+                }
+                if (dataObj.VLE === 'OTHER' && dataObj.VLE_CUSTOM) {
+                    dataObj.VLE = dataObj.VLE_CUSTOM.trim();
+                }
 
                 const response = await fetch(targetUrl, {
-                    method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify(dataObj)
                 });
                 
                 const result = await response.json();
 
                 if (result.success || result.fileId) {
+                    // फाइल सफलतापूर्वक जनरेट होने के बाद ही क्रेडिट काटें
+                    if (!window.currentUserData.isAdmin) {
+                        const userDocRef = doc(db, "users", window.currentUserData.uid);
+                        const newCredits = window.currentUserData.credits - docCost;
+                        await updateDoc(userDocRef, { credits: newCredits });
+                        window.currentUserData.credits = newCredits;
+                        document.getElementById('displayCredits').innerText = newCredits;
+                    }
+
                     await addDoc(collection(db, "history"), {
                         userId: window.currentUserData.uid,
                         fileName: `${dataObj.NAME || 'Document'} - ${serviceType}.pdf`,
@@ -1928,18 +2050,14 @@
                     alert('Success! Document generated successfully.');
                     window.switchService('history');
                     formElement.reset();
-                } else { throw new Error('API Response Failed'); }
-            } catch (error) {
-                if (!window.currentUserData.isAdmin) {
-                    const userDocRef = doc(db, "users", window.currentUserData.uid);
-                    const refundedCredits = window.currentUserData.credits + docCost;
-                    await updateDoc(userDocRef, { credits: refundedCredits });
-                    window.currentUserData.credits = refundedCredits;
-                    document.getElementById('displayCredits').innerText = refundedCredits;
+                } else {
+                    throw new Error('API Response Failed');
                 }
-                alert('Technical error occurred. Your credits have been refunded.');
+            } catch (error) {
+                alert('Technical error occurred while generating document. No credits were deducted.');
             } finally {
-                submitBtn.innerHTML = originalBtnText; submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+                submitBtn.disabled = false;
             }
         };
 
@@ -2069,7 +2187,7 @@
                                         <th class="p-3">तारीख (Date)</th>
                                         <th class="p-3">राशि</th>
                                         <th class="p-3">क्रेडिट्स / VIP</th>
-                                        <th class="p-3">UTR No.</th>
+                                        <th class="p-3">UTR / Mode</th>
                                         <th class="p-3 text-right">स्टेटस</th>
                                     </tr>
                                 </thead>
@@ -2080,7 +2198,8 @@
                 </div>
             `;
         }
-        // ================= MAIN SERVICE SWITCHER (FIXED 10 CREDITS EVERYWHERE) =================
+
+        // ================= MAIN SERVICE SWITCHER =================
         window.switchService = async function(serviceName) {
             const cfg = window.portalConfigState;
 
@@ -2115,11 +2234,10 @@
             const container = document.getElementById('formContainer');
             if (!container) return;
             
-            // सभी डॉक्यूमेंट्स के लिए 10 Credits फिक्स (Admin के लिए फ्री)
             const submitBtnText = window.currentUserData && window.currentUserData.isAdmin 
                 ? 'Generate Document (Admin Free) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' 
                 : 'Generate Document (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>';
-                                  
+                                                  
             const statusTagHtml = window.currentUserData && window.currentUserData.isAdmin 
                 ? '<span class="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-[10px] font-bold border border-green-200 uppercase">Admin Free</span>' 
                 : (window.currentUserData && window.currentUserData.isVip 
@@ -2128,7 +2246,16 @@
 
             const todayISO = new Date().toISOString().split('T')[0];
 
-            // LIVE 2-WAY SUPPORT CHAT TAB (FOR LOGGED-IN USER)
+            // VLE ड्रॉपडाउन HTML
+            const vleSelectHtml = `
+                <select name="VLE" onchange="window.toggleCustomInput(this, 'customVleInput')" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none">
+                    ${window.VLE_NAMES_LIST.map(v => `<option value="${v}">${v}</option>`).join('')}
+                    <option value="OTHER">OTHER (अन्य नाम दर्ज करें)</option>
+                </select>
+                <input type="text" id="customVleInput" name="VLE_CUSTOM" placeholder="VLE का नाम यहाँ लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
+            `;
+
+            // LIVE 2-WAY SUPPORT CHAT TAB
             if (serviceName === 'support_chat') {
                 container.innerHTML = `
                     <div class="max-w-2xl mx-auto flex flex-col h-[460px] md:h-[520px] border border-slate-200 rounded-2xl overflow-hidden bg-slate-50 shadow-inner">
@@ -2142,7 +2269,7 @@
                                         Live Admin Support Chat
                                         <span class="w-2 h-2 rounded-full bg-green-400 animate-ping"></span>
                                     </h3>
-                                    <p class="text-[10px] text-slate-400 font-semibold">आपकी User ID: <span class="text-royal-300 font-bold">${window.currentUserData?.email || ''}</span></p>
+                                    <p class="text-[10px] text-slate-400 font-semibold">User ID: <span class="text-royal-300 font-bold">${window.currentUserData?.email || ''}</span></p>
                                 </div>
                             </div>
                             <span class="text-[10px] bg-dark-800 text-royal-300 border border-slate-700 px-2.5 py-1 rounded-lg font-bold">2-Way Live</span>
@@ -2236,7 +2363,7 @@
                             </div>
                             <div>
                                 <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">VLE Name (जन सेवा केंद्र संचालक)</label>
-                                <input type="text" name="VLE" placeholder="Enter VLE Name" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                                ${vleSelectHtml}
                             </div>
                             <div class="md:col-span-2">
                                 <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Upload Photo</label>
@@ -2248,7 +2375,7 @@
                 `;
                 window.updateTehsilsAndThanas();
             } 
-            // CASTE
+            // CASTE (UPDATED WITH NO 'JAT' & EXTENDED CASTES)
             else if(serviceName === 'caste') {
                 container.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
@@ -2270,14 +2397,24 @@
                             </div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Tehsil (तहसील)</label><select id="tehsilSelect" name="TAHSEEL" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></select></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="REL" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none"><option value="पुत्र / पुत्री">पुत्र / पुत्री</option><option value="पत्नी      .">पत्नी</option></select></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Caste</label><select name="CAST" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"><option value="जाट">जाट</option><option value="गुर्जर">गुर्जर</option><option value="कश्यप">कश्यप</option><option value="अहीर">अहीर</option><option value="ब्राह्मण">ब्राह्मण</option></select></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Caste (जाति)</label>
+                                <select name="CAST" onchange="window.toggleCustomInput(this, 'customCasteInput')" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                                    ${window.CASTE_OPTIONS_LIST.map(c => `<option value="${c}">${c}</option>`).join('')}
+                                    <option value="OTHER">OTHER (अन्य जाति लिखें)</option>
+                                </select>
+                                <input type="text" id="customCasteInput" name="CAST_CUSTOM" placeholder="जाति का नाम यहाँ लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
+                            </div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Customer Name</label><input type="text" name="NAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Hindi Name (Optional)</label><input type="text" name="HNAME" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Father/Husband Name</label><input type="text" name="FNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Mother Name</label><input type="text" name="MNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Area / Locality</label><input type="text" name="AREA" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Village / Ward Name</label><input type="text" name="GRAM" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">VLE Name</label><input type="text" name="VLE" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">VLE Name</label>
+                                ${vleSelectHtml}
+                            </div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Upload Photo</label><input type="file" name="PHOTO" accept="image/*" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-royal-100 file:text-royal-700 cursor-pointer"></div>
                         </div>
                         <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-glow transition text-sm md:text-base">${submitBtnText}</button>
@@ -2286,7 +2423,7 @@
                 window.updateTehsilsAndThanas();
             }
             
-            // DOB CERTIFICATE (18+ VIP - 10 CREDITS)
+            // DOB CERTIFICATE 18+ (PRE-FILLED WITH 'VILL - ')
             else if(serviceName === 'dob18') {
                 if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getFirstAllowedTab());
 
@@ -2310,7 +2447,10 @@
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Father Name</label><input type="text" name="FNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Mother Name</label><input type="text" name="MNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Pin Code</label><input type="text" name="PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
-                            <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">ADDRESS (only village and district name)</label><input type="text" name="ADDRESS" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
+                            <div class="md:col-span-2">
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">ADDRESS (Village and District name)</label>
+                                <input type="text" name="ADDRESS" value="VILL - " required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                            </div>
                         </div>
                         <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base">${dobSubmitBtnText}</button>
                     </form>
@@ -2336,11 +2476,30 @@
                                 <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पिता / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. SURESH CHAND" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             </div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">ID Number</label><input type="text" name="idNumber" placeholder="Enter ID Number" maxlength="14" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">कितनी बार DoB अपडेट किया?</label><select name="updateTimes" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="NEVER">NEVER (कभी नहीं)</option><option value="ONCE">ONCE (एक बार)</option><option value="MORE THAN ONCE">MORE THAN ONCE</option></select></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">कितनी बार DoB अपडेट किया?</label>
+                                <select name="updateTimes" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50">
+                                    <option value="NEVER">NEVER (कभी नहीं)</option>
+                                    <option value="ONCE">ONCE (एक बार)</option>
+                                    <option value="MORE THAN ONCE">MORE THAN ONCE (एक से अधिक बार)</option>
+                                </select>
+                            </div>
                             <div><label class="block text-[11px] font-bold text-green-700 uppercase mb-1">सही जन्मतिथि (Correct DoB)</label><input type="date" name="newDob" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold bg-green-50"></div>
                             <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">पहले दर्ज जन्मतिथि (Old DoB)</label><input type="date" name="oldDob" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold bg-amber-50"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पहले दिया गया दस्तावेज़ (Old Doc)</label><input type="text" name="oldDoc" value="BIRTH CERTIFICATE" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">अभी दिया जा रहा दस्तावेज़ (New Doc)</label><input type="text" name="newDoc" value="BIRTH CERTIFICATE" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पहले दिया गया दस्तावेज़ (Old Doc)</label>
+                                <select name="oldDoc" onchange="window.toggleCustomInput(this, 'an1OldDocCustom')" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50">
+                                    ${window.buildDocSelectOptions("BIRTH CERTIFICATE")}
+                                </select>
+                                <input type="text" id="an1OldDocCustom" name="oldDocCustom" placeholder="दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">अभी दिया जा रहा दस्तावेज़ (New Doc)</label>
+                                <select name="newDoc" onchange="window.toggleCustomInput(this, 'an1NewDocCustom')" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50">
+                                    ${window.buildDocSelectOptions("BIRTH CERTIFICATE")}
+                                </select>
+                                <input type="text" id="an1NewDocCustom" name="newDocCustom" placeholder="दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
+                            </div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">शपथ पत्र की तारीख (Date)</label><input type="date" name="date" value="${todayISO}" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, TEHSIL, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                         </div>
@@ -2373,9 +2532,28 @@
                             <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का ID Number</label><input type="text" name="childIdNumber" placeholder="Child ID Number" maxlength="14" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
                             <div><label class="block text-[11px] font-bold text-green-800 uppercase mb-1">बच्चे की सही जन्मतिथि (Correct DoB)</label><input type="date" name="newDob" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold bg-green-50"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पहले दर्ज गलत जन्मतिथि (Old DoB)</label><input type="date" name="oldDob" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पहले दिया गया दस्तावेज़ (Old Doc)</label><input type="text" name="oldDoc" value="BIRTH CERTIFICATE" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">कितनी बार अपडेट किया?</label><select name="updateTimes" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="NEVER">NEVER</option><option value="ONCE">ONCE</option><option value="MORE THAN ONCE">MORE THAN ONCE</option></select></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">अभी दिया जा रहा दस्तावेज़ (New Doc)</label><input type="text" name="newDoc" value="BIRTH CERTIFICATE" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पहले दिया गया दस्तावेज़ (Old Doc)</label>
+                                <select name="oldDoc" onchange="window.toggleCustomInput(this, 'an1aOldDocCustom')" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50">
+                                    ${window.buildDocSelectOptions("BIRTH CERTIFICATE")}
+                                </select>
+                                <input type="text" id="an1aOldDocCustom" name="oldDocCustom" placeholder="दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">कितनी बार अपडेट किया?</label>
+                                <select name="updateTimes" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50">
+                                    <option value="NEVER">NEVER (कभी नहीं)</option>
+                                    <option value="ONCE">ONCE (एक बार)</option>
+                                    <option value="MORE THAN ONCE">MORE THAN ONCE (एक से अधिक बार)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">अभी दिया जा रहा दस्तावेज़ (New Doc)</label>
+                                <select name="newDoc" onchange="window.toggleCustomInput(this, 'an1aNewDocCustom')" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50">
+                                    ${window.buildDocSelectOptions("BIRTH CERTIFICATE")}
+                                </select>
+                                <input type="text" id="an1aNewDocCustom" name="newDocCustom" placeholder="दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
+                            </div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">शपथ पत्र की तारीख (Date)</label><input type="date" name="date" value="${todayISO}" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"></div>
                         </div>
                         <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base">${submitBtnText}</button>
@@ -2403,11 +2581,23 @@
                             </div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">ID Number</label><input type="text" name="idNumber" placeholder="Enter ID Number" maxlength="14" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
-                            <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">पहले दिया गया अमान्य दस्तावेज़ (Invalid Doc)</label><input type="text" name="invalidDocName" value="BIRTH CERTIFICATE" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">पहले दिया गया अमान्य दस्तावेज़ (Invalid Doc)</label>
+                                <select name="invalidDocName" onchange="window.toggleCustomInput(this, 'an3InvDocCustom')" class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50">
+                                    ${window.buildDocSelectOptions("INVALID BIRTH CERTIFICATE")}
+                                </select>
+                                <input type="text" id="an3InvDocCustom" name="invalidDocNameCustom" placeholder="अमान्य दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
+                            </div>
                             <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">अमान्य दस्तावेज़ का नंबर (Doc Number)</label><input type="text" name="invalidDocNo" placeholder="Enter Document No" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
                             <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">अमान्य दस्तावेज़ की तारीख (Doc Date)</label><input type="date" name="invalidDocDate" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold bg-amber-50"></div>
                             <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">EID Number (एनरोलमेंट आईडी)</label><input type="text" name="eidNumber" placeholder="Enter EID Number" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
-                            <div><label class="block text-[11px] font-bold text-green-800 uppercase mb-1">अभी दिया जा रहा सही दस्तावेज़ (New Genuine Doc)</label><input type="text" name="newDoc" value="BIRTH CERTIFICATE" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-green-50"></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-green-800 uppercase mb-1">अभी दिया जा रहा सही दस्तावेज़ (New Genuine Doc)</label>
+                                <select name="newDoc" onchange="window.toggleCustomInput(this, 'an3NewDocCustom')" class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-green-50">
+                                    ${window.buildDocSelectOptions("BIRTH CERTIFICATE")}
+                                </select>
+                                <input type="text" id="an3NewDocCustom" name="newDocCustom" placeholder="सही दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-green-300 rounded-xl text-xs bg-green-50 uppercase">
+                            </div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">शपथ पत्र की तारीख (Date)</label><input type="date" name="date" value="${todayISO}" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"></div>
                         </div>
                         <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base">${submitBtnText}</button>
@@ -2437,11 +2627,23 @@
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का नाम (Child Name)</label><input type="text" name="childName" placeholder="e.g. AARAV KUMAR" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
                             <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का ID Number</label><input type="text" name="childIdNumber" placeholder="Child ID Number" maxlength="14" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पहले दिया गया अमान्य दस्तावेज़ (Invalid Doc)</label><input type="text" name="invalidDocName" value="BIRTH CERTIFICATE" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पहले दिया गया अमान्य दस्तावेज़ (Invalid Doc)</label>
+                                <select name="invalidDocName" onchange="window.toggleCustomInput(this, 'an3aInvDocCustom')" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50">
+                                    ${window.buildDocSelectOptions("INVALID BIRTH CERTIFICATE")}
+                                </select>
+                                <input type="text" id="an3aInvDocCustom" name="invalidDocNameCustom" placeholder="अमान्य दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
+                            </div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">अमान्य दस्तावेज़ का नंबर (Doc Number)</label><input type="text" name="invalidDocNo" placeholder="Enter Document No" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">अमान्य दस्तावेज़ की तारीख (Doc Date)</label><input type="date" name="invalidDocDate" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">EID Number (एनरोलमेंट आईडी)</label><input type="text" name="eidNumber" placeholder="Enter EID Number" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
-                            <div><label class="block text-[11px] font-bold text-green-800 uppercase mb-1">अभी दिया जा रहा सही दस्तावेज़ (New Genuine Doc)</label><input type="text" name="newDoc" value="BIRTH CERTIFICATE" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-green-50"></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-green-800 uppercase mb-1">अभी दिया जा रहा सही दस्तावेज़ (New Genuine Doc)</label>
+                                <select name="newDoc" onchange="window.toggleCustomInput(this, 'an3aNewDocCustom')" class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-green-50">
+                                    ${window.buildDocSelectOptions("BIRTH CERTIFICATE")}
+                                </select>
+                                <input type="text" id="an3aNewDocCustom" name="newDocCustom" placeholder="सही दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-green-300 rounded-xl text-xs bg-green-50 uppercase">
+                            </div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">शपथ पत्र की तारीख (Date)</label><input type="date" name="date" value="${todayISO}" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"></div>
                         </div>
                         <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base">${submitBtnText}</button>
@@ -2485,7 +2687,13 @@
                             ${childFieldsHtml}
                             <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">पहले दर्ज नाम (Old Recorded Name)</label><input type="text" name="oldName" placeholder="OLD NAME" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
                             <div><label class="block text-[11px] font-bold text-green-800 uppercase mb-1">नया सही नाम (New Correct Name)</label><input type="text" name="newName" placeholder="NEW CORRECT NAME" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-green-50"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">सपोर्टिंग डॉक्यूमेंट (Supporting PoI Doc)</label><input type="text" name="newDoc" value="${isChild ? 'BIRTH CERTIFICATE' : 'PAN CARD / MARKSHEET / MARRIAGE CERT'}" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">सपोर्टिंग दस्तावेज़ (Supporting PoI Doc)</label>
+                                <select name="newDoc" onchange="window.toggleCustomInput(this, 'anBcdDocCustom')" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50">
+                                    ${window.buildDocSelectOptions(isChild ? "BIRTH CERTIFICATE" : "PAN CARD")}
+                                </select>
+                                <input type="text" id="anBcdDocCustom" name="newDocCustom" placeholder="दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
+                            </div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">स्थान (Verified at Place)</label><input type="text" name="place" placeholder="e.g. BARAUT" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             <div class="grid grid-cols-2 gap-2">
@@ -2499,7 +2707,7 @@
                 window.initVerificationDefaults();
             }
 
-            // 8. ANNEXURE E
+            // 8. ANNEXURE E (URF / ALIAS AUTO-SPLIT)
             else if(serviceName === 'annexuree') {
                 if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getFirstAllowedTab());
 
@@ -2507,7 +2715,7 @@
                     <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                         <div>
                             <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-file-contract text-royal-500 mr-1.5"></i> Annexure E (Adults Urf/Alias Removal)</h3>
-                            <p class="text-[11px] text-slate-500">वयस्कों के नाम में से "उर्फ़ / Alias" हटाने हेतु शपथ पत्र।</p>
+                            <p class="text-[11px] text-slate-500">वयस्कों के नाम में से "उर्फ़ / Alias" हटाने हेतु शपथ पत्र। (नाम में URF लिखने पर दोनों नाम स्वतः अलग हो जाएंगे)</p>
                         </div>
                         ${statusTagHtml}
                     </div>
@@ -2533,8 +2741,8 @@
                                     <button type="button" onclick="window.swapAnnexureERetainRemove()" class="text-[10px] bg-amber-200 text-amber-950 font-black px-2 py-0.5 rounded"><i class="fa-solid fa-right-left mr-1"></i> Swap</button>
                                 </div>
                                 <div class="grid grid-cols-2 gap-2">
-                                    <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">पहला नाम (Name 1)</label><input type="text" id="inpRecorded1" name="recorded1" oninput="window.syncAnnexureENames()" placeholder="RAMESH" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
-                                    <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">उर्फ़ नाम (Alias 2)</label><input type="text" id="inpRecorded2" name="recorded2" oninput="window.syncAnnexureENames()" placeholder="SONU" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
+                                    <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">पहला नाम (Name 1)</label><input type="text" id="inpRecorded1" name="recorded1" placeholder="RAMESH" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
+                                    <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">उर्फ़ नाम (Alias 2)</label><input type="text" id="inpRecorded2" name="recorded2" placeholder="SONU" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
                                 </div>
                             </div>
 
@@ -2559,7 +2767,7 @@
                 window.initVerificationDefaults();
             }
 
-            // 9. ANNEXURE F
+            // 9. ANNEXURE F (CHILDREN URF / ALIAS AUTO-SPLIT)
             else if(serviceName === 'annexuref') {
                 if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getFirstAllowedTab());
 
@@ -2567,7 +2775,7 @@
                     <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                         <div>
                             <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-child-reaching text-royal-500 mr-1.5"></i> Annexure F (Children Urf/Alias Removal)</h3>
-                            <p class="text-[11px] text-slate-500">बच्चे के नाम में से "उर्फ़ / Alias" हटाने हेतु माता-पिता द्वारा शपथ पत्र।</p>
+                            <p class="text-[11px] text-slate-500">बच्चे के नाम में से "उर्फ़ / Alias" हटाने हेतु शपथ पत्र।</p>
                         </div>
                         ${statusTagHtml}
                     </div>
@@ -2595,8 +2803,8 @@
                                     <button type="button" onclick="window.swapAnnexureERetainRemove()" class="text-[10px] bg-amber-200 text-amber-950 font-black px-2 py-0.5 rounded"><i class="fa-solid fa-right-left mr-1"></i> Swap</button>
                                 </div>
                                 <div class="grid grid-cols-2 gap-2">
-                                    <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">पहला नाम (Name 1)</label><input type="text" id="inpRecorded1" name="recorded1" oninput="window.syncAnnexureENames()" placeholder="AARAV" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
-                                    <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">उर्फ़ नाम (Alias 2)</label><input type="text" id="inpRecorded2" name="recorded2" oninput="window.syncAnnexureENames()" placeholder="GOLU" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
+                                    <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">पहला नाम (Name 1)</label><input type="text" id="inpRecorded1" name="recorded1" placeholder="AARAV" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
+                                    <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">उर्फ़ नाम (Alias 2)</label><input type="text" id="inpRecorded2" name="recorded2" placeholder="GOLU" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
                                 </div>
                             </div>
 
@@ -2621,7 +2829,7 @@
                 window.initVerificationDefaults();
             }
             
-            // ADD CREDITS + VIP PAGE (AUTO-VERIFIED + MANUAL FALLBACK)
+            // ADD CREDITS + VIP PAGE (NO MANUAL UTR BOX - 24-HOUR RESOLUTION TICKET SYSTEM)
             else if(serviceName === 'add_credit') {
                 container.innerHTML = `
                     <div id="walletMainUI" class="max-w-md mx-auto">
@@ -2696,10 +2904,11 @@
                             </button>
                         </div>
 
+                        <!-- QR SECTION WITH AUTO-CANCEL ON BACK -->
                         <div id="qrSection" style="display: none;" class="flex-col items-center space-y-3 bg-slate-50 p-4 rounded-2xl border-2 border-royal-400">
                             <div class="w-full flex justify-between items-center">
-                                <button type="button" onclick="window.backToPaymentStep1()" class="text-xs font-bold text-slate-600 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
-                                    <i class="fa-solid fa-arrow-left mr-1"></i> बदलें (Back)
+                                <button type="button" onclick="window.cancelAndBackToPaymentStep1()" class="text-xs font-bold text-red-600 hover:bg-red-50 bg-white px-2.5 py-1.5 rounded-lg border border-red-200">
+                                    <i class="fa-solid fa-ban mr-1"></i> Cancel &amp; Back
                                 </button>
                                 <span id="qrPayableAmountText" class="text-sm font-black text-green-700 bg-green-100 px-3 py-1 rounded-lg border border-green-300">कुल पेमेंट: ₹0</span>
                             </div>
@@ -2732,14 +2941,25 @@
                                 <img id="upiQRCode" src="" alt="UPI QR Code" class="w-36 h-36 object-contain">
                             </div>
                             
-                            <div class="w-full pt-1 space-y-2">
-                                <label class="block text-[11px] font-black text-slate-600 text-center">अगर ऑटो-वेरीफाई न हो, तो यहाँ UTR नंबर डालें:</label>
-                                <input type="text" id="utrNumber" placeholder="Enter UTR / Ref No" class="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold bg-white focus:ring-2 focus:ring-amber-500 outline-none text-center tracking-widest uppercase">
-                                <button onclick="window.submitPayment()" id="btnSubmitPayment" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-3.5 rounded-xl shadow transition text-sm">
-                                    Submit UTR For Verification <i class="fa-solid fa-paper-plane ml-1"></i>
-                                </button>
+                            <!-- PAYMENT NOT AUTO-VERIFIED? RAISE TICKET (NO DIRECT UTR ENTRY) -->
+                            <div class="w-full pt-2 border-t border-slate-200">
+                                <div class="text-center">
+                                    <p class="text-[11px] font-semibold text-slate-500">पेमेंट कट गया पर क्रेडिट नहीं जुड़ा?</p>
+                                    <button type="button" onclick="window.togglePaymentTicketBox()" class="text-xs font-black text-amber-700 hover:text-amber-900 underline mt-1">
+                                        <i class="fa-solid fa-circle-question mr-1"></i> Payment Issue? Raise Ticket with UTR
+                                    </button>
+                                </div>
+
+                                <div id="paymentIssueTicketBox" style="display: none;" class="mt-3 p-3.5 bg-amber-50 rounded-2xl border border-amber-300 space-y-2.5">
+                                    <p class="text-[11px] font-black text-amber-950">पेमेंट के बाद प्राप्त 12 अंकों का UTR नंबर दर्ज करें:</p>
+                                    <input type="text" id="ticketUtrInput" placeholder="Enter 12-Digit UTR Number" maxlength="16" class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white text-center tracking-widest outline-none">
+                                    <button type="button" id="btnRaisePaymentTicket" onclick="window.submitPaymentIssueTicket()" class="w-full bg-dark-900 text-royal-300 hover:bg-black font-black py-2.5 rounded-xl text-xs shadow transition">
+                                        Submit Ticket (24 Hours Resolution) <i class="fa-solid fa-clock-rotate-left ml-1"></i>
+                                    </button>
+                                    <p class="text-[10px] text-amber-800 text-center font-medium">टिकट रेज़ होने पर 24 घंटे के अंदर आपकी समस्या का समाधान करके क्रेडिट जोड़ दिया जाएगा।</p>
+                                    <div id="paymentTicketResultMsg" style="display: none;"></div>
+                                </div>
                             </div>
-                            <p id="paymentErrorMsg" style="display: none;" class="text-xs font-bold text-red-500 text-center p-2 bg-red-50 rounded-lg border border-red-200 w-full"></p>
                         </div>
                     </div>
                 `;
@@ -2913,13 +3133,13 @@
         </div>
     </div>
 
-    <!-- OUTSIDE LOGIN: FORGOT PASSWORD TICKET MODAL (TELEGRAM + ADMIN PANEL SUPPORT CHAT) -->
+    <!-- OUTSIDE LOGIN: FORGOT PASSWORD TICKET MODAL -->
     <div id="forgotPasswordModal" style="display: none;" class="fixed inset-0 z-[180] bg-dark-950/80 backdrop-blur-sm items-center justify-center p-4">
         <div class="bg-white text-slate-800 w-full max-w-md rounded-3xl shadow-2xl border-t-4 border-royal-500 p-5 md:p-6 space-y-4">
             <div class="flex justify-between items-start border-b border-slate-100 pb-3">
                 <div>
                     <h3 class="text-base font-black text-dark-900"><i class="fa-solid fa-key text-royal-500 mr-1.5"></i> Forgot Password Ticket</h3>
-                    <p class="text-[11px] font-semibold text-slate-400 mt-0.5">अपनी User ID और नंबर लिखें, एडमिन को तुरंत अलर्ट चला जाएगा</p>
+                    <p class="text-[11px] font-semibold text-slate-400 mt-0.5">अपनी User ID और नंबर लिखें, एडमिन को तुरंत सूचना भेजी जाएगी</p>
                 </div>
                 <button type="button" onclick="window.closeForgotPasswordModal()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-red-500 text-slate-500 hover:text-white flex items-center justify-center transition">
                     <i class="fa-solid fa-xmark"></i>
