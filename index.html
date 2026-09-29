@@ -3279,6 +3279,170 @@
                 window.loadUserHistory();
             }
         };
+        // ================= ADMIN STAMP SYNC ADDON FOR INDEX.HTML =================
+        (function enableUserPortalStampSupport() {
+            // 1. Stamp Overlay CSS जोड़ें
+            const st = document.createElement('style');
+            st.innerHTML = `
+                .affidavit-paper { position: relative !important; }
+                .stamp-overlay-layer {
+                    position: absolute;
+                    top: 0; left: 0;
+                    width: 794px; height: 1122px;
+                    pointer-events: none;
+                    z-index: 30;
+                    mix-blend-mode: multiply;
+                    overflow: hidden;
+                }
+                .stamp-overlay-layer img {
+                    width: 794px; height: 1122px;
+                    object-fit: contain;
+                    object-position: top center;
+                    mix-blend-mode: multiply;
+                    display: block;
+                }
+            `;
+            document.head.appendChild(st);
+
+            // 2. स्टैम्प का सफेद बैकग्राउंड ट्रांसपेरेंट करके लोड करने का कैश
+            window.userStampCache = {};
+            window.getTransparentStampDataUrl = function(fileName = 'stamp.png') {
+                if (window.userStampCache[fileName]) return Promise.resolve(window.userStampCache[fileName]);
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        try {
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            canvas.width = img.naturalWidth || 794;
+                            canvas.height = img.naturalHeight || 1122;
+                            ctx.drawImage(img, 0, 0);
+                            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                            const data = imgData.data;
+                            for (let i = 0; i < data.length; i += 4) {
+                                if (data[i] > 240 && data[i + 1] > 240 && data[i + 2] > 240) {
+                                    data[i + 3] = 0;
+                                }
+                            }
+                            ctx.putImageData(imgData, 0, 0);
+                            const url = canvas.toDataURL('image/png');
+                            window.userStampCache[fileName] = url;
+                            resolve(url);
+                        } catch (e) {
+                            resolve(fileName);
+                        }
+                    };
+                    img.onerror = () => resolve(fileName);
+                    img.src = fileName;
+                });
+            };
+
+            // 3. buildLocalAffidavitHtml में स्टैम्प जोड़ें
+            const origBuildHtml = window.buildLocalAffidavitHtml;
+            window.buildLocalAffidavitHtml = function(fileId, d = {}, withShadow = true, withStamp = false, stampSrc = '') {
+                let rawHtml = origBuildHtml(fileId, d, withShadow);
+                if (withStamp && stampSrc) {
+                    const overlay = `<div class="stamp-overlay-layer"><img src="${stampSrc}" onerror="this.style.display='none'" /></div>`;
+                    rawHtml = rawHtml.replace(/<div class="affidavit-paper([^"]*)">/, `<div class="affidavit-paper$1">${overlay}`);
+                }
+                return rawHtml;
+            };
+
+            // 4. History Table में 'Stamped' बैज दिखाएं
+            const origRenderHistory = window.renderHistory;
+            window.renderHistory = function(filterType) {
+                origRenderHistory(filterType);
+                const rows = document.querySelectorAll('#historyTableBody tr');
+                const indexedData = window.historyData.map((item, idx) => ({ ...item, _origIndex: idx }));
+                const filteredData = filterType === 'ALL' ? indexedData : indexedData.filter(item => item.serviceType === filterType);
+                rows.forEach((tr, i) => {
+                    const item = filteredData[i];
+                    if (item && item.withStamp) {
+                        const firstTd = tr.querySelector('td');
+                        if (firstTd && !firstTd.innerHTML.includes('Stamped')) {
+                            firstTd.innerHTML += ` <span class="bg-green-100 text-green-800 border border-green-300 px-2 py-0.5 rounded-full text-[10px] font-black ml-1"><i class="fa-solid fa-stamp mr-0.5"></i>Stamped</span>`;
+                        }
+                    }
+                });
+            };
+
+            // 5. Preview, Print और Download PDF में एडमिन की स्टैम्प दिखाएं
+            window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
+                document.getElementById('pdfViewerTitle').innerText = fileName;
+                const iframe = document.getElementById('pdfIframe');
+                const htmlPreviewContainer = document.getElementById('htmlDocPreviewContainer');
+                const spinner = document.getElementById('pdfLoadingSpinner');
+                const downloadBtn = document.getElementById('modalDownloadBtn');
+                const printBtn = document.getElementById('modalPrintBtn');
+
+                if (String(fileId).startsWith('LOCAL_HTML_') && historyIndex >= 0) {
+                    const record = window.historyData[historyIndex];
+                    const fData = record?.formData || {};
+                    const withStamp = !!record?.withStamp;
+                    const stampSrc = withStamp ? await window.getTransparentStampDataUrl(record?.stampFile || 'stamp.png') : '';
+
+                    spinner.style.display = 'none';
+                    iframe.style.display = 'none';
+                    htmlPreviewContainer.style.display = 'flex';
+                    htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true, withStamp, stampSrc);
+
+                    downloadBtn.onclick = async function() {
+                        const btn = document.getElementById('modalDownloadBtn');
+                        const origHtml = btn.innerHTML;
+                        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Downloading...';
+                        btn.disabled = true;
+                        const savedX = window.scrollX, savedY = window.scrollY;
+                        window.scrollTo(0, 0);
+                        const tempWrapper = document.createElement('div');
+                        tempWrapper.style.cssText = 'position:fixed;top:0;left:0;width:794px;height:1122px;margin:0;padding:0;z-index:99999;background:#ffffff;overflow:hidden;';
+                        tempWrapper.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, false, withStamp, stampSrc);
+                        document.body.appendChild(tempWrapper);
+                        try {
+                            await html2pdf().set({
+                                margin: 0,
+                                filename: withStamp ? fileName.replace('.pdf', ' (With Stamp).pdf') : fileName,
+                                image: { type: 'jpeg', quality: 1.0 },
+                                html2canvas: { scale: 2, useCORS: true, x: 0, y: 0, scrollX: 0, scrollY: 0, width: 794, height: 1122, windowWidth: 794, windowHeight: 1122 },
+                                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                            }).from(tempWrapper.querySelector('.affidavit-paper')).save();
+                        } finally {
+                            document.body.removeChild(tempWrapper);
+                            window.scrollTo(savedX, savedY);
+                            btn.innerHTML = origHtml;
+                            btn.disabled = false;
+                        }
+                    };
+
+                    if (printBtn) {
+                        printBtn.onclick = function() {
+                            const htmlContent = window.buildLocalAffidavitHtml(fileId, fData, false, withStamp, stampSrc);
+                            let printFrame = document.getElementById('directPrintIframe');
+                            if (printFrame) document.body.removeChild(printFrame);
+                            printFrame = document.createElement('iframe');
+                            printFrame.id = 'directPrintIframe';
+                            printFrame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+                            document.body.appendChild(printFrame);
+                            const frameDoc = printFrame.contentWindow.document;
+                            frameDoc.open();
+                            frameDoc.write(`<!DOCTYPE html><html><head><title>${fileName}</title><style>@page{size:A4;margin:0;}html,body{margin:0;padding:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.affidavit-paper{position:relative;font-family:'Times New Roman',Times,serif;width:794px;height:1122px;padding:46px 62px;background:#fff;color:#000;font-size:15px;line-height:1.55;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;margin:0!important;overflow:hidden;}.filled-val{font-weight:bold!important;color:#000!important;text-decoration:underline!important;text-underline-offset:3px!important;}.stamp-overlay-layer{position:absolute;top:0;left:0;width:794px;height:1122px;pointer-events:none;z-index:30;mix-blend-mode:multiply;overflow:hidden;}.stamp-overlay-layer img{width:794px;height:1122px;object-fit:contain;object-position:top center;mix-blend-mode:multiply;display:block;}</style></head><body>${htmlContent}</body></html>`);
+                            frameDoc.close();
+                            setTimeout(() => { printFrame.contentWindow.focus(); printFrame.contentWindow.print(); }, 150);
+                        };
+                    }
+                } else {
+                    htmlPreviewContainer.style.display = 'none';
+                    htmlPreviewContainer.innerHTML = '';
+                    iframe.style.display = 'block';
+                    spinner.style.display = 'flex';
+                    iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
+                    downloadBtn.onclick = () => window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank');
+                    if (printBtn) printBtn.onclick = () => window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
+                }
+
+                document.getElementById('pdfViewerModal').style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+            };
+        })();
     </script>
 </head>
 <body class="bg-slate-50 font-sans min-h-screen flex flex-col justify-between selection:bg-royal-300 selection:text-dark-900 transition-colors duration-300">
