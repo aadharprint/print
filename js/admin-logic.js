@@ -1,6 +1,5 @@
 // ============================================================================
-// FILE: js/admin-logic.js
-// (Super Admin Logic: Payments, Per-User DOB Access, Users, Chat, Stamps)
+// FILE 4: js/admin-logic.js (UPDATED WITH 6 TABS & PER-USER DOB CONTROL)
 // ============================================================================
 
 import "./config-templates.js";
@@ -41,7 +40,7 @@ window.selectedChatTicketId = null;
 window.supportUnsubscribe = null;
 window.adminSupportWhatsapp = "919306437623";
 
-// ================= AUTO-DETECT UPLOADED STAMPS =================
+// ================= AUTO-DETECT UPLOADED STAMPS & MAKE WHITE BG TRANSPARENT =================
 window.loadSingleStampFile = function(fileName) {
     return new Promise((resolve) => {
         const img = new Image();
@@ -153,7 +152,7 @@ window.copyUtrText = function(utr, btnEl) {
     setTimeout(() => { btnEl.innerHTML = orig; }, 1500);
 };
 
-// ================= HELPER: BUILD CREDENTIAL MESSAGE & SHARE =================
+// ================= HELPER: BUILD CREDENTIAL MESSAGE & SEND VIA WHATSAPP / EMAIL =================
 window.getPortalLoginUrl = function() {
     return window.location.origin + window.location.pathname.replace('admin.html', 'index.html');
 };
@@ -193,7 +192,7 @@ window.shareSelectedUserCredentials = async function(channel) {
         } catch (e) {}
     }
 
-    const passToUse = uData.userPass || '[कृपया पहले नीचे नया पासवर्ड सेट करें]';
+    const passToUse = uData.userPass || '[कृपया पहले नया पासवर्ड सेट करें]';
     const messageText = window.buildUserCredentialsText(uData.email, passToUse, uData.credits, uData.isVip, uData.vipExpiry);
 
     if (channel === 'copy') {
@@ -205,7 +204,7 @@ window.shareSelectedUserCredentials = async function(channel) {
     if (channel === 'whatsapp') {
         let targetPhone = window.formatCleanPhone(phoneInput || uData.userPhone || '');
         if (!targetPhone) {
-            const askPhone = prompt("यूज़र का 10 अंकों का WhatsApp नंबर डालें (या खाली छोड़कर OK दबाएं):", "");
+            const askPhone = prompt("यूज़र का 10 अंकों का WhatsApp नंबर डालें (या बिना नंबर सीधे WhatsApp खोलने के लिए खाली छोड़कर OK दबाएं):", "");
             if (askPhone === null) return;
             if (askPhone.trim()) {
                 targetPhone = window.formatCleanPhone(askPhone.trim());
@@ -243,7 +242,33 @@ window.saveSelectedUserPhone = async function() {
     }
 };
 
-// ================= SECTION 5: REAL-TIME 2-WAY SUPPORT CHAT =================
+// ================= PER-USER DOB 18+ STEALTH ACCESS TOGGLE =================
+window.toggleUserDobAccess = async function(allowed) {
+    const uid = document.getElementById('userSelectDropdown').value;
+    if (!uid || !window.usersDataList[uid]) {
+        alert('कृपया पहले ड्रॉपडाउन से यूज़र सेलेक्ट करें!');
+        const chk = document.getElementById('userDobToggle');
+        if (chk) chk.checked = !allowed;
+        return;
+    }
+
+    const uData = window.usersDataList[uid];
+    const msg = document.getElementById('adminMsg');
+
+    try {
+        await updateDoc(doc(db, "users", uid), { allowDob18: allowed });
+        window.usersDataList[uid].allowDob18 = allowed;
+
+        msg.className = "p-3.5 bg-amber-50 text-amber-950 rounded-2xl text-xs font-black border border-amber-300 text-center shadow-sm";
+        msg.innerHTML = `<i class="fa-solid ${allowed ? 'fa-eye text-green-600' : 'fa-eye-slash text-red-600'} mr-1"></i> <strong>${uData.email}</strong> के लिए DOB 18+ सेक्शन <strong>${allowed ? 'चालू (Visible)' : 'गायब (Hidden)'}</strong> कर दिया गया है!`;
+        msg.classList.remove('hidden');
+        setTimeout(() => msg.classList.add('hidden'), 3500);
+    } catch (err) {
+        alert('Error updating user DOB access: ' + err.message);
+    }
+};
+
+// ================= SECTION: REAL-TIME 2-WAY SUPPORT CHAT & FORGOT PASSWORD TICKETS =================
 window.findUserUidByIdentifier = function(identifier = '') {
     const clean = String(identifier).trim().toLowerCase();
     if (!clean) return '';
@@ -341,14 +366,14 @@ window.renderSupportChatSidebar = function() {
 
         const activeClass = isSelected
             ? 'bg-royal-50 border-royal-400 shadow-sm'
-            : (isUnread ? 'bg-red-50/50 border-red-200 hover:bg-slate-50' : 'bg-white border-slate-200 hover:bg-slate-50');
+            : (isUnread ? 'bg-red-50/60 border-red-200 hover:bg-slate-50' : 'bg-white border-slate-200 hover:bg-slate-50');
 
         listEl.innerHTML += `
             <div onclick="window.selectSupportChatThread('${t.id}')" class="p-3 rounded-2xl border-2 ${activeClass} cursor-pointer transition space-y-1">
                 <div class="flex items-center justify-between gap-1">
                     <div class="flex items-center gap-1.5 overflow-hidden">
                         ${isUnread ? `<span class="bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase shrink-0 animate-pulse">NEW</span>` : ''}
-                        ${isForgot ? `<span class="bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-black px-1.5 py-0.5 rounded uppercase shrink-0"><i class="fa-solid fa-key mr-0.5"></i>Pass Ticket</span>` : `<i class="fa-solid fa-user text-royal-600 text-xs shrink-0"></i>`}
+                        ${isForgot ? `<span class="bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-black px-1.5 py-0.5 rounded uppercase shrink-0"><i class="fa-solid fa-key mr-0.5"></i>Pass</span>` : `<i class="fa-solid fa-circle-user text-royal-600 text-xs shrink-0"></i>`}
                         <span class="text-xs font-black text-dark-900 truncate">${t.userIdentifier || 'User'}</span>
                     </div>
                     <span class="text-[10px] font-semibold text-slate-400 shrink-0">${timeStr}</span>
@@ -393,13 +418,13 @@ window.renderActiveChatConversation = function(ticketId, scrollToBottom = true) 
 
     document.getElementById('chatHeaderUserTitle').innerText = ticket.userIdentifier || 'Unknown User';
     const phoneToShow = ticket.userPhone || matchedUser?.userPhone || '';
-    document.getElementById('chatHeaderUserPhone').innerText = phoneToShow ? `WhatsApp: ${phoneToShow}` : 'No phone provided';
+    document.getElementById('chatHeaderUserPhone').innerText = phoneToShow ? `📱 WhatsApp: ${phoneToShow}` : 'No phone number saved';
 
     const passBadge = document.getElementById('chatHeaderSavedPassBadge');
     if (matchedUser) {
-        passBadge.innerHTML = `Current Pass: <strong class="text-royal-300 font-mono">${matchedUser.userPass || 'Not Synced'}</strong> | Cr: <strong>${matchedUser.credits || 0}</strong>`;
+        passBadge.innerHTML = `Pass: <strong class="text-royal-300 font-mono">${matchedUser.userPass || 'Not Synced'}</strong> • Cr: <strong class="text-emerald-400">${matchedUser.credits || 0}</strong>`;
     } else {
-        passBadge.innerHTML = `<span class="text-amber-300">Unregistered / Guest ID</span>`;
+        passBadge.innerHTML = `<span class="text-amber-300">Guest Ticket</span>`;
     }
 
     const msgContainer = document.getElementById('chatMessagesScrollBox');
@@ -414,8 +439,8 @@ window.renderActiveChatConversation = function(ticketId, scrollToBottom = true) 
         if (isAdmin) {
             msgContainer.innerHTML += `
                 <div class="flex flex-col items-end">
-                    <div class="max-w-[82%] bg-dark-900 text-white px-3.5 py-2.5 rounded-2xl rounded-br-none shadow-sm border border-royal-500/40">
-                        <span class="text-[9px] font-black text-royal-400 uppercase block mb-0.5"><i class="fa-solid fa-crown mr-1"></i>Admin Reply</span>
+                    <div class="max-w-[80%] bg-dark-900 text-white px-4 py-2.5 rounded-2xl rounded-br-none shadow-sm border border-royal-500/40">
+                        <span class="text-[9px] font-black text-royal-400 uppercase block mb-0.5"><i class="fa-solid fa-crown mr-1"></i>Admin Support</span>
                         <div class="text-xs font-semibold leading-relaxed">${safeText}</div>
                     </div>
                     <span class="text-[9px] font-bold text-slate-400 mt-0.5">${tStr}</span>
@@ -424,7 +449,7 @@ window.renderActiveChatConversation = function(ticketId, scrollToBottom = true) 
         } else {
             msgContainer.innerHTML += `
                 <div class="flex flex-col items-start">
-                    <div class="max-w-[82%] bg-white text-slate-800 px-3.5 py-2.5 rounded-2xl rounded-bl-none shadow-sm border border-slate-200">
+                    <div class="max-w-[80%] bg-white text-slate-800 px-4 py-2.5 rounded-2xl rounded-bl-none shadow-sm border border-slate-200">
                         <span class="text-[9px] font-black text-indigo-600 uppercase block mb-0.5"><i class="fa-solid fa-user mr-1"></i>${ticket.userIdentifier || 'User'}</span>
                         <div class="text-xs font-bold leading-relaxed">${safeText}</div>
                     </div>
@@ -692,13 +717,13 @@ window.startNewChatWithSelectedUser = async function() {
 window.populateSupportUserDropdown = function() {
     const sel = document.getElementById('newChatUserSelect');
     if (!sel) return;
-    sel.innerHTML = '<option value="">-- किसी यूज़र के साथ नई चैट शुरू करें --</option>';
+    sel.innerHTML = '<option value="">-- किसी यूज़र के साथ नई चैट खोलें --</option>';
     for (const [uid, data] of Object.entries(window.usersDataList)) {
         sel.innerHTML += `<option value="${uid}">${data.email}</option>`;
     }
 };
 
-// ================= SECTION 4: PORTAL CONTROL =================
+// ================= SECTION: PORTAL CONTROL =================
 window.loadPortalSettingsForAdmin = async function() {
     try {
         const snap = await getDoc(doc(db, "settings", "portalConfig"));
@@ -753,7 +778,7 @@ window.updateStealthStatusPill = function() {
         pill.innerHTML = `<i class="fa-solid fa-eye mr-1"></i>All Visible`;
     } else {
         pill.className = "bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-1 rounded-full text-[10px] font-black uppercase";
-        pill.innerHTML = `<i class="fa-solid fa-sliders mr-1"></i>Custom`;
+        pill.innerHTML = `<i class="fa-solid fa-sliders mr-1"></i>Custom Mode`;
     }
 };
 
@@ -782,11 +807,11 @@ window.savePortalSettings = async function(event) {
         showCaste: document.getElementById('chkShowCaste').checked,
         showDob18: document.getElementById('chkShowDob18').checked,
         bannerEnabled: document.getElementById('chkBannerEnabled').checked,
-        bannerBadge: document.getElementById('inpBannerBadge')?.value.trim() || 'UPDATE',
-        bannerTitle: document.getElementById('inpBannerTitle')?.value.trim() || '',
-        bannerMessage: document.getElementById('inpBannerMessage')?.value.trim() || '',
-        bannerBtnText: document.getElementById('inpBannerBtnText')?.value.trim() || '',
-        bannerBtnLink: document.getElementById('inpBannerBtnLink')?.value.trim() || '',
+        bannerBadge: document.getElementById('inpBannerBadge').value.trim() || 'UPDATE',
+        bannerTitle: document.getElementById('inpBannerTitle').value.trim(),
+        bannerMessage: document.getElementById('inpBannerMessage').value.trim(),
+        bannerBtnText: document.getElementById('inpBannerBtnText').value.trim(),
+        bannerBtnLink: document.getElementById('inpBannerBtnLink').value.trim(),
         supportWhatsapp: cleanSupWa,
         updatedAt: new Date()
     };
@@ -811,7 +836,7 @@ window.savePortalSettings = async function(event) {
     }
 };
 
-// ================= SECTION 1: COMPLETE PAYMENTS =================
+// ================= SECTION 1: COMPLETE PAYMENT NOTIFICATIONS, HISTORY & RESOLUTION =================
 window.loadAllPayments = async function() {
     const container = document.getElementById('adminPaymentsCardsContainer');
     container.innerHTML = `
@@ -883,9 +908,9 @@ window.setPaymentFilter = function(filterStatus) {
         const btn = document.getElementById(`filterPill-${f}`);
         if (!btn) return;
         if (f === filterStatus) {
-            btn.className = "px-3.5 py-2 rounded-xl text-xs font-black bg-dark-900 text-royal-300 shadow-sm transition flex items-center justify-center gap-1.5";
+            btn.className = "px-3 py-2.5 rounded-xl text-xs font-black bg-dark-900 text-royal-300 shadow-sm transition flex items-center justify-center gap-1.5 border border-royal-500/40";
         } else {
-            btn.className = "px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition flex items-center justify-center gap-1.5";
+            btn.className = "px-3 py-2.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition flex items-center justify-center gap-1.5 border border-slate-200";
         }
     });
 
@@ -917,7 +942,7 @@ window.renderPaymentsByFilter = function() {
     if (list.length === 0) {
         const emptyTitle = activeFilter === 'Pending' ? 'कोई पेंडिंग पेमेंट या टिकट नहीं है!' : 'इस फिल्टर में कोई पेमेंट रिकॉर्ड नहीं मिला!';
         container.innerHTML = `
-            <div class="col-span-1 md:col-span-2 p-10 text-center bg-white rounded-3xl border border-slate-200/80 shadow-card">
+            <div class="col-span-1 md:col-span-2 p-10 text-center bg-white rounded-3xl border border-slate-100 shadow-card">
                 <div class="w-14 h-14 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
                     <i class="fa-solid fa-receipt"></i>
                 </div>
@@ -950,8 +975,8 @@ window.renderPaymentsByFilter = function() {
             statusBadge = `<span class="bg-green-100 text-green-800 border border-green-300 px-2.5 py-0.5 rounded-full text-[10px] font-black"><i class="fa-solid fa-check-circle mr-1"></i>Approved</span>`;
             cardBorder = 'border-green-200';
         } else if (status === 'Cancelled') {
-            statusBadge = `<span class="bg-slate-200 text-slate-700 border border-slate-300 px-2.5 py-0.5 rounded-full text-[10px] font-black"><i class="fa-solid fa-ban mr-1"></i>Cancelled</span>`;
-            cardBorder = 'border-slate-200';
+            statusBadge = `<span class="bg-slate-200 text-slate-700 border border-slate-300 px-2.5 py-0.5 rounded-full text-[10px] font-black"><i class="fa-solid fa-ban mr-1"></i>Cancelled by User</span>`;
+            cardBorder = 'border-slate-300';
         } else {
             statusBadge = `<span class="bg-red-100 text-red-700 border border-red-300 px-2.5 py-0.5 rounded-full text-[10px] font-black"><i class="fa-solid fa-circle-xmark mr-1"></i>Rejected</span>`;
             cardBorder = 'border-red-200';
@@ -983,7 +1008,7 @@ window.renderPaymentsByFilter = function() {
             actionButtonsHtml = `
                 <div class="flex items-center gap-2 pt-1">
                     <button onclick="window.approvePayment('${data.id}', '${data.userId}', ${creditsReq}, ${vipDays}, true)" class="flex-1 bg-amber-500 hover:bg-amber-600 active:scale-95 text-dark-950 py-2.5 px-3 rounded-xl text-xs font-black shadow-sm transition flex items-center justify-center gap-1.5">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> Resolve & Approve (+${creditsReq} Cr)
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Resolve &amp; Approve (+${creditsReq} Cr)
                     </button>
                     <button onclick="window.deletePaymentRecord('${data.id}')" class="w-9 h-9 bg-slate-100 hover:bg-red-500 text-slate-500 hover:text-white rounded-xl text-xs transition flex items-center justify-center" title="Delete Record">
                         <i class="fa-solid fa-trash"></i>
@@ -994,7 +1019,7 @@ window.renderPaymentsByFilter = function() {
             actionButtonsHtml = `
                 <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px] text-green-700 font-bold">
                     <span><i class="fa-solid fa-circle-check mr-1"></i> क्रेडिट्स और प्लान यूज़र को मिल चुके हैं</span>
-                    <button onclick="window.deletePaymentRecord('${data.id}')" class="text-slate-400 hover:text-red-600 px-2 py-1 rounded transition">
+                    <button onclick="window.deletePaymentRecord('${data.id}')" class="text-slate-400 hover:text-red-600 px-2 py-1 rounded transition" title="Delete History Record">
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </div>
@@ -1088,7 +1113,7 @@ window.approvePayment = async function(paymentDocId, userId, creditsToAdd, vipDa
 };
 
 window.rejectPayment = async function(paymentDocId) {
-    if (!confirm(`क्या आप इस पेमेंट को REJECT करना चाहते हैं?`)) return;
+    if (!confirm(`क्या आप इस पेमेंट को REJECT करना चाहते हैं?\n(यह आपकी Rejected History में सेव रहेगा, जिसे आप बाद में चाहें तो Resolve भी कर सकते हैं)`)) return;
     try {
         await updateDoc(doc(db, "payments", paymentDocId), { status: "Rejected" });
         window.loadAllPayments();
@@ -1103,13 +1128,13 @@ window.deletePaymentRecord = async function(paymentDocId) {
     } catch (err) { alert('Error deleting payment record: ' + err.message); }
 };
 
-// ================= SECTION 2: USER, VIP, PASS & PER-USER DOB 18+ ACCESS =================
+// ================= SECTION 2: USER, VIP VALIDITY & PASSWORD RESET MANAGEMENT =================
 window.loadAllUsersForDropdown = async function() {
     try {
         const usersSnap = await getDocs(collection(db, "users"));
         const select = document.getElementById('userSelectDropdown');
         const currentSelected = select ? select.value : '';
-        if (select) select.innerHTML = '<option value="">-- यूज़र सेलेक्ट करें --</option>';
+        if (select) select.innerHTML = '<option value="">-- यहाँ क्लिक करके यूज़र सेलेक्ट करें --</option>';
         window.usersDataList = {};
         
         const now = Date.now();
@@ -1120,8 +1145,7 @@ window.loadAllUsersForDropdown = async function() {
             const isFreeVip = FREE_VIP_EMAILS.includes(emailLower);
             const isCurrentlyVip = isFreeVip || (data.isVip && (!data.vipExpiry || data.vipExpiry > now));
             const vipLabel = isFreeVip ? '👑 [FREE VIP] ' : (isCurrentlyVip ? '👑 [VIP] ' : '');
-            const dobTag = data.allowDob18 === false ? ' [DOB OFF]' : '';
-            if (select) select.innerHTML += `<option value="${docSnap.id}">${vipLabel}${data.email} (${isFreeVip ? 'Free' : (data.credits || 0) + ' Cr'})${dobTag}</option>`;
+            if (select) select.innerHTML += `<option value="${docSnap.id}">${vipLabel}${data.email} (${isFreeVip ? 'Free' : (data.credits || 0) + ' Cr'})</option>`;
         });
         if (select && currentSelected && window.usersDataList[currentSelected]) {
             select.value = currentSelected;
@@ -1138,27 +1162,19 @@ window.handleUserSelection = function() {
     const passDisplay = document.getElementById('selectedUserSavedPass');
     const phoneInp = document.getElementById('selectedUserPhoneInput');
     const dobToggle = document.getElementById('userDobToggle');
-    const dobStatusText = document.getElementById('userDobStatusText');
 
     if (uid && window.usersDataList[uid]) {
         const uData = window.usersDataList[uid];
         const isFreeVip = FREE_VIP_EMAILS.includes((uData.email || '').toLowerCase());
         display.innerText = isFreeVip ? 'FREE' : (uData.credits || 0);
         if (passDisplay) {
-            passDisplay.innerText = uData.userPass ? uData.userPass : 'Not synced yet';
+            passDisplay.innerText = uData.userPass ? uData.userPass : 'Not Set';
         }
         if (phoneInp) {
             phoneInp.value = uData.userPhone || '';
         }
-
-        // Per-User DOB 18+ Checkbox & Status Pill
-        const isDobAllowed = uData.allowDob18 !== false;
-        if (dobToggle) dobToggle.checked = isDobAllowed;
-        if (dobStatusText) {
-            dobStatusText.className = isDobAllowed
-                ? "text-[10px] font-black px-2 py-0.5 rounded-full bg-green-100 text-green-800 border border-green-300"
-                : "text-[10px] font-black px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-300";
-            dobStatusText.innerText = isDobAllowed ? "VISIBLE (ON)" : "HIDDEN (OFF)";
+        if (dobToggle) {
+            dobToggle.checked = uData.allowDob18 !== false;
         }
 
         const now = Date.now();
@@ -1166,7 +1182,7 @@ window.handleUserSelection = function() {
         const isActiveVip = isFreeVip || (uData.isVip && (expiry === 0 || expiry > now));
 
         if (isFreeVip) {
-            vipBadge.innerHTML = '<span class="bg-green-400 text-dark-950 px-2.5 py-0.5 rounded-full text-xs font-black">👑 Lifetime Free VIP</span>';
+            vipBadge.innerHTML = '<span class="bg-emerald-400 text-dark-950 px-2.5 py-1 rounded-full text-xs font-black">👑 Lifetime Free VIP</span>';
         } else if (isActiveVip) {
             if (expiry > now) {
                 const remDays = Math.ceil((expiry - now) / MS_PER_DAY);
@@ -1175,58 +1191,20 @@ window.handleUserSelection = function() {
                     <span class="bg-amber-400 text-dark-950 px-2.5 py-0.5 rounded-full text-xs font-black inline-block">
                         👑 VIP (${remDays}d Left)
                     </span>
-                    <div class="text-[10px] font-bold text-slate-400 mt-0.5">Exp: ${expDateStr}</div>
+                    <div class="text-[10px] font-bold text-royal-300 mt-0.5">Exp: ${expDateStr}</div>
                 `;
             } else {
-                vipBadge.innerHTML = '<span class="bg-amber-400 text-dark-950 px-2.5 py-0.5 rounded-full text-xs font-black">👑 VIP Active</span>';
+                vipBadge.innerHTML = '<span class="bg-amber-400 text-dark-950 px-2.5 py-1 rounded-full text-xs font-black">👑 VIP Active</span>';
             }
         } else {
-            vipBadge.innerHTML = '<span class="bg-slate-700 text-slate-300 px-2.5 py-0.5 rounded-full text-xs font-bold">Normal User</span>';
+            vipBadge.innerHTML = '<span class="bg-slate-700 text-slate-200 px-2.5 py-1 rounded-full text-xs font-bold">Normal User</span>';
         }
     } else {
         display.innerText = '--';
         vipBadge.innerHTML = '--';
         if (passDisplay) passDisplay.innerText = '--';
         if (phoneInp) phoneInp.value = '';
-        if (dobToggle) dobToggle.checked = false;
-        if (dobStatusText) {
-            dobStatusText.className = "text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-200 text-slate-700";
-            dobStatusText.innerText = "--";
-        }
-    }
-};
-
-// प्रति यूज़र DOB 18+ सेक्शन को दिखाने या छुपाने का फंक्शन
-window.toggleUserDobAccess = async function(allowed) {
-    const uid = document.getElementById('userSelectDropdown').value;
-    if (!uid || !window.usersDataList[uid]) {
-        alert('कृपया पहले ड्रॉपडाउन से यूज़र सेलेक्ट करें!');
-        const dobToggle = document.getElementById('userDobToggle');
-        if (dobToggle) dobToggle.checked = !allowed;
-        return;
-    }
-
-    const uData = window.usersDataList[uid];
-    const msg = document.getElementById('adminMsg');
-
-    try {
-        await updateDoc(doc(db, "users", uid), { allowDob18: allowed });
-        window.usersDataList[uid].allowDob18 = allowed;
-
-        await window.loadAllUsersForDropdown();
-        document.getElementById('userSelectDropdown').value = uid;
-        window.handleUserSelection();
-
-        msg.className = allowed
-            ? "mt-3 p-3 bg-green-50 text-green-800 rounded-xl text-xs font-black border border-green-300 text-center"
-            : "mt-3 p-3 bg-red-50 text-red-700 rounded-xl text-xs font-black border border-red-200 text-center";
-        msg.innerHTML = allowed
-            ? `<i class="fa-solid fa-eye mr-1"></i> <strong>${uData.email}</strong> के लिए DOB 18+ सेक्शन <strong>चालू (Show)</strong> कर दिया गया है!`
-            : `<i class="fa-solid fa-eye-slash mr-1"></i> <strong>${uData.email}</strong> के लिए DOB 18+ सेक्शन <strong>छुपा (Hide)</strong> दिया गया है!`;
-        msg.classList.remove('hidden');
-        setTimeout(() => msg.classList.add('hidden'), 4000);
-    } catch (err) {
-        alert('Error updating DOB access: ' + err.message);
+        if (dobToggle) dobToggle.checked = true;
     }
 };
 
@@ -1242,7 +1220,7 @@ window.adminSetNewUserPassword = async function() {
     const uData = window.usersDataList[uid];
     const origHtml = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Setting...';
 
     try {
         if (uData.userPass) {
@@ -1271,9 +1249,17 @@ window.adminSetNewUserPassword = async function() {
         document.getElementById('selectedUserSavedPass').innerText = newPass;
         document.getElementById('adminNewResetPass').value = '';
 
-        msg.className = "mt-3 p-3 bg-green-50 text-green-800 rounded-xl text-xs font-bold border border-green-300 text-center space-y-2";
+        msg.className = "p-3.5 bg-green-50 text-green-800 rounded-2xl text-xs font-bold border border-green-300 text-center space-y-2 shadow-sm";
         msg.innerHTML = `
             <div><i class="fa-solid fa-circle-check mr-1"></i> <strong>${uData.email}</strong> का नया पासवर्ड <strong>${newPass}</strong> सेट हो गया!</div>
+            <div class="flex justify-center gap-2 pt-1">
+                <button type="button" onclick="window.shareSelectedUserCredentials('whatsapp')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-[11px] font-black">
+                    <i class="fa-brands fa-whatsapp mr-1"></i> WhatsApp पर भेजें
+                </button>
+                <button type="button" onclick="window.shareSelectedUserCredentials('email')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-[11px] font-black">
+                    <i class="fa-solid fa-envelope mr-1"></i> Email पर भेजें
+                </button>
+            </div>
         `;
         msg.classList.remove('hidden');
     } catch (err) {
@@ -1298,7 +1284,7 @@ window.adminUpdateVipDays = async function(daysToAdd) {
             window.usersDataList[uid].isVip = false;
             window.usersDataList[uid].vipExpiry = 0;
 
-            msg.className = "mt-3 p-3 bg-slate-100 text-slate-800 rounded-xl text-xs font-bold border border-slate-300 text-center";
+            msg.className = "p-3.5 bg-slate-200 text-slate-800 rounded-2xl text-xs font-bold border border-slate-300 text-center";
             msg.innerHTML = `VIP Access हटा दिया गया है! यूज़र अब Normal User है।`;
         } else {
             const now = Date.now();
@@ -1311,7 +1297,7 @@ window.adminUpdateVipDays = async function(daysToAdd) {
             window.usersDataList[uid].vipExpiry = newExpiry;
 
             const totalDaysNow = Math.ceil((newExpiry - now) / MS_PER_DAY);
-            msg.className = "mt-3 p-3 bg-amber-50 text-amber-900 rounded-xl text-xs font-bold border border-amber-300 text-center";
+            msg.className = "p-3.5 bg-amber-50 text-amber-900 rounded-2xl text-xs font-bold border border-amber-300 text-center shadow-sm";
             msg.innerHTML = `👑 +${daysToAdd} Days VIP जोड़ दिए गए! कुल एक्टिव वैलिडिटी: <strong>${totalDaysNow} Days</strong>`;
         }
 
@@ -1337,7 +1323,6 @@ window.createNewUserByAdmin = async function(event) {
 
     const newUserPass = document.getElementById('newAdminUserPass').value.trim();
     const newUserPhone = document.getElementById('newAdminUserPhone')?.value.trim() || '';
-    const allowDob18 = document.getElementById('newAdminUserAllowDob') ? document.getElementById('newAdminUserAllowDob').checked : true;
     
     const isSpecialFree = FREE_VIP_EMAILS.includes(newUserEmail);
     const creditsInputVal = parseInt(document.getElementById('newAdminUserCredits').value);
@@ -1349,7 +1334,7 @@ window.createNewUserByAdmin = async function(event) {
     const msg = document.getElementById('adminCreateMsg');
     const btn = event.target.querySelector('button[type="submit"]');
     
-    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating...';
+    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating Account...';
     msg.classList.remove('hidden'); msg.innerText = "Creating account...";
 
     try {
@@ -1371,7 +1356,7 @@ window.createNewUserByAdmin = async function(event) {
             credits: initialCredits, 
             isVip: isVip, 
             vipExpiry: vipExpiry,
-            allowDob18: allowDob18,
+            allowDob18: true,
             createdAt: new Date()
         });
 
@@ -1382,17 +1367,17 @@ window.createNewUserByAdmin = async function(event) {
             : `https://wa.me/?text=${encodeURIComponent(credMsg)}`;
         const mailLink = `mailto:${newUserEmail}?subject=${encodeURIComponent('Ojas Print Service - Your Login ID & Password')}&body=${encodeURIComponent(credMsg)}`;
         
-        msg.className = "mt-3 p-3.5 bg-green-50 text-green-900 rounded-2xl text-xs font-bold border border-green-300 space-y-2.5";
+        msg.className = "mt-4 p-4 bg-emerald-50 text-emerald-950 rounded-2xl text-xs font-bold border border-emerald-300 space-y-3 shadow-sm";
         msg.innerHTML = `
             <div class="text-center">
-                <i class="fa-solid fa-circle-check text-green-600 mr-1"></i> नया अकाउंट बन गया!<br>
-                ID: <strong>${newUserEmail}</strong> | Pass: <strong>${newUserPass}</strong>
+                <i class="fa-solid fa-circle-check text-emerald-600 text-base mr-1"></i> नया अकाउंट सफलतापूर्वक बन गया!<br>
+                <span class="inline-block mt-1 bg-white px-3 py-1 rounded-lg border border-emerald-200">ID: <strong>${newUserEmail}</strong> &nbsp;|&nbsp; Pass: <strong>${newUserPass}</strong></span>
             </div>
-            <div class="grid grid-cols-2 gap-2">
-                <a href="${waLink}" target="_blank" class="bg-green-600 hover:bg-green-700 text-white font-black py-2 px-3 rounded-xl text-center text-[11px] flex items-center justify-center gap-1 shadow-sm">
+            <div class="grid grid-cols-2 gap-2.5">
+                <a href="${waLink}" target="_blank" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 px-3 rounded-xl text-center text-xs flex items-center justify-center gap-1.5 shadow-sm">
                     <i class="fa-brands fa-whatsapp text-sm"></i> WhatsApp पर भेजें
                 </a>
-                <a href="${mailLink}" class="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-2 px-3 rounded-xl text-center text-[11px] flex items-center justify-center gap-1 shadow-sm">
+                <a href="${mailLink}" class="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-2.5 px-3 rounded-xl text-center text-xs flex items-center justify-center gap-1.5 shadow-sm">
                     <i class="fa-solid fa-envelope"></i> Email पर भेजें
                 </a>
             </div>
@@ -1401,13 +1386,15 @@ window.createNewUserByAdmin = async function(event) {
         event.target.reset();
         document.getElementById('newAdminUserCredits').value = 30;
         document.getElementById('newAdminUserVipDays').value = "2";
-        if (document.getElementById('newAdminUserAllowDob')) document.getElementById('newAdminUserAllowDob').checked = true;
         
         await window.loadAllUsersForDropdown();
     } catch (err) {
-        msg.className = "mt-3 p-3 bg-red-50 text-red-700 rounded-xl text-xs font-bold border border-red-200 text-center";
+        msg.className = "mt-4 p-3.5 bg-red-50 text-red-700 rounded-2xl text-xs font-bold border border-red-200 text-center";
         msg.innerHTML = `Error: ${err.message}`;
-    } finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-user-check mr-1"></i> Register User Account'; }
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-user-check"></i> Create User Account (@print.com)';
+    }
 };
 
 window.adjustCredits = async function(action) {
@@ -1437,12 +1424,12 @@ window.adjustCredits = async function(action) {
         document.getElementById('currentUserCreditsDisplay').innerText = newCredits;
         document.getElementById('creditAdjustmentAmount').value = '';
         
-        msg.className = "mt-3 p-3 bg-green-50 text-green-700 rounded-xl text-xs font-bold border border-green-200 text-center";
-        msg.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> अपडेट हो गया! नया बैलेंस: <strong>${newCredits} Credits</strong>`;
+        msg.className = "p-3.5 bg-green-50 text-green-800 rounded-2xl text-xs font-bold border border-green-300 text-center shadow-sm";
+        msg.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i> क्रेडिट्स अपडेट हो गए! नया बैलेंस: <strong>${newCredits} Credits</strong>`;
         await window.loadAllUsersForDropdown();
         document.getElementById('userSelectDropdown').value = uid;
     } catch (err) {
-        msg.className = "mt-3 p-3 bg-red-50 text-red-700 rounded-xl text-xs font-bold border border-red-200 text-center";
+        msg.className = "p-3.5 bg-red-50 text-red-700 rounded-2xl text-xs font-bold border border-red-200 text-center";
         msg.innerHTML = `Error: ${err.message}`;
     } finally {
         btn.innerHTML = origText; btn.disabled = false;
@@ -1450,7 +1437,7 @@ window.adjustCredits = async function(action) {
     }
 };
 
-// ================= SECTION 3: DATABASE RECORDS (HISTORY) + STAMP SYNC =================
+// ================= SECTION: DATABASE RECORDS (HISTORY) + STAMP SYNC TO USER PORTAL =================
 window.loadAdminHistory = async function() {
     const container = document.getElementById('adminHistoryListContainer');
     container.innerHTML = `<div class="p-10 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>रिकॉर्ड्स लोड हो रहे हैं...</div>`;
@@ -1519,7 +1506,9 @@ window.toggleRowStampCheckbox = async function(origIndex, isChecked) {
                 stampFile: chosenObj.name,
                 stampedAt: new Date()
             });
-        } catch (e) {}
+        } catch (e) {
+            console.error("Failed to save stamp to Firestore:", e);
+        }
     } else {
         window.stampSelectionMap[origIndex] = {
             enabled: false,
@@ -1534,7 +1523,9 @@ window.toggleRowStampCheckbox = async function(origIndex, isChecked) {
                 withStamp: false,
                 stampFile: ''
             });
-        } catch (e) {}
+        } catch (e) {
+            console.error("Failed to remove stamp from Firestore:", e);
+        }
     }
 
     window.renderAdminHistory();
@@ -1574,7 +1565,7 @@ window.renderAdminHistory = function() {
         const isStampChecked = !!(stampState && stampState.enabled);
 
         const stampCheckboxHtml = isAnnexure ? `
-            <label class="inline-flex items-center gap-1.5 ${isStampChecked ? 'bg-green-100 text-green-900 border-green-400' : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'} border px-2.5 py-2 rounded-xl text-xs font-black cursor-pointer select-none transition shadow-sm">
+            <label class="inline-flex items-center gap-1.5 ${isStampChecked ? 'bg-green-100 text-green-900 border-green-400' : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'} border px-2.5 py-2 rounded-xl text-xs font-black cursor-pointer select-none transition shadow-sm" title="टिक करते ही यह स्टैम्प यूज़र के पोर्टल पर भी सेव हो जाएगी">
                 <input type="checkbox" id="stampChk-${data._origIndex}" ${isStampChecked ? 'checked' : ''} onchange="window.toggleRowStampCheckbox(${data._origIndex}, this.checked)" class="w-4 h-4 accent-green-600 rounded cursor-pointer">
                 <span><i class="fa-solid fa-stamp ${isStampChecked ? 'text-green-700' : 'text-amber-600'} mr-0.5"></i> ${isStampChecked ? 'Stamped for User' : 'Apply Stamp'}</span>
             </label>
@@ -1596,10 +1587,10 @@ window.renderAdminHistory = function() {
                     <button onclick="window.openPdfViewer('${data.fileId}', '${safeFileName}', ${data._origIndex})" class="flex-1 sm:flex-initial justify-center inline-flex items-center gap-1.5 bg-royal-50 text-royal-700 px-3 py-2 rounded-xl text-xs font-black hover:bg-royal-500 hover:text-white transition border border-royal-200">
                         <i class="fa-solid fa-eye"></i> Preview / PDF
                     </button>
-                    <button onclick="window.triggerDirectPrintByIndex(${data._origIndex}, this)" class="inline-flex items-center justify-center gap-1 bg-amber-500 hover:bg-amber-600 text-dark-950 px-3 py-2 rounded-xl text-xs font-black transition shadow-sm">
+                    <button onclick="window.triggerDirectPrintByIndex(${data._origIndex}, this)" class="inline-flex items-center justify-center gap-1 bg-amber-500 hover:bg-amber-600 text-dark-950 px-3 py-2 rounded-xl text-xs font-black transition shadow-sm" title="Direct Print">
                         <i class="fa-solid fa-print"></i> Print
                     </button>
-                    <button onclick="window.deleteHistoryRecord('${data.id}')" class="w-9 h-9 inline-flex items-center justify-center bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition border border-red-100">
+                    <button onclick="window.deleteHistoryRecord('${data.id}')" class="w-9 h-9 inline-flex items-center justify-center bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition border border-red-100" title="Delete">
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </div>
@@ -1797,14 +1788,13 @@ window.closePdfViewer = function() {
     document.body.style.overflow = 'auto';
 };
 
-// ================= 5-TAB NAVIGATION SWITCHER (WHITE ACTIVE / DARK INACTIVE) =================
+// ================= 6-TAB NAVIGATION SWITCHER =================
 window.switchAdminMainTab = function(tabName) {
-    const tabs = ['payments', 'users', 'support', 'history', 'controls'];
+    const tabs = ['payments', 'users', 'create_user', 'support', 'history', 'controls'];
     tabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
         if (btn) {
-            const extraSpan = t === 'controls' ? 'col-span-2 sm:col-span-1 ' : '';
-            btn.className = `${extraSpan}bg-dark-900 text-slate-300 font-bold py-2.5 px-3 rounded-xl hover:bg-dark-800 hover:text-white transition border border-slate-800 text-xs md:text-sm flex justify-center items-center gap-2`;
+            btn.className = "bg-slate-50 text-slate-600 font-bold py-2.5 px-3 rounded-xl hover:bg-slate-100 transition border border-slate-200/80 text-xs flex justify-center items-center gap-1.5";
         }
         const section = document.getElementById(`section-${t}`);
         if (section) section.classList.add('hidden');
@@ -1812,18 +1802,18 @@ window.switchAdminMainTab = function(tabName) {
 
     const activeBtn = document.getElementById(`tab-${tabName}`);
     if (activeBtn) {
-        const extraSpan = tabName === 'controls' ? 'col-span-2 sm:col-span-1 ' : '';
-        activeBtn.className = `${extraSpan}bg-white text-dark-950 font-black py-2.5 px-3 rounded-xl shadow-glow transition text-xs md:text-sm flex justify-center items-center gap-2 border-2 border-royal-400`;
+        activeBtn.className = "bg-dark-950 text-royal-300 font-black py-2.5 px-3 rounded-xl shadow-glow transition text-xs flex justify-center items-center gap-1.5 border border-royal-500/50";
     }
     
     const activeSection = document.getElementById(`section-${tabName}`);
     if (activeSection) {
         activeSection.removeAttribute('class');
-        if (tabName === 'payments') activeSection.className = 'space-y-5';
-        if (tabName === 'users') activeSection.className = 'grid grid-cols-1 lg:grid-cols-12 gap-6';
+        if (tabName === 'payments') activeSection.className = 'space-y-4';
+        if (tabName === 'users') activeSection.className = 'space-y-4';
+        if (tabName === 'create_user') activeSection.className = 'block';
         if (tabName === 'support') activeSection.className = 'space-y-4';
         if (tabName === 'history') activeSection.className = 'space-y-4';
-        if (tabName === 'controls') activeSection.className = 'grid grid-cols-1 md:grid-cols-2 gap-6';
+        if (tabName === 'controls') activeSection.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
     }
 
     if (tabName === 'payments') window.loadAllPayments();
