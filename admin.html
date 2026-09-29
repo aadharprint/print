@@ -49,9 +49,12 @@
             overflow: hidden;
             flex-shrink: 0;
         }
+        /* भरे गए शब्दों के नीचे बोल्ड अंडरलाइन */
         .filled-val {
-            font-weight: bold;
-            color: #000000;
+            font-weight: bold !important;
+            color: #000000 !important;
+            text-decoration: underline !important;
+            text-underline-offset: 3px !important;
         }
         /* Stamp Overlap Layer */
         .stamp-overlay-layer {
@@ -94,7 +97,14 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
         const ADMIN_EMAIL = "hkosiun1221@gmail.com";
+        const FREE_VIP_EMAILS = ["aadhaar@gmail.com", "danish@print.com"];
         const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+        window.isAllowedPortalEmail = function(email) {
+            if (!email) return false;
+            const clean = String(email).trim().toLowerCase();
+            return clean === ADMIN_EMAIL || FREE_VIP_EMAILS.includes(clean) || clean.endsWith("@print.com");
+        };
 
         // ================= 6 STAMP FILES AUTO-DETECT & RANDOM CONFIG =================
         const CANDIDATE_STAMP_FILES = [
@@ -108,7 +118,7 @@
         
         window.availableStampsList = [];
         window.stampSelectionMap = {};
-        window.currentModalContext = { fileId: '', fileName: '', historyIndex: -1, withStamp: false, stampSrc: '' };
+        window.currentModalContext = { fileId: '', fileName: '', historyIndex: -1, withStamp: false, stampSrc: '', stampFile: '' };
 
         window.currentUserData = null;
         window.allUsersMap = {}; 
@@ -189,10 +199,22 @@
             }
         };
 
-        window.pickRandomAvailableStamp = function() {
-            if (window.availableStampsList.length === 0) return "stamp.png";
+        window.pickRandomAvailableStampObj = function() {
+            if (window.availableStampsList.length === 0) {
+                return { name: "stamp.png", dataUrl: "stamp.png" };
+            }
             const randomIndex = Math.floor(Math.random() * window.availableStampsList.length);
-            return window.availableStampsList[randomIndex].dataUrl;
+            return window.availableStampsList[randomIndex];
+        };
+
+        window.pickRandomAvailableStamp = function() {
+            return window.pickRandomAvailableStampObj().dataUrl;
+        };
+
+        window.getStampDataUrlByName = function(fileName) {
+            if (!fileName) return window.pickRandomAvailableStamp();
+            const found = window.availableStampsList.find(s => s.name === fileName);
+            return found ? found.dataUrl : window.pickRandomAvailableStamp();
         };
 
         onAuthStateChanged(auth, async (user) => {
@@ -204,7 +226,7 @@
                 document.getElementById('adminPanelContent').classList.remove('hidden');
                 document.getElementById('loadingScreen').classList.add('hidden');
                 
-                window.preloadAllAvailableStamps();
+                await window.preloadAllAvailableStamps();
                 await window.loadAllUsersForDropdown(); 
                 await window.loadPortalSettingsForAdmin();
                 window.startLiveSupportListener();
@@ -236,10 +258,12 @@
         };
 
         window.buildUserCredentialsText = function(email, pass, credits, isVip, vipExpiry) {
-            const shortId = email.endsWith('@ovportal.com') ? email.split('@')[0] : email;
+            const shortId = email.endsWith('@print.com') ? email.split('@')[0] : email;
             const now = Date.now();
             let vipText = "Normal User";
-            if (isVip) {
+            if (FREE_VIP_EMAILS.includes(email.toLowerCase())) {
+                vipText = "👑 Lifetime Free VIP";
+            } else if (isVip) {
                 if (vipExpiry && vipExpiry > now) {
                     const remDays = Math.ceil((vipExpiry - now) / MS_PER_DAY);
                     vipText = `👑 VIP Active (${remDays} Days)`;
@@ -247,7 +271,7 @@
                     vipText = `👑 VIP Active`;
                 }
             }
-            return `🌟 Ojas Print Service - Login Details 🌟\n\n👤 User ID: ${shortId}\n📧 Full Email: ${email}\n🔑 Password: ${pass || 'Not Set'}\n💰 Credits Balance: ${credits || 0} Cr\n✨ Status: ${vipText}\n\n🌐 Login Portal Link:\n${window.getPortalLoginUrl()}`;
+            return `🌟 Ojas Print Service - Login Details 🌟\n\n👤 User ID: ${email}\n🔑 Password: ${pass || 'Not Set'}\n💰 Credits Balance: ${FREE_VIP_EMAILS.includes(email.toLowerCase()) ? 'Unlimited (Free)' : (credits || 0) + ' Cr'}\n✨ Status: ${vipText}\n\n🌐 Login Portal Link:\n${window.getPortalLoginUrl()}`;
         };
 
         window.shareSelectedUserCredentials = async function(channel) {
@@ -293,7 +317,7 @@
                     : `https://wa.me/?text=${encodeURIComponent(messageText)}`;
                 window.open(waUrl, '_blank');
             } else if (channel === 'email') {
-                const targetEmail = uData.contactEmail || (uData.email.endsWith('@ovportal.com') ? prompt("यूज़र का असली Email एड्रेस डालें:", "") : uData.email);
+                const targetEmail = uData.contactEmail || (uData.email.endsWith('@print.com') ? prompt("यूज़र का असली Email एड्रेस डालें:", "") : uData.email);
                 if (!targetEmail) return;
                 const subject = "Ojas Print Service - Your Login ID & Password";
                 window.open(`mailto:${targetEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(messageText)}`, '_self');
@@ -320,7 +344,7 @@
             for (const [uid, uData] of Object.entries(window.usersDataList)) {
                 const emailLower = (uData.email || '').toLowerCase();
                 const unameLower = (uData.username || emailLower.split('@')[0]).toLowerCase();
-                if (emailLower === clean || unameLower === clean || `${clean}@ovportal.com` === emailLower) {
+                if (emailLower === clean || unameLower === clean || `${clean}@print.com` === emailLower) {
                     return uid;
                 }
             }
@@ -349,7 +373,6 @@
                     window.allSupportTickets.push({ id: docSnap.id, ...docSnap.data() });
                 });
 
-                // Sort by latest activity (updatedAtMs or timestamp)
                 window.allSupportTickets.sort((a, b) => {
                     const timeA = a.updatedAtMs || (a.timestamp?.seconds ? a.timestamp.seconds * 1000 : 0);
                     const timeB = b.updatedAtMs || (b.timestamp?.seconds ? b.timestamp.seconds * 1000 : 0);
@@ -473,7 +496,6 @@
                 passBadge.innerHTML = `<span class="text-amber-300">Unregistered / Guest ID</span>`;
             }
 
-            // Render Messages
             const msgContainer = document.getElementById('chatMessagesScrollBox');
             const msgs = window.getTicketMessagesArray(ticket);
             msgContainer.innerHTML = '';
@@ -513,7 +535,6 @@
             }
         };
 
-        // Send Admin Reply Directly to User's Support Tab in index.html
         window.sendAdminChatReply = async function(event) {
             if (event) event.preventDefault();
             const ticketId = window.selectedChatTicketId;
@@ -547,7 +568,6 @@
                     updatedAtMs: Date.now()
                 });
 
-                // If this was a Forgot Password ticket with a random ID, also sync reply to the user's actual UID doc so they see it inside portal
                 const matchedUid = ticket.userId || window.findUserUidByIdentifier(ticket.userIdentifier);
                 if (matchedUid && matchedUid !== ticketId) {
                     try {
@@ -578,7 +598,6 @@
             }
         };
 
-        // Quick Template Fill into Chat Input
         window.insertQuickChatReply = function(type) {
             const ticket = window.allSupportTickets.find(t => t.id === window.selectedChatTicketId);
             if (!ticket) return alert('कृपया पहले किसी यूज़र की चैट चुनें!');
@@ -587,7 +606,7 @@
             const u = matchedUid ? window.usersDataList[matchedUid] : null;
             const inp = document.getElementById('adminChatReplyInput');
 
-            const shortId = u ? (u.email.split('@')[0]) : (ticket.userIdentifier || 'User');
+            const shortId = u ? u.email : (ticket.userIdentifier || 'User');
             const pass = u ? (u.userPass || '[PASS]') : '[PASS]';
             const cr = u ? (u.credits || 0) : 0;
 
@@ -601,7 +620,6 @@
             inp.focus();
         };
 
-        // 1-Click Password Reset + Auto Send in Chat
         window.resetPassAndSendInChat = async function() {
             const ticket = window.allSupportTickets.find(t => t.id === window.selectedChatTicketId);
             if (!ticket) return alert('कृपया पहले किसी यूज़र की चैट चुनें!');
@@ -653,7 +671,7 @@
                 await updateDoc(doc(db, "users", matchedUid), updateUserPayload);
                 window.usersDataList[matchedUid].userPass = newPass;
 
-                const autoReplyMsg = `🔑 आपका नया पासवर्ड सेट कर दिया गया है:\nUser ID: ${uData.email.split('@')[0]}\nNew Password: ${newPass}\n\nअब आप इस नए पासवर्ड से लॉगिन कर सकते हैं।`;
+                const autoReplyMsg = `🔑 आपका नया पासवर्ड सेट कर दिया गया है:\nUser ID: ${uData.email}\nNew Password: ${newPass}\n\nअब आप इस नए पासवर्ड से लॉगिन कर सकते हैं।`;
                 const newMsgObj = {
                     sender: 'admin',
                     text: autoReplyMsg,
@@ -672,7 +690,6 @@
                     updatedAtMs: Date.now()
                 });
 
-                // Also sync to user's UID supportTickets doc if ticket.id was a Forgot Password ticket
                 if (matchedUid !== ticket.id) {
                     try {
                         const userChatRef = doc(db, "supportTickets", matchedUid);
@@ -702,7 +719,6 @@
             }
         };
 
-        // Optional: Also send current chat reply on WhatsApp if admin wants
         window.alsoOpenChatUserWhatsApp = function() {
             const ticket = window.allSupportTickets.find(t => t.id === window.selectedChatTicketId);
             if (!ticket) return;
@@ -731,13 +747,11 @@
             }
         };
 
-        // Start New Chat with any Registered User from Admin (Synced with User UID)
         window.startNewChatWithSelectedUser = async function() {
             const uid = document.getElementById('newChatUserSelect').value;
             if (!uid || !window.usersDataList[uid]) return alert('कृपया ड्रॉपडाउन से यूज़र चुनें!');
             const u = window.usersDataList[uid];
 
-            // Check if a thread already exists for this user's UID
             const existing = window.allSupportTickets.find(t => t.id === uid || t.userId === uid);
             if (existing) {
                 window.selectSupportChatThread(existing.id);
@@ -745,7 +759,6 @@
             }
 
             try {
-                // Document ID MUST be uid so index.html and Firestore rules allow 2-way chat
                 const newDocRef = doc(db, "supportTickets", uid);
                 await setDoc(newDocRef, {
                     type: 'ADMIN_MESSAGE',
@@ -892,6 +905,20 @@
             }
         };
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         // ================= SECTION 1: COMPLETE PAYMENT NOTIFICATIONS, HISTORY & RESOLUTION =================
         window.loadAllPayments = async function() {
             const container = document.getElementById('adminPaymentsCardsContainer');
@@ -925,13 +952,13 @@
             window.allPaymentsData.forEach(item => {
                 const amt = parseFloat(item.amountPaid) || 0;
                 const st = (item.status || 'Pending');
-                if (st === 'Pending') {
+                if (st === 'Pending' || st.includes('Ticket')) {
                     pendingCount++;
                     pendingAmt += amt;
                 } else if (st === 'Approved' || st === 'Auto-Approved') {
                     approvedCount++;
                     approvedAmt += amt;
-                } else if (st === 'Rejected') {
+                } else if (st === 'Rejected' || st === 'Cancelled') {
                     rejectedCount++;
                     rejectedAmt += amt;
                 }
@@ -980,9 +1007,9 @@
 
             let list = window.allPaymentsData.filter(item => {
                 const st = (item.status || 'Pending');
-                if (activeFilter === 'Pending' && st !== 'Pending') return false;
+                if (activeFilter === 'Pending' && st !== 'Pending' && !st.includes('Ticket')) return false;
                 if (activeFilter === 'Approved' && st !== 'Approved' && st !== 'Auto-Approved') return false;
-                if (activeFilter === 'Rejected' && st !== 'Rejected') return false;
+                if (activeFilter === 'Rejected' && st !== 'Rejected' && st !== 'Cancelled') return false;
 
                 if (searchQuery) {
                     const emailMatch = (item.email || '').toLowerCase().includes(searchQuery);
@@ -996,7 +1023,7 @@
             container.innerHTML = '';
 
             if(list.length === 0) {
-                const emptyTitle = activeFilter === 'Pending' ? 'कोई पेंडिंग पेमेंट नहीं है!' : 'इस फिल्टर में कोई पेमेंट रिकॉर्ड नहीं मिला!';
+                const emptyTitle = activeFilter === 'Pending' ? 'कोई पेंडिंग पेमेंट या टिकट नहीं है!' : 'इस फिल्टर में कोई पेमेंट रिकॉर्ड नहीं मिला!';
                 container.innerHTML = `
                     <div class="col-span-1 md:col-span-2 p-10 text-center bg-white rounded-3xl border border-slate-100 shadow-card">
                         <div class="w-14 h-14 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
@@ -1021,12 +1048,18 @@
 
                 let statusBadge = '';
                 let cardBorder = 'border-slate-200';
-                if (status === 'Pending') {
+                if (status.includes('Ticket')) {
+                    statusBadge = `<span class="bg-indigo-100 text-indigo-800 border border-indigo-300 px-2.5 py-0.5 rounded-full text-[10px] font-black animate-pulse"><i class="fa-solid fa-ticket mr-1"></i>UTR Ticket Raised</span>`;
+                    cardBorder = 'border-indigo-400';
+                } else if (status === 'Pending') {
                     statusBadge = `<span class="bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 rounded-full text-[10px] font-black animate-pulse"><i class="fa-solid fa-clock mr-1"></i>Pending</span>`;
                     cardBorder = 'border-amber-300';
                 } else if (status === 'Approved' || status === 'Auto-Approved') {
                     statusBadge = `<span class="bg-green-100 text-green-800 border border-green-300 px-2.5 py-0.5 rounded-full text-[10px] font-black"><i class="fa-solid fa-check-circle mr-1"></i>Approved</span>`;
                     cardBorder = 'border-green-200';
+                } else if (status === 'Cancelled') {
+                    statusBadge = `<span class="bg-slate-200 text-slate-700 border border-slate-300 px-2.5 py-0.5 rounded-full text-[10px] font-black"><i class="fa-solid fa-ban mr-1"></i>Cancelled by User</span>`;
+                    cardBorder = 'border-slate-300';
                 } else {
                     statusBadge = `<span class="bg-red-100 text-red-700 border border-red-300 px-2.5 py-0.5 rounded-full text-[10px] font-black"><i class="fa-solid fa-circle-xmark mr-1"></i>Rejected</span>`;
                     cardBorder = 'border-red-200';
@@ -1043,7 +1076,7 @@
                        </div>`;
 
                 let actionButtonsHtml = '';
-                if (status === 'Pending') {
+                if (status === 'Pending' || status.includes('Ticket')) {
                     actionButtonsHtml = `
                         <div class="grid grid-cols-2 gap-2 pt-1">
                             <button onclick="window.approvePayment('${data.id}', '${data.userId}', ${creditsReq}, ${vipDays}, false)" class="bg-green-600 hover:bg-green-700 active:scale-95 text-white py-2.5 rounded-xl text-xs font-black shadow-sm transition flex items-center justify-center gap-1.5">
@@ -1054,7 +1087,7 @@
                             </button>
                         </div>
                     `;
-                } else if (status === 'Rejected') {
+                } else if (status === 'Rejected' || status === 'Cancelled') {
                     actionButtonsHtml = `
                         <div class="flex items-center gap-2 pt-1">
                             <button onclick="window.approvePayment('${data.id}', '${data.userId}', ${creditsReq}, ${vipDays}, true)" class="flex-1 bg-amber-500 hover:bg-amber-600 active:scale-95 text-dark-950 py-2.5 px-3 rounded-xl text-xs font-black shadow-sm transition flex items-center justify-center gap-1.5">
@@ -1095,7 +1128,7 @@
                             <div class="flex items-center justify-between bg-slate-100 px-3 py-2 rounded-xl border border-slate-200">
                                 <div>
                                     <span class="text-[9px] font-bold text-slate-400 uppercase block">UTR / Ref Number</span>
-                                    <span class="font-mono font-black text-xs md:text-sm text-slate-900 tracking-wider">${data.utrNumber || 'N/A'}</span>
+                                    <span class="font-mono font-black text-xs md:text-sm text-slate-900 tracking-wider">${data.utrNumber || 'ONLINE_UPI'}</span>
                                 </div>
                                 <button onclick="window.copyUtrText('${data.utrNumber || ''}', this)" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-2.5 py-1 rounded-lg text-[11px] font-bold shadow-sm transition">
                                     <i class="fa-regular fa-copy mr-1"></i> Copy
@@ -1117,7 +1150,7 @@
         };
 
         window.approvePayment = async function(paymentDocId, userId, creditsToAdd, vipDaysToAdd, isResolution = false) {
-            const titleText = isResolution ? `Resolve & Approve Rejected Payment:` : `Approve Payment:`;
+            const titleText = isResolution ? `Resolve & Approve Payment:` : `Approve Payment:`;
             const confirmMsg = vipDaysToAdd > 0 
                 ? `${titleText}\n• Add +${creditsToAdd} Credits\n• Add +${vipDaysToAdd} Days VIP Access\n\nक्या आप कन्फर्म हैं?`
                 : `${titleText}\n• Add +${creditsToAdd} Credits to this user?\n\nक्या आप कन्फर्म हैं?`;
@@ -1191,9 +1224,11 @@
                 usersSnap.forEach(docSnap => {
                     const data = docSnap.data();
                     window.usersDataList[docSnap.id] = data;
-                    const isCurrentlyVip = data.isVip && (!data.vipExpiry || data.vipExpiry > now);
-                    const vipLabel = isCurrentlyVip ? '👑 [VIP] ' : '';
-                    if (select) select.innerHTML += `<option value="${docSnap.id}">${vipLabel}${data.email} (${data.credits || 0} Cr)</option>`;
+                    const emailLower = (data.email || '').toLowerCase();
+                    const isFreeVip = FREE_VIP_EMAILS.includes(emailLower);
+                    const isCurrentlyVip = isFreeVip || (data.isVip && (!data.vipExpiry || data.vipExpiry > now));
+                    const vipLabel = isFreeVip ? '👑 [FREE VIP] ' : (isCurrentlyVip ? '👑 [VIP] ' : '');
+                    if (select) select.innerHTML += `<option value="${docSnap.id}">${vipLabel}${data.email} (${isFreeVip ? 'Free' : (data.credits || 0) + ' Cr'})</option>`;
                 });
                 if (select && currentSelected && window.usersDataList[currentSelected]) {
                     select.value = currentSelected;
@@ -1212,7 +1247,8 @@
 
             if(uid && window.usersDataList[uid]) {
                 const uData = window.usersDataList[uid];
-                display.innerText = uData.credits || 0;
+                const isFreeVip = FREE_VIP_EMAILS.includes((uData.email || '').toLowerCase());
+                display.innerText = isFreeVip ? 'FREE' : (uData.credits || 0);
                 if (passDisplay) {
                     passDisplay.innerText = uData.userPass ? uData.userPass : 'Not synced yet (Set new below)';
                 }
@@ -1222,9 +1258,11 @@
 
                 const now = Date.now();
                 const expiry = uData.vipExpiry || 0;
-                const isActiveVip = uData.isVip && (expiry === 0 || expiry > now);
+                const isActiveVip = isFreeVip || (uData.isVip && (expiry === 0 || expiry > now));
 
-                if (isActiveVip) {
+                if (isFreeVip) {
+                    vipBadge.innerHTML = '<span class="bg-green-100 text-green-800 border border-green-300 px-2.5 py-0.5 rounded-full text-xs font-black">👑 Lifetime Free VIP</span>';
+                } else if (isActiveVip) {
                     if (expiry > now) {
                         const remDays = Math.ceil((expiry - now) / MS_PER_DAY);
                         const expDateStr = new Date(expiry).toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
@@ -1352,13 +1390,20 @@
             }
         };
 
+        // NEW USER CREATION WITH STRICT @print.com ENFORCEMENT
         window.createNewUserByAdmin = async function(event) {
             event.preventDefault();
             const rawUser = document.getElementById('newAdminUserEmail').value.trim().toLowerCase();
-            const newUserEmail = rawUser.includes('@') ? rawUser : `${rawUser}@ovportal.com`;
+            const newUserEmail = rawUser.includes('@') ? rawUser : `${rawUser}@print.com`;
+
+            if (!window.isAllowedPortalEmail(newUserEmail)) {
+                return alert("केवल @print.com डोमेन वाली User ID ही बनाई जा सकती है! (जैसे: rahul@print.com)");
+            }
+
             const newUserPass = document.getElementById('newAdminUserPass').value.trim();
             const newUserPhone = document.getElementById('newAdminUserPhone')?.value.trim() || '';
             
+            const isSpecialFree = FREE_VIP_EMAILS.includes(newUserEmail);
             const creditsInputVal = parseInt(document.getElementById('newAdminUserCredits').value);
             const initialCredits = isNaN(creditsInputVal) ? 30 : creditsInputVal;
             
@@ -1379,8 +1424,8 @@
                 const data = await res.json();
                 if (data.error) throw new Error(data.error.message);
 
-                const isVip = initialVipDays > 0;
-                const vipExpiry = isVip ? (Date.now() + (initialVipDays * MS_PER_DAY)) : 0;
+                const isVip = isSpecialFree || initialVipDays > 0;
+                const vipExpiry = isSpecialFree ? 0 : (isVip ? (Date.now() + (initialVipDays * MS_PER_DAY)) : 0);
 
                 await setDoc(doc(db, "users", data.localId), {
                     email: newUserEmail, 
@@ -1398,13 +1443,13 @@
                 const waLink = cleanPhone 
                     ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(credMsg)}`
                     : `https://wa.me/?text=${encodeURIComponent(credMsg)}`;
-                const mailLink = `mailto:${ rawUser.includes('@') ? rawUser : '' }?subject=${encodeURIComponent('Ojas Print Service - Your Login ID & Password')}&body=${encodeURIComponent(credMsg)}`;
+                const mailLink = `mailto:${newUserEmail}?subject=${encodeURIComponent('Ojas Print Service - Your Login ID & Password')}&body=${encodeURIComponent(credMsg)}`;
                 
                 msg.className = "mt-3 p-3.5 bg-green-50 text-green-900 rounded-2xl text-xs font-bold border border-green-300 space-y-2.5";
                 msg.innerHTML = `
                     <div class="text-center">
                         <i class="fa-solid fa-circle-check text-green-600 mr-1"></i> नया अकाउंट बन गया!<br>
-                        ID: <strong>${newUserEmail.split('@')[0]}</strong> | Pass: <strong>${newUserPass}</strong>
+                        ID: <strong>${newUserEmail}</strong> | Pass: <strong>${newUserPass}</strong>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <a href="${waLink}" target="_blank" class="bg-green-600 hover:bg-green-700 text-white font-black py-2 px-3 rounded-xl text-center text-[11px] flex items-center justify-center gap-1 shadow-sm">
@@ -1424,7 +1469,7 @@
             } catch(err) {
                 msg.className = "mt-3 p-3 bg-red-50 text-red-700 rounded-xl text-xs font-bold border border-red-200 text-center";
                 msg.innerHTML = `Error: ${err.message}`;
-            } finally { btn.disabled = false; btn.innerText = "Register User (30 Credits + 2d VIP)"; }
+            } finally { btn.disabled = false; btn.innerText = "Register User (@print.com)"; }
         };
 
         window.adjustCredits = async function(action) {
@@ -1467,12 +1512,12 @@
             }
         };
 
-        // ================= SECTION 3: DATABASE RECORDS (HISTORY) =================
+        // ================= SECTION 3: DATABASE RECORDS (HISTORY) + STAMP SYNC TO USER PORTAL =================
         window.loadAdminHistory = async function() {
             const container = document.getElementById('adminHistoryListContainer');
             container.innerHTML = `<div class="p-10 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>रिकॉर्ड्स लोड हो रहे हैं...</div>`;
 
-            window.updateStampCountBadge();
+            await window.preloadAllAvailableStamps();
 
             try {
                 const filterUserDropdown = document.getElementById('filterUser');
@@ -1491,8 +1536,22 @@
 
                 const historySnap = await getDocs(collection(db, "history"));
                 window.adminAllHistoryData = [];
-                historySnap.forEach(docSnap => { window.adminAllHistoryData.push({ id: docSnap.id, ...docSnap.data() }); });
+                historySnap.forEach(docSnap => {
+                    window.adminAllHistoryData.push({ id: docSnap.id, ...docSnap.data() });
+                });
                 window.adminAllHistoryData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+
+                // डेटाबेस में पहले से लगी स्टैम्प्स को लोड करें
+                window.stampSelectionMap = {};
+                window.adminAllHistoryData.forEach((rec, idx) => {
+                    if (rec.withStamp) {
+                        window.stampSelectionMap[idx] = {
+                            enabled: true,
+                            stampFile: rec.stampFile || 'stamp.png',
+                            stampSrc: window.getStampDataUrlByName(rec.stampFile || 'stamp.png')
+                        };
+                    }
+                });
 
                 window.renderAdminHistory(); 
             } catch (err) {
@@ -1500,22 +1559,53 @@
             }
         };
 
+        // जब एडमिन 'With Stamp' टिक या अनटिक करे, तो वह तुरंत Firestore में सेव हो जाए ताकि यूज़र के पोर्टल पर भी स्टैम्प दिखे!
         window.toggleRowStampCheckbox = async function(origIndex, isChecked) {
+            const record = window.adminAllHistoryData[origIndex];
+            if (!record) return;
+
             if (isChecked) {
                 if (window.availableStampsList.length === 0) {
                     await window.preloadAllAvailableStamps();
                 }
-                const chosenSrc = window.pickRandomAvailableStamp();
+                const chosenObj = window.pickRandomAvailableStampObj();
                 window.stampSelectionMap[origIndex] = {
                     enabled: true,
-                    stampSrc: chosenSrc
+                    stampFile: chosenObj.name,
+                    stampSrc: chosenObj.dataUrl
                 };
+                record.withStamp = true;
+                record.stampFile = chosenObj.name;
+
+                try {
+                    await updateDoc(doc(db, "history", record.id), {
+                        withStamp: true,
+                        stampFile: chosenObj.name,
+                        stampedAt: new Date()
+                    });
+                } catch (e) {
+                    console.error("Failed to save stamp to Firestore:", e);
+                }
             } else {
                 window.stampSelectionMap[origIndex] = {
                     enabled: false,
+                    stampFile: '',
                     stampSrc: ''
                 };
+                record.withStamp = false;
+                record.stampFile = '';
+
+                try {
+                    await updateDoc(doc(db, "history", record.id), {
+                        withStamp: false,
+                        stampFile: ''
+                    });
+                } catch (e) {
+                    console.error("Failed to remove stamp from Firestore:", e);
+                }
             }
+
+            window.renderAdminHistory();
         };
 
         window.renderAdminHistory = function() {
@@ -1552,18 +1642,19 @@
                 const isStampChecked = !!(stampState && stampState.enabled);
 
                 const stampCheckboxHtml = isAnnexure ? `
-                    <label class="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-2 rounded-xl text-xs font-black cursor-pointer select-none transition shadow-sm" title="टिक करने पर उपलब्ध स्टैम्प्स में से कोई भी एक रैंडम स्टैम्प लग जाएगी">
-                        <input type="checkbox" id="stampChk-${data._origIndex}" ${isStampChecked ? 'checked' : ''} onchange="window.toggleRowStampCheckbox(${data._origIndex}, this.checked)" class="w-4 h-4 accent-amber-600 rounded cursor-pointer">
-                        <span><i class="fa-solid fa-stamp text-amber-600 mr-0.5"></i> With Stamp</span>
+                    <label class="inline-flex items-center gap-1.5 ${isStampChecked ? 'bg-green-100 text-green-900 border-green-400' : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'} border px-2.5 py-2 rounded-xl text-xs font-black cursor-pointer select-none transition shadow-sm" title="टिक करते ही यह स्टैम्प यूज़र के पोर्टल पर भी सेव हो जाएगी">
+                        <input type="checkbox" id="stampChk-${data._origIndex}" ${isStampChecked ? 'checked' : ''} onchange="window.toggleRowStampCheckbox(${data._origIndex}, this.checked)" class="w-4 h-4 accent-green-600 rounded cursor-pointer">
+                        <span><i class="fa-solid fa-stamp ${isStampChecked ? 'text-green-700' : 'text-amber-600'} mr-0.5"></i> ${isStampChecked ? 'Stamped for User' : 'Apply Stamp'}</span>
                     </label>
                 ` : '';
 
                 container.innerHTML += `
-                    <div class="bg-white p-3.5 md:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 hover:border-royal-400 transition">
+                    <div class="bg-white p-3.5 md:p-4 rounded-2xl border ${isStampChecked ? 'border-green-300 bg-green-50/20' : 'border-slate-200'} shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 hover:border-royal-400 transition">
                         <div class="space-y-1 overflow-hidden w-full">
                             <div class="flex flex-wrap items-center gap-2">
                                 <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-md text-[10px] font-black uppercase">${data.serviceType}</span>
                                 ${userBadge}
+                                ${isStampChecked ? `<span class="bg-green-100 text-green-800 border border-green-300 px-2 py-0.5 rounded-full text-[10px] font-black"><i class="fa-solid fa-check mr-0.5"></i>Stamp Synced to User</span>` : ''}
                                 <span class="text-[11px] text-slate-400 font-medium ml-auto sm:ml-0">${dateStr} • ${timeStr}</span>
                             </div>
                             <p class="font-black text-slate-800 text-xs md:text-sm truncate">${data.fileName}</p>
@@ -1642,8 +1733,8 @@
                                 <li style="margin-bottom: 11px; padding-left: 6px;">That I am the resident of the above said address.</li>
                                 <li style="margin-bottom: 11px; padding-left: 6px;">That my correct date of birth is <span class="filled-val">${d.newDob || ''}</span>.</li>
                                 <li style="margin-bottom: 11px; padding-left: 6px;">That the earlier recorded date of birth is <span class="filled-val">${d.oldDob || ''}</span> based on <span class="filled-val">${d.oldDoc || ''}</span> document submitted by me.</li>
-                                <li style="margin-bottom: 11px; padding-left: 6px;">That I have <span class="filled-val">${d.updateTimes || 'NEVER'}</span> (never/once/ more than once) updated my date of birth.</li>
-                                <li style="margin-bottom: 11px; padding-left: 6px;">That currently a corrected version of the same document as mentioned in (iii) above / birth certificate (choose as applicable) is being provided in support of DoB update request.</li>
+                                <li style="margin-bottom: 11px; padding-left: 6px;">That I have <span class="filled-val">${d.updateTimes || 'NEVER'}</span> updated my date of birth.</li>
+                                <li style="margin-bottom: 11px; padding-left: 6px;">That currently a corrected version of the same document as mentioned in (iii) above / <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> is being provided in support of DoB update request.</li>
                                 <li style="margin-bottom: 11px; padding-left: 6px;">That I wish to get my date of birth updated as <span class="filled-val">${d.newDob || ''}</span> for which I am submitting <span class="filled-val">${d.newDoc || ''}</span> as proof of date of birth.</li>
                                 <li style="margin-bottom: 11px; padding-left: 6px;">That I further undertake that I shall not be eligible for any further updation of my date of birth.</li>
                             </ol>
@@ -1688,8 +1779,8 @@
                                 <li style="margin-bottom: 9px; padding-left: 6px;">That I am parent/legal guardian of the <span class="filled-val">${d.childName || ''}</span> holding ID number <span class="filled-val">${d.childIdNumber || ''}</span>.</li>
                                 <li style="margin-bottom: 9px; padding-left: 6px;">That correct date of birth of my child/ ward is <span class="filled-val">${d.newDob || ''}</span>.</li>
                                 <li style="margin-bottom: 9px; padding-left: 6px;">That the earlier recorded date of birth of my child/ward is <span class="filled-val">${d.oldDob || ''}</span> based on <span class="filled-val">${d.oldDoc || ''}</span> document submitted by me.</li>
-                                <li style="margin-bottom: 9px; padding-left: 6px;">That I have <span class="filled-val">${d.updateTimes || 'NEVER'}</span> (never/once/more than once) updated my child/ward date of birth.</li>
-                                <li style="margin-bottom: 9px; padding-left: 6px;">That birth certificate of my child/ward is being provided in support of DoB update request.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That I have <span class="filled-val">${d.updateTimes || 'NEVER'}</span> updated my child/ward date of birth.</li>
+                                <li style="margin-bottom: 9px; padding-left: 6px;">That <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> of my child/ward is being provided in support of DoB update request.</li>
                                 <li style="margin-bottom: 9px; padding-left: 6px;">That I wish to get my child/ward date of birth updated as <span class="filled-val">${d.newDob || ''}</span> for which I am submitting his/her <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> as proof of date of birth.</li>
                                 <li style="margin-bottom: 9px; padding-left: 6px;">That I further undertake that my child/ward shall not be eligible for any further updation of date of birth.</li>
                             </ol>
@@ -2049,7 +2140,12 @@
                                 margin: 0 !important;
                                 overflow: hidden;
                             }
-                            .filled-val { font-weight: bold; color: #000000; }
+                            .filled-val {
+                                font-weight: bold !important;
+                                color: #000000 !important;
+                                text-decoration: underline !important;
+                                text-underline-offset: 3px !important;
+                            }
                             .stamp-overlay-layer {
                                 position: absolute;
                                 top: 0;
@@ -2096,13 +2192,15 @@
                 if (window.availableStampsList.length === 0) {
                     await window.preloadAllAvailableStamps();
                 }
-                chosenSrc = window.pickRandomAvailableStamp();
-                window.stampSelectionMap[historyIndex] = { enabled: true, stampSrc: chosenSrc };
+                const chosenObj = window.pickRandomAvailableStampObj();
+                chosenSrc = chosenObj.dataUrl;
+                window.stampSelectionMap[historyIndex] = { enabled: true, stampFile: chosenObj.name, stampSrc: chosenSrc };
             }
 
             window.directPrintDocument(record.fileId, record.formData || {}, record.fileName || 'Document.pdf', withStamp, chosenSrc, btnEl);
         };
 
+        // Preview Modal के अंदर से भी स्टैम्प ऑन/ऑफ करने पर यूज़र के पोर्टल में सेव हो जाए
         window.toggleModalStampPreview = async function(isChecked) {
             const ctx = window.currentModalContext;
             if (!ctx || !String(ctx.fileId).startsWith('LOCAL_HTML_')) return;
@@ -2111,20 +2209,35 @@
                 if (window.availableStampsList.length === 0) {
                     await window.preloadAllAvailableStamps();
                 }
+                const chosenObj = window.pickRandomAvailableStampObj();
                 ctx.withStamp = true;
-                ctx.stampSrc = window.pickRandomAvailableStamp();
+                ctx.stampFile = chosenObj.name;
+                ctx.stampSrc = chosenObj.dataUrl;
             } else {
                 ctx.withStamp = false;
+                ctx.stampFile = '';
                 ctx.stampSrc = '';
             }
 
             if (ctx.historyIndex >= 0) {
                 window.stampSelectionMap[ctx.historyIndex] = {
                     enabled: ctx.withStamp,
+                    stampFile: ctx.stampFile,
                     stampSrc: ctx.stampSrc
                 };
-                const rowChk = document.getElementById(`stampChk-${ctx.historyIndex}`);
-                if (rowChk) rowChk.checked = isChecked;
+                const record = window.adminAllHistoryData[ctx.historyIndex];
+                if (record) {
+                    record.withStamp = ctx.withStamp;
+                    record.stampFile = ctx.stampFile;
+                    try {
+                        await updateDoc(doc(db, "history", record.id), {
+                            withStamp: ctx.withStamp,
+                            stampFile: ctx.stampFile || '',
+                            stampedAt: new Date()
+                        });
+                    } catch (e) {}
+                }
+                window.renderAdminHistory();
             }
 
             const record = window.adminAllHistoryData[ctx.historyIndex];
@@ -2147,14 +2260,17 @@
             const existingState = historyIndex >= 0 ? window.stampSelectionMap[historyIndex] : null;
             const initialWithStamp = !!(existingState && existingState.enabled);
             let initialStampSrc = existingState?.stampSrc || '';
+            let initialStampFile = existingState?.stampFile || '';
 
             if (initialWithStamp && !initialStampSrc) {
                 if (window.availableStampsList.length === 0) {
                     await window.preloadAllAvailableStamps();
                 }
-                initialStampSrc = window.pickRandomAvailableStamp();
+                const chosenObj = window.pickRandomAvailableStampObj();
+                initialStampSrc = chosenObj.dataUrl;
+                initialStampFile = chosenObj.name;
                 if (historyIndex >= 0) {
-                    window.stampSelectionMap[historyIndex] = { enabled: true, stampSrc: initialStampSrc };
+                    window.stampSelectionMap[historyIndex] = { enabled: true, stampFile: initialStampFile, stampSrc: initialStampSrc };
                 }
             }
 
@@ -2163,6 +2279,7 @@
                 fileName: fileName,
                 historyIndex: historyIndex,
                 withStamp: initialWithStamp,
+                stampFile: initialStampFile,
                 stampSrc: initialStampSrc
             };
 
@@ -2282,7 +2399,7 @@
                 <div class="flex flex-wrap items-center gap-2 shrink-0">
                     <label id="modalStampToggleLabel" class="hidden inline-flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-400 px-3 py-1.5 md:py-2 rounded-xl text-xs font-black cursor-pointer select-none transition shadow-sm">
                         <input type="checkbox" id="modalStampCheckbox" onchange="window.toggleModalStampPreview(this.checked)" class="w-4 h-4 accent-amber-600 rounded cursor-pointer">
-                        <span><i class="fa-solid fa-stamp text-amber-700 mr-1"></i> With Stamp (Random)</span>
+                        <span><i class="fa-solid fa-stamp text-amber-700 mr-1"></i> With Stamp (Syncs to User)</span>
                     </label>
                     <button id="modalPrintBtn" class="bg-amber-500 hover:bg-amber-600 text-dark-950 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs font-black transition shadow-sm flex items-center gap-1.5">
                         <i class="fa-solid fa-print"></i> Print
@@ -2357,7 +2474,7 @@
         <div id="section-payments" class="space-y-4">
             <div class="grid grid-cols-3 gap-2 md:gap-4">
                 <div onclick="window.setPaymentFilter('Pending')" class="cursor-pointer bg-amber-50 border border-amber-200 p-3 rounded-2xl shadow-sm hover:border-amber-400 transition">
-                    <span class="text-[10px] font-black text-amber-800 uppercase block">⏳ Pending</span>
+                    <span class="text-[10px] font-black text-amber-800 uppercase block">⏳ Pending / Tickets</span>
                     <span id="statPendingAmt" class="text-base md:text-2xl font-black text-amber-600 block mt-0.5">₹0</span>
                     <span id="statPendingCount" class="text-[10px] font-bold text-amber-700">0 Requests</span>
                 </div>
@@ -2367,7 +2484,7 @@
                     <span id="statApprovedCount" class="text-[10px] font-bold text-green-700">0 Txns</span>
                 </div>
                 <div onclick="window.setPaymentFilter('Rejected')" class="cursor-pointer bg-red-50 border border-red-200 p-3 rounded-2xl shadow-sm hover:border-red-400 transition">
-                    <span class="text-[10px] font-black text-red-800 uppercase block">❌ Rejected</span>
+                    <span class="text-[10px] font-black text-red-800 uppercase block">❌ Rejected / Cancelled</span>
                     <span id="statRejectedAmt" class="text-base md:text-2xl font-black text-red-600 block mt-0.5">₹0</span>
                     <span id="statRejectedCount" class="text-[10px] font-bold text-red-700">0 Txns</span>
                 </div>
@@ -2512,15 +2629,15 @@
                     <div class="flex items-center gap-2.5 border-b border-slate-100 pb-3">
                         <div class="w-10 h-10 bg-royal-50 text-royal-600 rounded-xl flex items-center justify-center text-lg border border-royal-200"><i class="fa-solid fa-user-plus"></i></div>
                         <div>
-                            <h3 class="text-base font-black text-dark-900">Create New User</h3>
-                            <p class="text-[10px] font-bold text-green-600 uppercase">Auto: 30 Credits + 2 Days VIP + Instant Share</p>
+                            <h3 class="text-base font-black text-dark-900">Create New User (@print.com)</h3>
+                            <p class="text-[10px] font-bold text-green-600 uppercase">Auto: @print.com Domain + 30 Credits + 2d VIP</p>
                         </div>
                     </div>
 
                     <form id="adminCreateUserForm" onsubmit="window.createNewUserByAdmin(event)" class="space-y-3.5">
                         <div>
-                            <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">User ID or Email</label>
-                            <input type="text" id="newAdminUserEmail" placeholder="e.g. rahul123 या rahul@gmail.com" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 font-semibold outline-none focus:bg-white focus:border-royal-400">
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">User ID (केवल @print.com मान्य है)</label>
+                            <input type="text" id="newAdminUserEmail" placeholder="e.g. rahul या rahul@print.com" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 font-semibold outline-none focus:bg-white focus:border-royal-400">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Password</label>
@@ -2547,7 +2664,7 @@
                             </div>
                         </div>
                         <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl text-xs md:text-sm shadow-glow transition mt-2">
-                            Register User (30 Credits + 2d VIP)
+                            Register User (@print.com)
                         </button>
                     </form>
                 </div>
@@ -2555,10 +2672,9 @@
             </div>
         </div>
 
-        <!-- ================= SECTION 5: LIVE 2-WAY SUPPORT CHAT SYSTEM (REFLECTS DIRECTLY IN USER'S SUPPORT TAB) ================= -->
+        <!-- ================= SECTION 5: LIVE 2-WAY SUPPORT CHAT SYSTEM ================= -->
         <div id="section-support" class="space-y-4 hidden">
             
-            <!-- Top Bar: Start New Chat with any User -->
             <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-2">
                 <div class="flex items-center gap-2">
                     <div class="w-9 h-9 rounded-xl bg-green-50 text-green-600 flex items-center justify-center border border-green-200 font-black">
@@ -2579,10 +2695,7 @@
                 </div>
             </div>
 
-            <!-- Main 2-Column Chat Interface -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-                
-                <!-- Left Column: User Chat Threads List -->
                 <div class="bg-white rounded-2xl p-3.5 shadow-card border border-slate-200 space-y-3">
                     <div class="relative">
                         <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
@@ -2591,10 +2704,7 @@
                     <div id="supportChatThreadsList" class="space-y-2 max-h-[520px] overflow-y-auto pr-1"></div>
                 </div>
 
-                <!-- Right Column (2 Cols Wide): Active Conversation Window -->
                 <div class="md:col-span-2 bg-white rounded-2xl shadow-card border-2 border-royal-400 overflow-hidden flex flex-col min-h-[540px]">
-                    
-                    <!-- Empty State when no chat selected -->
                     <div id="chatWindowEmptyState" class="flex-1 flex flex-col items-center justify-center p-10 text-center text-slate-400">
                         <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-3xl mb-3 text-slate-300">
                             <i class="fa-solid fa-comments"></i>
@@ -2603,10 +2713,7 @@
                         <p class="text-xs font-semibold text-slate-400 mt-1">यूज़र द्वारा Support टैब या Forgot Password से भेजा गया हर मैसेज यहाँ रियल-टाइम में दिखेगा।</p>
                     </div>
 
-                    <!-- Active Chat Box -->
                     <div id="chatWindowActiveBox" class="hidden flex-1 flex flex-col justify-between h-[560px]">
-                        
-                        <!-- Chat Header + Quick Password Reset Bar -->
                         <div class="bg-dark-950 text-white p-3.5 border-b border-slate-800 space-y-2.5">
                             <div class="flex flex-wrap items-center justify-between gap-2">
                                 <div>
@@ -2626,7 +2733,6 @@
                                 </div>
                             </div>
 
-                            <!-- 1-Click Password Reset & Auto-Send in Chat -->
                             <div class="flex items-center gap-2 bg-dark-800 p-2 rounded-xl border border-slate-700">
                                 <span class="text-[10px] font-black text-royal-400 uppercase shrink-0"><i class="fa-solid fa-key mr-1"></i>New Pass:</span>
                                 <input type="text" id="chatQuickNewPassInput" placeholder="नया पासवर्ड लिखें (Min 6 chars)" class="flex-1 bg-dark-900 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold border border-slate-700 outline-none">
@@ -2636,10 +2742,8 @@
                             </div>
                         </div>
 
-                        <!-- Messages Scroll Area -->
                         <div id="chatMessagesScrollBox" class="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50"></div>
 
-                        <!-- Quick Reply Pills & Input Form -->
                         <div class="p-3 bg-white border-t border-slate-200 space-y-2">
                             <div class="flex flex-wrap items-center gap-1.5">
                                 <span class="text-[10px] font-black text-slate-400 uppercase mr-1">Quick Fill:</span>
@@ -2661,10 +2765,8 @@
                                 </button>
                             </form>
                         </div>
-
                     </div>
                 </div>
-
             </div>
         </div>
 
@@ -2718,7 +2820,7 @@
             <div id="adminHistoryListContainer" class="space-y-2.5"></div>
         </div>
 
-        <!-- ================= SECTION 4: PORTAL CONTROL (STEALTH HIDE SERVICES + LIVE UPDATE BANNER + SUPPORT NUMBER) ================= -->
+        <!-- ================= SECTION 4: PORTAL CONTROL ================= -->
         <div id="section-controls" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
             
             <div class="bg-white rounded-2xl p-4 md:p-6 shadow-card border border-slate-200 space-y-4">
