@@ -1153,7 +1153,17 @@
                 btn.innerHTML = origHtml;
             }
         };
-        4// ================= USER PAYMENT HISTORY =================
+
+
+
+
+
+
+
+
+
+
+        // ================= USER PAYMENT HISTORY =================
         window.loadUserPayments = async function() {
             const tbody = document.getElementById('userPaymentsTableBody');
             if (!tbody) return;
@@ -2199,6 +2209,118 @@
             `;
         }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        // ================= NEW HELPERS: UNDERLINE CSS, 12-DIGIT PAIR FORMATTER & 'NA' CHECKBOX =================
+        (function injectAnnexureEnhancements() {
+            const st = document.createElement('style');
+            st.innerHTML = `
+                .filled-val {
+                    font-weight: bold !important;
+                    color: #000000 !important;
+                    text-decoration: underline !important;
+                    text-underline-offset: 3px !important;
+                }
+            `;
+            document.head.appendChild(st);
+        })();
+
+        // 12-Digit ID Auto-Formatter (XXXX XXXX XXXX)
+        window.format12DigitId = function(el) {
+            const digits = el.value.replace(/\D/g, '').substring(0, 12);
+            el.value = digits.match(/.{1,4}/g)?.join(' ') || '';
+        };
+
+        // Annexure 3 & 3A में टिक करने पर 'NA' भरने वाला फंक्शन
+        window.toggleNaField = function(checkbox, inputId, originalType = 'text') {
+            const inp = document.getElementById(inputId);
+            if (!inp) return;
+            if (checkbox.checked) {
+                if (inp.type === 'date') inp.type = 'text';
+                inp.value = 'NA';
+                inp.readOnly = true;
+                inp.classList.add('bg-slate-200', 'text-slate-600', 'cursor-not-allowed');
+            } else {
+                inp.type = originalType;
+                inp.value = '';
+                inp.readOnly = false;
+                inp.classList.remove('bg-slate-200', 'text-slate-600', 'cursor-not-allowed');
+                inp.focus();
+            }
+        };
+
+        // Direct Print में भी अंडरलाइन आने के लिए अपडेटेड प्रिंट फंक्शन
+        window.directPrintDocument = function(fileId, formDataObj, fileName) {
+            if (String(fileId).startsWith('LOCAL_HTML_')) {
+                const htmlContent = window.buildLocalAffidavitHtml(fileId, formDataObj, false);
+                let printFrame = document.getElementById('directPrintIframe');
+                if (printFrame) document.body.removeChild(printFrame);
+
+                printFrame = document.createElement('iframe');
+                printFrame.id = 'directPrintIframe';
+                printFrame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+                document.body.appendChild(printFrame);
+
+                const frameDoc = printFrame.contentWindow.document;
+                frameDoc.open();
+                frameDoc.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>${fileName || 'Print Document'}</title>
+                        <style>
+                            @page { size: A4; margin: 0; }
+                            html, body { margin: 0; padding: 0; background: #ffffff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                            .affidavit-paper {
+                                font-family: 'Times New Roman', Times, serif;
+                                width: 210mm;
+                                height: 297mm;
+                                padding: 14mm 18mm;
+                                background: #ffffff;
+                                color: #000000;
+                                font-size: 12pt;
+                                line-height: 1.55;
+                                box-sizing: border-box;
+                                display: flex;
+                                flex-direction: column;
+                                justify-content: space-between;
+                                margin: 0 !important;
+                                overflow: hidden;
+                            }
+                            .filled-val {
+                                font-weight: bold;
+                                color: #000000;
+                                text-decoration: underline;
+                                text-underline-offset: 3px;
+                            }
+                        </style>
+                    </head>
+                    <body>${htmlContent}</body>
+                    </html>
+                `);
+                frameDoc.close();
+
+                setTimeout(() => {
+                    printFrame.contentWindow.focus();
+                    printFrame.contentWindow.print();
+                }, 250);
+            } else {
+                window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
+            }
+        };
+
         // ================= MAIN SERVICE SWITCHER =================
         window.switchService = async function(serviceName) {
             const cfg = window.portalConfigState;
@@ -2375,7 +2497,7 @@
                 `;
                 window.updateTehsilsAndThanas();
             } 
-            // CASTE (UPDATED WITH NO 'JAT' & EXTENDED CASTES)
+            // CASTE
             else if(serviceName === 'caste') {
                 container.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
@@ -2475,7 +2597,10 @@
                                 <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="S/o">S/o</option><option value="D/o">D/o</option><option value="W/o">W/o</option></select></div>
                                 <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पिता / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. SURESH CHAND" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             </div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">ID Number</label><input type="text" name="idNumber" placeholder="Enter ID Number" maxlength="14" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">12-Digit ID Number (4-4 Pair)</label>
+                                <input type="text" name="idNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold tracking-wider uppercase bg-slate-50">
+                            </div>
                             <div>
                                 <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">कितनी बार DoB अपडेट किया?</label>
                                 <select name="updateTimes" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50">
@@ -2526,10 +2651,16 @@
                                 <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="S/o">S/o</option><option value="W/o">W/o</option><option value="D/o">D/o</option></select></div>
                                 <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">दादा / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. RAMPHAL" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             </div>
-                            <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का ID Number</label><input type="text" name="parentIdNumber" placeholder="Parent ID Number" maxlength="14" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का 12-Digit ID Number</label>
+                                <input type="text" name="parentIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-amber-50">
+                            </div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का नाम (Child Name)</label><input type="text" name="childName" placeholder="e.g. AARAV KUMAR" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
-                            <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का ID Number</label><input type="text" name="childIdNumber" placeholder="Child ID Number" maxlength="14" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का 12-Digit ID Number</label>
+                                <input type="text" name="childIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-indigo-50">
+                            </div>
                             <div><label class="block text-[11px] font-bold text-green-800 uppercase mb-1">बच्चे की सही जन्मतिथि (Correct DoB)</label><input type="date" name="newDob" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold bg-green-50"></div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पहले दर्ज गलत जन्मतिथि (Old DoB)</label><input type="date" name="oldDob" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"></div>
                             <div>
@@ -2561,14 +2692,14 @@
                 `;
             }
 
-            // 3. ANNEXURE-III
+            // 3. ANNEXURE-III (WITH 'NA' CHECKBOXES FOR DOC NO, DOC DATE & EID)
             else if(serviceName === 'annexure3') {
                 if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getFirstAllowedTab());
                 container.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                         <div>
                             <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-bolt text-royal-500 mr-1.5"></i> Annexure-III (Adults Reactivation)</h3>
-                            <p class="text-[11px] text-slate-500">वयस्कों की निष्क्रिय आईडी को चालू (Reactivate) कराने हेतु शपथ पत्र।</p>
+                            <p class="text-[11px] text-slate-500">वयस्कों की निष्क्रिय आईडी को चालू (Reactivate) कराने हेतु शपथ पत्र। (जानकारी न होने पर <strong>टिक करें = NA</strong> चुनें)</p>
                         </div>
                         ${statusTagHtml}
                     </div>
@@ -2579,7 +2710,10 @@
                                 <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="S/o">S/o</option><option value="D/o">D/o</option><option value="W/o">W/o</option></select></div>
                                 <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पिता / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. SURESH CHAND" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             </div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">ID Number</label><input type="text" name="idNumber" placeholder="Enter ID Number" maxlength="14" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">12-Digit ID Number (4-4 Pair)</label>
+                                <input type="text" name="idNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold tracking-wider uppercase bg-slate-50">
+                            </div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             <div>
                                 <label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">पहले दिया गया अमान्य दस्तावेज़ (Invalid Doc)</label>
@@ -2588,9 +2722,40 @@
                                 </select>
                                 <input type="text" id="an3InvDocCustom" name="invalidDocNameCustom" placeholder="अमान्य दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
                             </div>
-                            <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">अमान्य दस्तावेज़ का नंबर (Doc Number)</label><input type="text" name="invalidDocNo" placeholder="Enter Document No" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
-                            <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">अमान्य दस्तावेज़ की तारीख (Doc Date)</label><input type="date" name="invalidDocDate" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold bg-amber-50"></div>
-                            <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">EID Number (एनरोलमेंट आईडी)</label><input type="text" name="eidNumber" placeholder="Enter EID Number" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
+
+                            <!-- 1. INVALID DOC NO WITH 'NA' CHECKBOX -->
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="text-[11px] font-bold text-amber-800 uppercase">अमान्य दस्तावेज़ का नंबर (Doc No)</label>
+                                    <label class="inline-flex items-center gap-1 cursor-pointer bg-amber-200/80 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black select-none">
+                                        <input type="checkbox" onchange="window.toggleNaField(this, 'an3InvDocNo', 'text')" class="accent-dark-900 w-3.5 h-3.5"> टिक करें = NA
+                                    </label>
+                                </div>
+                                <input type="text" id="an3InvDocNo" name="invalidDocNo" placeholder="Enter Document No (या ऊपर NA टिक करें)" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50">
+                            </div>
+
+                            <!-- 2. INVALID DOC DATE WITH 'NA' CHECKBOX -->
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="text-[11px] font-bold text-amber-800 uppercase">अमान्य दस्तावेज़ की तारीख (Doc Date)</label>
+                                    <label class="inline-flex items-center gap-1 cursor-pointer bg-amber-200/80 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black select-none">
+                                        <input type="checkbox" onchange="window.toggleNaField(this, 'an3InvDocDate', 'date')" class="accent-dark-900 w-3.5 h-3.5"> टिक करें = NA
+                                    </label>
+                                </div>
+                                <input type="date" id="an3InvDocDate" name="invalidDocDate" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50">
+                            </div>
+
+                            <!-- 3. EID NUMBER WITH 'NA' CHECKBOX -->
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="text-[11px] font-bold text-amber-800 uppercase">EID Number (एनरोलमेंट आईडी)</label>
+                                    <label class="inline-flex items-center gap-1 cursor-pointer bg-amber-200/80 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black select-none">
+                                        <input type="checkbox" onchange="window.toggleNaField(this, 'an3EidNo', 'text')" class="accent-dark-900 w-3.5 h-3.5"> टिक करें = NA
+                                    </label>
+                                </div>
+                                <input type="text" id="an3EidNo" name="eidNumber" placeholder="Enter EID Number (या ऊपर NA टिक करें)" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50">
+                            </div>
+
                             <div>
                                 <label class="block text-[11px] font-bold text-green-800 uppercase mb-1">अभी दिया जा रहा सही दस्तावेज़ (New Genuine Doc)</label>
                                 <select name="newDoc" onchange="window.toggleCustomInput(this, 'an3NewDocCustom')" class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-green-50">
@@ -2605,14 +2770,14 @@
                 `;
             }
 
-            // 4. ANNEXURE-IIIA
+            // 4. ANNEXURE-IIIA (WITH 'NA' CHECKBOXES FOR DOC NO, DOC DATE & EID)
             else if(serviceName === 'annexure3a') {
                 if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getFirstAllowedTab());
                 container.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                         <div>
                             <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-child text-royal-500 mr-1.5"></i> Annexure-IIIA (Children Reactivation)</h3>
-                            <p class="text-[11px] text-slate-500">बच्चों की निष्क्रिय आईडी को चालू (Reactivate) कराने हेतु माता-पिता का शपथ पत्र।</p>
+                            <p class="text-[11px] text-slate-500">बच्चों की निष्क्रिय आईडी को चालू (Reactivate) कराने हेतु माता-पिता का शपथ पत्र। (जानकारी न होने पर <strong>टिक करें = NA</strong> चुनें)</p>
                         </div>
                         ${statusTagHtml}
                     </div>
@@ -2623,10 +2788,16 @@
                                 <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="S/o">S/o</option><option value="W/o">W/o</option><option value="D/o">D/o</option></select></div>
                                 <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">दादा / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. RAMPHAL" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             </div>
-                            <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का ID Number</label><input type="text" name="parentIdNumber" placeholder="Parent ID Number" maxlength="14" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का 12-Digit ID Number</label>
+                                <input type="text" name="parentIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-amber-50">
+                            </div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का नाम (Child Name)</label><input type="text" name="childName" placeholder="e.g. AARAV KUMAR" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
-                            <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का ID Number</label><input type="text" name="childIdNumber" placeholder="Child ID Number" maxlength="14" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का 12-Digit ID Number</label>
+                                <input type="text" name="childIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-indigo-50">
+                            </div>
                             <div>
                                 <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पहले दिया गया अमान्य दस्तावेज़ (Invalid Doc)</label>
                                 <select name="invalidDocName" onchange="window.toggleCustomInput(this, 'an3aInvDocCustom')" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50">
@@ -2634,9 +2805,40 @@
                                 </select>
                                 <input type="text" id="an3aInvDocCustom" name="invalidDocNameCustom" placeholder="अमान्य दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
                             </div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">अमान्य दस्तावेज़ का नंबर (Doc Number)</label><input type="text" name="invalidDocNo" placeholder="Enter Document No" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">अमान्य दस्तावेज़ की तारीख (Doc Date)</label><input type="date" name="invalidDocDate" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">EID Number (एनरोलमेंट आईडी)</label><input type="text" name="eidNumber" placeholder="Enter EID Number" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+
+                            <!-- 1. INVALID DOC NO WITH 'NA' CHECKBOX -->
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="text-[11px] font-bold text-slate-600 uppercase">अमान्य दस्तावेज़ का नंबर (Doc No)</label>
+                                    <label class="inline-flex items-center gap-1 cursor-pointer bg-amber-200/80 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black select-none">
+                                        <input type="checkbox" onchange="window.toggleNaField(this, 'an3aInvDocNo', 'text')" class="accent-dark-900 w-3.5 h-3.5"> टिक करें = NA
+                                    </label>
+                                </div>
+                                <input type="text" id="an3aInvDocNo" name="invalidDocNo" placeholder="Enter Document No (या ऊपर NA टिक करें)" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50">
+                            </div>
+
+                            <!-- 2. INVALID DOC DATE WITH 'NA' CHECKBOX -->
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="text-[11px] font-bold text-slate-600 uppercase">अमान्य दस्तावेज़ की तारीख (Doc Date)</label>
+                                    <label class="inline-flex items-center gap-1 cursor-pointer bg-amber-200/80 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black select-none">
+                                        <input type="checkbox" onchange="window.toggleNaField(this, 'an3aInvDocDate', 'date')" class="accent-dark-900 w-3.5 h-3.5"> टिक करें = NA
+                                    </label>
+                                </div>
+                                <input type="date" id="an3aInvDocDate" name="invalidDocDate" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50">
+                            </div>
+
+                            <!-- 3. EID NUMBER WITH 'NA' CHECKBOX -->
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="text-[11px] font-bold text-slate-600 uppercase">EID Number (एनरोलमेंट आईडी)</label>
+                                    <label class="inline-flex items-center gap-1 cursor-pointer bg-amber-200/80 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black select-none">
+                                        <input type="checkbox" onchange="window.toggleNaField(this, 'an3aEidNo', 'text')" class="accent-dark-900 w-3.5 h-3.5"> टिक करें = NA
+                                    </label>
+                                </div>
+                                <input type="text" id="an3aEidNo" name="eidNumber" placeholder="Enter EID Number (या ऊपर NA टिक करें)" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50">
+                            </div>
+
                             <div>
                                 <label class="block text-[11px] font-bold text-green-800 uppercase mb-1">अभी दिया जा रहा सही दस्तावेज़ (New Genuine Doc)</label>
                                 <select name="newDoc" onchange="window.toggleCustomInput(this, 'an3aNewDocCustom')" class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-green-50">
@@ -2662,7 +2864,10 @@
                 }[serviceName];
 
                 const childFieldsHtml = isChild ? `
-                    <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का ID Number</label><input type="text" name="childIdNumber" placeholder="Child ID Number" maxlength="14" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का 12-Digit ID Number</label>
+                        <input type="text" name="childIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-indigo-50">
+                    </div>
                 ` : '';
 
                 container.innerHTML = `
@@ -2683,7 +2888,10 @@
                                 <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="S/o">S/o</option><option value="W/o">W/o</option><option value="D/o">D/o</option></select></div>
                                 <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पिता / पति का नाम</label><input type="text" name="relativeName" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             </div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">${isChild ? 'माता/पिता का ID Number' : 'ID Number'}</label><input type="text" name="idNumber" placeholder="Enter ID Number" maxlength="14" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">${isChild ? 'माता/पिता का 12-Digit ID Number' : '12-Digit ID Number (4-4 Pair)'}</label>
+                                <input type="text" name="idNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold tracking-wider uppercase bg-slate-50">
+                            </div>
                             ${childFieldsHtml}
                             <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">पहले दर्ज नाम (Old Recorded Name)</label><input type="text" name="oldName" placeholder="OLD NAME" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
                             <div><label class="block text-[11px] font-bold text-green-800 uppercase mb-1">नया सही नाम (New Correct Name)</label><input type="text" name="newName" placeholder="NEW CORRECT NAME" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-green-50"></div>
@@ -2707,7 +2915,7 @@
                 window.initVerificationDefaults();
             }
 
-            // 8. ANNEXURE E (URF / ALIAS AUTO-SPLIT)
+            // 8. ANNEXURE E (URF / ALIAS AUTO-SPLIT + 12-DIGIT ID)
             else if(serviceName === 'annexuree') {
                 if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getFirstAllowedTab());
 
@@ -2731,7 +2939,10 @@
                                 <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पिता / पति का नाम</label><input type="text" id="inpRelativeName" name="relativeName" placeholder="e.g. SURESH CHAND" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             </div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Resident of)</label><input type="text" id="inpAddress" name="address" placeholder="e.g. VILL BARAUT, DISTT BAGHPAT" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">ID Number</label><input type="text" id="inpIdNumber" name="idNumber" placeholder="Enter ID Number" maxlength="14" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">12-Digit ID Number (4-4 Pair)</label>
+                                <input type="text" id="inpIdNumber" name="idNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold tracking-wider uppercase bg-slate-50">
+                            </div>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
@@ -2767,7 +2978,7 @@
                 window.initVerificationDefaults();
             }
 
-            // 9. ANNEXURE F (CHILDREN URF / ALIAS AUTO-SPLIT)
+            // 9. ANNEXURE F (CHILDREN URF / ALIAS AUTO-SPLIT + 12-DIGIT ID)
             else if(serviceName === 'annexuref') {
                 if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getFirstAllowedTab());
 
@@ -2790,10 +3001,16 @@
                                 <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="S/o">S/o</option><option value="W/o">W/o</option><option value="D/o">D/o</option></select></div>
                                 <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">दादा / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. RAMPHAL" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             </div>
-                            <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का ID Number</label><input type="text" name="parentIdNumber" placeholder="Parent ID Number" maxlength="14" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का 12-Digit ID Number</label>
+                                <input type="text" name="parentIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-amber-50">
+                            </div>
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Resident of)</label><input type="text" name="address" placeholder="VILL BARAUT, DISTT BAGHPAT" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
                             <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का नाम (Child Name)</label><input type="text" id="inpApplicantName" name="childName" oninput="window.syncAnnexureENames()" placeholder="e.g. AARAV URF GOLU" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
-                            <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का ID Number</label><input type="text" name="childIdNumber" placeholder="Child ID Number" maxlength="14" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का 12-Digit ID Number</label>
+                                <input type="text" name="childIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-indigo-50">
+                            </div>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
