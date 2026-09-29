@@ -1,6 +1,6 @@
 // ============================================================================
-// FILE 3: js/portal-wallet-chat.js
-// (Auth, Live Support Chat, Wallet/QR/UTR Ticket, History & Tab Switcher)
+// FILE 3: js/portal-wallet-chat.js (UPDATED)
+// (Auth, Per-User DOB Stealth, Active=White/Inactive=Dark Tabs, Wallet & Chat)
 // ============================================================================
 
 import "./config-templates.js";
@@ -18,6 +18,7 @@ window.userPaymentsData = [];
 window.currentActiveTab = 'domicile';
 window.vipCountdownInterval = null;
 window.portalSettingsUnsubscribe = null;
+window.userProfileUnsubscribe = null;
 window.userChatUnsubscribe = null;
 window.activePaymentUnsubscribe = null;
 window.currentActiveOrderId = null;
@@ -40,6 +41,13 @@ window.currentTotalPayable = 0;
 window.currentWantsVip = false;
 window.currentVipDays = 0;
 window.currentVipPlanFee = 0;
+
+// हेल्पर: चेक करें कि इस यूज़र को DOB 18+ दिखना चाहिए या नहीं (Global + Per-User)
+window.canCurrentUserSeeDob18 = function() {
+    const globalDob = window.portalConfigState.showDob18 !== false;
+    const userDob = window.currentUserData ? (window.currentUserData.allowDob18 !== false) : true;
+    return globalDob && userDob;
+};
 
 async function notifyAdminSecurely(payload) {
     try {
@@ -278,6 +286,36 @@ window.sendUserSupportMessage = async function(event) {
     }
 };
 
+// ================= REAL-TIME USER PROFILE LISTENER (FOR LIVE DOB HIDE/SHOW & CREDITS) =================
+function startUserProfileListener(uid) {
+    if (window.userProfileUnsubscribe) window.userProfileUnsubscribe();
+
+    const userRef = doc(db, "users", uid);
+    window.userProfileUnsubscribe = onSnapshot(userRef, (snap) => {
+        if (!snap.exists() || !window.currentUserData) return;
+        const data = snap.data();
+
+        window.currentUserData.credits = data.credits || 0;
+        window.currentUserData.allowDob18 = data.allowDob18 !== false;
+
+        const creditEl = document.getElementById('displayCredits');
+        if (creditEl) creditEl.innerText = window.currentUserData.credits;
+
+        const now = Date.now();
+        const isNowVip = window.currentUserData.hasFreeAccess || (data.isVip && (!data.vipExpiry || data.vipExpiry > now));
+        const vipChanged = window.currentUserData.isVip !== isNowVip;
+
+        window.currentUserData.isVip = isNowVip;
+        window.currentUserData.vipExpiry = window.currentUserData.hasFreeAccess ? 0 : (data.vipExpiry || 0);
+
+        if (vipChanged) {
+            setupDashboard(window.currentUserData);
+        } else {
+            window.applyLivePortalControls();
+        }
+    });
+}
+
 // ================= REAL-TIME STEALTH MODE & BANNER LISTENER =================
 function startPortalSettingsListener() {
     if (window.portalSettingsUnsubscribe) window.portalSettingsUnsubscribe();
@@ -306,6 +344,7 @@ function startPortalSettingsListener() {
 
 window.applyLivePortalControls = function() {
     const cfg = window.portalConfigState;
+    const canShowDob = window.canCurrentUserSeeDob18();
 
     const bannerBox = document.getElementById('liveUpdateBannerContainer');
     if (bannerBox) {
@@ -361,15 +400,16 @@ window.applyLivePortalControls = function() {
         }
     }
 
-    if (btnDob) btnDob.style.setProperty('display', cfg.showDob18 ? 'flex' : 'none', 'important');
+    // अगर एडमिन ने इस यूज़र के लिए या ग्लोबली DOB 18+ बंद किया है, तो बटन और नाम दोनों छुपा दें
+    if (btnDob) btnDob.style.setProperty('display', canShowDob ? 'flex' : 'none', 'important');
 
     if (promoDesc) {
-        promoDesc.innerHTML = cfg.showDob18
+        promoDesc.innerHTML = canShowDob
             ? `VIP लें: <strong>18+ DOB & सारे 9 Official Annexures</strong> अनलॉक करें (सभी डॉक्यूमेंट 10 Cr)!`
             : `VIP लें: <strong>सारे 9 Official Annexures</strong> अनलॉक करें (सभी डॉक्यूमेंट 10 Cr)!`;
     }
     if (vipHeaderLabel) {
-        vipHeaderLabel.innerHTML = cfg.showDob18
+        vipHeaderLabel.innerHTML = canShowDob
             ? `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures)`
             : `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (All 9 Annexures)`;
     }
@@ -377,7 +417,7 @@ window.applyLivePortalControls = function() {
     if (
         (window.currentActiveTab === 'domicile' && !cfg.showDomicile) ||
         (window.currentActiveTab === 'caste' && !cfg.showCaste) ||
-        (window.currentActiveTab === 'dob18' && !cfg.showDob18)
+        (window.currentActiveTab === 'dob18' && !canShowDob)
     ) {
         window.switchService(window.getFirstAllowedTab());
     }
@@ -385,10 +425,11 @@ window.applyLivePortalControls = function() {
 
 window.getFirstAllowedTab = function() {
     const cfg = window.portalConfigState;
+    const canShowDob = window.canCurrentUserSeeDob18();
     if (cfg.showDomicile) return 'domicile';
     if (cfg.showCaste) return 'caste';
     if (window.currentUserData && window.currentUserData.isVip) {
-        if (cfg.showDob18) return 'dob18';
+        if (canShowDob) return 'dob18';
         return 'annexure1';
     }
     return 'history';
@@ -454,12 +495,14 @@ onAuthStateChanged(auth, async (user) => {
             let userCredits = 0;
             let isVip = false;
             let vipExpiry = 0;
+            let allowDob18 = true;
 
             if (userDoc.exists()) {
                 const data = userDoc.data();
                 userCredits = data.credits || 0;
                 isVip = data.isVip || false;
                 vipExpiry = data.vipExpiry || 0;
+                allowDob18 = data.allowDob18 !== false;
             }
             
             const isAdmin = (emailLower === window.ADMIN_EMAIL);
@@ -479,6 +522,7 @@ onAuthStateChanged(auth, async (user) => {
                 credits: userCredits, 
                 isVip: isVip || hasFreeAccess, 
                 vipExpiry: hasFreeAccess ? 0 : vipExpiry,
+                allowDob18: allowDob18,
                 isAdmin: isAdmin,
                 isFreeVip: isFreeVip,
                 hasFreeAccess: hasFreeAccess,
@@ -487,6 +531,7 @@ onAuthStateChanged(auth, async (user) => {
             
             setupDashboard(window.currentUserData);
             startPortalSettingsListener();
+            startUserProfileListener(user.uid);
             startUserSupportChatListener(user.uid);
             startVipCountdownLoop();
             loadingScreen.style.display = 'none'; 
@@ -497,6 +542,7 @@ onAuthStateChanged(auth, async (user) => {
     } else {
         if (window.vipCountdownInterval) clearInterval(window.vipCountdownInterval);
         if (window.portalSettingsUnsubscribe) window.portalSettingsUnsubscribe();
+        if (window.userProfileUnsubscribe) window.userProfileUnsubscribe();
         if (window.userChatUnsubscribe) window.userChatUnsubscribe();
         if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe();
 
@@ -1040,6 +1086,7 @@ window.loadUserPayments = async function() {
             const uData = userDoc.data();
             window.currentUserData.credits = uData.credits || 0;
             window.currentUserData.vipExpiry = uData.vipExpiry || 0;
+            window.currentUserData.allowDob18 = uData.allowDob18 !== false;
             const isNowVip = (uData.isVip && (!uData.vipExpiry || uData.vipExpiry > Date.now())) || window.currentUserData.hasFreeAccess;
             window.currentUserData.isVip = isNowVip;
             const creditEl = document.getElementById('displayCredits');
@@ -1050,6 +1097,7 @@ window.loadUserPayments = async function() {
         if (validityCard) {
             const now = Date.now();
             const exp = window.currentUserData.vipExpiry || 0;
+            const canShowDob = window.canCurrentUserSeeDob18();
             if (window.currentUserData.isVip && exp > now) {
                 const daysLeft = Math.ceil((exp - now) / window.MS_PER_DAY);
                 const expDateStr = new Date(exp).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -1072,7 +1120,7 @@ window.loadUserPayments = async function() {
                     <div class="p-3.5 rounded-2xl bg-slate-100 border border-slate-200 text-slate-700 flex flex-wrap justify-between items-center gap-2">
                         <div>
                             <h4 class="text-xs md:text-sm font-black text-slate-800">अभी कोई VIP प्लान एक्टिव नहीं है (0 दिन)</h4>
-                            <p class="text-[11px] text-slate-500">DOB 18+ और सारे 9 Annexures अनलॉक करने के लिए VIP लें।</p>
+                            <p class="text-[11px] text-slate-500">${canShowDob ? 'DOB 18+ और सारे 9 Annexures' : 'सारे 9 Official Annexures'} अनलॉक करने के लिए VIP लें।</p>
                         </div>
                         <button onclick="window.jumpToVipUpgrade(30)" class="bg-dark-900 text-royal-300 font-black px-3 py-2 rounded-xl text-xs">
                             👑 ₹149 में VIP लें
@@ -1319,9 +1367,10 @@ function getPaymentHistorySectionHtml() {
     `;
 }
 
-// ================= MAIN SERVICE SWITCHER =================
+// ================= MAIN SERVICE SWITCHER (ACTIVE = WHITE, INACTIVE = DARK) =================
 window.switchService = async function(serviceName) {
     const cfg = window.portalConfigState;
+    const canShowDob = window.canCurrentUserSeeDob18();
 
     if (window.currentUserData?.hasFreeAccess && (serviceName === 'add_credit' || serviceName === 'payments_history')) {
         serviceName = window.getFirstAllowedTab();
@@ -1329,23 +1378,25 @@ window.switchService = async function(serviceName) {
 
     if (serviceName === 'domicile' && !cfg.showDomicile) serviceName = window.getFirstAllowedTab();
     else if (serviceName === 'caste' && !cfg.showCaste) serviceName = window.getFirstAllowedTab();
-    else if (serviceName === 'dob18' && !cfg.showDob18) serviceName = window.getFirstAllowedTab();
+    else if (serviceName === 'dob18' && !canShowDob) serviceName = window.getFirstAllowedTab();
 
     window.currentActiveTab = serviceName;
 
+    // 1. सभी अनसेलेक्टेड बटन्स को थीम के हिसाब से डार्क (Dark) रखें
     document.querySelectorAll('.service-tab').forEach(btn => {
-        btn.className = "service-tab bg-white text-slate-700 font-bold py-2.5 px-3 rounded-xl hover:bg-slate-50 transition shadow-sm border border-slate-200 text-xs md:text-sm flex-1 flex justify-center items-center gap-1.5";
+        btn.className = "service-tab bg-dark-900 text-royal-300 font-bold py-2.5 px-3 rounded-xl hover:bg-dark-800 transition shadow-sm border border-slate-700 text-xs md:text-sm flex-1 flex justify-center items-center gap-1.5";
     });
     document.querySelectorAll('.vip-tab').forEach(btn => {
-        btn.className = "vip-tab bg-dark-800 text-royal-300 border border-royal-500/30 font-bold py-2 px-2.5 rounded-xl hover:bg-royal-500 hover:text-dark-950 transition text-[11px] md:text-xs flex items-center justify-center gap-1 shadow-sm";
+        btn.className = "vip-tab bg-dark-800 text-royal-300 border border-royal-500/30 font-bold py-2 px-2.5 rounded-xl hover:bg-dark-700 transition text-[11px] md:text-xs flex items-center justify-center gap-1 shadow-sm";
     });
 
+    // 2. जिस बटन पर क्लिक किया गया है (Active), उसे व्हाइट (White) बनाएं
     const activeBtn = document.getElementById('btn-' + serviceName);
     if (activeBtn) {
         if (activeBtn.classList.contains('vip-tab')) {
-            activeBtn.className = "vip-tab bg-gradient-to-r from-yellow-300 via-royal-400 to-amber-500 text-dark-950 font-black py-2 px-2.5 rounded-xl shadow-vip-glow transition text-[11px] md:text-xs flex items-center justify-center gap-1 border border-yellow-200";
+            activeBtn.className = "vip-tab bg-white text-dark-950 font-black py-2 px-2.5 rounded-xl shadow-vip-glow transition text-[11px] md:text-xs flex items-center justify-center gap-1 border-2 border-royal-400";
         } else {
-            activeBtn.className = "service-tab bg-dark-900 text-royal-300 font-bold py-2.5 px-3 rounded-xl shadow-glow transition text-xs md:text-sm flex-1 flex justify-center items-center gap-1.5 border border-royal-500/50";
+            activeBtn.className = "service-tab bg-white text-dark-950 font-black py-2.5 px-3 rounded-xl shadow-glow transition text-xs md:text-sm flex-1 flex justify-center items-center gap-1.5 border-2 border-royal-500";
         }
     }
 
@@ -1364,7 +1415,12 @@ window.switchService = async function(serviceName) {
             ? '<span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-md text-[10px] font-black border border-amber-300 uppercase"><i class="fa-solid fa-crown mr-1"></i>10 Credits</span>' 
             : '<span class="bg-royal-100 text-royal-900 px-2.5 py-1 rounded-md text-[10px] font-black border border-royal-300 uppercase">10 Credits</span>');
 
-    // पहले चेक करें कि क्या यह कोई सर्टिफिकेट या Annexure फॉर्म है (portal-forms.js से)
+    const canShowDobForForm = window.canCurrentUserSeeDob18();
+    if (serviceName === 'dob18' && !canShowDobForForm) {
+        return;
+    }
+
+    // सर्टिफिकेट या Annexure फॉर्म रेंडर करें (portal-forms.js से)
     if (window.renderServiceFormHtml(serviceName, container, submitBtnText, statusTagHtml)) {
         return;
     }
@@ -1414,6 +1470,7 @@ window.switchService = async function(serviceName) {
 
     // ADD CREDITS + VIP PAGE
     if (serviceName === 'add_credit') {
+        const canShowDob = window.canCurrentUserSeeDob18();
         container.innerHTML = `
             <div id="walletMainUI" class="max-w-md mx-auto">
                 <div id="paymentStep1" class="space-y-4">
@@ -1434,7 +1491,7 @@ window.switchService = async function(serviceName) {
 
                     <div class="p-3.5 rounded-2xl bg-dark-900 text-white border border-royal-400 space-y-2.5">
                         <div class="flex items-center justify-between">
-                            <span class="text-[11px] font-black uppercase text-royal-300"><i class="fa-solid fa-crown text-yellow-400 mr-1"></i> VIP प्लान जोड़ें (DOB 18+ व सारे Annexures अनलॉक)</span>
+                            <span class="text-[11px] font-black uppercase text-royal-300"><i class="fa-solid fa-crown text-yellow-400 mr-1"></i> VIP प्लान जोड़ें (${canShowDob ? 'DOB 18+ व सारे Annexures' : 'सारे 9 Annexures'} अनलॉक)</span>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
                             <label class="flex items-center gap-2 p-2 rounded-xl bg-dark-800 border border-slate-700 cursor-pointer">
@@ -1594,9 +1651,10 @@ window.switchService = async function(serviceName) {
 
     if (serviceName === 'history') {
         const isVipUser = window.currentUserData && window.currentUserData.isVip;
+        const canShowDob = window.canCurrentUserSeeDob18();
         const domOpt = cfg.showDomicile ? `<option value="Domicile">मूल निवास</option>` : '';
         const casOpt = cfg.showCaste ? `<option value="Caste">जाति प्रमाण पत्र</option>` : '';
-        const dobOpt = (isVipUser && cfg.showDob18) ? `<option value="DOB 18+">DOB (18+)</option>` : '';
+        const dobOpt = (isVipUser && canShowDob) ? `<option value="DOB 18+">DOB (18+)</option>` : '';
 
         const vipFilterOptions = isVipUser ? `
             ${dobOpt}
