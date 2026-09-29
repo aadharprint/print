@@ -71,9 +71,12 @@
             overflow: hidden;
             flex-shrink: 0;
         }
+        /* भरे गए सभी फील्ड्स के नीचे बोल्ड अंडरलाइन */
         .filled-val {
-            font-weight: bold;
-            color: #000000;
+            font-weight: bold !important;
+            color: #000000 !important;
+            text-decoration: underline !important;
+            text-underline-offset: 3px !important;
         }
     </style>
 
@@ -97,8 +100,22 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
+        // ================= STRICT ADMIN, FREE VIP & @print.com DOMAIN CONFIG =================
         const ADMIN_EMAIL = "hkosiun1221@gmail.com"; 
+        const FREE_VIP_EMAILS = [
+            "aadhaar@gmail.com",
+            "danish@print.com"
+        ];
         const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+        // केवल Admin, दोनों स्पेशल फ्री यूज़र्स और '@print.com' वाली आईडी ही मान्य हैं
+        window.isAllowedPortalEmail = function(email) {
+            if (!email) return false;
+            const cleanEmail = String(email).trim().toLowerCase();
+            if (cleanEmail === ADMIN_EMAIL) return true;
+            if (FREE_VIP_EMAILS.includes(cleanEmail)) return true;
+            return cleanEmail.endsWith("@print.com");
+        };
 
         window.currentUserData = null;
         window.historyData = []; 
@@ -134,7 +151,6 @@
             "मोहित"
         ];
 
-        // 'जाट' हटा दिया गया है और अन्य जातियाँ जोड़ी गई हैं
         window.CASTE_OPTIONS_LIST = [
             "गुर्जर",
             "कश्यप",
@@ -167,6 +183,30 @@
             }
         };
 
+        // 12-Digit ID Auto-Formatter (XXXX XXXX XXXX)
+        window.format12DigitId = function(el) {
+            const digits = el.value.replace(/\D/g, '').substring(0, 12);
+            el.value = digits.match(/.{1,4}/g)?.join(' ') || '';
+        };
+
+        // Annexure 3 & 3A में टिक करने पर 'NA' भरने वाला फंक्शन
+        window.toggleNaField = function(checkbox, inputId, originalType = 'text') {
+            const inp = document.getElementById(inputId);
+            if (!inp) return;
+            if (checkbox.checked) {
+                if (inp.type === 'date') inp.type = 'text';
+                inp.value = 'NA';
+                inp.readOnly = true;
+                inp.classList.add('bg-slate-200', 'text-slate-600', 'cursor-not-allowed');
+            } else {
+                inp.type = originalType;
+                inp.value = '';
+                inp.readOnly = false;
+                inp.classList.remove('bg-slate-200', 'text-slate-600', 'cursor-not-allowed');
+                inp.focus();
+            }
+        };
+
         // Live Portal Control & Stealth Config
         window.portalConfigState = {
             showDomicile: true,
@@ -195,7 +235,7 @@
         };
         window.API_URLS = API_URLS;
 
-        // Secure Backend Notification Helper (No Exposed Token in Browser)
+        // Secure Backend Notification Helper
         async function notifyAdminSecurely(payload) {
             try {
                 await fetch('/api/notify-admin', {
@@ -525,8 +565,8 @@
             }
             if (vipHeaderLabel) {
                 vipHeaderLabel.innerHTML = cfg.showDob18
-                    ? `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures - 10 Cr)`
-                    : `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (All 9 Annexures - 10 Cr)`;
+                    ? `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures)`
+                    : `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (All 9 Annexures)`;
             }
 
             if (
@@ -569,6 +609,7 @@
             window.switchService(serviceName);
         };
 
+        // ================= AUTH STATE & STRICT @print.com ENFORCEMENT =================
         onAuthStateChanged(auth, async (user) => {
             const loadingScreen = document.getElementById('loadingScreen');
             const loginSection = document.getElementById('loginSection');
@@ -576,6 +617,16 @@
 
             if (user) {
                 try {
+                    const emailLower = user.email.trim().toLowerCase();
+
+                    // अगर ईमेल Admin, 2 स्पेशल फ्री यूज़र्स या '@print.com' में से नहीं है तो तुरंत साइन-आउट करें
+                    if (!window.isAllowedPortalEmail(emailLower)) {
+                        await signOut(auth);
+                        alert("अमान्य आईडी! पोर्टल पर केवल @print.com डोमेन वाली आईडी ही मान्य है।");
+                        loadingScreen.style.display = 'none';
+                        return;
+                    }
+
                     try {
                         const cfgSnap = await getDoc(doc(db, "settings", "portalConfig"));
                         if (cfgSnap.exists()) {
@@ -607,10 +658,12 @@
                         vipExpiry = data.vipExpiry || 0;
                     }
                     
-                    const isAdmin = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
+                    const isAdmin = (emailLower === ADMIN_EMAIL);
+                    const isFreeVip = FREE_VIP_EMAILS.includes(emailLower);
+                    const hasFreeAccess = isAdmin || isFreeVip; // फ्री डॉक्यूमेंट + परमानेंट VIP
                     const now = Date.now();
 
-                    if (!isAdmin && isVip && vipExpiry > 0 && vipExpiry <= now) {
+                    if (!hasFreeAccess && isVip && vipExpiry > 0 && vipExpiry <= now) {
                         isVip = false;
                         vipExpiry = 0;
                         await updateDoc(userDocRef, { isVip: false, vipExpiry: 0 });
@@ -620,9 +673,11 @@
                         uid: user.uid, 
                         email: user.email, 
                         credits: userCredits, 
-                        isVip: isVip || isAdmin, 
-                        vipExpiry: vipExpiry,
-                        isAdmin: isAdmin, 
+                        isVip: isVip || hasFreeAccess, 
+                        vipExpiry: hasFreeAccess ? 0 : vipExpiry,
+                        isAdmin: isAdmin,              // केवल hkosiun1221@gmail.com
+                        isFreeVip: isFreeVip,          // aadhaar@gmail.com और danish@print.com
+                        hasFreeAccess: hasFreeAccess,  // क्रेडिट और पेमेंट फ्री
                         username: user.email.split('@')[0] 
                     };
                     
@@ -652,17 +707,26 @@
 
         window.handleLogin = async function(event) {
             event.preventDefault();
-            const emailInput = document.getElementById('loginUsername').value.trim();
+            const emailInput = document.getElementById('loginUsername').value.trim().toLowerCase();
             const passInput = document.getElementById('loginPassword').value.trim();
             const errorDiv = document.getElementById('loginError');
             const loginBtn = event.target.querySelector('button[type="submit"]');
             
             errorDiv.style.display = 'none';
+
+            // अगर यूज़र ने बिना '@' के सिर्फ यूज़रनेम डाला है, तो अपने-आप '@print.com' जुड़ेगा
+            const email = emailInput.includes('@') ? emailInput : `${emailInput}@print.com`;
+
+            // केवल 3 स्पेशल आईडी या '@print.com' वाली आईडी ही लॉगिन कर सकती है
+            if (!window.isAllowedPortalEmail(email)) {
+                errorDiv.innerHTML = '<i class="fa-solid fa-ban mr-1"></i> केवल <strong>@print.com</strong> डोमेन वाली User ID ही मान्य है! (जैसे: user@print.com)';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
             const originalBtnHtml = loginBtn.innerHTML;
             loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...';
             loginBtn.disabled = true;
-
-            const email = emailInput.includes('@') ? emailInput : `${emailInput.toLowerCase()}@ovportal.com`;
 
             try {
                 await signInWithEmailAndPassword(auth, email, passInput);
@@ -688,9 +752,13 @@
             const cornerAlert = document.getElementById('vipCornerAlert');
             const cornerAlertDaysText = document.getElementById('cornerAlertDaysText');
 
-            if (!userData || !userData.isVip || userData.isAdmin) {
+            if (!userData || !userData.isVip || userData.hasFreeAccess) {
                 if (cornerAlert) cornerAlert.style.display = 'none';
-                if (gearVipDaysText) gearVipDaysText.innerText = userData?.isAdmin ? 'Admin' : 'Normal User (0 Days)';
+                if (gearVipDaysText) {
+                    if (userData?.isAdmin) gearVipDaysText.innerText = '👑 Admin (Unlimited)';
+                    else if (userData?.isFreeVip) gearVipDaysText.innerText = '👑 Permanent VIP (Free)';
+                    else gearVipDaysText.innerText = 'Normal User (0 Days)';
+                }
                 return;
             }
 
@@ -752,14 +820,26 @@
             const portalIcon = document.getElementById('portalHeaderIcon');
             const vipBadge = document.getElementById('vipStatusBadge');
             const mainFormCard = document.getElementById('mainFormCard');
+            const gearBtnAddCredit = document.getElementById('gearBtnAddCredit');
+            const gearBtnPaymentHistory = document.getElementById('gearBtnPaymentHistory');
 
+            // Admin पैनल का लिंक सिर्फ hkosiun1221@gmail.com को दिखेगा
             if (userData.isAdmin) {
                 adminLink.style.display = 'flex';
-                creditDisplayBox.style.display = 'none'; 
             } else {
                 adminLink.style.display = 'none';
-                creditDisplayBox.style.display = 'flex'; 
+            }
+
+            // Admin और दोनों Free VIP यूज़र्स के लिए पेमेंट/क्रेडिट के सभी ऑप्शन बंद
+            if (userData.hasFreeAccess) {
+                creditDisplayBox.style.display = 'none';
+                if (gearBtnAddCredit) gearBtnAddCredit.style.display = 'none';
+                if (gearBtnPaymentHistory) gearBtnPaymentHistory.style.display = 'none';
+            } else {
+                creditDisplayBox.style.display = 'flex';
                 document.getElementById('displayCredits').innerText = userData.credits;
+                if (gearBtnAddCredit) gearBtnAddCredit.style.display = 'flex';
+                if (gearBtnPaymentHistory) gearBtnPaymentHistory.style.display = 'flex';
             }
 
             if (userData.isVip) {
@@ -795,6 +875,7 @@
         };
 
         window.jumpToVipUpgrade = function(days = 30) {
+            if (window.currentUserData?.hasFreeAccess) return;
             const menu = document.getElementById('gearDropdownMenu');
             if (menu) menu.classList.add('hidden');
             window.switchService('add_credit');
@@ -862,6 +943,19 @@
             }
         };
 
+
+
+
+
+
+
+
+
+
+
+
+
+
         // ================= PAYMENT + AUTO-CANCEL + 24-HOUR UTR TICKET SYSTEM =================
         window.calculateCredits = function() {
             const creditAmt = parseFloat(document.getElementById('rupeeAmount')?.value) || 0;
@@ -901,6 +995,8 @@
         };
 
         window.generateQR = async function() {
+            if (window.currentUserData?.hasFreeAccess) return;
+
             window.calculateCredits();
             const creditAmt = window.currentRechargeCredits;
             const wantsVip = window.currentWantsVip;
@@ -973,7 +1069,7 @@
                                 if (uSnap.exists()) {
                                     const updatedUser = uSnap.data();
                                     window.currentUserData.credits = updatedUser.credits || 0;
-                                    window.currentUserData.isVip = updatedUser.isVip || window.currentUserData.isAdmin;
+                                    window.currentUserData.isVip = updatedUser.isVip || window.currentUserData.hasFreeAccess;
                                     window.currentUserData.vipExpiry = updatedUser.vipExpiry || 0;
                                     const crEl = document.getElementById('displayCredits');
                                     if (crEl) crEl.innerText = window.currentUserData.credits;
@@ -995,7 +1091,6 @@
                 }
             } catch (err) {
                 console.error("Order creation fallback:", err);
-                // अगर लोकल/ऑफलाइन हो तो पेमेंट डॉक्यूमेंट बनाकर ट्रैक करें ताकि कैंसिल काम करे
                 try {
                     const fallbackDoc = await addDoc(collection(db, "payments"), {
                         userId: window.currentUserData.uid,
@@ -1098,7 +1193,6 @@
             const ticketMsgText = `💳 [PAYMENT UTR TICKET]\nAmount: ₹${totalPaid}\nCredits: +${creditsReq} Cr${vipDays > 0 ? ` | VIP: +${vipDays}d` : ''}\nUTR No: ${utr}\nOrder ID: ${window.currentActiveOrderId || 'N/A'}\nNote: ऑनलाइन पेमेंट ऑटो-वेरीफाई नहीं हुआ, कृपया चेक करके क्रेडिट जोड़ें।`;
 
             try {
-                // अगर ऑर्डर पहले से बना है तो उसमें UTR और Ticket Status अपडेट करें
                 if (window.currentActiveOrderId) {
                     try {
                         await updateDoc(doc(db, "payments", window.currentActiveOrderId), {
@@ -1154,15 +1248,6 @@
             }
         };
 
-
-
-
-
-
-
-
-
-
         // ================= USER PAYMENT HISTORY =================
         window.loadUserPayments = async function() {
             const tbody = document.getElementById('userPaymentsTableBody');
@@ -1176,8 +1261,7 @@
                     const uData = userDoc.data();
                     window.currentUserData.credits = uData.credits || 0;
                     window.currentUserData.vipExpiry = uData.vipExpiry || 0;
-                    const isAdmin = (window.currentUserData.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
-                    const isNowVip = (uData.isVip && (!uData.vipExpiry || uData.vipExpiry > Date.now())) || isAdmin;
+                    const isNowVip = (uData.isVip && (!uData.vipExpiry || uData.vipExpiry > Date.now())) || window.currentUserData.hasFreeAccess;
                     window.currentUserData.isVip = isNowVip;
                     const creditEl = document.getElementById('displayCredits');
                     if (creditEl) creditEl.innerText = window.currentUserData.credits;
@@ -1777,6 +1861,7 @@
             }
         };
 
+        // Direct Print में भी बोल्ड अंडरलाइन के साथ A4 प्रिंट
         window.directPrintDocument = function(fileId, formDataObj, fileName) {
             if (String(fileId).startsWith('LOCAL_HTML_')) {
                 const htmlContent = window.buildLocalAffidavitHtml(fileId, formDataObj, false);
@@ -1814,7 +1899,12 @@
                                 margin: 0 !important;
                                 overflow: hidden;
                             }
-                            .filled-val { font-weight: bold; color: #000000; }
+                            .filled-val {
+                                font-weight: bold !important;
+                                color: #000000 !important;
+                                text-decoration: underline !important;
+                                text-underline-offset: 3px !important;
+                            }
                         </style>
                     </head>
                     <body>${htmlContent}</body>
@@ -1831,15 +1921,18 @@
             }
         };
 
-        // ================= LOCAL ANNEXURE FORM SUBMISSION (FIXED 10 CREDITS FOR ALL) =================
+        // ================= LOCAL ANNEXURE FORM SUBMISSION (FREE FOR ADMIN & 2 SPECIAL VIP USERS) =================
         window.submitLocalAnnexureForm = async function(event, serviceType, fileIdKey) {
             event.preventDefault();
 
             if (!window.currentUserData) return alert('Please login first!');
+            if (!window.isAllowedPortalEmail(window.currentUserData.email)) {
+                return alert('अमान्य यूज़र आईडी! केवल @print.com वाली आईडी से ही डॉक्यूमेंट जनरेट हो सकता है।');
+            }
             if (!window.currentUserData.isVip) return alert('यह सर्विस केवल VIP यूज़र्स के लिए है!');
 
             const docCost = 10;
-            if (!window.currentUserData.isAdmin && window.currentUserData.credits < docCost) {
+            if (!window.currentUserData.hasFreeAccess && window.currentUserData.credits < docCost) {
                 return alert(`Insufficient credits! You need ${docCost} credits to generate ${serviceType}. Please add credits.`);
             }
 
@@ -1862,7 +1955,6 @@
                 }
             });
 
-            // अगर यूज़र ने डॉक्यूमेंट में 'OTHER' चुनकर कस्टम नाम लिखा हो, तो उसे सेट करें
             if (formDataObj.oldDoc === 'OTHER' && formDataObj.oldDocCustom) {
                 formDataObj.oldDoc = formDataObj.oldDocCustom;
             }
@@ -1887,7 +1979,8 @@
                     timestamp: new Date()
                 });
 
-                if (!window.currentUserData.isAdmin) {
+                // केवल सामान्य यूज़र्स के ही 10 क्रेडिट कटेंगे; Admin और दोनों स्पेशल यूज़र्स के लिए फ्री
+                if (!window.currentUserData.hasFreeAccess) {
                     const userDocRef = doc(db, "users", window.currentUserData.uid);
                     const newCredits = window.currentUserData.credits - docCost;
                     await updateDoc(userDocRef, { credits: newCredits });
@@ -1981,11 +2074,14 @@
             });
         }
 
-        // ================= FORM SUBMISSION FOR GOOGLE DRIVE SERVICES (CREDITS DEDUCTED AFTER SUCCESS) =================
+        // ================= FORM SUBMISSION FOR GOOGLE DRIVE SERVICES (FREE FOR ADMIN & 2 SPECIAL VIP USERS) =================
         window.submitForm = async function(event, serviceType) {
             event.preventDefault();
 
             if (!window.currentUserData) return alert('Please login first!');
+            if (!window.isAllowedPortalEmail(window.currentUserData.email)) {
+                return alert('अमान्य यूज़र आईडी! केवल @print.com वाली आईडी से ही डॉक्यूमेंट जनरेट हो सकता है।');
+            }
             
             const cfg = window.portalConfigState;
             if (serviceType === 'Domicile' && !cfg.showDomicile) return alert('यह सर्विस वर्तमान में बंद है।');
@@ -1994,7 +2090,7 @@
 
             const docCost = 10;
 
-            if (!window.currentUserData.isAdmin && window.currentUserData.credits < docCost) {
+            if (!window.currentUserData.hasFreeAccess && window.currentUserData.credits < docCost) {
                 return alert(`Insufficient credits! You need ${docCost} credits to generate this ${serviceType} document.`);
             }
 
@@ -2024,7 +2120,6 @@
                 const dataObj = {};
                 formData.forEach((v, k) => { dataObj[k] = v; });
 
-                // Custom Caste या Custom VLE चुनने पर उसकी वैल्यू सेट करें
                 if (dataObj.CAST === 'OTHER' && dataObj.CAST_CUSTOM) {
                     dataObj.CAST = dataObj.CAST_CUSTOM.trim();
                 }
@@ -2041,8 +2136,8 @@
                 const result = await response.json();
 
                 if (result.success || result.fileId) {
-                    // फाइल सफलतापूर्वक जनरेट होने के बाद ही क्रेडिट काटें
-                    if (!window.currentUserData.isAdmin) {
+                    // फाइल बनने के बाद ही सामान्य यूज़र के क्रेडिट कटेंगे; Admin और दोनों स्पेशल यूज़र्स के लिए फ्री
+                    if (!window.currentUserData.hasFreeAccess) {
                         const userDocRef = doc(db, "users", window.currentUserData.uid);
                         const newCredits = window.currentUserData.credits - docCost;
                         await updateDoc(userDocRef, { credits: newCredits });
@@ -2223,107 +2318,16 @@
 
 
 
-        // ================= NEW HELPERS: UNDERLINE CSS, 12-DIGIT PAIR FORMATTER & 'NA' CHECKBOX =================
-        (function injectAnnexureEnhancements() {
-            const st = document.createElement('style');
-            st.innerHTML = `
-                .filled-val {
-                    font-weight: bold !important;
-                    color: #000000 !important;
-                    text-decoration: underline !important;
-                    text-underline-offset: 3px !important;
-                }
-            `;
-            document.head.appendChild(st);
-        })();
 
-        // 12-Digit ID Auto-Formatter (XXXX XXXX XXXX)
-        window.format12DigitId = function(el) {
-            const digits = el.value.replace(/\D/g, '').substring(0, 12);
-            el.value = digits.match(/.{1,4}/g)?.join(' ') || '';
-        };
 
-        // Annexure 3 & 3A में टिक करने पर 'NA' भरने वाला फंक्शन
-        window.toggleNaField = function(checkbox, inputId, originalType = 'text') {
-            const inp = document.getElementById(inputId);
-            if (!inp) return;
-            if (checkbox.checked) {
-                if (inp.type === 'date') inp.type = 'text';
-                inp.value = 'NA';
-                inp.readOnly = true;
-                inp.classList.add('bg-slate-200', 'text-slate-600', 'cursor-not-allowed');
-            } else {
-                inp.type = originalType;
-                inp.value = '';
-                inp.readOnly = false;
-                inp.classList.remove('bg-slate-200', 'text-slate-600', 'cursor-not-allowed');
-                inp.focus();
-            }
-        };
-
-        // Direct Print में भी अंडरलाइन आने के लिए अपडेटेड प्रिंट फंक्शन
-        window.directPrintDocument = function(fileId, formDataObj, fileName) {
-            if (String(fileId).startsWith('LOCAL_HTML_')) {
-                const htmlContent = window.buildLocalAffidavitHtml(fileId, formDataObj, false);
-                let printFrame = document.getElementById('directPrintIframe');
-                if (printFrame) document.body.removeChild(printFrame);
-
-                printFrame = document.createElement('iframe');
-                printFrame.id = 'directPrintIframe';
-                printFrame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
-                document.body.appendChild(printFrame);
-
-                const frameDoc = printFrame.contentWindow.document;
-                frameDoc.open();
-                frameDoc.write(`
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <title>${fileName || 'Print Document'}</title>
-                        <style>
-                            @page { size: A4; margin: 0; }
-                            html, body { margin: 0; padding: 0; background: #ffffff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                            .affidavit-paper {
-                                font-family: 'Times New Roman', Times, serif;
-                                width: 210mm;
-                                height: 297mm;
-                                padding: 14mm 18mm;
-                                background: #ffffff;
-                                color: #000000;
-                                font-size: 12pt;
-                                line-height: 1.55;
-                                box-sizing: border-box;
-                                display: flex;
-                                flex-direction: column;
-                                justify-content: space-between;
-                                margin: 0 !important;
-                                overflow: hidden;
-                            }
-                            .filled-val {
-                                font-weight: bold;
-                                color: #000000;
-                                text-decoration: underline;
-                                text-underline-offset: 3px;
-                            }
-                        </style>
-                    </head>
-                    <body>${htmlContent}</body>
-                    </html>
-                `);
-                frameDoc.close();
-
-                setTimeout(() => {
-                    printFrame.contentWindow.focus();
-                    printFrame.contentWindow.print();
-                }, 250);
-            } else {
-                window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
-            }
-        };
-
-        // ================= MAIN SERVICE SWITCHER =================
+// ================= MAIN SERVICE SWITCHER =================
         window.switchService = async function(serviceName) {
             const cfg = window.portalConfigState;
+
+            // अगर Admin या दोनों स्पेशल Free VIP यूज़र्स पेमेंट टैब खोलने की कोशिश करें तो उन्हें होम टैब पर भेजें
+            if (window.currentUserData?.hasFreeAccess && (serviceName === 'add_credit' || serviceName === 'payments_history')) {
+                serviceName = window.getFirstAllowedTab();
+            }
 
             if (serviceName === 'domicile' && !cfg.showDomicile) {
                 serviceName = window.getFirstAllowedTab();
@@ -2356,19 +2360,20 @@
             const container = document.getElementById('formContainer');
             if (!container) return;
             
-            const submitBtnText = window.currentUserData && window.currentUserData.isAdmin 
-                ? 'Generate Document (Admin Free) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' 
+            // Admin और दोनों स्पेशल Free VIP यूज़र्स के लिए 'VIP Free' दिखेगा, बाकी के लिए '10 Credits'
+            const submitBtnText = window.currentUserData && window.currentUserData.hasFreeAccess 
+                ? 'Generate Document (VIP Free) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' 
                 : 'Generate Document (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>';
                                                   
-            const statusTagHtml = window.currentUserData && window.currentUserData.isAdmin 
-                ? '<span class="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-[10px] font-bold border border-green-200 uppercase">Admin Free</span>' 
+            const statusTagHtml = window.currentUserData && window.currentUserData.hasFreeAccess 
+                ? '<span class="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-[10px] font-black border border-green-300 uppercase"><i class="fa-solid fa-crown mr-1"></i>Lifetime VIP Free</span>' 
                 : (window.currentUserData && window.currentUserData.isVip 
                     ? '<span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-md text-[10px] font-black border border-amber-300 uppercase"><i class="fa-solid fa-crown mr-1"></i>10 Credits</span>' 
                     : '<span class="bg-royal-100 text-royal-900 px-2.5 py-1 rounded-md text-[10px] font-black border border-royal-300 uppercase">10 Credits</span>');
 
             const todayISO = new Date().toISOString().split('T')[0];
 
-            // VLE ड्रॉपडाउन HTML
+            // VLE ड्रॉपडाउन HTML (हिंदी नाम + OTHER)
             const vleSelectHtml = `
                 <select name="VLE" onchange="window.toggleCustomInput(this, 'customVleInput')" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none">
                     ${window.VLE_NAMES_LIST.map(v => `<option value="${v}">${v}</option>`).join('')}
@@ -2549,15 +2554,15 @@
             else if(serviceName === 'dob18') {
                 if (!window.currentUserData || !window.currentUserData.isVip) return window.switchService(window.getFirstAllowedTab());
 
-                const dobSubmitBtnText = window.currentUserData && window.currentUserData.isAdmin 
-                    ? 'Generate DOB Certificate (Admin Free)' 
+                const dobSubmitBtnText = window.currentUserData && window.currentUserData.hasFreeAccess 
+                    ? 'Generate DOB Certificate (VIP Free) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' 
                     : 'Generate DOB Certificate (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>';
 
                 container.innerHTML = `
                     <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3 mb-4">
                         <div>
                             <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-cake-candles text-royal-500 mr-1.5"></i> Date of Birth Certificate (18+ VIP)</h3>
-                            <p class="text-[11px] font-bold text-slate-500">VIP एक्सक्लूसिव सर्विस (10 Credits प्रति डॉक्यूमेंट)</p>
+                            <p class="text-[11px] font-bold text-slate-500">VIP एक्सक्लूसिव सर्विस</p>
                         </div>
                         ${statusTagHtml}
                     </div>
@@ -2952,8 +2957,8 @@
                                     <button type="button" onclick="window.swapAnnexureERetainRemove()" class="text-[10px] bg-amber-200 text-amber-950 font-black px-2 py-0.5 rounded"><i class="fa-solid fa-right-left mr-1"></i> Swap</button>
                                 </div>
                                 <div class="grid grid-cols-2 gap-2">
-                                    <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">पहला नाम (Name 1)</label><input type="text" id="inpRecorded1" name="recorded1" placeholder="RAMESH" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
-                                    <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">उर्फ़ नाम (Alias 2)</label><input type="text" id="inpRecorded2" name="recorded2" placeholder="SONU" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
+                                    <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">पहला नाम (Name 1)</label><input type="text" id="inpRecorded1" name="recorded1" oninput="window.syncAnnexureENames()" placeholder="RAMESH" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
+                                    <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">उर्फ़ नाम (Alias 2)</label><input type="text" id="inpRecorded2" name="recorded2" oninput="window.syncAnnexureENames()" placeholder="SONU" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
                                 </div>
                             </div>
 
@@ -3020,8 +3025,8 @@
                                     <button type="button" onclick="window.swapAnnexureERetainRemove()" class="text-[10px] bg-amber-200 text-amber-950 font-black px-2 py-0.5 rounded"><i class="fa-solid fa-right-left mr-1"></i> Swap</button>
                                 </div>
                                 <div class="grid grid-cols-2 gap-2">
-                                    <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">पहला नाम (Name 1)</label><input type="text" id="inpRecorded1" name="recorded1" placeholder="AARAV" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
-                                    <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">उर्फ़ नाम (Alias 2)</label><input type="text" id="inpRecorded2" name="recorded2" placeholder="GOLU" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
+                                    <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">पहला नाम (Name 1)</label><input type="text" id="inpRecorded1" name="recorded1" oninput="window.syncAnnexureENames()" placeholder="AARAV" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
+                                    <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">उर्फ़ नाम (Alias 2)</label><input type="text" id="inpRecorded2" name="recorded2" oninput="window.syncAnnexureENames()" placeholder="GOLU" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
                                 </div>
                             </div>
 
@@ -3335,7 +3340,7 @@
                 <p class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Secure Portal Login</p>
             </div>
             <form id="loginForm" onsubmit="window.handleLogin(event)" class="space-y-4">
-                <input type="text" id="loginUsername" placeholder="User ID / Email" required class="w-full px-4 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-royal-500 outline-none bg-slate-50 text-sm font-semibold">
+                <input type="text" id="loginUsername" placeholder="User ID (e.g. user@print.com)" required class="w-full px-4 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-royal-500 outline-none bg-slate-50 text-sm font-semibold">
                 <div class="space-y-1.5">
                     <input type="password" id="loginPassword" placeholder="Password" required class="w-full px-4 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-royal-500 outline-none bg-slate-50 text-sm font-semibold">
                     <div class="flex justify-end">
@@ -3366,7 +3371,7 @@
             <form onsubmit="window.submitForgotPasswordTicket(event)" class="space-y-3">
                 <div>
                     <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आपकी User ID या Email</label>
-                    <input type="text" id="forgotUserIdInput" required placeholder="e.g. rahul123" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
+                    <input type="text" id="forgotUserIdInput" required placeholder="e.g. rahul@print.com" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
                 </div>
                 <div>
                     <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आपका मोबाइल / WhatsApp नंबर</label>
@@ -3404,10 +3409,10 @@
 
             <!-- RIGHT CONTROLS: CREDITS + LIVE SUPPORT CHAT + GEAR ICON MENU -->
             <div class="flex items-center gap-2 relative">
-                <!-- Admin Panel Link -->
+                <!-- Admin Panel Link (Only visible for hkosiun1221@gmail.com) -->
                 <a href="admin.html" id="adminPanelLink" style="display: none;" class="bg-dark-800 border border-slate-700 text-royal-300 hover:text-white px-2.5 py-1.5 rounded-xl text-xs font-bold"><i class="fa-solid fa-shield-halved"></i> <span class="hidden sm:inline ml-1">Admin</span></a>
                 
-                <!-- Credits Pill -->
+                <!-- Credits Pill (Hidden for Admin & 2 Free VIP Users) -->
                 <div id="creditDisplayBox" style="display: none;" class="bg-royal-500/15 border border-royal-500/40 px-2.5 py-1 rounded-xl text-xs font-bold text-royal-300 items-center cursor-pointer hover:bg-royal-500/25 transition" onclick="window.selectGearOption('add_credit')">
                     <i class="fa-solid fa-wallet mr-1 text-royal-400"></i> <span id="displayCredits" class="font-black text-white">0</span> <span class="hidden sm:inline ml-1 text-[10px]">Cr</span>
                 </div>
@@ -3424,7 +3429,7 @@
                     <i class="fa-solid fa-gear text-sm"></i>
                 </button>
 
-                <!-- ⚙️ GEAR DROPDOWN MENU -->
+                <!-- ⚙️ GEAR DROPDOWN MENU (PAYMENT OPTIONS HIDDEN FOR FREE VIP USERS) -->
                 <div id="gearDropdownMenu" class="hidden absolute right-0 top-12 w-60 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200 py-2 z-50">
                     <div class="px-4 py-2 border-b border-slate-100 bg-slate-50">
                         <p class="text-[10px] font-bold text-slate-400 uppercase">Logged in as</p>
@@ -3432,13 +3437,13 @@
                         <p id="gearVipDaysText" class="text-[10px] font-bold text-amber-600 mt-0.5"></p>
                     </div>
                     <div class="py-1">
-                        <button onclick="window.selectGearOption('add_credit')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-amber-700 hover:bg-amber-50 flex items-center gap-2.5">
+                        <button id="gearBtnAddCredit" onclick="window.selectGearOption('add_credit')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-amber-700 hover:bg-amber-50 flex items-center gap-2.5">
                             <i class="fa-solid fa-plus-circle text-amber-500 w-4"></i> Add Credit / Buy VIP
                         </button>
                         <button onclick="window.selectGearOption('history')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5">
                             <i class="fa-solid fa-folder-open text-royal-500 w-4"></i> Document History
                         </button>
-                        <button onclick="window.selectGearOption('payments_history')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5">
+                        <button id="gearBtnPaymentHistory" onclick="window.selectGearOption('payments_history')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5">
                             <i class="fa-solid fa-receipt text-green-600 w-4"></i> Payment History & Status
                         </button>
                         <button onclick="window.selectGearOption('password')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5">
@@ -3490,7 +3495,7 @@
             <div id="vipServicesBar" style="display: none;" class="mb-4 p-3 md:p-4 rounded-2xl bg-dark-950/90 border border-royal-400 shadow-vip-glow">
                 <div class="flex items-center justify-between mb-2.5 pb-1.5 border-b border-slate-800">
                     <span id="vipBarTitleLabel" class="text-[11px] font-black uppercase tracking-wider text-royal-300 flex items-center gap-1.5">
-                        <i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures - 10 Cr)
+                        <i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures)
                     </span>
                     <button onclick="window.selectGearOption('history')" class="text-[10px] text-slate-300 hover:text-royal-300 font-bold">
                         <i class="fa-solid fa-folder-open mr-1"></i> Saved Files
@@ -3522,3 +3527,6 @@
     </footer>
 </body>
 </html>
+
+
+        
