@@ -229,7 +229,7 @@
             }
         };
 
-        // ================= DOB 18+ ADDRESS SMART CLEANER (AUTO-REMOVE UTTAR PRADESH + 20 CHAR LIMIT) =================
+        // ================= DOB 18+ ADDRESS SMART CLEANER (AUTO-REMOVE UTTAR PRADESH + 38 CHAR LIMIT) =================
         window.cleanDob18AddressString = function(rawVal = '') {
             let val = String(rawVal).toUpperCase();
 
@@ -242,9 +242,9 @@
                 val = val.replace(/[,\-]+$/, '');
             }
 
-            // 2. उत्तर प्रदेश हटने के बाद बचे हुए पते को अधिकतम 20 कैरेक्टर तक सीमित रखें
-            if (val.length > 20) {
-                val = val.substring(0, 20);
+            // 2. उत्तर प्रदेश हटने के बाद बचे हुए पते को अधिकतम 38 कैरेक्टर तक सीमित रखें
+            if (val.length > 38) {
+                val = val.substring(0, 38);
             }
             return val;
         };
@@ -252,7 +252,7 @@
         window.handleDob18AddressInput = function(el) {
             const rawUpper = el.value.toUpperCase();
             const hasUP = /(?:UTT[AE]R\s*PRADESH|उत्तर\s*प्रदेश|उत्तरप्रदेश)/i.test(rawUpper);
-            if (hasUP || rawUpper.length > 20) {
+            if (hasUP || rawUpper.length > 38) {
                 el.value = window.cleanDob18AddressString(rawUpper);
             } else {
                 el.value = rawUpper;
@@ -261,8 +261,8 @@
             const counterEl = document.getElementById('dobAddressCharCount');
             if (counterEl) {
                 const len = el.value.length;
-                counterEl.innerText = `${len} / 20 Characters`;
-                counterEl.className = len >= 20 
+                counterEl.innerText = `${len} / 38 Characters`;
+                counterEl.className = len >= 38 
                     ? "text-[10px] font-black text-red-600" 
                     : "text-[10px] font-bold text-slate-400";
             }
@@ -2725,8 +2725,8 @@
                             <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Pin Code</label><input type="text" name="PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
                             <div class="md:col-span-2">
                                 <div class="flex justify-between items-center mb-1">
-                                    <label class="text-[11px] font-bold text-slate-500 uppercase">ADDRESS (Max 20 Chars • 'Uttar Pradesh' लिखने की आवश्यकता नहीं है)</label>
-                                    <span id="dobAddressCharCount" class="text-[10px] font-bold text-slate-400">7 / 20 Characters</span>
+                                    <label class="text-[11px] font-bold text-slate-500 uppercase">ADDRESS ( 'Uttar Pradesh' लिखने की आवश्यकता नहीं है)</label>
+                                    <span id="dobAddressCharCount" class="text-[10px] font-bold text-slate-400">7 / 38 Characters</span>
                                 </div>
                                 <input type="text" id="dob18AddressInput" name="ADDRESS" value="VILL - " oninput="window.handleDob18AddressInput(this)" onblur="this.value = window.cleanDob18AddressString(this.value); window.handleDob18AddressInput(this);" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white outline-none uppercase">
                             </div>
