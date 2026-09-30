@@ -148,7 +148,7 @@
             </button>
             <button onclick="window.switchAdminMainTab('users')" id="tab-users">
                 <i class="fa-solid fa-user-shield text-indigo-500"></i>
-                <span>Users & Access</span>
+                <span>Users &amp; Access</span>
             </button>
             <button onclick="window.switchAdminMainTab('create_user')" id="tab-create_user">
                 <i class="fa-solid fa-user-plus text-emerald-500"></i>
@@ -223,7 +223,7 @@
             <div id="adminPaymentsCardsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3.5"></div>
         </div>
 
-        <!-- ================= TAB 2: MANAGE USERS & ACCESS (UPGRADED FULL-WIDTH 2-COLUMN UI) ================= -->
+        <!-- ================= TAB 2: MANAGE USERS & ACCESS (WITH DELETE USER BUTTON) ================= -->
         <div id="section-users" class="space-y-4 hidden">
             <!-- Top User Selector Bar -->
             <div class="bg-white rounded-2xl p-4 md:p-5 shadow-card border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
@@ -232,7 +232,7 @@
                         <i class="fa-solid fa-user-gear"></i>
                     </div>
                     <div>
-                        <h3 class="text-base md:text-lg font-black text-dark-900">User Access, Credits & Security</h3>
+                        <h3 class="text-base md:text-lg font-black text-dark-900">User Access, Credits &amp; Security</h3>
                         <p class="text-[11px] font-semibold text-slate-400">ड्रॉपडाउन से किसी भी यूज़र को चुनें और उसकी सभी सेटिंग्स कंट्रोल करें</p>
                     </div>
                 </div>
@@ -248,11 +248,11 @@
             <!-- 2-Column Control Grid for Selected User -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
-                <!-- LEFT COLUMN: Profile Status, DOB 18+ Stealth Control & WhatsApp/Email Share -->
+                <!-- LEFT COLUMN: Profile Status, DOB 18+ Stealth Control, Share & DELETE USER -->
                 <div class="bg-white rounded-2xl p-5 shadow-card border border-slate-200 space-y-4 flex flex-col justify-between">
                     <div class="space-y-4">
                         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                            <span class="text-xs font-black uppercase tracking-wider text-slate-400"><i class="fa-solid fa-id-badge text-royal-500 mr-1.5"></i>User Overview & Service Access</span>
+                            <span class="text-xs font-black uppercase tracking-wider text-slate-400"><i class="fa-solid fa-id-badge text-royal-500 mr-1.5"></i>User Overview &amp; Service Access</span>
                         </div>
 
                         <!-- Live Balance & VIP Badge Card -->
@@ -290,7 +290,7 @@
                         <!-- WhatsApp Phone & 1-Click Credentials Share -->
                         <div class="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-200 space-y-3">
                             <label class="block text-[10px] font-black text-emerald-900 uppercase tracking-wider">
-                                <i class="fa-brands fa-whatsapp text-emerald-600 mr-1"></i> User WhatsApp & Instant Login Share
+                                <i class="fa-brands fa-whatsapp text-emerald-600 mr-1"></i> User WhatsApp &amp; Instant Login Share
                             </label>
                             <div class="flex gap-2">
                                 <input type="text" id="selectedUserPhoneInput" placeholder="यूज़र का 10-अंकों का WhatsApp नंबर" class="flex-1 p-2.5 border border-emerald-300 rounded-xl text-xs font-bold bg-white outline-none focus:border-emerald-600">
@@ -310,6 +310,13 @@
                                 </button>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- DELETE USER ACCOUNT BUTTON -->
+                    <div class="pt-2 border-t border-slate-100">
+                        <button type="button" id="btnDeleteUserAccount" onclick="window.deleteSelectedUserAccount()" class="w-full bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border-2 border-red-200 hover:border-red-600 font-black py-3 px-4 rounded-2xl text-xs transition flex items-center justify-center gap-2 shadow-sm">
+                            <i class="fa-solid fa-user-slash"></i> Delete Selected User Account Permanently
+                        </button>
                     </div>
                 </div>
 
@@ -435,7 +442,7 @@
                         <i class="fa-solid fa-headset"></i>
                     </div>
                     <div>
-                        <h3 class="text-sm md:text-base font-black text-dark-900">Live Support Messenger & Password Tickets</h3>
+                        <h3 class="text-sm md:text-base font-black text-dark-900">Live Support Messenger &amp; Password Tickets</h3>
                         <p class="text-[11px] font-semibold text-slate-400">यूज़र के साथ रियल-टाइम चैट करें या 1-Click में पासवर्ड रीसेट करके भेजें</p>
                     </div>
                 </div>
