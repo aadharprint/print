@@ -1,5 +1,6 @@
 // ============================================================================
-// FILE 4: js/admin-logic.js (UPDATED WITH 6 TABS & PER-USER DOB CONTROL)
+// FILE 4: js/admin-logic.js
+// (Complete Admin Logic: 6 Tabs, Per-User DOB Toggle & Permanent User Delete)
 // ============================================================================
 
 import "./config-templates.js";
@@ -265,6 +266,82 @@ window.toggleUserDobAccess = async function(allowed) {
         setTimeout(() => msg.classList.add('hidden'), 3500);
     } catch (err) {
         alert('Error updating user DOB access: ' + err.message);
+    }
+};
+
+// ================= DELETE SELECTED USER ACCOUNT PERMANENTLY =================
+window.deleteSelectedUserAccount = async function() {
+    const uid = document.getElementById('userSelectDropdown').value;
+    if (!uid || !window.usersDataList[uid]) {
+        return alert('कृपया पहले ड्रॉपडाउन से उस यूज़र को सेलेक्ट करें जिसे आप डिलीट करना चाहते हैं!');
+    }
+
+    const uData = window.usersDataList[uid];
+    if ((uData.email || '').toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+        return alert('आप मुख्य सुपर एडमिन अकाउंट को डिलीट नहीं कर सकते!');
+    }
+
+    const confirmDelete = confirm(
+        `⚠️ चेतावनी (Permanent Delete)!\n\nक्या आप वाकई यूज़र "${uData.email}" का अकाउंट हमेशा के लिए डिलीट करना चाहते हैं?\n\nडिलीट करने के बाद यह यूज़र लॉगिन नहीं कर पाएगा।`
+    );
+    if (!confirmDelete) return;
+
+    const btn = document.getElementById('btnDeleteUserAccount');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Deleting User Account...';
+    }
+
+    try {
+        // 1. यदि यूज़र का पासवर्ड सेव है, तो Firebase Auth से भी उसका लॉगिन अकाउंट डिलीट करें
+        if (uData.userPass) {
+            try {
+                const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: uData.email, password: uData.userPass, returnSecureToken: true })
+                });
+                const signInData = await signInRes.json();
+                if (signInData.idToken) {
+                    await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${firebaseConfig.apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ idToken: signInData.idToken })
+                    });
+                }
+            } catch (authErr) {
+                console.warn("Auth delete skipped:", authErr);
+            }
+        }
+
+        // 2. Firestore 'users' कलेक्शन से यूज़र का डेटा हटाएं
+        await deleteDoc(doc(db, "users", uid));
+
+        // 3. यदि यूज़र का कोई सपोर्ट चैट टिकट है तो उसे भी हटाएं
+        try {
+            await deleteDoc(doc(db, "supportTickets", uid));
+        } catch (e) {}
+
+        delete window.usersDataList[uid];
+        await window.loadAllUsersForDropdown();
+        document.getElementById('userSelectDropdown').value = '';
+        window.handleUserSelection();
+
+        const msg = document.getElementById('adminMsg');
+        if (msg) {
+            msg.className = "p-3.5 bg-red-50 text-red-800 rounded-2xl text-xs font-black border border-red-300 text-center shadow-sm";
+            msg.innerHTML = `<i class="fa-solid fa-trash-can mr-1"></i> यूज़र <strong>${uData.email}</strong> का अकाउंट हमेशा के लिए डिलीट कर दिया गया है!`;
+            msg.classList.remove('hidden');
+            setTimeout(() => msg.classList.add('hidden'), 4000);
+        }
+    } catch (err) {
+        alert('यूज़र डिलीट करने में समस्या आई: ' + err.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
     }
 };
 
