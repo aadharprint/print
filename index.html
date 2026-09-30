@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ojas Print Service - Portal</title>
+    <title>उत्तर प्रदेश प्रिंट पोर्टल - Ojas Service</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
@@ -53,7 +53,7 @@
             animation: slideInRight 0.4s ease-out forwards;
         }
 
-        /* फिक्स सिंगल-पेज A4 लेआउट */
+        /* Fixed Single-Page A4 Layout */
         .affidavit-paper {
             position: relative !important;
             font-family: 'Times New Roman', Times, serif;
@@ -79,23 +79,26 @@
             text-underline-offset: 3px !important;
         }
         .stamp-overlay-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 794px;
-            height: 1122px;
-            pointer-events: none;
-            z-index: 30;
-            mix-blend-mode: multiply;
-            overflow: hidden;
+            position: absolute; top: 0; left: 0; width: 794px; height: 1122px;
+            pointer-events: none; z-index: 30; mix-blend-mode: multiply; overflow: hidden;
         }
         .stamp-overlay-layer img {
-            width: 794px;
-            height: 1122px;
-            object-fit: contain;
-            object-position: top center;
-            mix-blend-mode: multiply;
-            display: block;
+            width: 794px; height: 1122px; object-fit: contain; object-position: top center; mix-blend-mode: multiply; display: block;
+        }
+
+        /* 🌟 NEW SIDEBAR LAYOUT OVERRIDES FOR DESKTOP 🌟 */
+        @media (min-width: 1024px) {
+            /* Force Grid to 1 Column on Desktop (overriding JS injected styles) */
+            #standardServicesGrid { grid-template-columns: repeat(1, minmax(0, 1fr)) !important; }
+            #vipTabsContainer { grid-template-columns: repeat(1, minmax(0, 1fr)) !important; }
+            
+            /* Align text to the left with icon spacing for Sidebar Cards */
+            .service-tab, .vip-tab { 
+                justify-content: flex-start !important; 
+                padding-left: 1.25rem !important; 
+                padding-right: 1.25rem !important;
+                text-align: left !important; 
+            }
         }
     </style>
 
@@ -107,11 +110,11 @@
     <!-- SECURITY LOADING SCREEN -->
     <div id="loadingScreen" style="display: flex;" class="fixed inset-0 bg-dark-900 z-[200] flex-col items-center justify-center">
         <i class="fa-solid fa-sun text-6xl text-royal-400 mb-4 animate-spin-slow"></i>
-        <h2 class="text-xl font-black text-white tracking-widest uppercase">Ojas Print Service</h2>
+        <h2 class="text-xl font-black text-white tracking-widest uppercase">UP Print Portal</h2>
         <p class="text-xs text-royal-300 mt-1 font-bold animate-pulse">Checking Security...</p>
     </div>
 
-    <!-- COMPACT FLOATING CORNER ALERT WHEN 5 DAYS OR LESS REMAINING IN VIP -->
+    <!-- VIP EXPIRY ALERT -->
     <div id="vipCornerAlert" style="display: none;" class="fixed bottom-3 right-3 z-[150] w-72 bg-amber-50 border-l-4 border-amber-500 rounded-xl p-3 shadow-xl text-slate-800 corner-alert-anim">
         <div class="flex justify-between items-center mb-1">
             <h4 class="text-xs font-black text-amber-900"><i class="fa-solid fa-triangle-exclamation text-amber-600 mr-1"></i> VIP एक्सपायरी अलर्ट</h4>
@@ -121,10 +124,10 @@
         <button onclick="window.jumpToVipUpgrade(30)" class="w-full bg-dark-900 text-royal-300 font-black py-1.5 rounded-lg text-[11px]">अभी VIP वैलिडिटी बढ़ाएं</button>
     </div>
 
-    <!-- FULL SCREEN PDF & HTML DOCUMENT VIEWER MODAL -->
+    <!-- FULL SCREEN PDF VIEWER MODAL -->
     <div id="pdfViewerModal" style="display: none;" class="fixed inset-0 z-[100] bg-dark-900/80 backdrop-blur-md items-center justify-center p-2 md:p-6 transition-opacity">
-        <div class="bg-white w-full max-w-6xl h-full flex flex-col rounded-2xl shadow-2xl overflow-hidden">
-            <div class="flex justify-between items-center p-3 md:p-4 border-b border-slate-200 bg-slate-50 gap-2">
+        <div class="bg-white w-full max-w-6xl h-full flex flex-col rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
+            <div class="flex flex-wrap justify-between items-center p-3 md:p-4 border-b border-slate-200 bg-slate-50 gap-2">
                 <div class="flex items-center gap-2 overflow-hidden">
                     <div class="w-7 h-7 bg-royal-100 text-royal-600 rounded-lg flex items-center justify-center shrink-0 text-xs"><i class="fa-solid fa-file-pdf"></i></div>
                     <h3 id="pdfViewerTitle" class="font-bold text-slate-800 text-xs md:text-sm truncate">Document Preview</h3>
@@ -157,8 +160,8 @@
                 <div class="w-16 h-16 bg-gradient-to-br from-royal-300 to-royal-600 text-white rounded-full flex items-center justify-center mx-auto mb-3 text-3xl shadow-glow">
                     <i class="fa-solid fa-sun"></i>
                 </div>
-                <h1 class="text-2xl font-black text-dark-900">Ojas Print Service</h1>
-                <p class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Secure Portal Login</p>
+                <h1 class="text-2xl font-black text-dark-900 leading-tight">UP Print Portal</h1>
+                <p class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Secure Ojas Login</p>
             </div>
             <form id="loginForm" onsubmit="window.handleLogin(event)" class="space-y-4">
                 <input type="text" id="loginUsername" placeholder="User ID (e.g. user@print.com)" required class="w-full px-4 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-royal-500 outline-none bg-slate-50 text-sm font-semibold">
@@ -188,7 +191,6 @@
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-
             <form onsubmit="window.submitForgotPasswordTicket(event)" class="space-y-3">
                 <div>
                     <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आपकी User ID या Email</label>
@@ -202,9 +204,7 @@
                     <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">मैसेज (Optional)</label>
                     <input type="text" id="forgotUserNoteInput" placeholder="मैं अपना पासवर्ड भूल गया हूँ, नया पासवर्ड भेजें" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-semibold bg-slate-50 focus:bg-white outline-none">
                 </div>
-
                 <div id="forgotResultBox" style="display: none;"></div>
-
                 <button type="submit" id="btnSubmitForgotTicket" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl text-xs md:text-sm shadow-glow transition">
                     <i class="fa-solid fa-paper-plane mr-1"></i> Raise Password Reset Ticket
                 </button>
@@ -212,42 +212,50 @@
         </div>
     </div>
 
-    <!-- DASHBOARD SCREEN -->
+    <!-- ================= DASHBOARD SCREEN ================= -->
     <div id="dashboardSection" style="display: none;" class="flex-grow flex-col">
-        <header class="bg-dark-950 shadow-lg px-3 md:px-6 py-2.5 flex justify-between items-center sticky top-0 z-40 border-b border-royal-500">
-            <div class="flex items-center gap-2">
-                <div id="portalHeaderIcon" class="w-8 h-8 bg-gradient-to-br from-royal-400 to-royal-600 text-white rounded-xl flex items-center justify-center">
+        
+        <!-- TOP HEADER BAR -->
+        <header class="bg-dark-950 shadow-lg px-4 md:px-6 py-2.5 flex justify-between items-center sticky top-0 z-40 border-b border-royal-500">
+            <div class="flex items-center gap-3">
+                <div id="portalHeaderIcon" class="w-9 h-9 bg-gradient-to-br from-royal-400 to-royal-600 text-white rounded-xl flex items-center justify-center">
                     <i class="fa-solid fa-sun text-sm"></i>
                 </div>
-                <div class="flex items-center gap-1.5">
-                    <h2 id="portalHeaderTitle" class="text-base md:text-lg font-black text-white">Ojas <span class="text-royal-400">Portal</span></h2>
-                    <span id="vipStatusBadge" style="display: none;" class="items-center gap-1 bg-gradient-to-r from-yellow-300 to-amber-500 text-dark-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
-                        <i class="fa-solid fa-crown text-[8px]"></i> VIP
-                    </span>
+                <div>
+                    <!-- Name Changed to UP Print Portal -->
+                    <h2 id="portalHeaderTitle" class="text-sm md:text-xl font-black text-white leading-tight">UP Print <span class="text-royal-400">Portal</span></h2>
+                    <div class="flex items-center gap-1.5">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">उत्तर प्रदेश</p>
+                        <span id="vipStatusBadge" style="display: none;" class="bg-gradient-to-r from-yellow-300 to-amber-500 text-dark-950 text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase">
+                            <i class="fa-solid fa-crown"></i> VIP
+                        </span>
+                    </div>
                 </div>
             </div>
 
+            <!-- RIGHT CONTROLS -->
             <div class="flex items-center gap-2 relative">
-                <a href="admin.html" id="adminPanelLink" style="display: none;" class="bg-dark-800 border border-slate-700 text-royal-300 hover:text-white px-2.5 py-1.5 rounded-xl text-xs font-bold"><i class="fa-solid fa-shield-halved"></i> <span class="hidden sm:inline ml-1">Admin</span></a>
+                <a href="admin.html" id="adminPanelLink" style="display: none;" class="bg-dark-800 border border-slate-700 text-royal-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-bold"><i class="fa-solid fa-shield-halved"></i> <span class="hidden sm:inline ml-1">Admin</span></a>
                 
-                <div id="creditDisplayBox" style="display: none;" class="bg-royal-500/15 border border-royal-500/40 px-2.5 py-1 rounded-xl text-xs font-bold text-royal-300 items-center cursor-pointer hover:bg-royal-500/25 transition" onclick="window.selectGearOption('add_credit')">
-                    <i class="fa-solid fa-wallet mr-1 text-royal-400"></i> <span id="displayCredits" class="font-black text-white">0</span> <span class="hidden sm:inline ml-1 text-[10px]">Cr</span>
+                <div id="creditDisplayBox" style="display: none;" class="bg-royal-500/15 border border-royal-500/40 px-3 py-1.5 rounded-xl text-xs font-bold text-royal-300 items-center cursor-pointer hover:bg-royal-500/25 transition shadow-sm" onclick="window.selectGearOption('add_credit')">
+                    <i class="fa-solid fa-wallet mr-1.5 text-royal-400"></i> <span id="displayCredits" class="font-black text-white text-sm">0</span> <span class="hidden sm:inline ml-1 text-[10px]">Cr</span>
                 </div>
 
-                <button onclick="window.selectGearOption('support_chat')" class="relative bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white border border-green-500/40 px-2.5 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5" title="Live Support Chat">
+                <button onclick="window.selectGearOption('support_chat')" class="relative bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white border border-green-500/40 px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 shadow-sm" title="Live Support Chat">
                     <i class="fa-solid fa-comments text-sm"></i>
                     <span class="hidden md:inline">Support</span>
                     <span id="headerSupportUnreadBadge" style="display: none;" class="bg-red-600 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full animate-bounce">0</span>
                 </button>
                 
-                <button id="gearMenuBtn" onclick="window.toggleGearMenu(event)" class="w-9 h-9 rounded-xl bg-dark-800 hover:bg-royal-500 text-royal-300 hover:text-dark-950 border border-slate-700 flex items-center justify-center transition shadow-sm" title="Settings & History Menu">
-                    <i class="fa-solid fa-gear text-sm"></i>
+                <button id="gearMenuBtn" onclick="window.toggleGearMenu(event)" class="w-10 h-10 rounded-xl bg-dark-800 hover:bg-royal-500 text-royal-300 hover:text-dark-950 border border-slate-700 flex items-center justify-center transition shadow-sm" title="Settings & History Menu">
+                    <i class="fa-solid fa-gear"></i>
                 </button>
 
-                <div id="gearDropdownMenu" class="hidden absolute right-0 top-12 w-60 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200 py-2 z-50">
-                    <div class="px-4 py-2 border-b border-slate-100 bg-slate-50">
+                <!-- DROPDOWN MENU -->
+                <div id="gearDropdownMenu" class="hidden absolute right-0 top-12 w-64 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200 py-2 z-50">
+                    <div class="px-4 py-2.5 border-b border-slate-100 bg-slate-50">
                         <p class="text-[10px] font-bold text-slate-400 uppercase">Logged in as</p>
-                        <p id="displayUser" class="text-xs font-black text-dark-900 truncate"></p>
+                        <p id="displayUser" class="text-sm font-black text-dark-900 truncate"></p>
                         <p id="gearVipDaysText" class="text-[10px] font-bold text-amber-600 mt-0.5"></p>
                     </div>
                     <div class="py-1">
@@ -269,7 +277,7 @@
                         </button>
                     </div>
                     <div class="border-t border-slate-100 pt-1">
-                        <button onclick="window.handleLogout()" class="w-full px-4 py-2 text-left text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-2.5">
+                        <button onclick="window.handleLogout()" class="w-full px-4 py-2.5 text-left text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-2.5">
                             <i class="fa-solid fa-power-off w-4"></i> Logout
                         </button>
                     </div>
@@ -277,61 +285,116 @@
             </div>
         </header>
 
-        <main class="max-w-5xl mx-auto w-full p-3 md:p-6 flex-grow">
-            <div id="liveUpdateBannerContainer" style="display: none;" class="mb-3.5"></div>
-
-            <div id="normalUserVipPromo" style="display: none;" class="mb-4 rounded-2xl vip-promo-shine border border-royal-400 p-3 text-white shadow-md">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                    <div class="flex items-center gap-2">
-                        <span class="bg-amber-400 text-dark-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase shrink-0"><i class="fa-solid fa-crown"></i> VIP ACCESS</span>
-                        <p id="normalPromoTextDesc" class="text-xs font-bold text-royal-100">
-                            VIP लें: <strong>18+ DOB & सारे 9 Official Annexures</strong> अनलॉक करें (सभी डॉक्यूमेंट 10 Cr)!
-                        </p>
-                    </div>
-                    <div class="flex items-center gap-1.5 w-full sm:w-auto justify-end">
-                        <button onclick="window.jumpToVipUpgrade(30)" class="flex-1 sm:flex-initial bg-dark-900 hover:bg-royal-400 hover:text-dark-950 text-royal-300 border border-royal-400 px-2.5 py-1 rounded-lg text-[11px] font-black transition">1M ₹149</button>
-                        <button onclick="window.jumpToVipUpgrade(60)" class="flex-1 sm:flex-initial bg-dark-900 hover:bg-royal-400 hover:text-dark-950 text-royal-300 border border-royal-400 px-2.5 py-1 rounded-lg text-[11px] font-black transition">2M ₹249</button>
-                        <button onclick="window.jumpToVipUpgrade(90)" class="flex-1 sm:flex-initial bg-amber-400 text-dark-950 px-2.5 py-1 rounded-lg text-[11px] font-black transition">3M ₹299</button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="standardServicesGrid" class="grid grid-cols-2 gap-2.5 mb-3">
-                <button onclick="window.switchService('domicile')" id="btn-domicile" class="service-tab"><i class="fa-solid fa-house-chimney"></i> Domicile (मूल निवास)</button>
-                <button onclick="window.switchService('caste')" id="btn-caste" class="service-tab"><i class="fa-solid fa-users"></i> Caste (जाति प्रमाण पत्र)</button>
-            </div>
-
-            <div id="vipServicesBar" style="display: none;" class="mb-4 p-3 md:p-4 rounded-2xl bg-dark-950/90 border border-royal-400 shadow-vip-glow">
-                <div class="flex items-center justify-between mb-2.5 pb-1.5 border-b border-slate-800">
-                    <span id="vipBarTitleLabel" class="text-[11px] font-black uppercase tracking-wider text-royal-300 flex items-center gap-1.5">
-                        <i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures)
-                    </span>
-                    <button onclick="window.selectGearOption('history')" class="text-[10px] text-slate-300 hover:text-royal-300 font-bold">
-                        <i class="fa-solid fa-folder-open mr-1"></i> Saved Files
-                    </button>
-                </div>
-                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                    <button onclick="window.switchService('dob18')" id="btn-dob18" class="vip-tab"><i class="fa-solid fa-cake-candles"></i> DOB MEERUT 18+</button>
-                    <button onclick="window.switchService('annexure1')" id="btn-annexure1" class="vip-tab">Annexure 1</button>
-                    <button onclick="window.switchService('annexure1a')" id="btn-annexure1a" class="vip-tab">Annexure 1A</button>
-                    <button onclick="window.switchService('annexure3')" id="btn-annexure3" class="vip-tab">Annexure 3</button>
-                    <button onclick="window.switchService('annexure3a')" id="btn-annexure3a" class="vip-tab">Annexure 3A</button>
-                    <button onclick="window.switchService('annexureb')" id="btn-annexureb" class="vip-tab">Annexure B</button>
-                    <button onclick="window.switchService('annexurec')" id="btn-annexurec" class="vip-tab">Annexure C</button>
-                    <button onclick="window.switchService('annexured')" id="btn-annexured" class="vip-tab">Annexure D</button>
-                    <button onclick="window.switchService('annexuree')" id="btn-annexuree" class="vip-tab">Annexure E</button>
-                    <button onclick="window.switchService('annexuref')" id="btn-annexuref" class="vip-tab">Annexure F</button>
-                </div>
-            </div>
+        <!-- ================= MAIN TWO-COLUMN LAYOUT ================= -->
+        <main class="max-w-[1400px] mx-auto w-full p-3 md:p-6 flex-grow flex flex-col lg:flex-row gap-5 lg:gap-8 items-start">
             
-            <div id="mainFormCard" class="bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-card border border-slate-100 p-4 md:p-7">
-                <div id="formContainer"></div>
-            </div>
+            <!-- LEFT SIDEBAR (NAVIGATION CARDS) -->
+            <aside class="w-full lg:w-72 xl:w-80 flex-shrink-0 flex flex-col gap-4 lg:sticky lg:top-[88px] z-30">
+                
+                <!-- Live Banner -->
+                <div id="liveUpdateBannerContainer" style="display: none;"></div>
+
+                <!-- VIP Promo -->
+                <div id="normalUserVipPromo" style="display: none;" class="rounded-2xl vip-promo-shine border border-royal-400 p-3.5 text-white shadow-md">
+                    <div class="flex flex-col gap-3">
+                        <div class="flex items-center gap-2">
+                            <span class="bg-amber-400 text-dark-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase shrink-0"><i class="fa-solid fa-crown"></i> VIP ACCESS</span>
+                            <p id="normalPromoTextDesc" class="text-xs font-bold text-royal-100 leading-tight">
+                                VIP लें: <strong>18+ DOB & सारे 9 Official Annexures</strong> अनलॉक करें!
+                            </p>
+                        </div>
+                        <div class="grid grid-cols-3 gap-1.5 w-full">
+                            <button onclick="window.jumpToVipUpgrade(30)" class="bg-dark-900 hover:bg-royal-400 hover:text-dark-950 text-royal-300 border border-royal-400 py-1.5 rounded-lg text-[10px] font-black transition">1M ₹149</button>
+                            <button onclick="window.jumpToVipUpgrade(60)" class="bg-dark-900 hover:bg-royal-400 hover:text-dark-950 text-royal-300 border border-royal-400 py-1.5 rounded-lg text-[10px] font-black transition">2M ₹249</button>
+                            <button onclick="window.jumpToVipUpgrade(90)" class="bg-amber-400 text-dark-950 py-1.5 rounded-lg text-[10px] font-black transition shadow-sm">3M ₹299</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 1. Standard Services Sidebar Card -->
+                <div class="bg-white rounded-2xl p-4 shadow-card border border-slate-200">
+                    <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1 border-b border-slate-100 pb-2">
+                        <i class="fa-solid fa-file-lines mr-1.5"></i> Standard Services
+                    </h3>
+                    <div id="standardServicesGrid" class="grid grid-cols-2 lg:grid-cols-1 gap-2.5">
+                        <button onclick="window.switchService('domicile')" id="btn-domicile" class="service-tab">
+                            <i class="fa-solid fa-house-chimney w-5 text-center"></i> 
+                            <span class="text-left flex-1 whitespace-nowrap">Domicile <span class="hidden xl:inline text-[10px] font-semibold opacity-80">(मूल निवास)</span></span>
+                        </button>
+                        <button onclick="window.switchService('caste')" id="btn-caste" class="service-tab">
+                            <i class="fa-solid fa-users w-5 text-center"></i> 
+                            <span class="text-left flex-1 whitespace-nowrap">Caste <span class="hidden xl:inline text-[10px] font-semibold opacity-80">(जाति प्रमाण पत्र)</span></span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. VIP Services Sidebar Card -->
+                <div id="vipServicesBar" style="display: none;" class="bg-dark-950 rounded-2xl p-4 border border-royal-500 shadow-vip-glow">
+                    <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                        <span id="vipBarTitleLabel" class="text-[11px] font-black uppercase tracking-widest text-royal-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-crown text-royal-400 text-sm"></i> VIP Annexures
+                        </span>
+                        <button onclick="window.selectGearOption('history')" class="w-7 h-7 flex items-center justify-center rounded-lg bg-dark-800 text-royal-400 hover:bg-royal-500 hover:text-dark-900 transition" title="Saved Files">
+                            <i class="fa-solid fa-folder-open text-[10px]"></i>
+                        </button>
+                    </div>
+                    <div id="vipTabsContainer" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-1 gap-2">
+                        <button onclick="window.switchService('dob18')" id="btn-dob18" class="vip-tab">
+                            <i class="fa-solid fa-cake-candles w-5 text-center text-amber-500"></i> 
+                            <span class="text-left flex-1 font-black tracking-wide">DOB 18+</span>
+                        </button>
+                        <button onclick="window.switchService('annexure1')" id="btn-annexure1" class="vip-tab">
+                            <i class="fa-solid fa-file-signature w-5 text-center"></i> 
+                            <span class="text-left flex-1">Annexure 1</span>
+                        </button>
+                        <button onclick="window.switchService('annexure1a')" id="btn-annexure1a" class="vip-tab">
+                            <i class="fa-solid fa-child-reaching w-5 text-center"></i> 
+                            <span class="text-left flex-1">Annexure 1A</span>
+                        </button>
+                        <button onclick="window.switchService('annexure3')" id="btn-annexure3" class="vip-tab">
+                            <i class="fa-solid fa-bolt w-5 text-center"></i> 
+                            <span class="text-left flex-1">Annexure 3</span>
+                        </button>
+                        <button onclick="window.switchService('annexure3a')" id="btn-annexure3a" class="vip-tab">
+                            <i class="fa-solid fa-child w-5 text-center"></i> 
+                            <span class="text-left flex-1">Annexure 3A</span>
+                        </button>
+                        <button onclick="window.switchService('annexureb')" id="btn-annexureb" class="vip-tab">
+                            <i class="fa-solid fa-file-contract w-5 text-center"></i> 
+                            <span class="text-left flex-1">Annexure B</span>
+                        </button>
+                        <button onclick="window.switchService('annexurec')" id="btn-annexurec" class="vip-tab">
+                            <i class="fa-solid fa-file-contract w-5 text-center"></i> 
+                            <span class="text-left flex-1">Annexure C</span>
+                        </button>
+                        <button onclick="window.switchService('annexured')" id="btn-annexured" class="vip-tab">
+                            <i class="fa-solid fa-file-contract w-5 text-center"></i> 
+                            <span class="text-left flex-1">Annexure D</span>
+                        </button>
+                        <button onclick="window.switchService('annexuree')" id="btn-annexuree" class="vip-tab">
+                            <i class="fa-solid fa-file-contract w-5 text-center"></i> 
+                            <span class="text-left flex-1">Annexure E</span>
+                        </button>
+                        <button onclick="window.switchService('annexuref')" id="btn-annexuref" class="vip-tab">
+                            <i class="fa-solid fa-child-reaching w-5 text-center"></i> 
+                            <span class="text-left flex-1">Annexure F</span>
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- RIGHT MAIN CONTENT (FORMS & OTHER VIEWS) -->
+            <section class="flex-1 w-full min-w-0">
+                <div id="mainFormCard" class="bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-card border border-slate-100 p-4 md:p-8 min-h-[500px]">
+                    <!-- JS Injects forms, chat, history, etc here -->
+                    <div id="formContainer"></div>
+                </div>
+            </section>
         </main>
     </div>
     
-    <footer class="bg-dark-950 border-t border-slate-800 text-center py-3.5 text-[10px] font-bold text-slate-400 mt-auto uppercase tracking-widest">
-        © 2026 Ojas Print Service | Secure Portal
+    <footer class="bg-dark-950 border-t border-slate-800 text-center py-4 text-[10px] font-bold text-slate-500 mt-auto uppercase tracking-widest">
+        © 2026 Uttar Pradesh Print Portal | Ojas Service
     </footer>
 </body>
 </html>
