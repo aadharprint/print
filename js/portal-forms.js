@@ -201,9 +201,8 @@ window.submitLocalAnnexureForm = async function(event, serviceType, fileIdKey) {
     }
 };
 
-// ================= BACKGROUND WATERMARK HELPER (NEW ADVANCED DESIGN) =================
+// ================= BACKGROUND WATERMARK HELPER (ADVANCED FORM OVERLAY) =================
 const getWatermarkHtml = (srv) => {
-    // हर फॉर्म के लिए अलग-अलग इमोजी और नाम
     const wMap = {
         'domicile': { emoji: '🏠', text: 'DOMICILE' },
         'caste': { emoji: '👥', text: 'CASTE CERT' },
@@ -221,25 +220,16 @@ const getWatermarkHtml = (srv) => {
     };
     const wm = wMap[srv] || { emoji: '📄', text: srv.toUpperCase() };
     
-    // 5 बार नाम और 1 सेंटर इमोजी वाला HTML
+    // z-[60] Ensures it is above form inputs, pointer-events-none ensures it doesn't block typing
     return `
-        <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.045] select-none z-0 overflow-hidden">
-            <!-- Central Emoji -->
-            <div class="absolute text-[180px] md:text-[250px] transform -rotate-12 grayscale-[20%]">${wm.emoji}</div>
-            
-            <!-- 5 Times Repeating Text Pattern around Emoji -->
-            <div class="absolute inset-0 flex flex-col justify-between items-center py-10 md:py-16 transform -rotate-12 w-[150%] left-[-25%]">
-                <div class="flex justify-between w-full px-6 md:px-12">
-                    <span class="text-[40px] md:text-[60px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span>
-                    <span class="text-[40px] md:text-[60px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span>
-                </div>
-                <div class="text-center w-full">
-                    <span class="text-[40px] md:text-[60px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span>
-                </div>
-                <div class="flex justify-between w-full px-6 md:px-12">
-                    <span class="text-[40px] md:text-[60px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span>
-                    <span class="text-[40px] md:text-[60px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span>
-                </div>
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-[60] overflow-hidden select-none">
+            <div class="absolute text-[160px] md:text-[220px] transform -rotate-12 grayscale-[10%] opacity-[0.06]">${wm.emoji}</div>
+            <div class="absolute inset-0 flex flex-col justify-around items-center py-6 transform -rotate-12 w-[200%] left-[-50%] opacity-[0.03]">
+                <div class="flex justify-around w-full px-4"><span class="text-[30px] md:text-[45px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span><span class="text-[30px] md:text-[45px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span><span class="text-[30px] md:text-[45px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span></div>
+                <div class="flex justify-around w-full px-4"><span class="text-[30px] md:text-[45px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span><span class="text-[30px] md:text-[45px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span></div>
+                <div class="flex justify-around w-full px-4"><span class="text-[30px] md:text-[45px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span><span class="text-[30px] md:text-[45px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span><span class="text-[30px] md:text-[45px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span></div>
+                <div class="flex justify-around w-full px-4"><span class="text-[30px] md:text-[45px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span><span class="text-[30px] md:text-[45px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span></div>
+                <div class="flex justify-around w-full px-4"><span class="text-[30px] md:text-[45px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span><span class="text-[30px] md:text-[45px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span><span class="text-[30px] md:text-[45px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span></div>
             </div>
         </div>
     `;
@@ -250,14 +240,14 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
     const todayISO = new Date().toISOString().split('T')[0];
 
     const vleSelectHtml = `
-        <select name="VLE" onchange="window.toggleCustomInput(this, 'customVleInput')" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none">
+        <select name="VLE" onchange="window.toggleCustomInput(this, 'customVleInput')" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none relative z-10">
             ${window.VLE_NAMES_LIST.map(v => `<option value="${v}">${v}</option>`).join('')}
             <option value="OTHER">OTHER (अन्य नाम दर्ज करें)</option>
         </select>
-        <input type="text" id="customVleInput" name="VLE_CUSTOM" placeholder="VLE का नाम यहाँ लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
+        <input type="text" id="customVleInput" name="VLE_CUSTOM" placeholder="VLE का नाम यहाँ लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase relative z-10">
     `;
 
-    // 🌟 VIP ANNEXURE DROPDOWN UI WITH EMOJIS
+    // 🌟 VIP ANNEXURE DROPDOWN UI WITH EMOJIS (Kept outside watermark)
     const annexureDropdownHtml = serviceName.startsWith('annexure') ? `
         <div class="mb-6 p-1 rounded-2xl bg-gradient-to-r from-amber-400 via-royal-500 to-amber-600 shadow-vip-glow relative z-20">
             <div class="bg-dark-950 p-4 rounded-[14px]">
@@ -282,17 +272,17 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
     // DOMICILE
     if (serviceName === 'domicile') {
         container.innerHTML = `
-            ${getWatermarkHtml('domicile')}
-            <div class="relative z-10">
-                <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
-                    <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-house-chimney text-royal-500 mr-1.5"></i> Domicile Certificate (मूल निवास)</h3>
-                    ${statusTagHtml}
-                </div>
-                <form onsubmit="window.submitForm(event, 'Domicile')" class="space-y-3.5">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4 relative z-20">
+                <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-house-chimney text-royal-500 mr-1.5"></i> Domicile Certificate (मूल निवास)</h3>
+                ${statusTagHtml}
+            </div>
+            <div class="relative overflow-hidden rounded-2xl p-1 -mx-1">
+                ${getWatermarkHtml('domicile')}
+                <form onsubmit="window.submitForm(event, 'Domicile')" class="space-y-3.5 relative z-10">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">District (जिला)</label>
-                            <select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                            <select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10">
                                 <option value="BAGHPAT">बागपत</option>
                                 <option value="SHAMLI">शामली</option>
                                 <option value="MUZAFFARNAGAR">मुजफ्फरनगर</option>
@@ -303,46 +293,46 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Tehsil (तहसील)</label>
-                            <select id="tehsilSelect" name="TAHSEEL" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></select>
+                            <select id="tehsilSelect" name="TAHSEEL" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"></select>
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Police Station (थाना)</label>
-                            <select id="thanaSelect" name="THANA" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></select>
+                            <select id="thanaSelect" name="THANA" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"></select>
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation (संबंध)</label>
-                            <select name="REL" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none">
+                            <select name="REL" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none relative z-10">
                                 <option value="पुत्र / पुत्री">पुत्र / पुत्री</option>
                                 <option value="पत्नी      .">पत्नी</option>
                             </select>
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Customer Name (English)</label>
-                            <input type="text" name="NAME" placeholder="Enter Full Name" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                            <input type="text" name="NAME" placeholder="Enter Full Name" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Hindi Name (Optional)</label>
-                            <input type="text" name="HNAME" placeholder="हिंदी में नाम (वैकल्पिक)" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none">
+                            <input type="text" name="HNAME" placeholder="हिंदी में नाम (वैकल्पिक)" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none relative z-10">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Father / Husband Name</label>
-                            <input type="text" name="FNAME" placeholder="Enter Father/Husband Name" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                            <input type="text" name="FNAME" placeholder="Enter Father/Husband Name" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Mother Name</label>
-                            <input type="text" name="MNAME" placeholder="Enter Mother Name" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                            <input type="text" name="MNAME" placeholder="Enter Mother Name" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">House Number (मकान नंबर - MN)</label>
-                            <input type="text" name="MN" placeholder="Enter House No" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                            <input type="text" name="MN" placeholder="Enter House No" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Area / Locality (मोहल्ला / पोस्ट)</label>
-                            <input type="text" name="AREA" placeholder="Enter Area / Locality" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                            <input type="text" name="AREA" placeholder="Enter Area / Locality" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Village / Ward Name (गाँव / वार्ड)</label>
-                            <input type="text" name="GRAM" placeholder="Enter Village / Ward Name" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                            <input type="text" name="GRAM" placeholder="Enter Village / Ward Name" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">VLE Name (जन सेवा केंद्र संचालक)</label>
@@ -350,10 +340,10 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
                         </div>
                         <div class="md:col-span-2">
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Upload Photo</label>
-                            <input type="file" name="PHOTO" accept="image/*" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-royal-100 file:text-royal-700 cursor-pointer">
+                            <input type="file" name="PHOTO" accept="image/*" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-royal-100 file:text-royal-700 cursor-pointer relative z-10">
                         </div>
                     </div>
-                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-glow transition text-sm md:text-base">${submitBtnText}</button>
+                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-glow transition text-sm md:text-base relative z-10">${submitBtnText}</button>
                 </form>
             </div>
         `;
@@ -364,17 +354,17 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
     // CASTE
     if (serviceName === 'caste') {
         container.innerHTML = `
-            ${getWatermarkHtml('caste')}
-            <div class="relative z-10">
-                <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
-                    <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-users text-royal-500 mr-1.5"></i> Caste Certificate (जाति प्रमाण पत्र)</h3>
-                    ${statusTagHtml}
-                </div>
-                <form onsubmit="window.submitForm(event, 'Caste')" class="space-y-3.5">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4 relative z-20">
+                <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-users text-royal-500 mr-1.5"></i> Caste Certificate (जाति प्रमाण पत्र)</h3>
+                ${statusTagHtml}
+            </div>
+            <div class="relative overflow-hidden rounded-2xl p-1 -mx-1">
+                ${getWatermarkHtml('caste')}
+                <form onsubmit="window.submitForm(event, 'Caste')" class="space-y-3.5 relative z-10">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">District (जिला)</label>
-                            <select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                            <select id="districtSelect" name="DISTRICT" onchange="window.updateTehsilsAndThanas()" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10">
                                 <option value="BAGHPAT">बागपत</option>
                                 <option value="SHAMLI">शामली</option>
                                 <option value="MUZAFFARNAGAR">मुजफ्फरनगर</option>
@@ -383,29 +373,29 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
                                 <option value="GHAZIABAD">गाजियाबाद</option>
                             </select>
                         </div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Tehsil (तहसील)</label><select id="tehsilSelect" name="TAHSEEL" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></select></div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="REL" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none"><option value="पुत्र / पुत्री">पुत्र / पुत्री</option><option value="पत्नी      .">पत्नी</option></select></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Tehsil (तहसील)</label><select id="tehsilSelect" name="TAHSEEL" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"></select></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="REL" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none relative z-10"><option value="पुत्र / पुत्री">पुत्र / पुत्री</option><option value="पत्नी      .">पत्नी</option></select></div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Caste (जाति)</label>
-                            <select name="CAST" onchange="window.toggleCustomInput(this, 'customCasteInput')" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase">
+                            <select name="CAST" onchange="window.toggleCustomInput(this, 'customCasteInput')" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10">
                                 ${window.CASTE_OPTIONS_LIST.map(c => `<option value="${c}">${c}</option>`).join('')}
                                 <option value="OTHER">OTHER (अन्य जाति लिखें)</option>
                             </select>
-                            <input type="text" id="customCasteInput" name="CAST_CUSTOM" placeholder="जाति का नाम यहाँ लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
+                            <input type="text" id="customCasteInput" name="CAST_CUSTOM" placeholder="जाति का नाम यहाँ लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase relative z-10">
                         </div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Customer Name</label><input type="text" name="NAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Hindi Name (Optional)</label><input type="text" name="HNAME" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none"></div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Father/Husband Name</label><input type="text" name="FNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Mother Name</label><input type="text" name="MNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Area / Locality</label><input type="text" name="AREA" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Village / Ward Name</label><input type="text" name="GRAM" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Customer Name</label><input type="text" name="NAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Hindi Name (Optional)</label><input type="text" name="HNAME" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none relative z-10"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Father/Husband Name</label><input type="text" name="FNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Mother Name</label><input type="text" name="MNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Area / Locality</label><input type="text" name="AREA" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Village / Ward Name</label><input type="text" name="GRAM" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"></div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">VLE Name</label>
                             ${vleSelectHtml}
                         </div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Upload Photo</label><input type="file" name="PHOTO" accept="image/*" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-royal-100 file:text-royal-700 cursor-pointer"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Upload Photo</label><input type="file" name="PHOTO" accept="image/*" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-royal-100 file:text-royal-700 cursor-pointer relative z-10"></div>
                     </div>
-                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-glow transition text-sm md:text-base">${submitBtnText}</button>
+                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-glow transition text-sm md:text-base relative z-10">${submitBtnText}</button>
                 </form>
             </div>
         `;
@@ -425,24 +415,24 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
             : 'Generate DOB Certificate (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>';
 
         container.innerHTML = `
-            ${getWatermarkHtml('dob18')}
-            <div class="relative z-10">
-                <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3 mb-4">
-                    <div>
-                        <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-cake-candles text-royal-500 mr-1.5"></i> Date of Birth Certificate (18+ VIP)</h3>
-                        <p class="text-[11px] font-bold text-slate-500">VIP एक्सक्लूसिव सर्विस</p>
-                    </div>
-                    ${statusTagHtml}
+            <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3 mb-4 relative z-20">
+                <div>
+                    <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-cake-candles text-royal-500 mr-1.5"></i> Date of Birth Certificate (18+ VIP)</h3>
+                    <p class="text-[11px] font-bold text-slate-500">VIP एक्सक्लूसिव सर्विस</p>
                 </div>
-                <form onsubmit="window.submitForm(event, 'DOB 18+')" class="space-y-3.5">
+                ${statusTagHtml}
+            </div>
+            <div class="relative overflow-hidden rounded-2xl p-1 -mx-1">
+                ${getWatermarkHtml('dob18')}
+                <form onsubmit="window.submitForm(event, 'DOB 18+')" class="space-y-3.5 relative z-10">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Full Name</label><input type="text" name="NAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Sex / Gender</label><select name="SEX" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"><option value="MALE">MALE</option><option value="FEMALE">FEMALE</option></select></div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Date of Birth (18+)</label><input type="date" name="DOB" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none"></div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Father Name</label><input type="text" name="FNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Mother Name</label><input type="text" name="MNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Pin Code</label><input type="text" name="PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase"></div>
-                        <div class="md:col-span-2">
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Full Name</label><input type="text" name="NAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Sex / Gender</label><select name="SEX" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"><option value="MALE">MALE</option><option value="FEMALE">FEMALE</option></select></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Date of Birth (18+)</label><input type="date" name="DOB" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none relative z-10"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Father Name</label><input type="text" name="FNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Mother Name</label><input type="text" name="MNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Pin Code</label><input type="text" name="PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"></div>
+                        <div class="md:col-span-2 relative z-10">
                             <div class="flex justify-between items-center mb-1">
                                 <label class="text-[11px] font-bold text-slate-500 uppercase">ADDRESS ( 'Uttar Pradesh' लिखने की आवश्यकता नहीं है)</label>
                                 <span id="dobAddressCharCount" class="text-[10px] font-bold text-slate-400">7 / 38 Characters</span>
@@ -450,7 +440,7 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
                             <input type="text" id="dob18AddressInput" name="ADDRESS" value="VILL - " oninput="window.handleDob18AddressInput(this)" onblur="this.value = window.cleanDob18AddressString(this.value); window.handleDob18AddressInput(this);" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white outline-none uppercase">
                         </div>
                     </div>
-                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base">${dobSubmitBtnText}</button>
+                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base relative z-10">${dobSubmitBtnText}</button>
                 </form>
             </div>
         `;
@@ -465,22 +455,21 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
         }
 
         container.innerHTML = `
-            ${getWatermarkHtml('dob_minor')}
-            <div class="relative z-10">
-                <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3 mb-4">
-                    <div>
-                        <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-baby text-royal-500 mr-1.5"></i> Date of Birth Certificate (Minor)</h3>
-                        <p class="text-[11px] font-bold text-slate-500">VIP एक्सक्लूसिव सर्विस</p>
-                    </div>
-                    ${statusTagHtml}
+            <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3 mb-4 relative z-20">
+                <div>
+                    <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-baby text-royal-500 mr-1.5"></i> Date of Birth Certificate (Minor)</h3>
+                    <p class="text-[11px] font-bold text-slate-500">VIP एक्सक्लूसिव सर्विस</p>
                 </div>
-                
-                <div class="flex flex-col items-center justify-center py-16 px-4 text-center bg-amber-50/50 rounded-3xl border-2 border-dashed border-amber-200">
+                ${statusTagHtml}
+            </div>
+            <div class="relative overflow-hidden rounded-3xl p-1 -mx-1">
+                ${getWatermarkHtml('dob_minor')}
+                <div class="flex flex-col items-center justify-center py-16 px-4 text-center bg-amber-50/80 border-2 border-dashed border-amber-200 relative z-10 rounded-2xl">
                     <div class="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
                         <i class="fa-solid fa-person-digging text-4xl text-amber-500 animate-bounce"></i>
                     </div>
                     <h4 class="text-2xl font-black text-dark-900 uppercase tracking-widest mb-1">Coming Soon</h4>
-                    <p class="text-sm text-slate-500 font-bold max-w-md mx-auto">इस सर्विस का फॉर्म और कोड अभी तैयार किया जा रहा है। जल्द ही यह सर्विस यहाँ उपलब्ध होगी!</p>
+                    <p class="text-sm text-slate-600 font-bold max-w-md mx-auto">इस सर्विस का फॉर्म और कोड अभी तैयार किया जा रहा है। जल्द ही यह सर्विस यहाँ उपलब्ध होगी!</p>
                 </div>
             </div>
         `;
@@ -491,55 +480,55 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
     if (serviceName === 'annexure1') {
         if (!window.currentUserData || !window.currentUserData.isVip) { window.switchService(window.getFirstAllowedTab()); return true; }
         container.innerHTML = `
-            ${getWatermarkHtml('annexure1')}
-            <div class="relative z-10">
-                ${annexureDropdownHtml}
-                <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
-                    <div>
-                        <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-file-signature text-royal-500 mr-1.5"></i> Annexure-I (Adults DoB Update)</h3>
-                        <p class="text-[11px] text-slate-500">जनरेट करने के बाद ⚙️ गियर आइकन -> Document History से Print व Download करें।</p>
-                    </div>
-                    ${statusTagHtml}
+            ${annexureDropdownHtml}
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4 relative z-20">
+                <div>
+                    <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-file-signature text-royal-500 mr-1.5"></i> Annexure-I (Adults DoB Update)</h3>
+                    <p class="text-[11px] text-slate-500">जनरेट करने के बाद ⚙️ गियर आइकन -> Document History से Print व Download करें।</p>
                 </div>
-                <form onsubmit="window.submitLocalAnnexureForm(event, 'Annexure 1', 'LOCAL_HTML_ANNEXURE_1')" class="space-y-3.5">
+                ${statusTagHtml}
+            </div>
+            <div class="relative overflow-hidden rounded-2xl p-1 -mx-1">
+                ${getWatermarkHtml('annexure1')}
+                <form onsubmit="window.submitLocalAnnexureForm(event, 'Annexure 1', 'LOCAL_HTML_ANNEXURE_1')" class="space-y-3.5 relative z-10">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आवेदक का नाम (Applicant Name)</label><input type="text" name="applicantName" placeholder="e.g. RAMESH KUMAR" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आवेदक का नाम (Applicant Name)</label><input type="text" name="applicantName" placeholder="e.g. RAMESH KUMAR" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
                         <div class="grid grid-cols-3 gap-2">
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="S/o">S/o</option><option value="D/o">D/o</option><option value="W/o">W/o</option></select></div>
-                            <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पिता / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. SURESH CHAND" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 relative z-10"><option value="S/o">S/o</option><option value="D/o">D/o</option><option value="W/o">W/o</option></select></div>
+                            <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पिता / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. SURESH CHAND" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">12-Digit ID Number (4-4 Pair)</label>
-                            <input type="text" name="idNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold tracking-wider uppercase bg-slate-50">
+                            <input type="text" name="idNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold tracking-wider uppercase bg-slate-50 relative z-10">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">कितनी बार DoB अपडेट किया?</label>
-                            <select name="updateTimes" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50">
+                            <select name="updateTimes" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 relative z-10">
                                 <option value="NEVER">NEVER (कभी नहीं)</option>
                                 <option value="ONCE">ONCE (एक बार)</option>
                                 <option value="MORE THAN ONCE">MORE THAN ONCE (एक से अधिक बार)</option>
                             </select>
                         </div>
-                        <div><label class="block text-[11px] font-bold text-green-700 uppercase mb-1">सही जन्मतिथि (Correct DoB)</label><input type="date" name="newDob" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold bg-green-50"></div>
-                        <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">पहले दर्ज जन्मतिथि (Old DoB)</label><input type="date" name="oldDob" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold bg-amber-50"></div>
+                        <div><label class="block text-[11px] font-bold text-green-700 uppercase mb-1">सही जन्मतिथि (Correct DoB)</label><input type="date" name="newDob" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold bg-green-50 relative z-10"></div>
+                        <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">पहले दर्ज जन्मतिथि (Old DoB)</label><input type="date" name="oldDob" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold bg-amber-50 relative z-10"></div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पहले दिया गया दस्तावेज़ (Old Doc)</label>
-                            <select name="oldDoc" onchange="window.toggleCustomInput(this, 'an1OldDocCustom')" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50">
+                            <select name="oldDoc" onchange="window.toggleCustomInput(this, 'an1OldDocCustom')" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10">
                                 ${window.buildDocSelectOptions("BIRTH CERTIFICATE")}
                             </select>
-                            <input type="text" id="an1OldDocCustom" name="oldDocCustom" placeholder="दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
+                            <input type="text" id="an1OldDocCustom" name="oldDocCustom" placeholder="दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase relative z-10">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">अभी दिया जा रहा दस्तावेज़ (New Doc)</label>
-                            <select name="newDoc" onchange="window.toggleCustomInput(this, 'an1NewDocCustom')" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50">
+                            <select name="newDoc" onchange="window.toggleCustomInput(this, 'an1NewDocCustom')" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10">
                                 ${window.buildDocSelectOptions("BIRTH CERTIFICATE")}
                             </select>
-                            <input type="text" id="an1NewDocCustom" name="newDocCustom" placeholder="दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
+                            <input type="text" id="an1NewDocCustom" name="newDocCustom" placeholder="दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase relative z-10">
                         </div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">शपथ पत्र की तारीख (Date)</label><input type="date" name="date" value="${todayISO}" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"></div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, TEHSIL, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">शपथ पत्र की तारीख (Date)</label><input type="date" name="date" value="${todayISO}" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 relative z-10"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, TEHSIL, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
                     </div>
-                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base">${submitBtnText}</button>
+                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base relative z-10">${submitBtnText}</button>
                 </form>
             </div>
         `;
@@ -550,45 +539,45 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
     if (serviceName === 'annexure1a') {
         if (!window.currentUserData || !window.currentUserData.isVip) { window.switchService(window.getFirstAllowedTab()); return true; }
         container.innerHTML = `
-            ${getWatermarkHtml('annexure1a')}
-            <div class="relative z-10">
-                ${annexureDropdownHtml}
-                <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
-                    <div>
-                        <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-child-reaching text-royal-500 mr-1.5"></i> Annexure-IA (Children DoB Update)</h3>
-                        <p class="text-[11px] text-slate-500">बच्चों (18 से कम) की जन्मतिथि अपडेट हेतु माता-पिता का शपथ पत्र।</p>
-                    </div>
-                    ${statusTagHtml}
+            ${annexureDropdownHtml}
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4 relative z-20">
+                <div>
+                    <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-child-reaching text-royal-500 mr-1.5"></i> Annexure-IA (Children DoB Update)</h3>
+                    <p class="text-[11px] text-slate-500">बच्चों (18 से कम) की जन्मतिथि अपडेट हेतु माता-पिता का शपथ पत्र।</p>
                 </div>
-                <form onsubmit="window.submitLocalAnnexureForm(event, 'Annexure 1A', 'LOCAL_HTML_ANNEXURE_1A')" class="space-y-3.5">
+                ${statusTagHtml}
+            </div>
+            <div class="relative overflow-hidden rounded-2xl p-1 -mx-1">
+                ${getWatermarkHtml('annexure1a')}
+                <form onsubmit="window.submitLocalAnnexureForm(event, 'Annexure 1A', 'LOCAL_HTML_ANNEXURE_1A')" class="space-y-3.5 relative z-10">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                        <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का नाम (Parent Name)</label><input type="text" name="parentName" placeholder="e.g. SURESH KUMAR" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
+                        <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का नाम (Parent Name)</label><input type="text" name="parentName" placeholder="e.g. SURESH KUMAR" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50 relative z-10"></div>
                         <div class="grid grid-cols-3 gap-2">
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="S/o">S/o</option><option value="W/o">W/o</option><option value="D/o">D/o</option></select></div>
-                            <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">दादा / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. RAMPHAL" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 relative z-10"><option value="S/o">S/o</option><option value="W/o">W/o</option><option value="D/o">D/o</option></select></div>
+                            <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">दादा / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. RAMPHAL" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का 12-Digit ID Number</label>
-                            <input type="text" name="parentIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-amber-50">
+                            <input type="text" name="parentIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-amber-50 relative z-10">
                         </div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
-                        <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का नाम (Child Name)</label><input type="text" name="childName" placeholder="e.g. AARAV KUMAR" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
+                        <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का नाम (Child Name)</label><input type="text" name="childName" placeholder="e.g. AARAV KUMAR" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50 relative z-10"></div>
                         <div>
                             <label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का 12-Digit ID Number</label>
-                            <input type="text" name="childIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-indigo-50">
+                            <input type="text" name="childIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-indigo-50 relative z-10">
                         </div>
-                        <div><label class="block text-[11px] font-bold text-green-800 uppercase mb-1">बच्चे की सही जन्मतिथि (Correct DoB)</label><input type="date" name="newDob" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold bg-green-50"></div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पहले दर्ज गलत जन्मतिथि (Old DoB)</label><input type="date" name="oldDob" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"></div>
+                        <div><label class="block text-[11px] font-bold text-green-800 uppercase mb-1">बच्चे की सही जन्मतिथि (Correct DoB)</label><input type="date" name="newDob" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold bg-green-50 relative z-10"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पहले दर्ज गलत जन्मतिथि (Old DoB)</label><input type="date" name="oldDob" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 relative z-10"></div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पहले दिया गया दस्तावेज़ (Old Doc)</label>
-                            <select name="oldDoc" onchange="window.toggleCustomInput(this, 'an1aOldDocCustom')" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50">
+                            <select name="oldDoc" onchange="window.toggleCustomInput(this, 'an1aOldDocCustom')" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10">
                                 ${window.buildDocSelectOptions("BIRTH CERTIFICATE")}
                             </select>
-                            <input type="text" id="an1aOldDocCustom" name="oldDocCustom" placeholder="दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
+                            <input type="text" id="an1aOldDocCustom" name="oldDocCustom" placeholder="दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase relative z-10">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">कितनी बार अपडेट किया?</label>
-                            <select name="updateTimes" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50">
+                            <select name="updateTimes" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 relative z-10">
                                 <option value="NEVER">NEVER (कभी नहीं)</option>
                                 <option value="ONCE">ONCE (एक बार)</option>
                                 <option value="MORE THAN ONCE">MORE THAN ONCE (एक से अधिक बार)</option>
@@ -596,14 +585,14 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">अभी दिया जा रहा दस्तावेज़ (New Doc)</label>
-                            <select name="newDoc" onchange="window.toggleCustomInput(this, 'an1aNewDocCustom')" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50">
+                            <select name="newDoc" onchange="window.toggleCustomInput(this, 'an1aNewDocCustom')" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10">
                                 ${window.buildDocSelectOptions("BIRTH CERTIFICATE")}
                             </select>
-                            <input type="text" id="an1aNewDocCustom" name="newDocCustom" placeholder="दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
+                            <input type="text" id="an1aNewDocCustom" name="newDocCustom" placeholder="दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase relative z-10">
                         </div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">शपथ पत्र की तारीख (Date)</label><input type="date" name="date" value="${todayISO}" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">शपथ पत्र की तारीख (Date)</label><input type="date" name="date" value="${todayISO}" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 relative z-10"></div>
                     </div>
-                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base">${submitBtnText}</button>
+                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base relative z-10">${submitBtnText}</button>
                 </form>
             </div>
         `;
@@ -614,76 +603,76 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
     if (serviceName === 'annexure3') {
         if (!window.currentUserData || !window.currentUserData.isVip) { window.switchService(window.getFirstAllowedTab()); return true; }
         container.innerHTML = `
-            ${getWatermarkHtml('annexure3')}
-            <div class="relative z-10">
-                ${annexureDropdownHtml}
-                <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
-                    <div>
-                        <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-bolt text-royal-500 mr-1.5"></i> Annexure-III (Adults Reactivation)</h3>
-                        <p class="text-[11px] text-slate-500">वयस्कों की निष्क्रिय आईडी को चालू (Reactivate) कराने हेतु शपथ पत्र। (जानकारी न होने पर <strong>टिक करें = NA</strong> चुनें)</p>
-                    </div>
-                    ${statusTagHtml}
+            ${annexureDropdownHtml}
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4 relative z-20">
+                <div>
+                    <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-bolt text-royal-500 mr-1.5"></i> Annexure-III (Adults Reactivation)</h3>
+                    <p class="text-[11px] text-slate-500">वयस्कों की निष्क्रिय आईडी को चालू (Reactivate) कराने हेतु शपथ पत्र। (जानकारी न होने पर <strong>टिक करें = NA</strong> चुनें)</p>
                 </div>
-                <form onsubmit="window.submitLocalAnnexureForm(event, 'Annexure 3', 'LOCAL_HTML_ANNEXURE_3')" class="space-y-3.5">
+                ${statusTagHtml}
+            </div>
+            <div class="relative overflow-hidden rounded-2xl p-1 -mx-1">
+                ${getWatermarkHtml('annexure3')}
+                <form onsubmit="window.submitLocalAnnexureForm(event, 'Annexure 3', 'LOCAL_HTML_ANNEXURE_3')" class="space-y-3.5 relative z-10">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आवेदक का नाम (Applicant Name)</label><input type="text" name="applicantName" placeholder="e.g. RAMESH KUMAR" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आवेदक का नाम (Applicant Name)</label><input type="text" name="applicantName" placeholder="e.g. RAMESH KUMAR" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
                         <div class="grid grid-cols-3 gap-2">
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="S/o">S/o</option><option value="D/o">D/o</option><option value="W/o">W/o</option></select></div>
-                            <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पिता / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. SURESH CHAND" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 relative z-10"><option value="S/o">S/o</option><option value="D/o">D/o</option><option value="W/o">W/o</option></select></div>
+                            <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पिता / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. SURESH CHAND" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">12-Digit ID Number (4-4 Pair)</label>
-                            <input type="text" name="idNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold tracking-wider uppercase bg-slate-50">
+                            <input type="text" name="idNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold tracking-wider uppercase bg-slate-50 relative z-10">
                         </div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
                         <div>
                             <label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">पहले दिया गया अमान्य दस्तावेज़ (Invalid Doc)</label>
-                            <select name="invalidDocName" onchange="window.toggleCustomInput(this, 'an3InvDocCustom')" class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50">
+                            <select name="invalidDocName" onchange="window.toggleCustomInput(this, 'an3InvDocCustom')" class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50 relative z-10">
                                 ${window.buildDocSelectOptions("INVALID BIRTH CERTIFICATE")}
                             </select>
-                            <input type="text" id="an3InvDocCustom" name="invalidDocNameCustom" placeholder="अमान्य दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
+                            <input type="text" id="an3InvDocCustom" name="invalidDocNameCustom" placeholder="अमान्य दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase relative z-10">
                         </div>
 
                         <div>
                             <div class="flex justify-between items-center mb-1">
                                 <label class="text-[11px] font-bold text-amber-800 uppercase">अमान्य दस्तावेज़ का नंबर (Doc No)</label>
-                                <label class="inline-flex items-center gap-1 cursor-pointer bg-amber-200/80 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black select-none">
+                                <label class="inline-flex items-center gap-1 cursor-pointer bg-amber-200/80 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black select-none relative z-10">
                                     <input type="checkbox" onchange="window.toggleNaField(this, 'an3InvDocNo', 'text')" class="accent-dark-900 w-3.5 h-3.5"> टिक करें = NA
                                 </label>
                             </div>
-                            <input type="text" id="an3InvDocNo" name="invalidDocNo" placeholder="Enter Document No (या ऊपर NA टिक करें)" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50">
+                            <input type="text" id="an3InvDocNo" name="invalidDocNo" placeholder="Enter Document No (या ऊपर NA टिक करें)" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50 relative z-10">
                         </div>
 
                         <div>
                             <div class="flex justify-between items-center mb-1">
                                 <label class="text-[11px] font-bold text-amber-800 uppercase">अमान्य दस्तावेज़ की तारीख (Doc Date)</label>
-                                <label class="inline-flex items-center gap-1 cursor-pointer bg-amber-200/80 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black select-none">
+                                <label class="inline-flex items-center gap-1 cursor-pointer bg-amber-200/80 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black select-none relative z-10">
                                     <input type="checkbox" onchange="window.toggleNaField(this, 'an3InvDocDate', 'date')" class="accent-dark-900 w-3.5 h-3.5"> टिक करें = NA
                                 </label>
                             </div>
-                            <input type="date" id="an3InvDocDate" name="invalidDocDate" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50">
+                            <input type="date" id="an3InvDocDate" name="invalidDocDate" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50 relative z-10">
                         </div>
 
                         <div>
                             <div class="flex justify-between items-center mb-1">
                                 <label class="text-[11px] font-bold text-amber-800 uppercase">EID Number (एनरोलमेंट आईडी)</label>
-                                <label class="inline-flex items-center gap-1 cursor-pointer bg-amber-200/80 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black select-none">
+                                <label class="inline-flex items-center gap-1 cursor-pointer bg-amber-200/80 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black select-none relative z-10">
                                     <input type="checkbox" onchange="window.toggleNaField(this, 'an3EidNo', 'text')" class="accent-dark-900 w-3.5 h-3.5"> टिक करें = NA
                                 </label>
                             </div>
-                            <input type="text" id="an3EidNo" name="eidNumber" placeholder="Enter EID Number (या ऊपर NA टिक करें)" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50">
+                            <input type="text" id="an3EidNo" name="eidNumber" placeholder="Enter EID Number (या ऊपर NA टिक करें)" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50 relative z-10">
                         </div>
 
                         <div>
                             <label class="block text-[11px] font-bold text-green-800 uppercase mb-1">अभी दिया जा रहा सही दस्तावेज़ (New Genuine Doc)</label>
-                            <select name="newDoc" onchange="window.toggleCustomInput(this, 'an3NewDocCustom')" class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-green-50">
+                            <select name="newDoc" onchange="window.toggleCustomInput(this, 'an3NewDocCustom')" class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-green-50 relative z-10">
                                 ${window.buildDocSelectOptions("BIRTH CERTIFICATE")}
                             </select>
-                            <input type="text" id="an3NewDocCustom" name="newDocCustom" placeholder="सही दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-green-300 rounded-xl text-xs bg-green-50 uppercase">
+                            <input type="text" id="an3NewDocCustom" name="newDocCustom" placeholder="सही दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-green-300 rounded-xl text-xs bg-green-50 uppercase relative z-10">
                         </div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">शपथ पत्र की तारीख (Date)</label><input type="date" name="date" value="${todayISO}" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">शपथ पत्र की तारीख (Date)</label><input type="date" name="date" value="${todayISO}" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 relative z-10"></div>
                     </div>
-                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base">${submitBtnText}</button>
+                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base relative z-10">${submitBtnText}</button>
                 </form>
             </div>
         `;
@@ -694,81 +683,81 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
     if (serviceName === 'annexure3a') {
         if (!window.currentUserData || !window.currentUserData.isVip) { window.switchService(window.getFirstAllowedTab()); return true; }
         container.innerHTML = `
-            ${getWatermarkHtml('annexure3a')}
-            <div class="relative z-10">
-                ${annexureDropdownHtml}
-                <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
-                    <div>
-                        <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-child text-royal-500 mr-1.5"></i> Annexure-IIIA (Children Reactivation)</h3>
-                        <p class="text-[11px] text-slate-500">बच्चों की निष्क्रिय आईडी को चालू (Reactivate) कराने हेतु माता-पिता का शपथ पत्र। (जानकारी न होने पर <strong>टिक करें = NA</strong> चुनें)</p>
-                    </div>
-                    ${statusTagHtml}
+            ${annexureDropdownHtml}
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4 relative z-20">
+                <div>
+                    <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-child text-royal-500 mr-1.5"></i> Annexure-IIIA (Children Reactivation)</h3>
+                    <p class="text-[11px] text-slate-500">बच्चों की निष्क्रिय आईडी को चालू (Reactivate) कराने हेतु माता-पिता का शपथ पत्र। (जानकारी न होने पर <strong>टिक करें = NA</strong> चुनें)</p>
                 </div>
-                <form onsubmit="window.submitLocalAnnexureForm(event, 'Annexure 3A', 'LOCAL_HTML_ANNEXURE_3A')" class="space-y-3.5">
+                ${statusTagHtml}
+            </div>
+            <div class="relative overflow-hidden rounded-2xl p-1 -mx-1">
+                ${getWatermarkHtml('annexure3a')}
+                <form onsubmit="window.submitLocalAnnexureForm(event, 'Annexure 3A', 'LOCAL_HTML_ANNEXURE_3A')" class="space-y-3.5 relative z-10">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                        <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का नाम (Parent Name)</label><input type="text" name="parentName" placeholder="e.g. SURESH KUMAR" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
+                        <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का नाम (Parent Name)</label><input type="text" name="parentName" placeholder="e.g. SURESH KUMAR" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50 relative z-10"></div>
                         <div class="grid grid-cols-3 gap-2">
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="S/o">S/o</option><option value="W/o">W/o</option><option value="D/o">D/o</option></select></div>
-                            <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">दादा / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. RAMPHAL" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 relative z-10"><option value="S/o">S/o</option><option value="W/o">W/o</option><option value="D/o">D/o</option></select></div>
+                            <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">दादा / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. RAMPHAL" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का 12-Digit ID Number</label>
-                            <input type="text" name="parentIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-amber-50">
+                            <input type="text" name="parentIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-amber-50 relative z-10">
                         </div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
-                        <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का नाम (Child Name)</label><input type="text" name="childName" placeholder="e.g. AARAV KUMAR" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
+                        <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का नाम (Child Name)</label><input type="text" name="childName" placeholder="e.g. AARAV KUMAR" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50 relative z-10"></div>
                         <div>
                             <label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का 12-Digit ID Number</label>
-                            <input type="text" name="childIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-indigo-50">
+                            <input type="text" name="childIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-indigo-50 relative z-10">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पहले दिया गया अमान्य दस्तावेज़ (Invalid Doc)</label>
-                            <select name="invalidDocName" onchange="window.toggleCustomInput(this, 'an3aInvDocCustom')" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50">
+                            <select name="invalidDocName" onchange="window.toggleCustomInput(this, 'an3aInvDocCustom')" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10">
                                 ${window.buildDocSelectOptions("INVALID BIRTH CERTIFICATE")}
                             </select>
-                            <input type="text" id="an3aInvDocCustom" name="invalidDocNameCustom" placeholder="अमान्य दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
+                            <input type="text" id="an3aInvDocCustom" name="invalidDocNameCustom" placeholder="अमान्य दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase relative z-10">
                         </div>
 
                         <div>
                             <div class="flex justify-between items-center mb-1">
                                 <label class="text-[11px] font-bold text-slate-600 uppercase">अमान्य दस्तावेज़ का नंबर (Doc No)</label>
-                                <label class="inline-flex items-center gap-1 cursor-pointer bg-amber-200/80 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black select-none">
+                                <label class="inline-flex items-center gap-1 cursor-pointer bg-amber-200/80 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black select-none relative z-10">
                                     <input type="checkbox" onchange="window.toggleNaField(this, 'an3aInvDocNo', 'text')" class="accent-dark-900 w-3.5 h-3.5"> टिक करें = NA
                                 </label>
                             </div>
-                            <input type="text" id="an3aInvDocNo" name="invalidDocNo" placeholder="Enter Document No (या ऊपर NA टिक करें)" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50">
+                            <input type="text" id="an3aInvDocNo" name="invalidDocNo" placeholder="Enter Document No (या ऊपर NA टिक करें)" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10">
                         </div>
 
                         <div>
                             <div class="flex justify-between items-center mb-1">
                                 <label class="text-[11px] font-bold text-slate-600 uppercase">अमान्य दस्तावेज़ की तारीख (Doc Date)</label>
-                                <label class="inline-flex items-center gap-1 cursor-pointer bg-amber-200/80 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black select-none">
+                                <label class="inline-flex items-center gap-1 cursor-pointer bg-amber-200/80 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black select-none relative z-10">
                                     <input type="checkbox" onchange="window.toggleNaField(this, 'an3aInvDocDate', 'date')" class="accent-dark-900 w-3.5 h-3.5"> टिक करें = NA
                                 </label>
                             </div>
-                            <input type="date" id="an3aInvDocDate" name="invalidDocDate" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50">
+                            <input type="date" id="an3aInvDocDate" name="invalidDocDate" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10">
                         </div>
 
                         <div>
                             <div class="flex justify-between items-center mb-1">
                                 <label class="text-[11px] font-bold text-slate-600 uppercase">EID Number (एनरोलमेंट आईडी)</label>
-                                <label class="inline-flex items-center gap-1 cursor-pointer bg-amber-200/80 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black select-none">
+                                <label class="inline-flex items-center gap-1 cursor-pointer bg-amber-200/80 hover:bg-amber-300 text-amber-950 px-2 py-0.5 rounded text-[10px] font-black select-none relative z-10">
                                     <input type="checkbox" onchange="window.toggleNaField(this, 'an3aEidNo', 'text')" class="accent-dark-900 w-3.5 h-3.5"> टिक करें = NA
                                 </label>
                             </div>
-                            <input type="text" id="an3aEidNo" name="eidNumber" placeholder="Enter EID Number (या ऊपर NA टिक करें)" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50">
+                            <input type="text" id="an3aEidNo" name="eidNumber" placeholder="Enter EID Number (या ऊपर NA टिक करें)" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10">
                         </div>
 
                         <div>
                             <label class="block text-[11px] font-bold text-green-800 uppercase mb-1">अभी दिया जा रहा सही दस्तावेज़ (New Genuine Doc)</label>
-                            <select name="newDoc" onchange="window.toggleCustomInput(this, 'an3aNewDocCustom')" class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-green-50">
+                            <select name="newDoc" onchange="window.toggleCustomInput(this, 'an3aNewDocCustom')" class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-green-50 relative z-10">
                                 ${window.buildDocSelectOptions("BIRTH CERTIFICATE")}
                             </select>
-                            <input type="text" id="an3aNewDocCustom" name="newDocCustom" placeholder="सही दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-green-300 rounded-xl text-xs bg-green-50 uppercase">
+                            <input type="text" id="an3aNewDocCustom" name="newDocCustom" placeholder="सही दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-green-300 rounded-xl text-xs bg-green-50 uppercase relative z-10">
                         </div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">शपथ पत्र की तारीख (Date)</label><input type="date" name="date" value="${todayISO}" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">शपथ पत्र की तारीख (Date)</label><input type="date" name="date" value="${todayISO}" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 relative z-10"></div>
                     </div>
-                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base">${submitBtnText}</button>
+                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base relative z-10">${submitBtnText}</button>
                 </form>
             </div>
         `;
@@ -788,53 +777,53 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
         const childFieldsHtml = isChild ? `
             <div>
                 <label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का 12-Digit ID Number</label>
-                <input type="text" name="childIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-indigo-50">
+                <input type="text" name="childIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-indigo-50 relative z-10">
             </div>
         ` : '';
 
         container.innerHTML = `
-            ${getWatermarkHtml(serviceName)}
-            <div class="relative z-10">
-                ${annexureDropdownHtml}
-                <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
-                    <div>
-                        <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-file-contract text-royal-500 mr-1.5"></i> ${mapInfo.title} - Name Update Affidavit</h3>
-                        <p class="text-[11px] text-slate-500">${mapInfo.desc}</p>
-                    </div>
-                    ${statusTagHtml}
+            ${annexureDropdownHtml}
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4 relative z-20">
+                <div>
+                    <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-file-contract text-royal-500 mr-1.5"></i> ${mapInfo.title} - Name Update Affidavit</h3>
+                    <p class="text-[11px] text-slate-500">${mapInfo.desc}</p>
                 </div>
-                <form onsubmit="window.submitLocalAnnexureForm(event, '${mapInfo.title}', '${mapInfo.key}')" class="space-y-3.5">
+                ${statusTagHtml}
+            </div>
+            <div class="relative overflow-hidden rounded-2xl p-1 -mx-1">
+                ${getWatermarkHtml(serviceName)}
+                <form onsubmit="window.submitLocalAnnexureForm(event, '${mapInfo.title}', '${mapInfo.key}')" class="space-y-3.5 relative z-10">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                         <div class="grid grid-cols-3 gap-2">
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Title</label><select name="title" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="Shri">Shri</option><option value="Smt.">Smt.</option><option value="Ms.">Ms.</option></select></div>
-                            <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">${isChild ? 'माता/पिता का नाम (Parent)' : 'आवेदक का नाम (Applicant)'}</label><input type="text" name="applicantName" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Title</label><select name="title" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 relative z-10"><option value="Shri">Shri</option><option value="Smt.">Smt.</option><option value="Ms.">Ms.</option></select></div>
+                            <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">${isChild ? 'माता/पिता का नाम (Parent)' : 'आवेदक का नाम (Applicant)'}</label><input type="text" name="applicantName" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
                         </div>
                         <div class="grid grid-cols-3 gap-2">
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="S/o">S/o</option><option value="W/o">W/o</option><option value="D/o">D/o</option></select></div>
-                            <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पिता / पति का नाम</label><input type="text" name="relativeName" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 relative z-10"><option value="S/o">S/o</option><option value="W/o">W/o</option><option value="D/o">D/o</option></select></div>
+                            <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पिता / पति का नाम</label><input type="text" name="relativeName" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">${isChild ? 'माता/पिता का 12-Digit ID Number' : '12-Digit ID Number (4-4 Pair)'}</label>
-                            <input type="text" name="idNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold tracking-wider uppercase bg-slate-50">
+                            <input type="text" name="idNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold tracking-wider uppercase bg-slate-50 relative z-10">
                         </div>
                         ${childFieldsHtml}
-                        <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">पहले दर्ज नाम (Old Recorded Name)</label><input type="text" name="oldName" placeholder="OLD NAME" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
-                        <div><label class="block text-[11px] font-bold text-green-800 uppercase mb-1">नया सही नाम (New Correct Name)</label><input type="text" name="newName" placeholder="NEW CORRECT NAME" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-green-50"></div>
+                        <div><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">पहले दर्ज नाम (Old Recorded Name)</label><input type="text" name="oldName" placeholder="OLD NAME" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50 relative z-10"></div>
+                        <div><label class="block text-[11px] font-bold text-green-800 uppercase mb-1">नया सही नाम (New Correct Name)</label><input type="text" name="newName" placeholder="NEW CORRECT NAME" required class="w-full p-3 border border-green-300 rounded-xl text-sm font-bold uppercase bg-green-50 relative z-10"></div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">सपोर्टिंग दस्तावेज़ (Supporting PoI Doc)</label>
-                            <select name="newDoc" onchange="window.toggleCustomInput(this, 'anBcdDocCustom')" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50">
+                            <select name="newDoc" onchange="window.toggleCustomInput(this, 'anBcdDocCustom')" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10">
                                 ${window.buildDocSelectOptions(isChild ? "BIRTH CERTIFICATE" : "PAN CARD")}
                             </select>
-                            <input type="text" id="anBcdDocCustom" name="newDocCustom" placeholder="दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
+                            <input type="text" id="anBcdDocCustom" name="newDocCustom" placeholder="दस्तावेज़ का नाम लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase relative z-10">
                         </div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">स्थान (Verified at Place)</label><input type="text" name="place" placeholder="e.g. BARAUT" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Complete Address)</label><input type="text" name="address" placeholder="VILL, POST, DISTT, PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">स्थान (Verified at Place)</label><input type="text" name="place" placeholder="e.g. BARAUT" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
                         <div class="grid grid-cols-2 gap-2">
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">दिन (Day)</label><input type="text" id="inpDay" name="day" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"></div>
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">महीना व वर्ष</label><input type="text" id="inpMonthYear" name="monthYear" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">दिन (Day)</label><input type="text" id="inpDay" name="day" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 relative z-10"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">महीना व वर्ष</label><input type="text" id="inpMonthYear" name="monthYear" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
                         </div>
                     </div>
-                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base">${submitBtnText}</button>
+                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base relative z-10">${submitBtnText}</button>
                 </form>
             </div>
         `;
@@ -846,62 +835,61 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
     if (serviceName === 'annexuree') {
         if (!window.currentUserData || !window.currentUserData.isVip) { window.switchService(window.getFirstAllowedTab()); return true; }
         container.innerHTML = `
-            ${getWatermarkHtml('annexuree')}
-            <div class="relative z-10">
-                ${annexureDropdownHtml}
-                <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
-                    <div>
-                        <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-file-contract text-royal-500 mr-1.5"></i> Annexure E (Adults Urf/Alias Removal)</h3>
-                        <p class="text-[11px] text-slate-500">वयस्कों के नाम में से "उर्फ़ / Alias" हटाने हेतु शपथ पत्र। (नाम में URF लिखने पर दोनों नाम स्वतः अलग हो जाएंगे)</p>
-                    </div>
-                    ${statusTagHtml}
+            ${annexureDropdownHtml}
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4 relative z-20">
+                <div>
+                    <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-file-contract text-royal-500 mr-1.5"></i> Annexure E (Adults Urf/Alias Removal)</h3>
+                    <p class="text-[11px] text-slate-500">वयस्कों के नाम में से "उर्फ़ / Alias" हटाने हेतु शपथ पत्र। (नाम में URF लिखने पर दोनों नाम स्वतः अलग हो जाएंगे)</p>
                 </div>
-
-                <form id="annexureEForm" onsubmit="window.submitLocalAnnexureForm(event, 'Annexure E', 'LOCAL_HTML_ANNEXURE_E')" class="space-y-3.5">
+                ${statusTagHtml}
+            </div>
+            <div class="relative overflow-hidden rounded-2xl p-1 -mx-1">
+                ${getWatermarkHtml('annexuree')}
+                <form id="annexureEForm" onsubmit="window.submitLocalAnnexureForm(event, 'Annexure E', 'LOCAL_HTML_ANNEXURE_E')" class="space-y-3.5 relative z-10">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                         <div class="grid grid-cols-3 gap-2">
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Title</label><select id="inpTitle" name="title" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="Shri">Shri</option><option value="Smt.">Smt.</option><option value="Ms.">Ms.</option></select></div>
-                            <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आवेदक का नाम (Applicant)</label><input type="text" id="inpApplicantName" name="applicantName" oninput="window.syncAnnexureENames()" placeholder="e.g. RAMESH URF SONU" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Title</label><select id="inpTitle" name="title" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 relative z-10"><option value="Shri">Shri</option><option value="Smt.">Smt.</option><option value="Ms.">Ms.</option></select></div>
+                            <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आवेदक का नाम (Applicant)</label><input type="text" id="inpApplicantName" name="applicantName" oninput="window.syncAnnexureENames()" placeholder="e.g. RAMESH URF SONU" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
                         </div>
                         <div class="grid grid-cols-3 gap-2">
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select id="inpRel" name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="S/o">S/o</option><option value="D/o">D/o</option><option value="W/o">W/o</option></select></div>
-                            <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पिता / पति का नाम</label><input type="text" id="inpRelativeName" name="relativeName" placeholder="e.g. SURESH CHAND" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select id="inpRel" name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 relative z-10"><option value="S/o">S/o</option><option value="D/o">D/o</option><option value="W/o">W/o</option></select></div>
+                            <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पिता / पति का नाम</label><input type="text" id="inpRelativeName" name="relativeName" placeholder="e.g. SURESH CHAND" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
                         </div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Resident of)</label><input type="text" id="inpAddress" name="address" placeholder="e.g. VILL BARAUT, DISTT BAGHPAT" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Resident of)</label><input type="text" id="inpAddress" name="address" placeholder="e.g. VILL BARAUT, DISTT BAGHPAT" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">12-Digit ID Number (4-4 Pair)</label>
-                            <input type="text" id="inpIdNumber" name="idNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold tracking-wider uppercase bg-slate-50">
+                            <input type="text" id="inpIdNumber" name="idNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold tracking-wider uppercase bg-slate-50 relative z-10">
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                        <div class="p-3 bg-amber-50 rounded-2xl border border-amber-200 space-y-2">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 relative z-10">
+                        <div class="p-3 bg-amber-50 rounded-2xl border border-amber-200 space-y-2 relative z-10">
                             <div class="flex justify-between items-center">
                                 <span class="text-[11px] font-black text-amber-900 uppercase">2. कार्ड में दर्ज दोनों नाम (Urf / Alias)</span>
-                                <button type="button" onclick="window.swapAnnexureERetainRemove()" class="text-[10px] bg-amber-200 text-amber-950 font-black px-2 py-0.5 rounded"><i class="fa-solid fa-right-left mr-1"></i> Swap</button>
+                                <button type="button" onclick="window.swapAnnexureERetainRemove()" class="text-[10px] bg-amber-200 text-amber-950 font-black px-2 py-0.5 rounded relative z-10"><i class="fa-solid fa-right-left mr-1"></i> Swap</button>
                             </div>
-                            <div class="grid grid-cols-2 gap-2">
-                                <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">पहला नाम (Name 1)</label><input type="text" id="inpRecorded1" name="recorded1" oninput="window.syncAnnexureENames()" placeholder="RAMESH" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
-                                <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">उर्फ़ नाम (Alias 2)</label><input type="text" id="inpRecorded2" name="recorded2" oninput="window.syncAnnexureENames()" placeholder="SONU" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
+                            <div class="grid grid-cols-2 gap-2 relative z-10">
+                                <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">पहला नाम (Name 1)</label><input type="text" id="inpRecorded1" name="recorded1" oninput="window.syncAnnexureENames()" placeholder="RAMESH" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white relative z-10"></div>
+                                <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">उर्फ़ नाम (Alias 2)</label><input type="text" id="inpRecorded2" name="recorded2" oninput="window.syncAnnexureENames()" placeholder="SONU" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white relative z-10"></div>
                             </div>
                         </div>
 
-                        <div class="p-3 bg-green-50 rounded-2xl border border-green-200 space-y-2">
-                            <span class="text-[11px] font-black text-green-900 uppercase block">3. कौन-सा नाम रखना और कौन-सा हटाना है</span>
-                            <div class="grid grid-cols-2 gap-2">
-                                <div><label class="block text-[10px] font-bold text-green-800 uppercase mb-1">रखने वाला (Retain)</label><input type="text" id="inpRetainName" name="retainName" placeholder="RAMESH" required class="w-full p-2.5 border border-green-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
-                                <div><label class="block text-[10px] font-bold text-red-700 uppercase mb-1">हटाने वाला (Remove)</label><input type="text" id="inpRemoveName" name="removeName" placeholder="SONU" required class="w-full p-2.5 border border-red-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
+                        <div class="p-3 bg-green-50 rounded-2xl border border-green-200 space-y-2 relative z-10">
+                            <span class="text-[11px] font-black text-green-900 uppercase block">3. कौन-सा नाम रखना है और कौन-सा हटाना है</span>
+                            <div class="grid grid-cols-2 gap-2 relative z-10">
+                                <div><label class="block text-[10px] font-bold text-green-800 uppercase mb-1">रखने वाला (Retain)</label><input type="text" id="inpRetainName" name="retainName" placeholder="RAMESH" required class="w-full p-2.5 border border-green-300 rounded-xl text-xs font-bold uppercase bg-white relative z-10"></div>
+                                <div><label class="block text-[10px] font-bold text-red-700 uppercase mb-1">हटाने वाला (Remove)</label><input type="text" id="inpRemoveName" name="removeName" placeholder="SONU" required class="w-full p-2.5 border border-red-300 rounded-xl text-xs font-bold uppercase bg-white relative z-10"></div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-3 gap-2.5">
-                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">स्थान (Place)</label><input type="text" id="inpPlace" name="place" placeholder="BARAUT" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold uppercase bg-slate-50"></div>
-                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">दिन (Day)</label><input type="text" id="inpDay" name="day" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50"></div>
-                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">महीना व वर्ष</label><input type="text" id="inpMonthYear" name="monthYear" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold uppercase bg-slate-50"></div>
+                    <div class="grid grid-cols-3 gap-2.5 relative z-10">
+                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">स्थान (Place)</label><input type="text" id="inpPlace" name="place" placeholder="BARAUT" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold uppercase bg-slate-50 relative z-10"></div>
+                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">दिन (Day)</label><input type="text" id="inpDay" name="day" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 relative z-10"></div>
+                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">महीना व वर्ष</label><input type="text" id="inpMonthYear" name="monthYear" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold uppercase bg-slate-50 relative z-10"></div>
                     </div>
 
-                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base">${submitBtnText}</button>
+                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base relative z-10">${submitBtnText}</button>
                 </form>
             </div>
         `;
@@ -913,67 +901,66 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
     if (serviceName === 'annexuref') {
         if (!window.currentUserData || !window.currentUserData.isVip) { window.switchService(window.getFirstAllowedTab()); return true; }
         container.innerHTML = `
-            ${getWatermarkHtml('annexuref')}
-            <div class="relative z-10">
-                ${annexureDropdownHtml}
-                <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
-                    <div>
-                        <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-child-reaching text-royal-500 mr-1.5"></i> Annexure F (Children Urf/Alias Removal)</h3>
-                        <p class="text-[11px] text-slate-500">बच्चे के नाम में से "उर्फ़ / Alias" हटाने हेतु शपथ पत्र।</p>
-                    </div>
-                    ${statusTagHtml}
+            ${annexureDropdownHtml}
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4 relative z-20">
+                <div>
+                    <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-child-reaching text-royal-500 mr-1.5"></i> Annexure F (Children Urf/Alias Removal)</h3>
+                    <p class="text-[11px] text-slate-500">बच्चे के नाम में से "उर्फ़ / Alias" हटाने हेतु शपथ पत्र।</p>
                 </div>
-
-                <form onsubmit="window.submitLocalAnnexureForm(event, 'Annexure F', 'LOCAL_HTML_ANNEXURE_F')" class="space-y-3.5">
+                ${statusTagHtml}
+            </div>
+            <div class="relative overflow-hidden rounded-2xl p-1 -mx-1">
+                ${getWatermarkHtml('annexuref')}
+                <form onsubmit="window.submitLocalAnnexureForm(event, 'Annexure F', 'LOCAL_HTML_ANNEXURE_F')" class="space-y-3.5 relative z-10">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                         <div class="grid grid-cols-3 gap-2">
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Title</label><select name="title" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="Shri">Shri</option><option value="Smt.">Smt.</option><option value="Ms.">Ms.</option></select></div>
-                            <div class="col-span-2"><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का नाम (Parent)</label><input type="text" name="parentName" placeholder="e.g. SURESH KUMAR" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Title</label><select name="title" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 relative z-10"><option value="Shri">Shri</option><option value="Smt.">Smt.</option><option value="Ms.">Ms.</option></select></div>
+                            <div class="col-span-2"><label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का नाम (Parent)</label><input type="text" name="parentName" placeholder="e.g. SURESH KUMAR" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold uppercase bg-amber-50 relative z-10"></div>
                         </div>
                         <div class="grid grid-cols-3 gap-2">
-                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50"><option value="S/o">S/o</option><option value="W/o">W/o</option><option value="D/o">D/o</option></select></div>
-                            <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">दादा / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. RAMPHAL" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
+                            <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Relation</label><select name="rel" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 relative z-10"><option value="S/o">S/o</option><option value="W/o">W/o</option><option value="D/o">D/o</option></select></div>
+                            <div class="col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">दादा / पति का नाम</label><input type="text" name="relativeName" placeholder="e.g. RAMPHAL" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-amber-800 uppercase mb-1">माता / पिता का 12-Digit ID Number</label>
-                            <input type="text" name="parentIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-amber-50">
+                            <input type="text" name="parentIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-amber-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-amber-50 relative z-10">
                         </div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Resident of)</label><input type="text" name="address" placeholder="VILL BARAUT, DISTT BAGHPAT" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50"></div>
-                        <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का नाम (Child Name)</label><input type="text" id="inpApplicantName" name="childName" oninput="window.syncAnnexureENames()" placeholder="e.g. AARAV URF GOLU" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">पूरा पता (Resident of)</label><input type="text" name="address" placeholder="VILL BARAUT, DISTT BAGHPAT" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold uppercase bg-slate-50 relative z-10"></div>
+                        <div><label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का नाम (Child Name)</label><input type="text" id="inpApplicantName" name="childName" oninput="window.syncAnnexureENames()" placeholder="e.g. AARAV URF GOLU" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold uppercase bg-indigo-50 relative z-10"></div>
                         <div>
                             <label class="block text-[11px] font-bold text-indigo-800 uppercase mb-1">बच्चे का 12-Digit ID Number</label>
-                            <input type="text" name="childIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-indigo-50">
+                            <input type="text" name="childIdNumber" oninput="window.format12DigitId(this)" pattern="\\d{4} \\d{4} \\d{4}" minlength="14" maxlength="14" title="कृपया पूरे 12 अंक दर्ज करें (XXXX XXXX XXXX)" placeholder="XXXX XXXX XXXX" required class="w-full p-3 border border-indigo-300 rounded-xl text-sm font-bold tracking-wider uppercase bg-indigo-50 relative z-10">
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                        <div class="p-3 bg-amber-50 rounded-2xl border border-amber-200 space-y-2">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 relative z-10">
+                        <div class="p-3 bg-amber-50 rounded-2xl border border-amber-200 space-y-2 relative z-10">
                             <div class="flex justify-between items-center">
                                 <span class="text-[11px] font-black text-amber-900 uppercase">2. बच्चे के दर्ज दोनों नाम (Urf / Alias)</span>
-                                <button type="button" onclick="window.swapAnnexureERetainRemove()" class="text-[10px] bg-amber-200 text-amber-950 font-black px-2 py-0.5 rounded"><i class="fa-solid fa-right-left mr-1"></i> Swap</button>
+                                <button type="button" onclick="window.swapAnnexureERetainRemove()" class="text-[10px] bg-amber-200 text-amber-950 font-black px-2 py-0.5 rounded relative z-10"><i class="fa-solid fa-right-left mr-1"></i> Swap</button>
                             </div>
-                            <div class="grid grid-cols-2 gap-2">
-                                <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">पहला नाम (Name 1)</label><input type="text" id="inpRecorded1" name="recorded1" oninput="window.syncAnnexureENames()" placeholder="AARAV" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
-                                <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">उर्फ़ नाम (Alias 2)</label><input type="text" id="inpRecorded2" name="recorded2" oninput="window.syncAnnexureENames()" placeholder="GOLU" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
+                            <div class="grid grid-cols-2 gap-2 relative z-10">
+                                <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">पहला नाम (Name 1)</label><input type="text" id="inpRecorded1" name="recorded1" oninput="window.syncAnnexureENames()" placeholder="AARAV" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white relative z-10"></div>
+                                <div><label class="block text-[10px] font-bold text-amber-800 uppercase mb-1">उर्फ़ नाम (Alias 2)</label><input type="text" id="inpRecorded2" name="recorded2" oninput="window.syncAnnexureENames()" placeholder="GOLU" required class="w-full p-2.5 border border-amber-300 rounded-xl text-xs font-bold uppercase bg-white relative z-10"></div>
                             </div>
                         </div>
 
-                        <div class="p-3 bg-green-50 rounded-2xl border border-green-200 space-y-2">
+                        <div class="p-3 bg-green-50 rounded-2xl border border-green-200 space-y-2 relative z-10">
                             <span class="text-[11px] font-black text-green-900 uppercase block">3. कौन-सा नाम रखना है और कौन-सा हटाना है</span>
-                            <div class="grid grid-cols-2 gap-2">
-                                <div><label class="block text-[10px] font-bold text-green-800 uppercase mb-1">रखने वाला (Retain)</label><input type="text" id="inpRetainName" name="retainName" placeholder="AARAV" required class="w-full p-2.5 border border-green-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
-                                <div><label class="block text-[10px] font-bold text-red-700 uppercase mb-1">हटाने वाला (Remove)</label><input type="text" id="inpRemoveName" name="removeName" placeholder="GOLU" required class="w-full p-2.5 border border-red-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
+                            <div class="grid grid-cols-2 gap-2 relative z-10">
+                                <div><label class="block text-[10px] font-bold text-green-800 uppercase mb-1">रखने वाला (Retain)</label><input type="text" id="inpRetainName" name="retainName" placeholder="AARAV" required class="w-full p-2.5 border border-green-300 rounded-xl text-xs font-bold uppercase bg-white relative z-10"></div>
+                                <div><label class="block text-[10px] font-bold text-red-700 uppercase mb-1">हटाने वाला (Remove)</label><input type="text" id="inpRemoveName" name="removeName" placeholder="GOLU" required class="w-full p-2.5 border border-red-300 rounded-xl text-xs font-bold uppercase bg-white relative z-10"></div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-3 gap-2.5">
-                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">स्थान (Place)</label><input type="text" id="inpPlace" name="place" placeholder="BARAUT" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold uppercase bg-slate-50"></div>
-                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">दिन (Day)</label><input type="text" id="inpDay" name="day" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50"></div>
-                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">महीना व वर्ष</label><input type="text" id="inpMonthYear" name="monthYear" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold uppercase bg-slate-50"></div>
+                    <div class="grid grid-cols-3 gap-2.5 relative z-10">
+                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">स्थान (Place)</label><input type="text" id="inpPlace" name="place" placeholder="BARAUT" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold uppercase bg-slate-50 relative z-10"></div>
+                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">दिन (Day)</label><input type="text" id="inpDay" name="day" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 relative z-10"></div>
+                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">महीना व वर्ष</label><input type="text" id="inpMonthYear" name="monthYear" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold uppercase bg-slate-50 relative z-10"></div>
                     </div>
 
-                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base">${submitBtnText}</button>
+                    <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base relative z-10">${submitBtnText}</button>
                 </form>
             </div>
         `;
