@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>उत्तर प्रदेश प्रिंट पोर्टल - Ojas Service</title>
+    <title>उत्तर प्रदेश प्रिंट पोर्टल - Ojas</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- html2pdf.js for Single-Page A4 PDF Download -->
+    <!-- html2pdf.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     
     <!-- Theme Config -->
@@ -32,77 +32,60 @@
 
     <style>
         .animate-spin-slow { animation: spin 4s linear infinite; }
-        .vip-body-bg {
-            background: radial-gradient(circle at top, #1e293b 0%, #0f172a 50%, #020617 100%);
-            color: #f8fafc;
-        }
-        @keyframes shimmer {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
-        }
+        .vip-body-bg { background: #f8fafc; }
+        
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
         .vip-promo-shine {
             background: linear-gradient(90deg, #0f172a 0%, #1e293b 40%, #78350f 50%, #1e293b 60%, #0f172a 100%);
-            background-size: 200% 100%;
-            animation: shimmer 5s infinite linear;
-        }
-        @keyframes slideInRight {
-            from { transform: translateX(120%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        .corner-alert-anim {
-            animation: slideInRight 0.4s ease-out forwards;
+            background-size: 200% 100%; animation: shimmer 5s infinite linear;
         }
 
-        /* Fixed Single-Page A4 Layout */
+        /* Fixed A4 Layout for Print */
         .affidavit-paper {
-            position: relative !important;
-            font-family: 'Times New Roman', Times, serif;
-            width: 794px;
-            height: 1122px;
-            padding: 46px 62px;
-            background: #ffffff;
-            color: #000000;
-            font-size: 15px;
-            line-height: 1.55;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            margin: 0 !important;
-            overflow: hidden;
-            flex-shrink: 0;
+            position: relative !important; font-family: 'Times New Roman', Times, serif;
+            width: 794px; height: 1122px; padding: 46px 62px; background: #ffffff; color: #000000;
+            font-size: 15px; line-height: 1.55; box-sizing: border-box; display: flex; flex-direction: column;
+            justify-content: space-between; margin: 0 !important; overflow: hidden; flex-shrink: 0;
         }
-        .filled-val {
-            font-weight: bold !important;
-            color: #000000 !important;
-            text-decoration: underline !important;
-            text-underline-offset: 3px !important;
-        }
-        .stamp-overlay-layer {
-            position: absolute; top: 0; left: 0; width: 794px; height: 1122px;
-            pointer-events: none; z-index: 30; mix-blend-mode: multiply; overflow: hidden;
-        }
-        .stamp-overlay-layer img {
-            width: 794px; height: 1122px; object-fit: contain; object-position: top center; mix-blend-mode: multiply; display: block;
-        }
+        .filled-val { font-weight: bold !important; color: #000000 !important; text-decoration: underline !important; text-underline-offset: 3px !important; }
+        .stamp-overlay-layer { position: absolute; top: 0; left: 0; width: 794px; height: 1122px; pointer-events: none; z-index: 30; mix-blend-mode: multiply; overflow: hidden; }
+        .stamp-overlay-layer img { width: 794px; height: 1122px; object-fit: contain; object-position: top center; mix-blend-mode: multiply; display: block; }
 
-        /* 🌟 NEW SIDEBAR LAYOUT OVERRIDES FOR DESKTOP 🌟 */
-        @media (min-width: 1024px) {
-            /* Force Grid to 1 Column on Desktop (overriding JS injected styles) */
-            #standardServicesGrid { grid-template-columns: repeat(1, minmax(0, 1fr)) !important; }
-            #vipTabsContainer { grid-template-columns: repeat(1, minmax(0, 1fr)) !important; }
-            
-            /* Align text to the left with icon spacing for Sidebar Cards */
-            .service-tab, .vip-tab { 
-                justify-content: flex-start !important; 
-                padding-left: 1.25rem !important; 
-                padding-right: 1.25rem !important;
-                text-align: left !important; 
+        /* =========================================================
+           SMART SIDEBAR OVERRIDES FOR DESKTOP
+           (This forces the JS grid into a vertical list on PC)
+        ========================================================= */
+        @media (min-width: 768px) {
+            #standardServicesGrid {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 0.6rem !important;
             }
+            #vipServicesGridContainer {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 0.5rem !important;
+            }
+            .service-tab, .vip-tab {
+                justify-content: flex-start !important;
+                text-align: left !important;
+                padding: 0.85rem 1rem !important;
+                width: 100% !important;
+                flex: none !important;
+            }
+            .service-tab i, .vip-tab i {
+                width: 26px; text-align: center; font-size: 1.1em; opacity: 0.9;
+            }
+            
+            /* Clean Scrollbar for Sidebar */
+            .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+            .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+            .sidebar-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+            .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         }
     </style>
 
-    <!-- Modular JS Files -->
+    <!-- Modular JS File -->
     <script type="module" src="./js/portal-wallet-chat.js"></script>
 </head>
 <body class="bg-slate-50 font-sans min-h-screen flex flex-col justify-between selection:bg-royal-300 selection:text-dark-900 transition-colors duration-300">
@@ -110,12 +93,12 @@
     <!-- SECURITY LOADING SCREEN -->
     <div id="loadingScreen" style="display: flex;" class="fixed inset-0 bg-dark-900 z-[200] flex-col items-center justify-center">
         <i class="fa-solid fa-sun text-6xl text-royal-400 mb-4 animate-spin-slow"></i>
-        <h2 class="text-xl font-black text-white tracking-widest uppercase">UP Print Portal</h2>
+        <h2 class="text-xl font-black text-white tracking-widest uppercase">उत्तर प्रदेश प्रिंट पोर्टल</h2>
         <p class="text-xs text-royal-300 mt-1 font-bold animate-pulse">Checking Security...</p>
     </div>
 
-    <!-- VIP EXPIRY ALERT -->
-    <div id="vipCornerAlert" style="display: none;" class="fixed bottom-3 right-3 z-[150] w-72 bg-amber-50 border-l-4 border-amber-500 rounded-xl p-3 shadow-xl text-slate-800 corner-alert-anim">
+    <!-- COMPACT FLOATING CORNER ALERT (VIP EXPIRY) -->
+    <div id="vipCornerAlert" style="display: none;" class="fixed bottom-3 right-3 z-[150] w-72 bg-amber-50 border-l-4 border-amber-500 rounded-xl p-3 shadow-xl text-slate-800">
         <div class="flex justify-between items-center mb-1">
             <h4 class="text-xs font-black text-amber-900"><i class="fa-solid fa-triangle-exclamation text-amber-600 mr-1"></i> VIP एक्सपायरी अलर्ट</h4>
             <button onclick="window.dismissCornerAlert()" class="text-slate-400 hover:text-red-500 text-xs"><i class="fa-solid fa-xmark"></i></button>
@@ -124,10 +107,10 @@
         <button onclick="window.jumpToVipUpgrade(30)" class="w-full bg-dark-900 text-royal-300 font-black py-1.5 rounded-lg text-[11px]">अभी VIP वैलिडिटी बढ़ाएं</button>
     </div>
 
-    <!-- FULL SCREEN PDF VIEWER MODAL -->
+    <!-- FULL SCREEN PDF & HTML DOCUMENT VIEWER MODAL -->
     <div id="pdfViewerModal" style="display: none;" class="fixed inset-0 z-[100] bg-dark-900/80 backdrop-blur-md items-center justify-center p-2 md:p-6 transition-opacity">
-        <div class="bg-white w-full max-w-6xl h-full flex flex-col rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
-            <div class="flex flex-wrap justify-between items-center p-3 md:p-4 border-b border-slate-200 bg-slate-50 gap-2">
+        <div class="bg-white w-full max-w-6xl h-full flex flex-col rounded-2xl shadow-2xl overflow-hidden">
+            <div class="flex justify-between items-center p-3 md:p-4 border-b border-slate-200 bg-slate-50 gap-2">
                 <div class="flex items-center gap-2 overflow-hidden">
                     <div class="w-7 h-7 bg-royal-100 text-royal-600 rounded-lg flex items-center justify-center shrink-0 text-xs"><i class="fa-solid fa-file-pdf"></i></div>
                     <h3 id="pdfViewerTitle" class="font-bold text-slate-800 text-xs md:text-sm truncate">Document Preview</h3>
@@ -160,8 +143,8 @@
                 <div class="w-16 h-16 bg-gradient-to-br from-royal-300 to-royal-600 text-white rounded-full flex items-center justify-center mx-auto mb-3 text-3xl shadow-glow">
                     <i class="fa-solid fa-sun"></i>
                 </div>
-                <h1 class="text-2xl font-black text-dark-900 leading-tight">UP Print Portal</h1>
-                <p class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Secure Ojas Login</p>
+                <h1 class="text-xl md:text-2xl font-black text-dark-900 leading-tight">उत्तर प्रदेश<br><span class="text-royal-600">प्रिंट पोर्टल</span></h1>
+                <p class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Secure Login</p>
             </div>
             <form id="loginForm" onsubmit="window.handleLogin(event)" class="space-y-4">
                 <input type="text" id="loginUsername" placeholder="User ID (e.g. user@print.com)" required class="w-full px-4 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-royal-500 outline-none bg-slate-50 text-sm font-semibold">
@@ -192,18 +175,9 @@
                 </button>
             </div>
             <form onsubmit="window.submitForgotPasswordTicket(event)" class="space-y-3">
-                <div>
-                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आपकी User ID या Email</label>
-                    <input type="text" id="forgotUserIdInput" required placeholder="e.g. rahul@print.com" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
-                </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आपका मोबाइल / WhatsApp नंबर</label>
-                    <input type="tel" id="forgotUserPhoneInput" required placeholder="Enter 10-Digit Mobile Number" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
-                </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">मैसेज (Optional)</label>
-                    <input type="text" id="forgotUserNoteInput" placeholder="मैं अपना पासवर्ड भूल गया हूँ, नया पासवर्ड भेजें" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-semibold bg-slate-50 focus:bg-white outline-none">
-                </div>
+                <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आपकी User ID या Email</label><input type="text" id="forgotUserIdInput" required placeholder="e.g. rahul@print.com" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none"></div>
+                <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आपका मोबाइल / WhatsApp नंबर</label><input type="tel" id="forgotUserPhoneInput" required placeholder="Enter 10-Digit Mobile Number" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none"></div>
+                <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">मैसेज (Optional)</label><input type="text" id="forgotUserNoteInput" placeholder="मैं अपना पासवर्ड भूल गया हूँ, नया पासवर्ड भेजें" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-semibold bg-slate-50 focus:bg-white outline-none"></div>
                 <div id="forgotResultBox" style="display: none;"></div>
                 <button type="submit" id="btnSubmitForgotTicket" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl text-xs md:text-sm shadow-glow transition">
                     <i class="fa-solid fa-paper-plane mr-1"></i> Raise Password Reset Ticket
@@ -212,50 +186,47 @@
         </div>
     </div>
 
-    <!-- ================= DASHBOARD SCREEN ================= -->
+    <!-- ================= DASHBOARD SCREEN (SIDEBAR + MAIN CONTENT) ================= -->
     <div id="dashboardSection" style="display: none;" class="flex-grow flex-col">
         
-        <!-- TOP HEADER BAR -->
-        <header class="bg-dark-950 shadow-lg px-4 md:px-6 py-2.5 flex justify-between items-center sticky top-0 z-40 border-b border-royal-500">
-            <div class="flex items-center gap-3">
-                <div id="portalHeaderIcon" class="w-9 h-9 bg-gradient-to-br from-royal-400 to-royal-600 text-white rounded-xl flex items-center justify-center">
-                    <i class="fa-solid fa-sun text-sm"></i>
+        <!-- HEADER -->
+        <header class="bg-dark-950 shadow-md px-3 md:px-6 py-2.5 flex justify-between items-center sticky top-0 z-40 border-b border-royal-500/50">
+            <div class="flex items-center gap-2.5">
+                <div id="portalHeaderIcon" class="w-9 h-9 bg-gradient-to-br from-yellow-300 via-royal-500 to-amber-700 text-dark-950 rounded-xl flex items-center justify-center shadow-glow">
+                    <i class="fa-solid fa-sun text-sm font-black"></i>
                 </div>
-                <div>
-                    <!-- Name Changed to UP Print Portal -->
-                    <h2 id="portalHeaderTitle" class="text-sm md:text-xl font-black text-white leading-tight">UP Print <span class="text-royal-400">Portal</span></h2>
-                    <div class="flex items-center gap-1.5">
-                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">उत्तर प्रदेश</p>
-                        <span id="vipStatusBadge" style="display: none;" class="bg-gradient-to-r from-yellow-300 to-amber-500 text-dark-950 text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase">
-                            <i class="fa-solid fa-crown"></i> VIP
-                        </span>
-                    </div>
+                <div class="flex flex-col sm:flex-row sm:items-center sm:gap-2">
+                    <h2 id="portalHeaderTitle" class="hidden"></h2> <!-- Hidden Dummy for JS Logic -->
+                    <h2 class="text-sm md:text-xl font-black text-white leading-tight tracking-wide whitespace-nowrap">उत्तर प्रदेश <span class="text-royal-400">प्रिंट पोर्टल</span></h2>
+                    <span id="vipStatusBadge" style="display: none;" class="items-center gap-1 bg-gradient-to-r from-yellow-300 to-amber-500 text-dark-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase w-max mt-0.5 sm:mt-0">
+                        <i class="fa-solid fa-crown text-[8px]"></i> VIP
+                    </span>
                 </div>
             </div>
 
             <!-- RIGHT CONTROLS -->
             <div class="flex items-center gap-2 relative">
-                <a href="admin.html" id="adminPanelLink" style="display: none;" class="bg-dark-800 border border-slate-700 text-royal-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-bold"><i class="fa-solid fa-shield-halved"></i> <span class="hidden sm:inline ml-1">Admin</span></a>
+                <a href="admin.html" id="adminPanelLink" style="display: none;" class="bg-dark-800 border border-slate-700 text-royal-300 hover:text-white px-2.5 py-1.5 rounded-xl text-xs font-bold"><i class="fa-solid fa-shield-halved"></i> <span class="hidden sm:inline ml-1">Admin</span></a>
                 
-                <div id="creditDisplayBox" style="display: none;" class="bg-royal-500/15 border border-royal-500/40 px-3 py-1.5 rounded-xl text-xs font-bold text-royal-300 items-center cursor-pointer hover:bg-royal-500/25 transition shadow-sm" onclick="window.selectGearOption('add_credit')">
-                    <i class="fa-solid fa-wallet mr-1.5 text-royal-400"></i> <span id="displayCredits" class="font-black text-white text-sm">0</span> <span class="hidden sm:inline ml-1 text-[10px]">Cr</span>
+                <div id="creditDisplayBox" style="display: none;" class="bg-royal-500/15 border border-royal-500/40 px-2.5 py-1 rounded-xl text-xs font-bold text-royal-300 items-center cursor-pointer hover:bg-royal-500/30 transition shadow-sm" onclick="window.selectGearOption('add_credit')">
+                    <i class="fa-solid fa-wallet mr-1 text-royal-400"></i> <span id="displayCredits" class="font-black text-white">0</span> <span class="hidden sm:inline ml-1 text-[10px]">Cr</span>
                 </div>
 
-                <button onclick="window.selectGearOption('support_chat')" class="relative bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white border border-green-500/40 px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 shadow-sm" title="Live Support Chat">
+                <button onclick="window.selectGearOption('support_chat')" class="relative bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white border border-green-500/40 px-2.5 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5" title="Live Support Chat">
                     <i class="fa-solid fa-comments text-sm"></i>
                     <span class="hidden md:inline">Support</span>
                     <span id="headerSupportUnreadBadge" style="display: none;" class="bg-red-600 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full animate-bounce">0</span>
                 </button>
                 
-                <button id="gearMenuBtn" onclick="window.toggleGearMenu(event)" class="w-10 h-10 rounded-xl bg-dark-800 hover:bg-royal-500 text-royal-300 hover:text-dark-950 border border-slate-700 flex items-center justify-center transition shadow-sm" title="Settings & History Menu">
-                    <i class="fa-solid fa-gear"></i>
+                <button id="gearMenuBtn" onclick="window.toggleGearMenu(event)" class="w-9 h-9 rounded-xl bg-dark-800 hover:bg-royal-500 text-royal-300 hover:text-dark-950 border border-slate-700 flex items-center justify-center transition shadow-sm" title="Settings & Menu">
+                    <i class="fa-solid fa-gear text-sm"></i>
                 </button>
 
-                <!-- DROPDOWN MENU -->
-                <div id="gearDropdownMenu" class="hidden absolute right-0 top-12 w-64 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200 py-2 z-50">
-                    <div class="px-4 py-2.5 border-b border-slate-100 bg-slate-50">
+                <!-- GEAR MENU DROPDOWN -->
+                <div id="gearDropdownMenu" class="hidden absolute right-0 top-12 w-60 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200 py-2 z-50">
+                    <div class="px-4 py-2 border-b border-slate-100 bg-slate-50">
                         <p class="text-[10px] font-bold text-slate-400 uppercase">Logged in as</p>
-                        <p id="displayUser" class="text-sm font-black text-dark-900 truncate"></p>
+                        <p id="displayUser" class="text-xs font-black text-dark-900 truncate"></p>
                         <p id="gearVipDaysText" class="text-[10px] font-bold text-amber-600 mt-0.5"></p>
                     </div>
                     <div class="py-1">
@@ -266,18 +237,14 @@
                             <i class="fa-solid fa-folder-open text-royal-500 w-4"></i> Document History
                         </button>
                         <button id="gearBtnPaymentHistory" onclick="window.selectGearOption('payments_history')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5">
-                            <i class="fa-solid fa-receipt text-green-600 w-4"></i> Payment History & Status
+                            <i class="fa-solid fa-receipt text-green-600 w-4"></i> Payment History
                         </button>
                         <button onclick="window.selectGearOption('password')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5">
                             <i class="fa-solid fa-key text-indigo-500 w-4"></i> Change Password
                         </button>
-                        <button onclick="window.selectGearOption('support_chat')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-green-700 hover:bg-green-50 flex items-center justify-between">
-                            <span class="flex items-center gap-2.5"><i class="fa-solid fa-comments text-green-600 w-4"></i> Live Support Chat</span>
-                            <span id="gearSupportUnreadBadge" style="display: none;" class="bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">New</span>
-                        </button>
                     </div>
                     <div class="border-t border-slate-100 pt-1">
-                        <button onclick="window.handleLogout()" class="w-full px-4 py-2.5 text-left text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-2.5">
+                        <button onclick="window.handleLogout()" class="w-full px-4 py-2 text-left text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-2.5">
                             <i class="fa-solid fa-power-off w-4"></i> Logout
                         </button>
                     </div>
@@ -285,116 +252,103 @@
             </div>
         </header>
 
-        <!-- ================= MAIN TWO-COLUMN LAYOUT ================= -->
-        <main class="max-w-[1400px] mx-auto w-full p-3 md:p-6 flex-grow flex flex-col lg:flex-row gap-5 lg:gap-8 items-start">
+        <!-- MAIN LAYOUT: SIDEBAR + CONTENT -->
+        <div class="flex-1 flex flex-col md:flex-row max-w-[1500px] w-full mx-auto">
             
-            <!-- LEFT SIDEBAR (NAVIGATION CARDS) -->
-            <aside class="w-full lg:w-72 xl:w-80 flex-shrink-0 flex flex-col gap-4 lg:sticky lg:top-[88px] z-30">
+            <!-- LEFT SIDEBAR MENU -->
+            <aside class="w-full md:w-[260px] lg:w-[320px] shrink-0 flex flex-col gap-4 p-3 md:p-5 md:sticky md:top-[60px] md:max-h-[calc(100vh-60px)] md:overflow-y-auto sidebar-scroll bg-slate-50/50 md:border-r border-slate-200/80">
                 
-                <!-- Live Banner -->
-                <div id="liveUpdateBannerContainer" style="display: none;"></div>
-
-                <!-- VIP Promo -->
-                <div id="normalUserVipPromo" style="display: none;" class="rounded-2xl vip-promo-shine border border-royal-400 p-3.5 text-white shadow-md">
-                    <div class="flex flex-col gap-3">
-                        <div class="flex items-center gap-2">
-                            <span class="bg-amber-400 text-dark-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase shrink-0"><i class="fa-solid fa-crown"></i> VIP ACCESS</span>
-                            <p id="normalPromoTextDesc" class="text-xs font-bold text-royal-100 leading-tight">
-                                VIP लें: <strong>18+ DOB & सारे 9 Official Annexures</strong> अनलॉक करें!
-                            </p>
-                        </div>
-                        <div class="grid grid-cols-3 gap-1.5 w-full">
-                            <button onclick="window.jumpToVipUpgrade(30)" class="bg-dark-900 hover:bg-royal-400 hover:text-dark-950 text-royal-300 border border-royal-400 py-1.5 rounded-lg text-[10px] font-black transition">1M ₹149</button>
-                            <button onclick="window.jumpToVipUpgrade(60)" class="bg-dark-900 hover:bg-royal-400 hover:text-dark-950 text-royal-300 border border-royal-400 py-1.5 rounded-lg text-[10px] font-black transition">2M ₹249</button>
-                            <button onclick="window.jumpToVipUpgrade(90)" class="bg-amber-400 text-dark-950 py-1.5 rounded-lg text-[10px] font-black transition shadow-sm">3M ₹299</button>
+                <!-- VIP PROMO (For Normal Users) -->
+                <div id="normalUserVipPromo" style="display: none;" class="rounded-2xl vip-promo-shine border border-royal-400 p-3 text-white shadow-md">
+                    <div class="flex flex-col gap-2 text-center sm:text-left">
+                        <span class="bg-amber-400 text-dark-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase self-center sm:self-start w-max"><i class="fa-solid fa-crown"></i> VIP ACCESS</span>
+                        <p id="normalPromoTextDesc" class="text-xs font-bold text-royal-100 leading-snug">
+                            VIP लें: <strong>18+ DOB & सारे 9 Annexures</strong> अनलॉक करें!
+                        </p>
+                        <div class="flex items-center gap-1.5 mt-1 justify-center sm:justify-start">
+                            <button onclick="window.jumpToVipUpgrade(30)" class="flex-1 bg-dark-900 hover:bg-royal-400 hover:text-dark-950 text-royal-300 border border-royal-400 px-2 py-1.5 rounded-lg text-[10px] font-black transition">1M ₹149</button>
+                            <button onclick="window.jumpToVipUpgrade(60)" class="flex-1 bg-dark-900 hover:bg-royal-400 hover:text-dark-950 text-royal-300 border border-royal-400 px-2 py-1.5 rounded-lg text-[10px] font-black transition">2M ₹249</button>
+                            <button onclick="window.jumpToVipUpgrade(90)" class="flex-1 bg-amber-400 text-dark-950 px-2 py-1.5 rounded-lg text-[10px] font-black transition">3M ₹299</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- 1. Standard Services Sidebar Card -->
-                <div class="bg-white rounded-2xl p-4 shadow-card border border-slate-200">
-                    <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1 border-b border-slate-100 pb-2">
-                        <i class="fa-solid fa-file-lines mr-1.5"></i> Standard Services
-                    </h3>
-                    <div id="standardServicesGrid" class="grid grid-cols-2 lg:grid-cols-1 gap-2.5">
+                <!-- STANDARD SERVICES (Menu Cards) -->
+                <div class="bg-white rounded-2xl p-3 shadow-sm border border-slate-200">
+                    <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2.5 pl-1.5">General Services</h3>
+                    <div id="standardServicesGrid" class="grid grid-cols-2 gap-2 mb-0">
                         <button onclick="window.switchService('domicile')" id="btn-domicile" class="service-tab">
-                            <i class="fa-solid fa-house-chimney w-5 text-center"></i> 
-                            <span class="text-left flex-1 whitespace-nowrap">Domicile <span class="hidden xl:inline text-[10px] font-semibold opacity-80">(मूल निवास)</span></span>
+                            <i class="fa-solid fa-house-chimney"></i> Domicile (मूल निवास)
                         </button>
                         <button onclick="window.switchService('caste')" id="btn-caste" class="service-tab">
-                            <i class="fa-solid fa-users w-5 text-center"></i> 
-                            <span class="text-left flex-1 whitespace-nowrap">Caste <span class="hidden xl:inline text-[10px] font-semibold opacity-80">(जाति प्रमाण पत्र)</span></span>
+                            <i class="fa-solid fa-users"></i> Caste (जाति प्रमाण पत्र)
                         </button>
                     </div>
                 </div>
 
-                <!-- 2. VIP Services Sidebar Card -->
-                <div id="vipServicesBar" style="display: none;" class="bg-dark-950 rounded-2xl p-4 border border-royal-500 shadow-vip-glow">
+                <!-- VIP SERVICES (Menu Cards) -->
+                <div id="vipServicesBar" style="display: none;" class="bg-dark-950 rounded-2xl p-3 border border-royal-500/40 shadow-card">
                     <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
-                        <span id="vipBarTitleLabel" class="text-[11px] font-black uppercase tracking-widest text-royal-300 flex items-center gap-1.5">
-                            <i class="fa-solid fa-crown text-royal-400 text-sm"></i> VIP Annexures
+                        <span id="vipBarTitleLabel" class="text-[10px] font-black uppercase tracking-widest text-royal-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-crown text-royal-400"></i> VIP Services
                         </span>
-                        <button onclick="window.selectGearOption('history')" class="w-7 h-7 flex items-center justify-center rounded-lg bg-dark-800 text-royal-400 hover:bg-royal-500 hover:text-dark-900 transition" title="Saved Files">
-                            <i class="fa-solid fa-folder-open text-[10px]"></i>
+                        <button onclick="window.selectGearOption('history')" class="text-[10px] text-slate-400 hover:text-royal-300 font-bold transition">
+                            <i class="fa-solid fa-folder-open mr-1"></i> History
                         </button>
                     </div>
-                    <div id="vipTabsContainer" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-1 gap-2">
+                    <div id="vipServicesGridContainer" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         <button onclick="window.switchService('dob18')" id="btn-dob18" class="vip-tab">
-                            <i class="fa-solid fa-cake-candles w-5 text-center text-amber-500"></i> 
-                            <span class="text-left flex-1 font-black tracking-wide">DOB 18+</span>
+                            <i class="fa-solid fa-cake-candles text-amber-500"></i> DOB MEERUT 18+
                         </button>
                         <button onclick="window.switchService('annexure1')" id="btn-annexure1" class="vip-tab">
-                            <i class="fa-solid fa-file-signature w-5 text-center"></i> 
-                            <span class="text-left flex-1">Annexure 1</span>
+                            <i class="fa-solid fa-file-signature text-blue-400"></i> Annexure 1
                         </button>
                         <button onclick="window.switchService('annexure1a')" id="btn-annexure1a" class="vip-tab">
-                            <i class="fa-solid fa-child-reaching w-5 text-center"></i> 
-                            <span class="text-left flex-1">Annexure 1A</span>
+                            <i class="fa-solid fa-child-reaching text-emerald-400"></i> Annexure 1A
                         </button>
                         <button onclick="window.switchService('annexure3')" id="btn-annexure3" class="vip-tab">
-                            <i class="fa-solid fa-bolt w-5 text-center"></i> 
-                            <span class="text-left flex-1">Annexure 3</span>
+                            <i class="fa-solid fa-bolt text-yellow-400"></i> Annexure 3
                         </button>
                         <button onclick="window.switchService('annexure3a')" id="btn-annexure3a" class="vip-tab">
-                            <i class="fa-solid fa-child w-5 text-center"></i> 
-                            <span class="text-left flex-1">Annexure 3A</span>
+                            <i class="fa-solid fa-child text-orange-400"></i> Annexure 3A
                         </button>
                         <button onclick="window.switchService('annexureb')" id="btn-annexureb" class="vip-tab">
-                            <i class="fa-solid fa-file-contract w-5 text-center"></i> 
-                            <span class="text-left flex-1">Annexure B</span>
+                            <i class="fa-solid fa-file-contract text-indigo-400"></i> Annexure B
                         </button>
                         <button onclick="window.switchService('annexurec')" id="btn-annexurec" class="vip-tab">
-                            <i class="fa-solid fa-file-contract w-5 text-center"></i> 
-                            <span class="text-left flex-1">Annexure C</span>
+                            <i class="fa-solid fa-file-contract text-indigo-400"></i> Annexure C
                         </button>
                         <button onclick="window.switchService('annexured')" id="btn-annexured" class="vip-tab">
-                            <i class="fa-solid fa-file-contract w-5 text-center"></i> 
-                            <span class="text-left flex-1">Annexure D</span>
+                            <i class="fa-solid fa-id-card-clip text-purple-400"></i> Annexure D
                         </button>
                         <button onclick="window.switchService('annexuree')" id="btn-annexuree" class="vip-tab">
-                            <i class="fa-solid fa-file-contract w-5 text-center"></i> 
-                            <span class="text-left flex-1">Annexure E</span>
+                            <i class="fa-solid fa-user-pen text-rose-400"></i> Annexure E
                         </button>
                         <button onclick="window.switchService('annexuref')" id="btn-annexuref" class="vip-tab">
-                            <i class="fa-solid fa-child-reaching w-5 text-center"></i> 
-                            <span class="text-left flex-1">Annexure F</span>
+                            <i class="fa-solid fa-child-dress text-pink-400"></i> Annexure F
                         </button>
                     </div>
                 </div>
             </aside>
 
-            <!-- RIGHT MAIN CONTENT (FORMS & OTHER VIEWS) -->
-            <section class="flex-1 w-full min-w-0">
-                <div id="mainFormCard" class="bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-card border border-slate-100 p-4 md:p-8 min-h-[500px]">
-                    <!-- JS Injects forms, chat, history, etc here -->
-                    <div id="formContainer"></div>
+            <!-- RIGHT MAIN CONTENT (Forms & History) -->
+            <main class="flex-1 p-3 md:p-6 min-w-0">
+                <div class="max-w-5xl mx-auto w-full space-y-4">
+                    <!-- Live Admin Banner -->
+                    <div id="liveUpdateBannerContainer" style="display: none;"></div>
+                    
+                    <!-- Dynamic Form Area -->
+                    <div id="mainFormCard" class="bg-white text-slate-800 rounded-3xl shadow-card border border-slate-200 p-4 md:p-8 min-h-[500px]">
+                        <div id="formContainer"></div>
+                    </div>
                 </div>
-            </section>
-        </main>
+            </main>
+        </div>
     </div>
     
-    <footer class="bg-dark-950 border-t border-slate-800 text-center py-4 text-[10px] font-bold text-slate-500 mt-auto uppercase tracking-widest">
-        © 2026 Uttar Pradesh Print Portal | Ojas Service
+    <!-- Footer -->
+    <footer class="bg-dark-950 border-t border-slate-800 text-center py-3.5 text-[10px] font-bold text-slate-400 mt-auto uppercase tracking-widest relative z-50">
+        © 2026 Ojas Print Service | Secure Portal
     </footer>
 </body>
 </html>
