@@ -1,6 +1,6 @@
 // ============================================================================
 // FILE 2: js/portal-forms.js
-// (All Service Forms: Domicile, Caste, DOB 18+ & All 9 Official Annexures)
+// (All Service Forms: Domicile, Caste, DOB 18+, DOB MINOR & All 9 Official Annexures)
 // ============================================================================
 
 import "./config-templates.js";
@@ -378,6 +378,34 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
                 </div>
                 <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-vip-glow transition text-sm md:text-base">${dobSubmitBtnText}</button>
             </form>
+        `;
+        return true;
+    }
+
+    // DOB MINOR (COMING SOON)
+    if (serviceName === 'dob_minor') {
+        if (!window.currentUserData || !window.currentUserData.isVip) {
+            window.switchService(window.getFirstAllowedTab());
+            return true;
+        }
+
+        container.innerHTML = `
+            <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3 mb-4">
+                <div>
+                    <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-baby text-royal-500 mr-1.5"></i> Date of Birth Certificate (Minor)</h3>
+                    <p class="text-[11px] font-bold text-slate-500">VIP एक्सक्लूसिव सर्विस</p>
+                </div>
+                ${statusTagHtml}
+            </div>
+            
+            <!-- COMING SOON UI -->
+            <div class="flex flex-col items-center justify-center py-16 px-4 text-center bg-amber-50/50 rounded-3xl border-2 border-dashed border-amber-200">
+                <div class="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
+                    <i class="fa-solid fa-person-digging text-4xl text-amber-500 animate-bounce"></i>
+                </div>
+                <h4 class="text-2xl font-black text-dark-900 uppercase tracking-widest mb-1">Coming Soon</h4>
+                <p class="text-sm text-slate-500 font-bold max-w-md mx-auto">इस सर्विस का फॉर्म और कोड अभी तैयार किया जा रहा है। जल्द ही यह सर्विस यहाँ उपलब्ध होगी!</p>
+            </div>
         `;
         return true;
     }
