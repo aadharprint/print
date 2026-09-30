@@ -201,29 +201,45 @@ window.submitLocalAnnexureForm = async function(event, serviceType, fileIdKey) {
     }
 };
 
-// ================= BACKGROUND WATERMARK HELPER =================
+// ================= BACKGROUND WATERMARK HELPER (NEW ADVANCED DESIGN) =================
 const getWatermarkHtml = (srv) => {
+    // हर फॉर्म के लिए अलग-अलग इमोजी और नाम
     const wMap = {
-        'domicile': { icon: 'fa-house-chimney', text: 'DOMICILE' },
-        'caste': { icon: 'fa-users', text: 'CASTE CERT' },
-        'dob18': { icon: 'fa-cake-candles', text: 'DOB 18+' },
-        'dob_minor': { icon: 'fa-baby', text: 'DOB MINOR' },
-        'annexure1': { icon: 'fa-file-signature', text: 'ANNEXURE I' },
-        'annexure1a': { icon: 'fa-child-reaching', text: 'ANNEXURE IA' },
-        'annexure3': { icon: 'fa-bolt', text: 'ANNEXURE III' },
-        'annexure3a': { icon: 'fa-child', text: 'ANNEXURE IIIA' },
-        'annexureb': { icon: 'fa-file-contract', text: 'ANNEXURE B' },
-        'annexurec': { icon: 'fa-file-contract', text: 'ANNEXURE C' },
-        'annexured': { icon: 'fa-file-contract', text: 'ANNEXURE D' },
-        'annexuree': { icon: 'fa-file-contract', text: 'ANNEXURE E' },
-        'annexuref': { icon: 'fa-child-reaching', text: 'ANNEXURE F' },
+        'domicile': { emoji: '🏠', text: 'DOMICILE' },
+        'caste': { emoji: '👥', text: 'CASTE CERT' },
+        'dob18': { emoji: '🎂', text: 'DOB 18+' },
+        'dob_minor': { emoji: '🍼', text: 'DOB MINOR' },
+        'annexure1': { emoji: '📜', text: 'ANNEXURE I' },
+        'annexure1a': { emoji: '👶', text: 'ANNEXURE IA' },
+        'annexure3': { emoji: '⚡', text: 'ANNEXURE III' },
+        'annexure3a': { emoji: '👦', text: 'ANNEXURE IIIA' },
+        'annexureb': { emoji: '🧑', text: 'ANNEXURE B' },
+        'annexurec': { emoji: '👧', text: 'ANNEXURE C' },
+        'annexured': { emoji: '💍', text: 'ANNEXURE D' },
+        'annexuree': { emoji: '✂️', text: 'ANNEXURE E' },
+        'annexuref': { emoji: '🖍️', text: 'ANNEXURE F' },
     };
-    const wm = wMap[srv] || { icon: 'fa-file', text: srv.toUpperCase() };
+    const wm = wMap[srv] || { emoji: '📄', text: srv.toUpperCase() };
+    
+    // 5 बार नाम और 1 सेंटर इमोजी वाला HTML
     return `
-        <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] select-none z-0 overflow-hidden">
-            <div class="text-center flex flex-col items-center justify-center transform -rotate-12 scale-[1.5] md:scale-[2] w-full">
-                <i class="fa-solid ${wm.icon} text-[150px] mb-6"></i>
-                <h1 class="text-[80px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</h1>
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.045] select-none z-0 overflow-hidden">
+            <!-- Central Emoji -->
+            <div class="absolute text-[180px] md:text-[250px] transform -rotate-12 grayscale-[20%]">${wm.emoji}</div>
+            
+            <!-- 5 Times Repeating Text Pattern around Emoji -->
+            <div class="absolute inset-0 flex flex-col justify-between items-center py-10 md:py-16 transform -rotate-12 w-[150%] left-[-25%]">
+                <div class="flex justify-between w-full px-6 md:px-12">
+                    <span class="text-[40px] md:text-[60px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span>
+                    <span class="text-[40px] md:text-[60px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span>
+                </div>
+                <div class="text-center w-full">
+                    <span class="text-[40px] md:text-[60px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span>
+                </div>
+                <div class="flex justify-between w-full px-6 md:px-12">
+                    <span class="text-[40px] md:text-[60px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span>
+                    <span class="text-[40px] md:text-[60px] font-black uppercase tracking-widest whitespace-nowrap">${wm.text}</span>
+                </div>
             </div>
         </div>
     `;
@@ -871,7 +887,7 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
                         </div>
 
                         <div class="p-3 bg-green-50 rounded-2xl border border-green-200 space-y-2">
-                            <span class="text-[11px] font-black text-green-900 uppercase block">3. कौन-सा नाम रखना है और कौन-सा हटाना है</span>
+                            <span class="text-[11px] font-black text-green-900 uppercase block">3. कौन-सा नाम रखना और कौन-सा हटाना है</span>
                             <div class="grid grid-cols-2 gap-2">
                                 <div><label class="block text-[10px] font-bold text-green-800 uppercase mb-1">रखने वाला (Retain)</label><input type="text" id="inpRetainName" name="retainName" placeholder="RAMESH" required class="w-full p-2.5 border border-green-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
                                 <div><label class="block text-[10px] font-bold text-red-700 uppercase mb-1">हटाने वाला (Remove)</label><input type="text" id="inpRemoveName" name="removeName" placeholder="SONU" required class="w-full p-2.5 border border-red-300 rounded-xl text-xs font-bold uppercase bg-white"></div>
