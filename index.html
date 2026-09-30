@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ojas Print Service - Portal</title>
+    <title>उत्तर प्रदेश प्रिंट पोर्टल</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
@@ -11,19 +11,47 @@
     <!-- html2pdf.js for Single-Page A4 PDF Download -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     
-    <!-- Theme Config -->
+    <!-- New Royal Indigo & Gold Theme Config -->
+    <script>मैंने आपका पोर्टल डिज़ाइन और थीम पूरी तरह से बदलकर **Card-Based Home Launcher + Sidebar Cards Workspace** बना दिया है। इसके लिए आपको अपनी किसी भी `.js` फाइल में बदलाव करने की ज़रूरत नहीं है—केवल **`index.html`** का कोड रिप्लेस करना है।
+
+### इस नए डिज़ाइन की मुख्य खासियतें:
+1. **होम स्क्रीन पर बड़े सर्विस कार्ड्स (Main Home Cards):** लॉगिन करते ही सबसे पहले मेन स्क्रीन पर सभी सेवाओं (**Domicile, Caste, DOB 18+ और सारे 9 Annexures**) के सुंदर **Cards** (आइकन, हिंदी नाम और बैज के साथ) दिखेंगे।
+2. **कार्ड पर क्लिक करते ही फॉर्म खुलेगा + साइड में भी कार्ड्स दिखेंगे:** किसी भी कार्ड पर क्लिक करते ही उसका **Form** खुल जाएगा, और बाईं तरफ (Left Sidebar) में साधारण टैब्स की जगह **Mini-Cards** दिखेंगे।
+3. **ऑटोमैटिक Back बटन ("← वापस सभी कार्ड्स देखें"):** फॉर्म के ठीक ऊपर एक **Back** बटन दिया गया है। उस पर क्लिक करते ही फॉर्म बंद हो जाएगा और वापस मुख्य होम स्क्रीन के सारे कार्ड्स दिखने लगेंगे।
+4. **सर्कल में पोर्टल लोगो (`logo.png`):** लॉगिन पेज और ऊपर हेडर दोनों जगह **गोल (Circular) लोगो** लगा दिया गया है। आप अपने प्रोजेक्ट फोल्डर में **`logo.png`** नाम से जो भी इमेज रखेंगे, वह अपने-आप इस सर्कल में दिखने लगेगी (और जब तक इमेज नहीं रखेंगे, तब तक एक रॉयल आइकन दिखेगा)।
+5. **नई प्रीमियम थीम (Royal Indigo & Emerald Theme):** पुरानी थीम को हटाकर नया रॉयल इंडिगो, एमराल्ड और क्लीन 3D कार्ड डिज़ाइन लगाया गया है।
+
+---
+
+### नया `index.html` (पूरा कोड कॉपी करके अपनी `index.html` में पेस्ट करें)
+
+```html
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>उत्तर प्रदेश प्रिंट पोर्टल</title>
+    <!-- Tailwind CSS -->
+    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="[https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css](https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css)">
+    <!-- html2pdf.js for Single-Page A4 PDF Download -->
+    <script src="[https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js](https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js)"></script>
+    
+    <!-- New Royal Indigo, Emerald & Gold Theme Config -->
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: { 
-                        royal: { 50: '#fffbeb', 100: '#fef3c7', 300: '#fcd34d', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 900: '#78350f' },
-                        dark: { 700: '#334155', 800: '#1e293b', 900: '#0f172a', 950: '#020617' }
+                        royal: { 50: '#eef2ff', 100: '#e0e7ff', 300: '#fcd34d', 400: '#fbbf24', 500: '#6366f1', 600: '#4f46e5', 900: '#312e81' },
+                        dark: { 700: '#334155', 800: '#1e1b4b', 900: '#0f172a', 950: '#090d16' }
                     },
                     boxShadow: {
-                        'glow': '0 0 15px rgba(245, 158, 11, 0.35)',
-                        'vip-glow': '0 0 25px rgba(251, 191, 36, 0.5)',
-                        'card': '0 8px 24px -4px rgba(0,0,0,0.08)'
+                        'glow': '0 10px 25px -5px rgba(99, 102, 241, 0.4)',
+                        'vip-glow': '0 12px 30px -5px rgba(245, 158, 11, 0.35)',
+                        'card': '0 12px 32px -4px rgba(15, 23, 42, 0.08)'
                     }
                 }
             }
@@ -32,18 +60,25 @@
 
     <style>
         .animate-spin-slow { animation: spin 4s linear infinite; }
-        .vip-body-bg {
-            background: radial-gradient(circle at top, #1e293b 0%, #0f172a 50%, #020617 100%);
-            color: #f8fafc;
+        
+        /* New Modern Mesh Background */
+        body {
+            background: radial-gradient(circle at top left, #eef2ff 0%, #f8fafc 45%, #f0fdf4 100%);
+            color: #0f172a;
         }
+        .vip-body-bg {
+            background: radial-gradient(circle at top left, #eef2ff 0%, #f8fafc 45%, #fefce8 100%) !important;
+            color: #0f172a !important;
+        }
+
         @keyframes shimmer {
             0% { background-position: -200% 0; }
             100% { background-position: 200% 0; }
         }
         .vip-promo-shine {
-            background: linear-gradient(90deg, #0f172a 0%, #1e293b 40%, #78350f 50%, #1e293b 60%, #0f172a 100%);
+            background: linear-gradient(90deg, #1e1b4b 0%, #312e81 40%, #78350f 50%, #312e81 60%, #1e1b4b 100%);
             background-size: 200% 100%;
-            animation: shimmer 5s infinite linear;
+            animation: shimmer 6s infinite linear;
         }
         @keyframes slideInRight {
             from { transform: translateX(120%); opacity: 0; }
@@ -52,6 +87,162 @@
         .corner-alert-anim {
             animation: slideInRight 0.4s ease-out forwards;
         }
+
+        /* =========================================================
+           NEW 3D SERVICE CARDS DESIGN (REPLACES OLD FLAT TABS)
+        ========================================================= */
+        .service-tab, .vip-tab {
+            position: relative !important;
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            gap: 14px !important;
+            padding: 16px 18px !important;
+            border-radius: 20px !important;
+            background: #ffffff !important;
+            color: #0f172a !important;
+            border: 1.5px solid #e2e8f0 !important;
+            box-shadow: 0 8px 20px -6px rgba(15, 23, 42, 0.06) !important;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            text-align: left !important;
+            width: 100% !important;
+            cursor: pointer !important;
+        }
+
+        .service-tab:hover, .vip-tab:hover {
+            transform: translateY(-4px) !important;
+            border-color: #6366f1 !important;
+            box-shadow: 0 16px 30px -8px rgba(99, 102, 241, 0.18) !important;
+        }
+
+        /* Active Selected Card Styling */
+        .service-tab.bg-white, .vip-tab.bg-white {
+            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%) !important;
+            color: #ffffff !important;
+            border: 2px solid #fbbf24 !important;
+            box-shadow: 0 14px 28px -6px rgba(49, 46, 129, 0.45) !important;
+        }
+        .service-tab.bg-white .card-sub, .vip-tab.bg-white .card-sub {
+            color: #c7d2fe !important;
+        }
+        .service-tab.bg-white .card-arrow, .vip-tab.bg-white .card-arrow {
+            background: #fbbf24 !important;
+            color: #0f172a !important;
+        }
+
+        .card-icon-box {
+            width: 48px;
+            height: 48px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+            box-shadow: inset 0 2px 4px rgba(255,255,255,0.4);
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 900;
+            line-height: 1.25;
+            display: block;
+        }
+        .card-sub {
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748b;
+            margin-top: 2px;
+            display: block;
+        }
+        .card-arrow {
+            margin-left: auto;
+            width: 28px;
+            height: 28px;
+            border-radius: 999px;
+            background: #f1f5f9;
+            color: #475569;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+
+        /* =========================================================
+           MODE 1: HOME CARDS LAUNCHER VIEW (DEFAULT ON LOGIN)
+        ========================================================= */
+        body.view-mode-home #cardsSidebarWrapper {
+            width: 100% !important;
+            max-width: 1280px !important;
+            margin: 0 auto !important;
+            border-right: none !important;
+            position: static !important;
+            max-height: none !important;
+            overflow: visible !important;
+        }
+        body.view-mode-home #mainWorkspacePanel {
+            display: none !important;
+        }
+        body.view-mode-home #homeLauncherBanner {
+            display: flex !important;
+        }
+        body.view-mode-home #standardServicesGrid {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)) !important;
+            gap: 16px !important;
+        }
+        body.view-mode-home #vipServicesGridContainer {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important;
+            gap: 16px !important;
+        }
+
+        /* =========================================================
+           MODE 2: WORKSPACE VIEW (LEFT SIDEBAR CARDS + RIGHT FORM)
+        ========================================================= */
+        body.view-mode-workspace #homeLauncherBanner {
+            display: none !important;
+        }
+        body.view-mode-workspace #mainWorkspacePanel {
+            display: block !important;
+        }
+        @media (min-width: 1024px) {
+            body.view-mode-workspace #cardsSidebarWrapper {
+                width: 340px !important;
+                flex-shrink: 0 !important;
+            }
+            body.view-mode-workspace #standardServicesGrid,
+            body.view-mode-workspace #vipServicesGridContainer {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 10px !important;
+            }
+            body.view-mode-workspace .service-tab,
+            body.view-mode-workspace .vip-tab {
+                padding: 12px 14px !important;
+                border-radius: 16px !important;
+            }
+            body.view-mode-workspace .card-icon-box {
+                width: 40px !important;
+                height: 40px !important;
+                font-size: 16px !important;
+                border-radius: 12px !important;
+            }
+        }
+        /* Mobile Workspace: Hide sidebar cards while filling form so form is full-screen with Back button */
+        @media (max-width: 1023px) {
+            body.view-mode-workspace #cardsSidebarWrapper {
+                display: none !important;
+            }
+        }
+
+        /* Custom Scrollbar */
+        .sidebar-scroll::-webkit-scrollbar { width: 5px; }
+        .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 
         /* फिक्स सिंगल-पेज A4 लेआउट */
         .affidavit-paper {
@@ -101,46 +292,103 @@
 
     <!-- Modular JS Files -->
     <script type="module" src="./js/portal-wallet-chat.js"></script>
+
+    <!-- Smart View Controller: Home Cards Launcher <-> Form Workspace -->
+    <script>
+        window._isInitialAutoLoad = true;
+
+        window.showHomeCardsView = function() {
+            document.body.classList.remove('view-mode-workspace');
+            document.body.classList.add('view-mode-home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        window.showWorkspaceFormView = function() {
+            document.body.classList.remove('view-mode-home');
+            document.body.classList.add('view-mode-workspace');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        window.openCardService = function(serviceName) {
+            window._isInitialAutoLoad = false;
+            window.showWorkspaceFormView();
+            if (typeof window.switchService === 'function') {
+                window.switchService(serviceName);
+            }
+        };
+
+        // Hook into switchService so Gear Menu, History, Wallet & Support also open Workspace View automatically
+        window.addEventListener('DOMContentLoaded', () => {
+            document.body.classList.add('view-mode-home');
+
+            const checkInterval = setInterval(() => {
+                if (typeof window.switchService === 'function' && !window._switchHooked) {
+                    window._switchHooked = true;
+                    clearInterval(checkInterval);
+
+                    const origSwitch = window.switchService;
+                    window.switchService = async function(serviceName) {
+                        const res = await origSwitch(serviceName);
+                        const nonCardViews = ['history', 'add_credit', 'payments_history', 'password', 'support_chat'];
+                        if (nonCardViews.includes(serviceName)) {
+                            window._isInitialAutoLoad = false;
+                            window.showWorkspaceFormView();
+                        } else if (window._isInitialAutoLoad) {
+                            // पहली बार लॉगिन होने पर होम स्क्रीन के सारे कार्ड्स दिखाएं
+                            window._isInitialAutoLoad = false;
+                            window.showHomeCardsView();
+                        }
+                        return res;
+                    };
+                }
+            }, 50);
+        });
+    </script>
 </head>
-<body class="bg-slate-50 font-sans min-h-screen flex flex-col justify-between selection:bg-royal-300 selection:text-dark-900 transition-colors duration-300">
+<body class="view-mode-home font-sans min-h-screen flex flex-col justify-between selection:bg-indigo-500 selection:text-white transition-colors duration-300">
     
     <!-- SECURITY LOADING SCREEN -->
-    <div id="loadingScreen" style="display: flex;" class="fixed inset-0 bg-dark-900 z-[200] flex-col items-center justify-center">
-        <i class="fa-solid fa-sun text-6xl text-royal-400 mb-4 animate-spin-slow"></i>
-        <h2 class="text-xl font-black text-white tracking-widest uppercase">Ojas Print Service</h2>
-        <p class="text-xs text-royal-300 mt-1 font-bold animate-pulse">Checking Security...</p>
+    <div id="loadingScreen" style="display: flex;" class="fixed inset-0 bg-dark-950 z-[200] flex-col items-center justify-center">
+        <div class="w-20 h-20 rounded-full p-1 bg-gradient-to-tr from-amber-400 via-indigo-500 to-emerald-400 shadow-glow mb-4 flex items-center justify-center overflow-hidden">
+            <img src="logo.png" alt="Logo" class="w-full h-full object-cover rounded-full bg-white" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <div style="display:none;" class="w-full h-full rounded-full bg-dark-900 items-center justify-center text-amber-400 text-3xl">
+                <i class="fa-solid fa-landmark-dome animate-pulse"></i>
+            </div>
+        </div>
+        <h2 class="text-xl font-black text-white tracking-widest uppercase">उत्तर प्रदेश प्रिंट पोर्टल</h2>
+        <p class="text-xs text-indigo-300 mt-1 font-bold animate-pulse">Checking Security...</p>
     </div>
 
     <!-- COMPACT FLOATING CORNER ALERT WHEN 5 DAYS OR LESS REMAINING IN VIP -->
-    <div id="vipCornerAlert" style="display: none;" class="fixed bottom-3 right-3 z-[150] w-72 bg-amber-50 border-l-4 border-amber-500 rounded-xl p-3 shadow-xl text-slate-800 corner-alert-anim">
+    <div id="vipCornerAlert" style="display: none;" class="fixed bottom-4 right-4 z-[150] w-72 bg-amber-50 border-l-4 border-amber-500 rounded-2xl p-3.5 shadow-2xl text-slate-800 corner-alert-anim">
         <div class="flex justify-between items-center mb-1">
             <h4 class="text-xs font-black text-amber-900"><i class="fa-solid fa-triangle-exclamation text-amber-600 mr-1"></i> VIP एक्सपायरी अलर्ट</h4>
             <button onclick="window.dismissCornerAlert()" class="text-slate-400 hover:text-red-500 text-xs"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <p id="cornerAlertDaysText" class="text-[11px] font-semibold text-amber-800 mb-2"></p>
-        <button onclick="window.jumpToVipUpgrade(30)" class="w-full bg-dark-900 text-royal-300 font-black py-1.5 rounded-lg text-[11px]">अभी VIP वैलिडिटी बढ़ाएं</button>
+        <button onclick="window.jumpToVipUpgrade(30)" class="w-full bg-dark-900 text-amber-300 font-black py-2 rounded-xl text-[11px]">अभी VIP वैलिडिटी बढ़ाएं</button>
     </div>
 
     <!-- FULL SCREEN PDF & HTML DOCUMENT VIEWER MODAL -->
-    <div id="pdfViewerModal" style="display: none;" class="fixed inset-0 z-[100] bg-dark-900/80 backdrop-blur-md items-center justify-center p-2 md:p-6 transition-opacity">
-        <div class="bg-white w-full max-w-6xl h-full flex flex-col rounded-2xl shadow-2xl overflow-hidden">
-            <div class="flex justify-between items-center p-3 md:p-4 border-b border-slate-200 bg-slate-50 gap-2">
+    <div id="pdfViewerModal" style="display: none;" class="fixed inset-0 z-[100] bg-dark-950/85 backdrop-blur-md items-center justify-center p-2 md:p-6 transition-opacity">
+        <div class="bg-white w-full max-w-6xl h-full flex flex-col rounded-3xl shadow-2xl overflow-hidden">
+            <div class="flex justify-between items-center p-3.5 md:p-4 border-b border-slate-200 bg-slate-50 gap-2">
                 <div class="flex items-center gap-2 overflow-hidden">
-                    <div class="w-7 h-7 bg-royal-100 text-royal-600 rounded-lg flex items-center justify-center shrink-0 text-xs"><i class="fa-solid fa-file-pdf"></i></div>
-                    <h3 id="pdfViewerTitle" class="font-bold text-slate-800 text-xs md:text-sm truncate">Document Preview</h3>
+                    <div class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center shrink-0 text-xs"><i class="fa-solid fa-file-pdf"></i></div>
+                    <h3 id="pdfViewerTitle" class="font-black text-slate-800 text-xs md:text-sm truncate">Document Preview</h3>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                    <button id="modalPrintBtn" class="bg-amber-500 hover:bg-amber-600 text-dark-950 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs font-black transition shadow-sm flex items-center gap-1.5">
+                    <button id="modalPrintBtn" class="bg-amber-500 hover:bg-amber-600 text-dark-950 px-3.5 py-2 rounded-xl text-xs font-black transition shadow-sm flex items-center gap-1.5">
                         <i class="fa-solid fa-print"></i> Print
                     </button>
-                    <button id="modalDownloadBtn" class="bg-dark-900 hover:bg-black text-royal-300 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs font-bold transition shadow-glow flex items-center gap-1.5">
+                    <button id="modalDownloadBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-glow flex items-center gap-1.5">
                         <i class="fa-solid fa-download"></i> Download PDF
                     </button>
                     <button onclick="window.closePdfViewer()" class="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-200 text-slate-600 hover:bg-red-500 hover:text-white transition"><i class="fa-solid fa-xmark"></i></button>
                 </div>
             </div>
             <div class="flex-grow bg-slate-300 relative overflow-y-auto">
-                <div id="pdfLoadingSpinner" class="absolute inset-0 flex flex-col items-center justify-center text-royal-600 bg-slate-100">
+                <div id="pdfLoadingSpinner" class="absolute inset-0 flex flex-col items-center justify-center text-indigo-600 bg-slate-100">
                     <i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i>
                     <p class="text-xs font-bold text-slate-600">Loading Preview...</p>
                 </div>
@@ -150,27 +398,33 @@
         </div>
     </div>
 
-    <!-- CLEAN LOGIN SCREEN -->
-    <div id="loginSection" style="display: none;" class="items-center justify-center flex-grow p-4 min-h-screen bg-dark-900 relative overflow-hidden">
-        <div class="bg-white p-6 md:p-8 rounded-3xl shadow-2xl border-t-4 border-royal-500 w-full max-w-sm relative z-10 text-slate-800">
+    <!-- CLEAN LOGIN SCREEN WITH CIRCULAR LOGO -->
+    <div id="loginSection" style="display: none;" class="items-center justify-center flex-grow p-4 min-h-screen bg-gradient-to-br from-dark-950 via-dark-800 to-indigo-950 relative overflow-hidden">
+        <div class="bg-white p-6 md:p-8 rounded-3xl shadow-2xl border-t-4 border-amber-400 w-full max-w-sm relative z-10 text-slate-800">
             <div class="text-center mb-6">
-                <div class="w-16 h-16 bg-gradient-to-br from-royal-300 to-royal-600 text-white rounded-full flex items-center justify-center mx-auto mb-3 text-3xl shadow-glow">
-                    <i class="fa-solid fa-sun"></i>
+                <!-- CIRCULAR SITE LOGO -->
+                <div class="w-20 h-20 rounded-full p-1 bg-gradient-to-tr from-amber-400 via-indigo-600 to-emerald-500 mx-auto mb-3 shadow-glow flex items-center justify-center overflow-hidden">
+                    <img src="logo.png" alt="Portal Logo" class="w-full h-full object-cover rounded-full bg-white" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div style="display:none;" class="w-full h-full rounded-full bg-indigo-950 text-amber-400 items-center justify-center text-3xl">
+                        <i class="fa-solid fa-landmark-dome"></i>
+                    </div>
                 </div>
-                <h1 class="text-2xl font-black text-dark-900">Ojas Print Service</h1>
-                <p class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Secure Portal Login</p>
+                <h1 class="text-xl md:text-2xl font-black text-dark-900 leading-tight">उत्तर प्रदेश <span class="text-indigo-600">प्रिंट पोर्टल</span></h1>
+                <p class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Authorized Digital Document Portal</p>
             </div>
             <form id="loginForm" onsubmit="window.handleLogin(event)" class="space-y-4">
-                <input type="text" id="loginUsername" placeholder="User ID (e.g. user@print.com)" required class="w-full px-4 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-royal-500 outline-none bg-slate-50 text-sm font-semibold">
+                <input type="text" id="loginUsername" placeholder="User ID (e.g. user@print.com)" required class="w-full px-4 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50 text-sm font-semibold">
                 <div class="space-y-1.5">
-                    <input type="password" id="loginPassword" placeholder="Password" required class="w-full px-4 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-royal-500 outline-none bg-slate-50 text-sm font-semibold">
+                    <input type="password" id="loginPassword" placeholder="Password" required class="w-full px-4 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50 text-sm font-semibold">
                     <div class="flex justify-end">
-                        <button type="button" onclick="window.openForgotPasswordModal()" class="text-[11px] font-bold text-royal-600 hover:text-royal-900 transition">
+                        <button type="button" onclick="window.openForgotPasswordModal()" class="text-[11px] font-bold text-indigo-600 hover:text-indigo-900 transition">
                             <i class="fa-solid fa-key mr-1"></i>Forgot Password?
                         </button>
                     </div>
                 </div>
-                <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-glow transition text-sm">Secure Login <i class="fa-solid fa-arrow-right ml-1"></i></button>
+                <button type="submit" class="w-full bg-gradient-to-r from-indigo-900 to-indigo-700 hover:from-indigo-950 hover:to-indigo-800 text-white font-black py-3.5 rounded-xl shadow-glow transition text-sm">
+                    Secure Login <i class="fa-solid fa-arrow-right ml-1"></i>
+                </button>
             </form>
             <div id="loginError" style="display: none;" class="mt-4 text-center text-xs font-bold text-red-500 bg-red-50 p-2.5 rounded-xl border border-red-100"></div>
         </div>
@@ -178,10 +432,10 @@
 
     <!-- OUTSIDE LOGIN: FORGOT PASSWORD TICKET MODAL -->
     <div id="forgotPasswordModal" style="display: none;" class="fixed inset-0 z-[180] bg-dark-950/80 backdrop-blur-sm items-center justify-center p-4">
-        <div class="bg-white text-slate-800 w-full max-w-md rounded-3xl shadow-2xl border-t-4 border-royal-500 p-5 md:p-6 space-y-4">
+        <div class="bg-white text-slate-800 w-full max-w-md rounded-3xl shadow-2xl border-t-4 border-indigo-600 p-5 md:p-6 space-y-4">
             <div class="flex justify-between items-start border-b border-slate-100 pb-3">
                 <div>
-                    <h3 class="text-base font-black text-dark-900"><i class="fa-solid fa-key text-royal-500 mr-1.5"></i> Forgot Password Ticket</h3>
+                    <h3 class="text-base font-black text-dark-900"><i class="fa-solid fa-key text-indigo-600 mr-1.5"></i> Forgot Password Ticket</h3>
                     <p class="text-[11px] font-semibold text-slate-400 mt-0.5">अपनी User ID और नंबर लिखें, एडमिन को तुरंत सूचना भेजी जाएगी</p>
                 </div>
                 <button type="button" onclick="window.closeForgotPasswordModal()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-red-500 text-slate-500 hover:text-white flex items-center justify-center transition">
@@ -205,66 +459,88 @@
 
                 <div id="forgotResultBox" style="display: none;"></div>
 
-                <button type="submit" id="btnSubmitForgotTicket" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl text-xs md:text-sm shadow-glow transition">
+                <button type="submit" id="btnSubmitForgotTicket" class="w-full bg-indigo-900 hover:bg-black text-white font-black py-3.5 rounded-xl text-xs md:text-sm shadow-glow transition">
                     <i class="fa-solid fa-paper-plane mr-1"></i> Raise Password Reset Ticket
                 </button>
             </form>
         </div>
     </div>
 
-    <!-- DASHBOARD SCREEN -->
+    <!-- ================= MAIN DASHBOARD SECTION ================= -->
     <div id="dashboardSection" style="display: none;" class="flex-grow flex-col">
-        <header class="bg-dark-950 shadow-lg px-3 md:px-6 py-2.5 flex justify-between items-center sticky top-0 z-40 border-b border-royal-500">
-            <div class="flex items-center gap-2">
-                <div id="portalHeaderIcon" class="w-8 h-8 bg-gradient-to-br from-royal-400 to-royal-600 text-white rounded-xl flex items-center justify-center">
-                    <i class="fa-solid fa-sun text-sm"></i>
+        
+        <!-- TOP NAVBAR WITH CIRCULAR LOGO -->
+        <header class="bg-gradient-to-r from-dark-950 via-dark-800 to-indigo-950 shadow-lg px-3 md:px-6 py-2.5 flex justify-between items-center sticky top-0 z-40 border-b border-indigo-500/40">
+            <div onclick="window.showHomeCardsView()" class="flex items-center gap-3 cursor-pointer group" title="होम कार्ड्स पर जाएं">
+                <!-- CIRCULAR SITE LOGO IN HEADER -->
+                <div class="w-10 h-10 md:w-11 md:h-11 rounded-full p-0.5 bg-gradient-to-tr from-amber-400 via-indigo-400 to-emerald-400 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition">
+                    <img src="logo.png" alt="Logo" class="w-full h-full object-cover rounded-full bg-white" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div style="display:none;" class="w-full h-full rounded-full bg-indigo-950 text-amber-400 items-center justify-center text-base">
+                        <i class="fa-solid fa-landmark-dome"></i>
+                    </div>
                 </div>
-                <div class="flex items-center gap-1.5">
-                    <h2 id="portalHeaderTitle" class="text-base md:text-lg font-black text-white">Ojas <span class="text-royal-400">Portal</span></h2>
-                    <span id="vipStatusBadge" style="display: none;" class="items-center gap-1 bg-gradient-to-r from-yellow-300 to-amber-500 text-dark-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
-                        <i class="fa-solid fa-crown text-[8px]"></i> VIP
-                    </span>
+                <!-- Hidden legacy elements so JS doesn't break -->
+                <div id="portalHeaderIcon" class="hidden"></div>
+                <h2 id="portalHeaderTitle" class="hidden"></h2>
+
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-sm md:text-lg font-black text-white tracking-wide leading-tight">उत्तर प्रदेश <span class="text-amber-400">प्रिंट पोर्टल</span></h1>
+                        <span id="vipStatusBadge" style="display: none;" class="items-center gap-1 bg-gradient-to-r from-yellow-300 to-amber-500 text-dark-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase shadow-sm">
+                            <i class="fa-solid fa-crown text-[8px]"></i> VIP
+                        </span>
+                    </div>
+                    <p class="text-[10px] font-semibold text-indigo-200 hidden sm:block">Fast &amp; Verified Document Service Portal</p>
                 </div>
             </div>
 
+            <!-- RIGHT HEADER BUTTONS -->
             <div class="flex items-center gap-2 relative">
-                <a href="admin.html" id="adminPanelLink" style="display: none;" class="bg-dark-800 border border-slate-700 text-royal-300 hover:text-white px-2.5 py-1.5 rounded-xl text-xs font-bold"><i class="fa-solid fa-shield-halved"></i> <span class="hidden sm:inline ml-1">Admin</span></a>
+                <!-- Home Cards Quick Button -->
+                <button onclick="window.showHomeCardsView()" class="bg-white/10 hover:bg-amber-400 text-white hover:text-dark-950 border border-white/15 px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5" title="All Service Cards">
+                    <i class="fa-solid fa-grip"></i> <span class="hidden sm:inline">All Cards</span>
+                </button>
+
+                <a href="admin.html" id="adminPanelLink" style="display: none;" class="bg-amber-400/20 border border-amber-400/50 text-amber-300 hover:bg-amber-400 hover:text-dark-950 px-2.5 py-1.5 rounded-xl text-xs font-black transition"><i class="fa-solid fa-shield-halved"></i> <span class="hidden sm:inline ml-1">Admin</span></a>
                 
-                <div id="creditDisplayBox" style="display: none;" class="bg-royal-500/15 border border-royal-500/40 px-2.5 py-1 rounded-xl text-xs font-bold text-royal-300 items-center cursor-pointer hover:bg-royal-500/25 transition" onclick="window.selectGearOption('add_credit')">
-                    <i class="fa-solid fa-wallet mr-1 text-royal-400"></i> <span id="displayCredits" class="font-black text-white">0</span> <span class="hidden sm:inline ml-1 text-[10px]">Cr</span>
+                <div id="creditDisplayBox" style="display: none;" class="bg-emerald-500/20 border border-emerald-400/40 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-300 items-center cursor-pointer hover:bg-emerald-500/30 transition" onclick="window.selectGearOption('add_credit')">
+                    <i class="fa-solid fa-coins mr-1.5 text-amber-400"></i> <span id="displayCredits" class="font-black text-white">0</span> <span class="hidden sm:inline ml-1 text-[10px]">Cr</span>
                 </div>
 
-                <button onclick="window.selectGearOption('support_chat')" class="relative bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white border border-green-500/40 px-2.5 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5" title="Live Support Chat">
+                <button onclick="window.selectGearOption('support_chat')" class="relative bg-indigo-500/25 hover:bg-indigo-500 text-indigo-200 hover:text-white border border-indigo-400/40 px-2.5 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5" title="Live Support Chat">
                     <i class="fa-solid fa-comments text-sm"></i>
                     <span class="hidden md:inline">Support</span>
                     <span id="headerSupportUnreadBadge" style="display: none;" class="bg-red-600 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full animate-bounce">0</span>
                 </button>
                 
-                <button id="gearMenuBtn" onclick="window.toggleGearMenu(event)" class="w-9 h-9 rounded-xl bg-dark-800 hover:bg-royal-500 text-royal-300 hover:text-dark-950 border border-slate-700 flex items-center justify-center transition shadow-sm" title="Settings & History Menu">
+                <button id="gearMenuBtn" onclick="window.toggleGearMenu(event)" class="w-9 h-9 rounded-xl bg-white/10 hover:bg-amber-400 text-amber-300 hover:text-dark-950 border border-white/15 flex items-center justify-center transition shadow-sm" title="Settings & History Menu">
                     <i class="fa-solid fa-gear text-sm"></i>
                 </button>
 
-                <div id="gearDropdownMenu" class="hidden absolute right-0 top-12 w-60 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200 py-2 z-50">
-                    <div class="px-4 py-2 border-b border-slate-100 bg-slate-50">
+                <div id="gearDropdownMenu" class="hidden absolute right-0 top-12 w-64 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200 py-2 z-50">
+                    <div class="px-4 py-2.5 border-b border-slate-100 bg-indigo-50/60">
                         <p class="text-[10px] font-bold text-slate-400 uppercase">Logged in as</p>
                         <p id="displayUser" class="text-xs font-black text-dark-900 truncate"></p>
-                        <p id="gearVipDaysText" class="text-[10px] font-bold text-amber-600 mt-0.5"></p>
+                        <p id="gearVipDaysText" class="text-[10px] font-bold text-indigo-600 mt-0.5"></p>
                     </div>
                     <div class="py-1">
+                        <button onclick="window.showHomeCardsView(); document.getElementById('gearDropdownMenu').classList.add('hidden');" class="w-full px-4 py-2.5 text-left text-xs font-black text-indigo-700 hover:bg-indigo-50 flex items-center gap-2.5">
+                            <i class="fa-solid fa-grip text-indigo-600 w-4"></i> Home Service Cards
+                        </button>
                         <button id="gearBtnAddCredit" onclick="window.selectGearOption('add_credit')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-amber-700 hover:bg-amber-50 flex items-center gap-2.5">
                             <i class="fa-solid fa-plus-circle text-amber-500 w-4"></i> Add Credit / Buy VIP
                         </button>
                         <button onclick="window.selectGearOption('history')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5">
-                            <i class="fa-solid fa-folder-open text-royal-500 w-4"></i> Document History
+                            <i class="fa-solid fa-folder-open text-indigo-500 w-4"></i> Document History
                         </button>
                         <button id="gearBtnPaymentHistory" onclick="window.selectGearOption('payments_history')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5">
-                            <i class="fa-solid fa-receipt text-green-600 w-4"></i> Payment History & Status
+                            <i class="fa-solid fa-receipt text-emerald-600 w-4"></i> Payment History &amp; Status
                         </button>
                         <button onclick="window.selectGearOption('password')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5">
-                            <i class="fa-solid fa-key text-indigo-500 w-4"></i> Change Password
+                            <i class="fa-solid fa-key text-purple-500 w-4"></i> Change Password
                         </button>
-                        <button onclick="window.selectGearOption('support_chat')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-green-700 hover:bg-green-50 flex items-center justify-between">
-                            <span class="flex items-center gap-2.5"><i class="fa-solid fa-comments text-green-600 w-4"></i> Live Support Chat</span>
+                        <button onclick="window.selectGearOption('support_chat')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-emerald-700 hover:bg-emerald-50 flex items-center justify-between">
+                            <span class="flex items-center gap-2.5"><i class="fa-solid fa-comments text-emerald-600 w-4"></i> Live Support Chat</span>
                             <span id="gearSupportUnreadBadge" style="display: none;" class="bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">New</span>
                         </button>
                     </div>
@@ -277,61 +553,252 @@
             </div>
         </header>
 
-        <main class="max-w-5xl mx-auto w-full p-3 md:p-6 flex-grow">
-            <div id="liveUpdateBannerContainer" style="display: none;" class="mb-3.5"></div>
+        <!-- LIVE ADMIN BANNER CONTAINER -->
+        <div class="max-w-7xl mx-auto w-full px-3 md:px-6 pt-3">
+            <div id="liveUpdateBannerContainer" style="display: none;"></div>
+        </div>
 
-            <div id="normalUserVipPromo" style="display: none;" class="mb-4 rounded-2xl vip-promo-shine border border-royal-400 p-3 text-white shadow-md">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                    <div class="flex items-center gap-2">
-                        <span class="bg-amber-400 text-dark-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase shrink-0"><i class="fa-solid fa-crown"></i> VIP ACCESS</span>
-                        <p id="normalPromoTextDesc" class="text-xs font-bold text-royal-100">
-                            VIP लें: <strong>18+ DOB & सारे 9 Official Annexures</strong> अनलॉक करें (सभी डॉक्यूमेंट 10 Cr)!
-                        </p>
-                    </div>
-                    <div class="flex items-center gap-1.5 w-full sm:w-auto justify-end">
-                        <button onclick="window.jumpToVipUpgrade(30)" class="flex-1 sm:flex-initial bg-dark-900 hover:bg-royal-400 hover:text-dark-950 text-royal-300 border border-royal-400 px-2.5 py-1 rounded-lg text-[11px] font-black transition">1M ₹149</button>
-                        <button onclick="window.jumpToVipUpgrade(60)" class="flex-1 sm:flex-initial bg-dark-900 hover:bg-royal-400 hover:text-dark-950 text-royal-300 border border-royal-400 px-2.5 py-1 rounded-lg text-[11px] font-black transition">2M ₹249</button>
-                        <button onclick="window.jumpToVipUpgrade(90)" class="flex-1 sm:flex-initial bg-amber-400 text-dark-950 px-2.5 py-1 rounded-lg text-[11px] font-black transition">3M ₹299</button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="standardServicesGrid" class="grid grid-cols-2 gap-2.5 mb-3">
-                <button onclick="window.switchService('domicile')" id="btn-domicile" class="service-tab"><i class="fa-solid fa-house-chimney"></i> Domicile (मूल निवास)</button>
-                <button onclick="window.switchService('caste')" id="btn-caste" class="service-tab"><i class="fa-solid fa-users"></i> Caste (जाति प्रमाण पत्र)</button>
-            </div>
-
-            <div id="vipServicesBar" style="display: none;" class="mb-4 p-3 md:p-4 rounded-2xl bg-dark-950/90 border border-royal-400 shadow-vip-glow">
-                <div class="flex items-center justify-between mb-2.5 pb-1.5 border-b border-slate-800">
-                    <span id="vipBarTitleLabel" class="text-[11px] font-black uppercase tracking-wider text-royal-300 flex items-center gap-1.5">
-                        <i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures)
-                    </span>
-                    <button onclick="window.selectGearOption('history')" class="text-[10px] text-slate-300 hover:text-royal-300 font-bold">
-                        <i class="fa-solid fa-folder-open mr-1"></i> Saved Files
-                    </button>
-                </div>
-                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                    <button onclick="window.switchService('dob18')" id="btn-dob18" class="vip-tab"><i class="fa-solid fa-cake-candles"></i> DOB MEERUT 18+</button>
-                    <button onclick="window.switchService('annexure1')" id="btn-annexure1" class="vip-tab">Annexure 1</button>
-                    <button onclick="window.switchService('annexure1a')" id="btn-annexure1a" class="vip-tab">Annexure 1A</button>
-                    <button onclick="window.switchService('annexure3')" id="btn-annexure3" class="vip-tab">Annexure 3</button>
-                    <button onclick="window.switchService('annexure3a')" id="btn-annexure3a" class="vip-tab">Annexure 3A</button>
-                    <button onclick="window.switchService('annexureb')" id="btn-annexureb" class="vip-tab">Annexure B</button>
-                    <button onclick="window.switchService('annexurec')" id="btn-annexurec" class="vip-tab">Annexure C</button>
-                    <button onclick="window.switchService('annexured')" id="btn-annexured" class="vip-tab">Annexure D</button>
-                    <button onclick="window.switchService('annexuree')" id="btn-annexuree" class="vip-tab">Annexure E</button>
-                    <button onclick="window.switchService('annexuref')" id="btn-annexuref" class="vip-tab">Annexure F</button>
-                </div>
-            </div>
+        <!-- ================= DUAL-MODE BODY: HOME CARDS LAUNCHER + WORKSPACE ================= -->
+        <div class="flex-1 flex flex-col lg:flex-row max-w-[1440px] w-full mx-auto p-3 md:p-6 gap-6">
             
-            <div id="mainFormCard" class="bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-card border border-slate-100 p-4 md:p-7">
-                <div id="formContainer"></div>
-            </div>
-        </main>
+            <!-- LEFT / FULL-SCREEN CARDS SECTION -->
+            <aside id="cardsSidebarWrapper" class="w-full lg:w-[340px] shrink-0 flex flex-col gap-5 lg:sticky lg:top-[76px] lg:max-h-[calc(100vh-96px)] lg:overflow-y-auto sidebar-scroll">
+                
+                <!-- Welcome Hero Banner (Visible on Main Home Cards View) -->
+                <div id="homeLauncherBanner" class="bg-gradient-to-r from-indigo-950 via-indigo-900 to-slate-900 rounded-3xl p-5 md:p-6 text-white shadow-card border border-indigo-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-amber-400 to-emerald-400 shrink-0 hidden sm:flex items-center justify-center overflow-hidden shadow-md">
+                            <img src="logo.png" alt="Logo" class="w-full h-full object-cover rounded-full bg-white" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div style="display:none;" class="w-full h-full rounded-full bg-indigo-950 text-amber-400 items-center justify-center text-xl">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="bg-amber-400 text-dark-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">Select Service Card</span>
+                            <h2 class="text-lg md:text-2xl font-black text-white mt-1">आपको कौन-सा डॉक्यूमेंट बनाना है?</h2>
+                            <p class="text-xs text-indigo-200 font-semibold">नीचे दिए गए किसी भी सर्विस कार्ड पर क्लिक करें, उसका फॉर्म तुरंत खुल जाएगा।</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 self-end sm:self-center shrink-0">
+                        <button onclick="window.selectGearOption('history')" class="bg-white/10 hover:bg-white text-white hover:text-dark-950 border border-white/20 font-black px-4 py-2.5 rounded-2xl text-xs transition flex items-center gap-2">
+                            <i class="fa-solid fa-folder-open text-amber-400"></i> Saved Files
+                        </button>
+                    </div>
+                </div>
+
+                <!-- VIP PROMO STRIP FOR NORMAL USERS -->
+                <div id="normalUserVipPromo" style="display: none;" class="rounded-3xl vip-promo-shine border border-amber-400/70 p-4 text-white shadow-lg">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center gap-2.5">
+                            <span class="bg-amber-400 text-dark-950 text-[10px] font-black px-2.5 py-1 rounded-full uppercase shrink-0"><i class="fa-solid fa-crown"></i> VIP PASS</span>
+                            <p id="normalPromoTextDesc" class="text-xs font-bold text-amber-100">
+                                VIP लें: <strong>18+ DOB &amp; सारे 9 Official Annexures</strong> अनलॉक करें!
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-1.5 w-full sm:w-auto justify-end">
+                            <button onclick="window.jumpToVipUpgrade(30)" class="flex-1 sm:flex-initial bg-dark-950/90 hover:bg-amber-400 hover:text-dark-950 text-amber-300 border border-amber-400/50 px-3 py-1.5 rounded-xl text-[11px] font-black transition">1M ₹149</button>
+                            <button onclick="window.jumpToVipUpgrade(60)" class="flex-1 sm:flex-initial bg-dark-950/90 hover:bg-amber-400 hover:text-dark-950 text-amber-300 border border-amber-400/50 px-3 py-1.5 rounded-xl text-[11px] font-black transition">2M ₹249</button>
+                            <button onclick="window.jumpToVipUpgrade(90)" class="flex-1 sm:flex-initial bg-amber-400 text-dark-950 px-3 py-1.5 rounded-xl text-[11px] font-black transition">3M ₹299</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 1. GENERAL CERTIFICATE CARDS -->
+                <div class="bg-white/80 backdrop-blur rounded-3xl p-4 shadow-card border border-slate-200/90">
+                    <div class="flex items-center justify-between mb-3 px-1">
+                        <span class="text-xs font-black uppercase tracking-wider text-indigo-950 flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> प्रमाण पत्र सेवाएं (General Certificates)
+                        </span>
+                        <span class="text-[10px] font-bold text-slate-400">Click Card to Open</span>
+                    </div>
+
+                    <div id="standardServicesGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        <!-- Domicile Card -->
+                        <button onclick="window.openCardService('domicile')" id="btn-domicile" class="service-tab">
+                            <div class="card-icon-box bg-emerald-100 text-emerald-600 border border-emerald-200">
+                                <i class="fa-solid fa-house-chimney"></i>
+                            </div>
+                            <div class="overflow-hidden">
+                                <span class="card-title">Domicile Certificate</span>
+                                <span class="card-sub">मूल निवास प्रमाण पत्र बनाएं</span>
+                            </div>
+                            <div class="card-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                        </button>
+
+                        <!-- Caste Card -->
+                        <button onclick="window.openCardService('caste')" id="btn-caste" class="service-tab">
+                            <div class="card-icon-box bg-indigo-100 text-indigo-600 border border-indigo-200">
+                                <i class="fa-solid fa-users"></i>
+                            </div>
+                            <div class="overflow-hidden">
+                                <span class="card-title">Caste Certificate</span>
+                                <span class="card-sub">जाति प्रमाण पत्र बनाएं</span>
+                            </div>
+                            <div class="card-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. VIP EXCLUSIVE SERVICE CARDS -->
+                <div id="vipServicesBar" style="display: none;" class="bg-white/90 backdrop-blur rounded-3xl p-4 border-2 border-amber-300/80 shadow-vip-glow">
+                    <div class="flex items-center justify-between mb-3.5 pb-2 border-b border-slate-100 px-1">
+                        <span id="vipBarTitleLabel" class="text-xs font-black uppercase tracking-wider text-indigo-950 flex items-center gap-1.5">
+                            <i class="fa-solid fa-crown text-amber-500"></i> VIP Services &amp; All Annexures
+                        </span>
+                        <span class="bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full text-[10px] font-black">VIP Unlocked</span>
+                    </div>
+
+                    <div id="vipServicesGridContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                        
+                        <!-- DOB 18+ Card -->
+                        <button onclick="window.openCardService('dob18')" id="btn-dob18" class="vip-tab">
+                            <div class="card-icon-box bg-amber-100 text-amber-600 border border-amber-300">
+                                <i class="fa-solid fa-cake-candles"></i>
+                            </div>
+                            <div class="overflow-hidden">
+                                <span class="card-title">DOB Meerut 18+</span>
+                                <span class="card-sub">जन्म प्रमाण पत्र (18+ VIP)</span>
+                            </div>
+                            <div class="card-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                        </button>
+
+                        <!-- Annexure 1 Card -->
+                        <button onclick="window.openCardService('annexure1')" id="btn-annexure1" class="vip-tab">
+                            <div class="card-icon-box bg-blue-100 text-blue-600 border border-blue-200">
+                                <i class="fa-solid fa-file-signature"></i>
+                            </div>
+                            <div class="overflow-hidden">
+                                <span class="card-title">Annexure-I (Adults)</span>
+                                <span class="card-sub">वयस्क जन्मतिथि सुधार शपथ पत्र</span>
+                            </div>
+                            <div class="card-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                        </button>
+
+                        <!-- Annexure 1A Card -->
+                        <button onclick="window.openCardService('annexure1a')" id="btn-annexure1a" class="vip-tab">
+                            <div class="card-icon-box bg-teal-100 text-teal-600 border border-teal-200">
+                                <i class="fa-solid fa-child-reaching"></i>
+                            </div>
+                            <div class="overflow-hidden">
+                                <span class="card-title">Annexure-IA (Child)</span>
+                                <span class="card-sub">बच्चों की जन्मतिथि सुधार शपथ पत्र</span>
+                            </div>
+                            <div class="card-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                        </button>
+
+                        <!-- Annexure 3 Card -->
+                        <button onclick="window.openCardService('annexure3')" id="btn-annexure3" class="vip-tab">
+                            <div class="card-icon-box bg-yellow-100 text-yellow-700 border border-yellow-300">
+                                <i class="fa-solid fa-bolt"></i>
+                            </div>
+                            <div class="overflow-hidden">
+                                <span class="card-title">Annexure-III (Adults)</span>
+                                <span class="card-sub">वयस्क आईडी Reactivation शपथ पत्र</span>
+                            </div>
+                            <div class="card-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                        </button>
+
+                        <!-- Annexure 3A Card -->
+                        <button onclick="window.openCardService('annexure3a')" id="btn-annexure3a" class="vip-tab">
+                            <div class="card-icon-box bg-orange-100 text-orange-600 border border-orange-200">
+                                <i class="fa-solid fa-child"></i>
+                            </div>
+                            <div class="overflow-hidden">
+                                <span class="card-title">Annexure-IIIA (Child)</span>
+                                <span class="card-sub">बच्चों की आईडी Reactivation</span>
+                            </div>
+                            <div class="card-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                        </button>
+
+                        <!-- Annexure B Card -->
+                        <button onclick="window.openCardService('annexureb')" id="btn-annexureb" class="vip-tab">
+                            <div class="card-icon-box bg-indigo-100 text-indigo-600 border border-indigo-200">
+                                <i class="fa-solid fa-file-contract"></i>
+                            </div>
+                            <div class="overflow-hidden">
+                                <span class="card-title">Annexure-B (Adults)</span>
+                                <span class="card-sub">वयस्क नाम सुधार / परिवर्तन</span>
+                            </div>
+                            <div class="card-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                        </button>
+
+                        <!-- Annexure C Card -->
+                        <button onclick="window.openCardService('annexurec')" id="btn-annexurec" class="vip-tab">
+                            <div class="card-icon-box bg-cyan-100 text-cyan-600 border border-cyan-200">
+                                <i class="fa-solid fa-file-pen"></i>
+                            </div>
+                            <div class="overflow-hidden">
+                                <span class="card-title">Annexure-C (Children)</span>
+                                <span class="card-sub">बच्चों के नाम सुधार हेतु शपथ पत्र</span>
+                            </div>
+                            <div class="card-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                        </button>
+
+                        <!-- Annexure D Card -->
+                        <button onclick="window.openCardService('annexured')" id="btn-annexured" class="vip-tab">
+                            <div class="card-icon-box bg-purple-100 text-purple-600 border border-purple-200">
+                                <i class="fa-solid fa-id-card-clip"></i>
+                            </div>
+                            <div class="overflow-hidden">
+                                <span class="card-title">Annexure-D (Name)</span>
+                                <span class="card-sub">विवाह पश्चात / नाम अपडेट शपथ पत्र</span>
+                            </div>
+                            <div class="card-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                        </button>
+
+                        <!-- Annexure E Card -->
+                        <button onclick="window.openCardService('annexuree')" id="btn-annexuree" class="vip-tab">
+                            <div class="card-icon-box bg-rose-100 text-rose-600 border border-rose-200">
+                                <i class="fa-solid fa-user-pen"></i>
+                            </div>
+                            <div class="overflow-hidden">
+                                <span class="card-title">Annexure-E (Adults Urf)</span>
+                                <span class="card-sub">वयस्क नाम से उर्फ़/Alias हटाएं</span>
+                            </div>
+                            <div class="card-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                        </button>
+
+                        <!-- Annexure F Card -->
+                        <button onclick="window.openCardService('annexuref')" id="btn-annexuref" class="vip-tab">
+                            <div class="card-icon-box bg-pink-100 text-pink-600 border border-pink-200">
+                                <i class="fa-solid fa-child-dress"></i>
+                            </div>
+                            <div class="overflow-hidden">
+                                <span class="card-title">Annexure-F (Child Urf)</span>
+                                <span class="card-sub">बच्चे के नाम से उर्फ़/Alias हटाएं</span>
+                            </div>
+                            <div class="card-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                        </button>
+
+                    </div>
+                </div>
+            </aside>
+
+            <!-- RIGHT WORKSPACE PANEL (OPENS WHEN ANY CARD IS CLICKED) -->
+            <main id="mainWorkspacePanel" class="flex-1 min-w-0">
+                <div class="space-y-4">
+                    <!-- Top Back Bar -->
+                    <div class="bg-white rounded-2xl p-3 px-4 shadow-sm border border-slate-200 flex items-center justify-between gap-2">
+                        <button type="button" onclick="window.showHomeCardsView()" class="bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200 font-black px-4 py-2 rounded-xl text-xs transition flex items-center gap-2 shadow-sm">
+                            <i class="fa-solid fa-arrow-left"></i> वापस सभी कार्ड्स देखें (Back to Cards)
+                        </button>
+                        <button type="button" onclick="window.selectGearOption('history')" class="text-xs font-bold text-slate-600 hover:text-indigo-600 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-indigo-50 transition">
+                            <i class="fa-solid fa-folder-open mr-1 text-amber-500"></i> Document History
+                        </button>
+                    </div>
+
+                    <!-- Dynamic Form Container -->
+                    <div id="mainFormCard" class="bg-white text-slate-800 rounded-3xl shadow-card border border-slate-200 p-4 md:p-7">
+                        <div id="formContainer"></div>
+                    </div>
+                </div>
+            </main>
+
+        </div>
     </div>
     
     <footer class="bg-dark-950 border-t border-slate-800 text-center py-3.5 text-[10px] font-bold text-slate-400 mt-auto uppercase tracking-widest">
-        © 2026 Ojas Print Service | Secure Portal
+        © 2026 उत्तर प्रदेश प्रिंट पोर्टल | Secure Digital Document Portal
     </footer>
 </body>
 </html>
