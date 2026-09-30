@@ -1390,8 +1390,14 @@ window.switchService = async function(serviceName) {
         btn.className = "vip-tab bg-dark-800 text-royal-300 border border-royal-500/30 font-bold py-2 px-2.5 rounded-xl hover:bg-dark-700 transition text-[11px] md:text-xs flex items-center justify-center gap-1 shadow-sm";
     });
 
-    // 2. जिस बटन पर क्लिक किया गया है (Active), उसे व्हाइट (White) बनाएं
-    const activeBtn = document.getElementById('btn-' + serviceName);
+    // 🌟 2. जिस बटन पर क्लिक किया गया है (Active), उसे व्हाइट (White) बनाएं
+    // अगर कोई भी एनेक्ज़र सेलेक्ट हुआ है, तो सिर्फ 'All Annexures' वाले टैब को ही हाईलाइट करें
+    let tabIdToHighlight = serviceName;
+    if (serviceName.startsWith('annexure')) {
+        tabIdToHighlight = 'annexures'; 
+    }
+
+    const activeBtn = document.getElementById('btn-' + tabIdToHighlight);
     if (activeBtn) {
         if (activeBtn.classList.contains('vip-tab')) {
             activeBtn.className = "vip-tab bg-white text-dark-950 font-black py-2 px-2.5 rounded-xl shadow-vip-glow transition text-[11px] md:text-xs flex items-center justify-center gap-1 border-2 border-royal-400";
