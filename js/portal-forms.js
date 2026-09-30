@@ -213,6 +213,24 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
         <input type="text" id="customVleInput" name="VLE_CUSTOM" placeholder="VLE का नाम यहाँ लिखें" style="display:none;" class="w-full mt-2 p-2.5 border border-amber-300 rounded-xl text-xs bg-amber-50 uppercase">
     `;
 
+    // 🌟 नया DROPDOWN (सिर्फ Annexures के लिए)
+    const annexureDropdownHtml = serviceName.startsWith('annexure') ? `
+        <div class="mb-5 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-200 shadow-sm">
+            <label class="block text-[11px] font-black text-indigo-900 uppercase mb-2 tracking-wide"><i class="fa-solid fa-list-check text-indigo-500 mr-1.5"></i> ड्रॉपडाउन से अपना एनेक्ज़र सेलेक्ट करें:</label>
+            <select onchange="window.switchService(this.value)" class="w-full p-3.5 border-2 border-indigo-300 rounded-xl text-sm font-black bg-white text-dark-900 outline-none cursor-pointer shadow-sm focus:border-indigo-500 transition">
+                <option value="annexure1" ${serviceName==='annexure1'?'selected':''}>Annexure-I (Adults DoB Update)</option>
+                <option value="annexure1a" ${serviceName==='annexure1a'?'selected':''}>Annexure-IA (Children DoB Update)</option>
+                <option value="annexure3" ${serviceName==='annexure3'?'selected':''}>Annexure-III (Adults Reactivation)</option>
+                <option value="annexure3a" ${serviceName==='annexure3a'?'selected':''}>Annexure-IIIA (Children Reactivation)</option>
+                <option value="annexureb" ${serviceName==='annexureb'?'selected':''}>Annexure B (Adults Name Update)</option>
+                <option value="annexurec" ${serviceName==='annexurec'?'selected':''}>Annexure C (Children Name Update)</option>
+                <option value="annexured" ${serviceName==='annexured'?'selected':''}>Annexure D (Name Update after Marriage)</option>
+                <option value="annexuree" ${serviceName==='annexuree'?'selected':''}>Annexure E (Adults Urf/Alias Removal)</option>
+                <option value="annexuref" ${serviceName==='annexuref'?'selected':''}>Annexure F (Children Urf/Alias Removal)</option>
+            </select>
+        </div>
+    ` : '';
+
     // DOMICILE
     if (serviceName === 'domicile') {
         container.innerHTML = `
@@ -398,7 +416,6 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
                 ${statusTagHtml}
             </div>
             
-            <!-- COMING SOON UI -->
             <div class="flex flex-col items-center justify-center py-16 px-4 text-center bg-amber-50/50 rounded-3xl border-2 border-dashed border-amber-200">
                 <div class="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
                     <i class="fa-solid fa-person-digging text-4xl text-amber-500 animate-bounce"></i>
@@ -414,6 +431,7 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
     if (serviceName === 'annexure1') {
         if (!window.currentUserData || !window.currentUserData.isVip) { window.switchService(window.getFirstAllowedTab()); return true; }
         container.innerHTML = `
+            ${annexureDropdownHtml}
             <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                 <div>
                     <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-file-signature text-royal-500 mr-1.5"></i> Annexure-I (Adults DoB Update)</h3>
@@ -469,6 +487,7 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
     if (serviceName === 'annexure1a') {
         if (!window.currentUserData || !window.currentUserData.isVip) { window.switchService(window.getFirstAllowedTab()); return true; }
         container.innerHTML = `
+            ${annexureDropdownHtml}
             <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                 <div>
                     <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-child-reaching text-royal-500 mr-1.5"></i> Annexure-IA (Children DoB Update)</h3>
@@ -529,6 +548,7 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
     if (serviceName === 'annexure3') {
         if (!window.currentUserData || !window.currentUserData.isVip) { window.switchService(window.getFirstAllowedTab()); return true; }
         container.innerHTML = `
+            ${annexureDropdownHtml}
             <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                 <div>
                     <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-bolt text-royal-500 mr-1.5"></i> Annexure-III (Adults Reactivation)</h3>
@@ -605,6 +625,7 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
     if (serviceName === 'annexure3a') {
         if (!window.currentUserData || !window.currentUserData.isVip) { window.switchService(window.getFirstAllowedTab()); return true; }
         container.innerHTML = `
+            ${annexureDropdownHtml}
             <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                 <div>
                     <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-child text-royal-500 mr-1.5"></i> Annexure-IIIA (Children Reactivation)</h3>
@@ -700,6 +721,7 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
         ` : '';
 
         container.innerHTML = `
+            ${annexureDropdownHtml}
             <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                 <div>
                     <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-file-contract text-royal-500 mr-1.5"></i> ${mapInfo.title} - Name Update Affidavit</h3>
@@ -749,6 +771,7 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
     if (serviceName === 'annexuree') {
         if (!window.currentUserData || !window.currentUserData.isVip) { window.switchService(window.getFirstAllowedTab()); return true; }
         container.innerHTML = `
+            ${annexureDropdownHtml}
             <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                 <div>
                     <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-file-contract text-royal-500 mr-1.5"></i> Annexure E (Adults Urf/Alias Removal)</h3>
@@ -812,6 +835,7 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
     if (serviceName === 'annexuref') {
         if (!window.currentUserData || !window.currentUserData.isVip) { window.switchService(window.getFirstAllowedTab()); return true; }
         container.innerHTML = `
+            ${annexureDropdownHtml}
             <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                 <div>
                     <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-child-reaching text-royal-500 mr-1.5"></i> Annexure F (Children Urf/Alias Removal)</h3>
