@@ -1,6 +1,6 @@
 // ============================================================================
 // FILE 3: js/portal-wallet-chat.js (UPDATED)
-// (Auth, Per-User DOB Stealth, Active=White/Inactive=Dark Tabs, Wallet, Chat & Direct Share)
+// (Auth, Per-User DOB Stealth, Active=White/Inactive=Dark Tabs, Wallet, Chat & Direct Share Fix)
 // ============================================================================
 
 import "./config-templates.js";
@@ -404,15 +404,15 @@ function setupDashboard(userData) {
     if (userData.isVip) {
         document.body.classList.add('vip-body-bg');
         portalTitle.innerHTML = `Ojas <span class="text-royal-400">VIP</span>`;
-        portalIcon.innerHTML = `<i class="fa-solid fa-crown text-sm animate-pulse"></i>`;
-        portalIcon.className = "w-8 h-8 md:w-9 md:h-9 bg-gradient-to-br from-yellow-300 via-royal-500 to-amber-700 text-dark-950 rounded-xl flex items-center justify-center shadow-vip-glow border border-yellow-200";
+        portalIcon.innerHTML = `<img src="logo.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">`;
+        portalIcon.className = "w-7 h-7 md:w-10 md:h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden p-1 border border-slate-200 shrink-0";
         vipBadge.style.display = 'inline-flex'; vipServicesBar.style.display = 'block'; normalUserVipPromo.style.display = 'none';
         mainFormCard.className = "bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-vip-glow border-2 border-royal-400 p-4 md:p-7";
     } else {
         document.body.classList.remove('vip-body-bg');
         portalTitle.innerHTML = `Ojas <span class="text-royal-400">Portal</span>`;
-        portalIcon.innerHTML = `<i class="fa-solid fa-sun text-sm"></i>`;
-        portalIcon.className = "w-8 h-8 md:w-9 md:h-9 bg-gradient-to-br from-royal-400 to-royal-600 text-white rounded-xl flex items-center justify-center shadow-inner";
+        portalIcon.innerHTML = `<img src="logo.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">`;
+        portalIcon.className = "w-7 h-7 md:w-10 md:h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden p-1 border border-slate-200 shrink-0";
         vipBadge.style.display = 'none'; vipServicesBar.style.display = 'none'; normalUserVipPromo.style.display = 'block';
         mainFormCard.className = "bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-card border border-slate-100 p-4 md:p-7";
     }
@@ -568,7 +568,7 @@ window.submitPaymentIssueTicket = async function() {
     } catch (err) { alert("टिकट रेज़ करने में समस्या आई: " + err.message); } finally { btn.disabled = false; btn.innerHTML = origHtml; }
 };
 
-// ================= NEW DIRECT SHARE LOGIC (FETCH AS BLOB) & MODAL FIX =================
+// ================= NEW DIRECT SHARE LOGIC WITH ERROR PREVENTION =================
 window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     document.getElementById('pdfViewerTitle').innerText = fileName;
     const iframe = document.getElementById('pdfIframe');
@@ -603,9 +603,13 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
 
     window.currentModalContext = { fileId: fileId, fileName: fileName, historyIndex: historyIndex, withStamp: initialWithStamp, stampFile: initialStampFile, stampSrc: initialStampSrc };
 
-    if (shareBtn) shareBtn.style.display = 'flex';
+    // शुरुआत में Share बटन को छिपा दें (Hidden)
+    if (shareBtn) shareBtn.style.display = 'none';
 
     if (isAnnexure && historyIndex >= 0) {
+        // यह Annexure है, यहाँ Share बटन दिखाएँ
+        if (shareBtn) shareBtn.style.display = 'flex';
+        
         if (modalStampLabel) modalStampLabel.classList.remove('hidden');
         if (modalStampCheckbox) modalStampCheckbox.checked = initialWithStamp;
 
@@ -621,8 +625,10 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
         if (printBtn) { printBtn.onclick = function() { window.directPrintDocument(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc); }; }
         if (shareBtn) { shareBtn.onclick = async function() { await window.shareHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc); }; }
     } else {
-        // GOOGLE DRIVE FILES LOGIC (Fetch Blob via Proxy)
+        // GOOGLE DRIVE FILES LOGIC (Domicile, Caste, DOB)
+        // यहाँ Share बटन पूरी तरह से छिपा रहेगा, जिससे एरर नहीं आएगी
         if (modalStampLabel) modalStampLabel.classList.add('hidden');
+        if (shareBtn) shareBtn.style.display = 'none'; 
         
         htmlPreviewContainer.style.display = 'none';
         htmlPreviewContainer.innerHTML = '';
@@ -632,47 +638,6 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
         
         if (downloadBtn) { downloadBtn.onclick = function() { window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank'); }; }
         if (printBtn) { printBtn.onclick = function() { window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank'); }; }
-        
-        if (shareBtn) {
-            shareBtn.onclick = async function() {
-                const btn = this;
-                const origHtml = btn.innerHTML;
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Wait...';
-                btn.disabled = true;
-
-                try {
-                    if (navigator.canShare) {
-                        const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-                        // Using CORS proxy to fetch file directly as blob
-                        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(driveUrl)}`;
-                        
-                        const response = await fetch(proxyUrl);
-                        if (!response.ok) throw new Error("Failed to fetch file");
-                        
-                        const blob = await response.blob();
-                        const file = new File([blob], fileName, { type: 'application/pdf' });
-
-                        if (navigator.canShare({ files: [file] })) {
-                            await navigator.share({
-                                files: [file],
-                                title: fileName,
-                                text: 'यहाँ से अपना डॉक्यूमेंट देखें / डाउनलोड करें:'
-                            });
-                        } else {
-                            alert('आपका डिवाइस डायरेक्ट फाइल शेयर सपोर्ट नहीं करता। कृपया फाइल डाउनलोड करें।');
-                        }
-                    } else {
-                        alert('आपका ब्राउज़र डायरेक्ट शेयर सपोर्ट नहीं करता।');
-                    }
-                } catch(e) {
-                    console.error("Direct Share Error: ", e);
-                    alert('फाइल को सीधे शेयर करने में समस्या आई। कृपया ध्यान दें कि Google Apps Script में फाइल की परमिशन "Anyone with link" होनी चाहिए। अगर वह सही है, तो कृपया फाइल डाउनलोड करके शेयर करें।');
-                } finally {
-                    btn.innerHTML = origHtml;
-                    btn.disabled = false;
-                }
-            };
-        }
     }
 
     const modal = document.getElementById('pdfViewerModal');
@@ -791,7 +756,6 @@ window.switchService = async function(serviceName) {
         if (headerBadge) headerBadge.style.display = 'none'; if (gearBadge) gearBadge.style.display = 'none'; return;
     }
 
-    // ADD CREDITS + VIP PAGE
     if (serviceName === 'add_credit') {
         const canShowDob = window.canCurrentUserSeeDob18();
         container.innerHTML = `
@@ -945,4 +909,62 @@ window.switchService = async function(serviceName) {
         container.innerHTML = `<div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-100 pb-3 mb-4"><div><h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-folder-open text-royal-500 mr-1.5"></i> Document History</h3><p id="userHistoryCount" class="text-[11px] font-bold text-royal-600">Total Files: 0</p></div><div class="flex items-center gap-2"><select onchange="window.renderHistory(this.value)" class="p-2 border border-slate-200 rounded-xl text-xs bg-slate-50 font-semibold outline-none"><option value="ALL">All Documents</option>${domOpt}${casOpt}${vipFilterOptions}</select><button onclick="window.loadUserHistory()" class="bg-slate-100 text-slate-600 px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-200"><i class="fa-solid fa-rotate-right"></i></button></div></div><div class="overflow-x-auto border border-slate-200 rounded-xl"><table class="w-full text-left border-collapse bg-white min-w-[500px]"><thead class="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase"><tr><th class="p-3">File Name</th><th class="p-3">Type</th><th class="p-3">Date & Time</th><th class="p-3 text-right">Action</th></tr></thead><tbody id="historyTableBody" class="text-xs text-slate-700"></tbody></table></div>`;
         window.loadUserHistory();
     }
+};
+
+window.loadUserPayments = async function() {
+    const tableBody = document.getElementById('userPaymentsTableBody');
+    if (!tableBody) return;
+    tableBody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 font-bold text-xs"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>Loading payment history...</td></tr>`;
+
+    try {
+        const querySnapshot = await getDocs(query(collection(db, "payments"), where("userId", "==", window.currentUserData.uid)));
+        window.userPaymentsData = [];
+        querySnapshot.forEach((docSnap) => { window.userPaymentsData.push({ id: docSnap.id, ...docSnap.data() }); });
+        window.userPaymentsData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+
+        let sumApproved = 0, sumPending = 0, pendingCount = 0;
+        window.userPaymentsData.forEach(item => {
+            const amt = parseFloat(item.amountPaid) || 0;
+            if (item.status === 'Approved' || item.status === 'Auto-Approved') { sumApproved += amt; } 
+            else if (item.status === 'Pending' || (item.status || '').includes('Ticket')) { sumPending += amt; pendingCount++; }
+        });
+
+        document.getElementById('sumTotalTxns').innerText = window.userPaymentsData.length;
+        document.getElementById('sumApprovedAmt').innerText = `₹${sumApproved}`;
+        document.getElementById('sumPendingAmt').innerText = `₹${sumPending} (${pendingCount})`;
+
+        tableBody.innerHTML = '';
+        if (window.userPaymentsData.length === 0) { tableBody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400 text-xs"><i class="fa-solid fa-receipt text-3xl mb-2 text-slate-300"></i><br>आपने अभी तक कोई पेमेंट नहीं किया है।</td></tr>`; return; }
+
+        window.userPaymentsData.forEach(data => {
+            const sec = data.timestamp?.seconds || Math.floor(Date.now() / 1000);
+            const dateObj = new Date(sec * 1000);
+            const dateStr = dateObj.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'});
+            const timeStr = dateObj.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+
+            let statusBadge = '';
+            if ((data.status || '').includes('Ticket')) { statusBadge = `<span class="bg-indigo-100 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded text-[10px] font-black"><i class="fa-solid fa-ticket mr-1"></i>Ticket Raised</span>`; } 
+            else if (data.status === 'Pending') { statusBadge = `<span class="bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded text-[10px] font-black"><i class="fa-solid fa-clock mr-1"></i>Pending</span>`; } 
+            else if (data.status === 'Approved' || data.status === 'Auto-Approved') { statusBadge = `<span class="bg-green-100 text-green-800 border border-green-200 px-2 py-0.5 rounded text-[10px] font-black"><i class="fa-solid fa-check-circle mr-1"></i>Approved</span>`; } 
+            else { statusBadge = `<span class="bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded text-[10px] font-black"><i class="fa-solid fa-circle-xmark mr-1"></i>${data.status}</span>`; }
+
+            const vipDays = data.vipDaysRequested || (data.wantsVip ? 30 : 0);
+            const creds = data.creditsRequested !== undefined ? data.creditsRequested : (data.creditsAdded || 0);
+
+            tableBody.innerHTML += `
+                <tr class="border-b border-slate-100 text-xs hover:bg-slate-50 transition">
+                    <td class="p-3 text-slate-500 font-medium">${dateStr} <br> ${timeStr}</td>
+                    <td class="p-3 font-black text-slate-800 text-sm">₹${data.amountPaid || 0}</td>
+                    <td class="p-3">
+                        <div class="flex flex-col gap-1">
+                            <span class="font-bold text-royal-600">+${creds} Cr</span>
+                            ${vipDays > 0 ? `<span class="bg-amber-400 text-dark-950 px-1.5 py-0.5 rounded text-[9px] font-black inline-block w-max">👑 +${vipDays}d VIP</span>` : ''}
+                        </div>
+                    </td>
+                    <td class="p-3 font-mono font-bold text-slate-600 text-[11px]">${data.utrNumber || 'ONLINE_UPI'}</td>
+                    <td class="p-3 text-right whitespace-nowrap">${statusBadge}</td>
+                </tr>
+            `;
+        });
+    } catch (err) { tableBody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500 text-xs">Failed to load payment history.</td></tr>`; }
 };
