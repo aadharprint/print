@@ -1342,3 +1342,224 @@ window.switchAdminMainTab = function(tabName) {
     if (tabName === 'history') window.loadAdminHistory();
     if (tabName === 'controls') window.loadPortalSettingsForAdmin();
 };
+// ================= SECTION: MISSING USER MANAGEMENT & DROPDOWN LOGIC =================
+
+// 1. Load All Users Data
+window.loadAllUsersForDropdown = async function() {
+    try {
+        const querySnapshot = await getDocs(collection(db, "users"));
+        window.usersDataList = {};
+        window.allUsersMap = {};
+        
+        const selectDropdown = document.getElementById('userSelectDropdown');
+        if (selectDropdown) {
+            selectDropdown.innerHTML = '<option value="">-- किसी यूज़र को चुनें --</option>';
+        }
+
+        querySnapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            window.usersDataList[docSnap.id] = data;
+            window.allUsersMap[docSnap.id] = data.email || 'Unknown User';
+            
+            // Populate the Main User Management Dropdown (Excluding Admin)
+            if (selectDropdown && (data.email || '').toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+                selectDropdown.innerHTML += `<option value="${docSnap.id}">${data.email} (${data.userPhone || 'No Phone'})</option>`;
+            }
+        });
+        
+        // Populate Support Chat Dropdown
+        if (typeof window.populateSupportUserDropdown === 'function') {
+            window.populateSupportUserDropdown();
+        }
+        
+    } catch (err) {
+        console.error("Error loading users: ", err);
+    }
+};
+
+// 2. Handle User Selection from Dropdown
+window.handleUserSelection = function() {
+    const uid = document.getElementById('userSelectDropdown').value;
+    if (!uid || !window.usersDataList[uid]) {
+        document.getElementById('currentUserCreditsDisplay').innerText = '--';
+        document.getElementById('selectedUserVipBadge').innerText = '--';
+        if(document.getElementById('selectedUserPhoneInput')) document.getElementById('selectedUserPhoneInput').value = '';
+        if(document.getElementById('selectedUserSavedPass')) document.getElementById('selectedUserSavedPass').innerText = '--';
+        return;
+    }
+    
+    const uData = window.usersDataList[uid];
+    document.getElementById('currentUserCreditsDisplay').innerText = uData.credits || 0;
+    
+    const now = Date.now();
+    let vipStatus = "Normal User";
+    if (uData.isVip) {
+        if (uData.vipExpiry && uData.vipExpiry > now) {
+            const days = Math.ceil((uData.vipExpiry - now) / MS_PER_DAY);
+            vipStatus = `👑 VIP (${days} Days)`;
+        } else if (!uData.vipExpiry) {
+            vipStatus = "👑 VIP (Lifetime)";
+        } else {
+            vipStatus = "Expired VIP";
+        }
+    }
+    document.getElementById('selectedUserVipBadge').innerText = vipStatus;
+    
+    if(document.getElementById('selectedUserPhoneInput')) document.getElementById('selectedUserPhoneInput').value = uData.userPhone || '';
+    if(document.getElementById('selectedUserSavedPass')) document.getElementById('selectedUserSavedPass').innerText = uData.userPass || 'Not Set';
+    if(document.getElementById('userDobToggle')) document.getElementById('userDobToggle').checked = uData.allowDob18 !== false;
+};
+
+// 3. Admin Reset Password Logic
+window.adminSetNewUserPassword = async function() {
+    const uid = document.getElementById('userSelectDropdown').value;
+    if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले यूज़र चुनें!');
+    
+    const newPass = document.getElementById('adminNewResetPass').value.trim();
+    if (newPass.length < 6) return alert('पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!');
+    
+    const btn = document.getElementById('btnAdminSetPass');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    btn.disabled = true;
+    
+    try {
+        const uData = window.usersDataList[uid];
+        
+        // Try Firebase Auth Password Update (Simulated for Client Admin)
+        if (uData.userPass) {
+            try {
+                const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: uData.email, password: uData.userPass, returnSecureToken: true })
+                });
+                const signInData = await signInRes.json();
+                if (signInData.idToken) {
+                    await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${firebaseConfig.apiKey}`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ idToken: signInData.idToken, password: newPass, returnSecureToken: true })
+                    });
+                }
+            } catch (e) { console.warn(e); }
+        }
+
+        await updateDoc(doc(db, "users", uid), { userPass: newPass, adminResetPass: newPass, passUpdatedAt: new Date() });
+        window.usersDataList[uid].userPass = newPass;
+        document.getElementById('selectedUserSavedPass').innerText = newPass;
+        document.getElementById('adminNewResetPass').value = '';
+        alert('पासवर्ड सफलतापूर्वक बदल दिया गया है!');
+    } catch (err) {
+        alert('Error: ' + err.message);
+    } finally {
+        btn.innerHTML = orig; btn.disabled = false;
+    }
+};
+
+// 4. Admin VIP Days Adjuster
+window.adminUpdateVipDays = async function(daysToAdd) {
+    const uid = document.getElementById('userSelectDropdown').value;
+    if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले यूज़र चुनें!');
+    
+    const uData = window.usersDataList[uid];
+    let newIsVip = false;
+    let newExpiry = 0;
+    const now = Date.now();
+    
+    if (daysToAdd > 0) {
+        newIsVip = true;
+        const baseTime = (uData.vipExpiry && uData.vipExpiry > now) ? uData.vipExpiry : now;
+        newExpiry = baseTime + (daysToAdd * MS_PER_DAY);
+    }
+    
+    try {
+        await updateDoc(doc(db, "users", uid), { isVip: newIsVip, vipExpiry: newExpiry });
+        window.usersDataList[uid].isVip = newIsVip;
+        window.usersDataList[uid].vipExpiry = newExpiry;
+        window.handleUserSelection();
+        alert(daysToAdd > 0 ? `VIP ${daysToAdd} दिन के लिए बढ़ा दिया गया है!` : `VIP हटा दिया गया है।`);
+    } catch (err) {
+        alert('Error updating VIP: ' + err.message);
+    }
+};
+
+// 5. Admin Credits Adjuster
+window.adjustCredits = async function(action) {
+    const uid = document.getElementById('userSelectDropdown').value;
+    if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले यूज़र चुनें!');
+    
+    const amtVal = parseInt(document.getElementById('creditAdjustmentAmount').value);
+    if (isNaN(amtVal) || amtVal <= 0) return alert('कृपया सही क्रेडिट वैल्यू डालें!');
+    
+    const uData = window.usersDataList[uid];
+    let currentCredits = uData.credits || 0;
+    let newCredits = action === 'add' ? currentCredits + amtVal : currentCredits - amtVal;
+    if (newCredits < 0) newCredits = 0;
+    
+    try {
+        await updateDoc(doc(db, "users", uid), { credits: newCredits });
+        window.usersDataList[uid].credits = newCredits;
+        window.handleUserSelection();
+        document.getElementById('creditAdjustmentAmount').value = '';
+        alert(`क्रेडिट्स सफलतापूर्वक ${action === 'add' ? 'जोड़' : 'घटा'} दिए गए हैं!`);
+    } catch (err) {
+        alert('Error updating credits: ' + err.message);
+    }
+};
+
+// 6. Create New User By Admin
+window.createNewUserByAdmin = async function(e) {
+    e.preventDefault();
+    const emailInp = document.getElementById('newAdminUserEmail').value.trim().toLowerCase();
+    const pass = document.getElementById('newAdminUserPass').value.trim();
+    const phone = document.getElementById('newAdminUserPhone').value.trim();
+    const credits = parseInt(document.getElementById('newAdminUserCredits').value) || 0;
+    const vipDays = parseInt(document.getElementById('newAdminUserVipDays').value) || 0;
+    const msg = document.getElementById('adminCreateMsg');
+    
+    const email = emailInp.includes('@') ? emailInp : `${emailInp}@print.com`;
+    
+    if (pass.length < 6) return alert('पासवर्ड 6 अक्षरों का होना चाहिए!');
+    
+    msg.className = "p-3 bg-blue-50 text-blue-800 rounded-xl text-xs font-bold text-center";
+    msg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating user account...';
+    msg.classList.remove('hidden');
+    
+    try {
+        const signUpRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, password: pass, returnSecureToken: true })
+        });
+        
+        const signUpData = await signUpRes.json();
+        if (signUpData.error) throw new Error(signUpData.error.message);
+        
+        const uid = signUpData.localId;
+        const now = Date.now();
+        const isVip = vipDays > 0;
+        const vipExpiry = isVip ? now + (vipDays * MS_PER_DAY) : 0;
+        
+        await setDoc(doc(db, "users", uid), {
+            email: email,
+            username: email.split('@')[0],
+            credits: credits,
+            isVip: isVip,
+            vipExpiry: vipExpiry,
+            allowDob18: true,
+            userPass: pass,
+            adminResetPass: pass,
+            userPhone: phone,
+            createdAt: new Date()
+        });
+        
+        await window.loadAllUsersForDropdown();
+        
+        msg.className = "p-3.5 bg-green-50 text-green-900 border border-green-300 rounded-xl text-xs font-black text-center";
+        msg.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> यूज़र <strong>${email}</strong> सफलतापूर्वक बन गया है!`;
+        
+        e.target.reset();
+        setTimeout(() => msg.classList.add('hidden'), 5000);
+    } catch (err) {
+        msg.className = "p-3 bg-red-50 text-red-800 border border-red-300 rounded-xl text-xs font-bold text-center";
+        msg.innerText = "Error: " + err.message;
+    }
+};
