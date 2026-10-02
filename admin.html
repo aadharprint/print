@@ -76,16 +76,14 @@
     
     <!-- Loading Screen -->
     <div id="loadingScreen" class="fixed inset-0 bg-dark-950 z-[100] flex flex-col items-center justify-center">
-        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-royal-400 to-amber-600 text-dark-950 flex items-center justify-center text-3xl shadow-glow mb-4 animate-bounce">
-            <i class="fa-solid fa-crown"></i>
-        </div>
+        <img src="logo.png" alt="Ojas Logo" class="w-16 h-16 md:w-20 md:h-20 mb-4 object-contain animate-pulse" onerror="this.style.display='none'">
         <h2 class="text-base font-black text-white tracking-widest uppercase">Super Admin Panel</h2>
         <p class="text-xs text-royal-300 font-bold mt-1 animate-pulse">Loading Workspace...</p>
     </div>
 
     <!-- FULL SCREEN PDF & HTML VIEWER MODAL (WITH SHARE BUTTON) -->
     <div id="pdfViewerModal" class="fixed inset-0 z-[100] hidden bg-dark-950/85 backdrop-blur-md flex items-center justify-center p-2 md:p-6">
-        <div class="bg-white w-full max-w-6xl h-full flex flex-col rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
+        <div class="bg-white w-full max-w-7xl h-full flex flex-col rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
             <div class="flex flex-wrap justify-between items-center p-3.5 md:p-4 border-b border-slate-200 bg-slate-50 gap-2">
                 <div class="flex items-center gap-2.5 overflow-hidden">
                     <div class="w-8 h-8 bg-royal-100 text-royal-600 rounded-xl flex items-center justify-center shrink-0 text-sm border border-royal-200"><i class="fa-solid fa-file-pdf"></i></div>
@@ -119,31 +117,31 @@
         </div>
     </div>
 
-    <!-- TOP HEADER -->
-    <header class="bg-dark-950 shadow-lg px-4 md:px-8 py-3.5 flex justify-between items-center sticky top-0 z-40 border-b border-royal-500/40">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-gradient-to-br from-yellow-300 via-royal-500 to-amber-600 text-dark-950 rounded-2xl flex items-center justify-center shadow-glow font-black text-lg">
-                <i class="fa-solid fa-crown"></i>
+    <!-- COMPACT TOP HEADER -->
+    <header class="bg-dark-950 shadow-lg px-2 py-2 md:px-8 md:py-3.5 flex justify-between items-center sticky top-0 z-40 border-b border-royal-500/40">
+        <div class="flex items-center gap-2 md:gap-3">
+            <div class="w-8 h-8 md:w-10 md:h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden p-1 border border-slate-200 shrink-0">
+                <img src="logo.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">
             </div>
             <div>
-                <h2 class="text-sm md:text-lg font-black text-white leading-tight">Admin <span class="text-royal-400">Harish Kumar</span></h2>
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ojas Portal Control Center</p>
+                <h2 class="text-[13px] md:text-lg font-black text-white leading-tight">Admin <span class="text-royal-400">Harish Kumar</span></h2>
+                <p class="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ojas Portal Control Center</p>
             </div>
         </div>
-        <div class="flex items-center gap-2.5">
-            <a href="index.html" class="flex items-center gap-1.5 text-royal-300 hover:bg-royal-500 hover:text-dark-950 transition font-black text-xs bg-dark-900 border border-royal-500/30 px-3.5 py-2.5 rounded-xl shadow-sm">
+        <div class="flex items-center gap-1.5 md:gap-2.5">
+            <a href="index.html" class="flex items-center gap-1.5 text-royal-300 hover:bg-royal-500 hover:text-dark-950 transition font-black text-[10px] md:text-xs bg-dark-900 border border-royal-500/30 px-2.5 py-1.5 md:px-3.5 md:py-2.5 rounded-lg md:rounded-xl shadow-sm">
                 <i class="fa-solid fa-arrow-up-right-from-square"></i> <span class="hidden sm:inline">Open VIP Portal</span>
             </a>
-            <button onclick="window.handleLogout()" class="bg-red-500/15 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+            <button onclick="window.handleLogout()" class="bg-red-500/15 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 px-2.5 py-1.5 md:px-3.5 md:py-2.5 rounded-lg md:rounded-xl text-[10px] md:text-xs font-bold transition flex items-center gap-1.5">
                 <i class="fa-solid fa-power-off"></i> <span class="hidden sm:inline">Logout</span>
             </button>
         </div>
     </header>
 
-    <main id="adminPanelContent" class="max-w-6xl mx-auto w-full p-3 md:p-6 flex-grow hidden space-y-5">
+    <main id="adminPanelContent" class="max-w-7xl mx-auto w-full p-2.5 md:p-6 flex-grow hidden space-y-5">
         
         <!-- 6-TAB NAVIGATION BAR -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 bg-white p-2 rounded-2xl shadow-card border border-slate-200/80 sticky top-[68px] z-30">
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 bg-white p-2 rounded-2xl shadow-card border border-slate-200/80 sticky top-[60px] md:top-[74px] z-30">
             <button onclick="window.switchAdminMainTab('payments')" id="tab-payments">
                 <i class="fa-solid fa-wallet text-amber-500"></i>
                 <span>Payments</span>
@@ -379,9 +377,6 @@
             </div>
         </div>
 
-
-
-
         <!-- ================= TAB 3: CREATE NEW USER (DEDICATED SEPARATE TAB) ================= -->
         <div id="section-create_user" class="hidden">
             <div class="max-w-xl mx-auto bg-white rounded-3xl p-5 md:p-8 shadow-card border border-slate-200 space-y-5">
@@ -438,9 +433,8 @@
             </div>
         </div>
 
-        <!-- ================= TAB 4: LIVE 2-WAY SUPPORT CHAT (SLEEK MESSENGER UI) ================= -->
+        <!-- ================= TAB 4: LIVE 2-WAY SUPPORT CHAT ================= -->
         <div id="section-support" class="space-y-4 hidden">
-            
             <!-- Top Bar: Start Chat with Any User -->
             <div class="bg-white rounded-2xl p-4 shadow-card border border-slate-200 flex flex-wrap items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
@@ -464,8 +458,7 @@
 
             <!-- Messenger Split View -->
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-                
-                <!-- Left Sidebar: Conversation List (4 Cols) -->
+                <!-- Left Sidebar: Conversation List -->
                 <div class="lg:col-span-4 bg-white rounded-2xl p-3.5 shadow-card border border-slate-200 flex flex-col h-[580px]">
                     <div class="relative mb-3">
                         <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-xs"></i>
@@ -474,10 +467,8 @@
                     <div id="supportChatThreadsList" class="space-y-2 flex-1 overflow-y-auto pr-1"></div>
                 </div>
 
-                <!-- Right Main Chat Window (8 Cols) -->
+                <!-- Right Main Chat Window -->
                 <div class="lg:col-span-8 bg-white rounded-2xl shadow-card border border-slate-200 overflow-hidden flex flex-col h-[580px]">
-                    
-                    <!-- Empty State -->
                     <div id="chatWindowEmptyState" class="flex-1 flex flex-col items-center justify-center p-10 text-center text-slate-400 bg-slate-50/50">
                         <div class="w-16 h-16 rounded-2xl bg-white shadow-sm border border-slate-200 flex items-center justify-center text-3xl mb-3 text-royal-500">
                             <i class="fa-regular fa-comments"></i>
@@ -486,10 +477,7 @@
                         <p class="text-xs font-semibold text-slate-400 mt-1 max-w-sm">Forgot Password टिकट, UTR पेमेंट टिकट और यूज़र के लाइव सपोर्ट मैसेज यहाँ दिखेंगे।</p>
                     </div>
 
-                    <!-- Active Conversation Box -->
                     <div id="chatWindowActiveBox" class="hidden flex-1 flex flex-col justify-between h-full">
-                        
-                        <!-- Sleek Dark Chat Header -->
                         <div class="bg-dark-950 text-white p-3.5 border-b border-slate-800 space-y-2.5">
                             <div class="flex flex-wrap items-center justify-between gap-2">
                                 <div class="flex items-center gap-2.5">
@@ -513,8 +501,6 @@
                                     </button>
                                 </div>
                             </div>
-
-                            <!-- Instant Inline Password Reset Bar -->
                             <div class="flex items-center gap-2 bg-dark-900 px-3 py-2 rounded-xl border border-slate-800">
                                 <span class="text-[10px] font-black text-royal-400 uppercase shrink-0"><i class="fa-solid fa-key mr-1"></i>Quick Pass Reset:</span>
                                 <input type="text" id="chatQuickNewPassInput" placeholder="नया पासवर्ड टाइप करें (Min 6 chars)" class="flex-1 bg-dark-950 text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-700 outline-none focus:border-royal-400">
@@ -524,10 +510,8 @@
                             </div>
                         </div>
 
-                        <!-- Chat Bubbles Area -->
                         <div id="chatMessagesScrollBox" class="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-100/80"></div>
 
-                        <!-- Bottom Quick Chips & Composer -->
                         <div class="p-3 bg-white border-t border-slate-200 space-y-2">
                             <div class="flex flex-wrap items-center gap-1.5">
                                 <span class="text-[10px] font-black text-slate-400 uppercase mr-1">Quick Replies:</span>
@@ -606,7 +590,6 @@
 
         <!-- ================= TAB 6: PORTAL CONTROL ================= -->
         <div id="section-controls" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
-            
             <!-- Global Stealth Control Card -->
             <div class="bg-white rounded-2xl p-5 shadow-card border border-slate-200 space-y-4 flex flex-col justify-between">
                 <div class="space-y-4">
