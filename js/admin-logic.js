@@ -345,6 +345,10 @@ window.deleteSelectedUserAccount = async function() {
     }
 };
 
+
+
+
+
 // ================= SECTION: REAL-TIME 2-WAY SUPPORT CHAT & FORGOT PASSWORD TICKETS =================
 window.findUserUidByIdentifier = function(identifier = '') {
     const clean = String(identifier).trim().toLowerCase();
@@ -1189,6 +1193,10 @@ window.approvePayment = async function(paymentDocId, userId, creditsToAdd, vipDa
     } catch (err) { alert('Error approving payment: ' + err.message); }
 };
 
+
+
+
+
 window.rejectPayment = async function(paymentDocId) {
     if (!confirm(`क्या आप इस पेमेंट को REJECT करना चाहते हैं?\n(यह आपकी Rejected History में सेव रहेगा, जिसे आप बाद में चाहें तो Resolve भी कर सकते हैं)`)) return;
     try {
@@ -1642,7 +1650,7 @@ window.renderAdminHistory = function() {
         const isStampChecked = !!(stampState && stampState.enabled);
 
         const stampCheckboxHtml = isAnnexure ? `
-            <label class="inline-flex items-center gap-1.5 ${isStampChecked ? 'bg-green-100 text-green-900 border-green-400' : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'} border px-2.5 py-2 rounded-xl text-xs font-black cursor-pointer select-none transition shadow-sm" title="टिक करते ही यह स्टैम्प यूज़र के पोर्टल पर भी सेव हो जाएगी">
+            <label class="inline-flex items-center gap-1.5 ${isStampChecked ? 'bg-green-100 text-green-900 border-green-400' : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'} border px-2.5 py-2 rounded-xl text-xs font-black cursor-pointer select-none transition shadow-sm" title="टिक करते ही यह स्टैम्प यूज़र के पोर्टल पर भी सेव সৌন্দর্য">
                 <input type="checkbox" id="stampChk-${data._origIndex}" ${isStampChecked ? 'checked' : ''} onchange="window.toggleRowStampCheckbox(${data._origIndex}, this.checked)" class="w-4 h-4 accent-green-600 rounded cursor-pointer">
                 <span><i class="fa-solid fa-stamp ${isStampChecked ? 'text-green-700' : 'text-amber-600'} mr-0.5"></i> ${isStampChecked ? 'Stamped for User' : 'Apply Stamp'}</span>
             </label>
@@ -1768,6 +1776,7 @@ window.toggleModalStampPreview = async function(isChecked) {
     htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(ctx.fileId, fData, true, ctx.withStamp, ctx.stampSrc);
 };
 
+// --- UPDATED openPdfViewer WITH SHARE FEATURE ---
 window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     document.getElementById('pdfViewerTitle').innerText = fileName;
     const iframe = document.getElementById('pdfIframe');
@@ -1777,6 +1786,7 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     const printBtn = document.getElementById('modalPrintBtn');
     const modalStampLabel = document.getElementById('modalStampToggleLabel');
     const modalStampCheckbox = document.getElementById('modalStampCheckbox');
+    const shareBtn = document.getElementById('modalShareBtn');
 
     const isAnnexure = String(fileId).startsWith('LOCAL_HTML_');
     const existingState = historyIndex >= 0 ? window.stampSelectionMap[historyIndex] : null;
@@ -1836,8 +1846,26 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
                 );
             };
         }
+        if (shareBtn) {
+            if (navigator.canShare) {
+                shareBtn.style.display = 'flex';
+                shareBtn.onclick = async function() {
+                    await window.shareHtmlDocAsPdf(
+                        fileId,
+                        fData,
+                        fileName,
+                        window.currentModalContext.withStamp,
+                        window.currentModalContext.stampSrc
+                    );
+                };
+            } else {
+                shareBtn.style.display = 'none';
+            }
+        }
     } else {
         if (modalStampLabel) modalStampLabel.classList.add('hidden');
+        if (shareBtn) shareBtn.style.display = 'none';
+        
         htmlPreviewContainer.style.display = 'none';
         htmlPreviewContainer.innerHTML = '';
         iframe.style.display = 'block';
