@@ -1256,9 +1256,11 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
 
     window.currentModalContext = { fileId: fileId, fileName: fileName, historyIndex: historyIndex, withStamp: initialWithStamp, stampFile: initialStampFile, stampSrc: initialStampSrc };
 
-    if (shareBtn) shareBtn.style.display = 'flex';
+    if (shareBtn) shareBtn.style.display = 'none';
 
     if (isAnnexure && historyIndex >= 0) {
+        if (shareBtn) shareBtn.style.display = 'flex';
+        
         if (modalStampLabel) modalStampLabel.classList.remove('hidden');
         if (modalStampCheckbox) modalStampCheckbox.checked = initialWithStamp;
 
@@ -1274,8 +1276,8 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
         if (printBtn) { printBtn.onclick = function() { window.directPrintDocument(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc); }; }
         if (shareBtn) { shareBtn.onclick = async function() { await window.shareHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc); }; }
     } else {
-        // GOOGLE DRIVE FILES LOGIC (Fetch Blob via Proxy)
         if (modalStampLabel) modalStampLabel.classList.add('hidden');
+        if (shareBtn) shareBtn.style.display = 'none'; 
         
         htmlPreviewContainer.style.display = 'none';
         htmlPreviewContainer.innerHTML = '';
@@ -1285,47 +1287,6 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
         
         if (downloadBtn) { downloadBtn.onclick = function() { window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank'); }; }
         if (printBtn) { printBtn.onclick = function() { window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank'); }; }
-        
-        if (shareBtn) {
-            shareBtn.onclick = async function() {
-                const btn = this;
-                const origHtml = btn.innerHTML;
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Wait...';
-                btn.disabled = true;
-
-                try {
-                    if (navigator.canShare) {
-                        const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-                        // Using CORS proxy to fetch file directly as blob
-                        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(driveUrl)}`;
-                        
-                        const response = await fetch(proxyUrl);
-                        if (!response.ok) throw new Error("Failed to fetch file");
-                        
-                        const blob = await response.blob();
-                        const file = new File([blob], fileName, { type: 'application/pdf' });
-
-                        if (navigator.canShare({ files: [file] })) {
-                            await navigator.share({
-                                files: [file],
-                                title: fileName,
-                                text: 'यहाँ से अपना डॉक्यूमेंट देखें / डाउनलोड करें:'
-                            });
-                        } else {
-                            alert('आपका डिवाइस डायरेक्ट फाइल शेयर सपोर्ट नहीं करता। कृपया फाइल डाउनलोड करें।');
-                        }
-                    } else {
-                        alert('आपका ब्राउज़र डायरेक्ट शेयर सपोर्ट नहीं करता।');
-                    }
-                } catch(e) {
-                    console.error("Direct Share Error: ", e);
-                    alert('फाइल को सीधे शेयर करने में समस्या आई। कृपया ध्यान दें कि Google Apps Script में फाइल की परमिशन "Anyone with link" होनी चाहिए। अगर वह सही है, तो कृपया फाइल डाउनलोड करके शेयर करें।');
-                } finally {
-                    btn.innerHTML = origHtml;
-                    btn.disabled = false;
-                }
-            };
-        }
     }
 
     const modal = document.getElementById('pdfViewerModal');
