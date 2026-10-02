@@ -83,11 +83,15 @@ window.submitForm = async function(event, serviceType) {
             dataObj.ADDRESS = window.cleanDob18AddressString(dataObj.ADDRESS).trim();
         }
 
-        const response = await fetch(targetUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify(dataObj)
-        });
+      // डेटा को URLSearchParams में रैप करें
+const urlEncodedData = new URLSearchParams();
+urlEncodedData.append("payloadData", JSON.stringify(dataObj));
+
+const response = await fetch(targetUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: urlEncodedData
+});
 
         const result = await response.json();
 
