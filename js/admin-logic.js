@@ -1776,7 +1776,7 @@ window.toggleModalStampPreview = async function(isChecked) {
     htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(ctx.fileId, fData, true, ctx.withStamp, ctx.stampSrc);
 };
 
-// --- UPDATED openPdfViewer WITH SHARE FEATURE ---
+// --- UPDATED openPdfViewer WITH DIRECT FILE SHARE FOR GOOGLE DRIVE ---
 window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     document.getElementById('pdfViewerTitle').innerText = fileName;
     const iframe = document.getElementById('pdfIframe');
@@ -1789,20 +1789,28 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     const shareBtn = document.getElementById('modalShareBtn');
 
     const isAnnexure = String(fileId).startsWith('LOCAL_HTML_');
-    const existingState = historyIndex >= 0 ? window.stampSelectionMap[historyIndex] : null;
-    const initialWithStamp = !!(existingState && existingState.enabled);
-    let initialStampSrc = existingState?.stampSrc || '';
-    let initialStampFile = existingState?.stampFile || '';
+    let initialWithStamp = false;
+    let initialStampSrc = '';
+    let initialStampFile = '';
 
-    if (initialWithStamp && !initialStampSrc) {
-        if (window.availableStampsList.length === 0) {
+    if (historyIndex >= 0) {
+        const existingState = window.stampSelectionMap ? window.stampSelectionMap[historyIndex] : null;
+        initialWithStamp = !!(existingState && existingState.enabled);
+        initialStampSrc = existingState?.stampSrc || '';
+        initialStampFile = existingState?.stampFile || '';
+    }
+
+    if (initialWithStamp && !initialStampSrc && typeof window.preloadAllAvailableStamps === 'function') {
+        if (window.availableStampsList && window.availableStampsList.length === 0) {
             await window.preloadAllAvailableStamps();
         }
-        const chosenObj = window.pickRandomAvailableStampObj();
-        initialStampSrc = chosenObj.dataUrl;
-        initialStampFile = chosenObj.name;
-        if (historyIndex >= 0) {
-            window.stampSelectionMap[historyIndex] = { enabled: true, stampFile: initialStampFile, stampSrc: initialStampSrc };
+        if(window.pickRandomAvailableStampObj){
+            const chosenObj = window.pickRandomAvailableStampObj();
+            initialStampSrc = chosenObj.dataUrl;
+            initialStampFile = chosenObj.name;
+            if (historyIndex >= 0 && window.stampSelectionMap) {
+                window.stampSelectionMap[historyIndex] = { enabled: true, stampFile: initialStampFile, stampSrc: initialStampSrc };
+            }
         }
     }
 
@@ -1815,56 +1823,39 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
         stampSrc: initialStampSrc
     };
 
+    // शेयर बटन दिखाएँ
+    if (shareBtn) shareBtn.style.display = 'flex';
+
     if (isAnnexure && historyIndex >= 0) {
         if (modalStampLabel) modalStampLabel.classList.remove('hidden');
         if (modalStampCheckbox) modalStampCheckbox.checked = initialWithStamp;
 
-        const record = window.adminAllHistoryData[historyIndex];
+        const record = (window.historyData && window.historyData[historyIndex]) || (window.adminAllHistoryData && window.adminAllHistoryData[historyIndex]);
         const fData = record?.formData || {};
+        
         spinner.style.display = 'none';
         iframe.style.display = 'none';
         htmlPreviewContainer.style.display = 'flex';
         htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true, initialWithStamp, initialStampSrc);
 
-        downloadBtn.onclick = async function() {
-            await window.downloadHtmlDocAsPdf(
-                fileId,
-                fData,
-                fileName,
-                window.currentModalContext.withStamp,
-                window.currentModalContext.stampSrc
-            );
-        };
+        if (downloadBtn) {
+            downloadBtn.onclick = async function() {
+                await window.downloadHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc);
+            };
+        }
         if (printBtn) {
             printBtn.onclick = function() {
-                window.directPrintDocument(
-                    fileId,
-                    fData,
-                    fileName,
-                    window.currentModalContext.withStamp,
-                    window.currentModalContext.stampSrc
-                );
+                window.directPrintDocument(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc);
             };
         }
         if (shareBtn) {
-            if (navigator.canShare) {
-                shareBtn.style.display = 'flex';
-                shareBtn.onclick = async function() {
-                    await window.shareHtmlDocAsPdf(
-                        fileId,
-                        fData,
-                        fileName,
-                        window.currentModalContext.withStamp,
-                        window.currentModalContext.stampSrc
-                    );
-                };
-            } else {
-                shareBtn.style.display = 'none';
-            }
+            shareBtn.onclick = async function() {
+                await window.shareHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc);
+            };
         }
     } else {
+        // GOOGLE DRIVE FILES LOGIC (Domicile / Caste)
         if (modalStampLabel) modalStampLabel.classList.add('hidden');
-        if (shareBtn) shareBtn.style.display = 'none';
         
         htmlPreviewContainer.style.display = 'none';
         htmlPreviewContainer.innerHTML = '';
@@ -1872,17 +1863,64 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
         spinner.style.display = 'flex';
         iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
         
-        downloadBtn.onclick = function() {
-            window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank');
-        };
+        if (downloadBtn) {
+            downloadBtn.onclick = function() {
+                window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank');
+            };
+        }
         if (printBtn) {
             printBtn.onclick = function() {
                 window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
             };
         }
+        if (shareBtn) {
+            shareBtn.onclick = async function() {
+                const btn = this;
+                const origHtml = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Wait...';
+                btn.disabled = true;
+
+                try {
+                    if (navigator.canShare) {
+                        // Drive Direct Download URL
+                        const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+                        
+                        // CORS Proxy to bypass Google Drive security and fetch the actual PDF blob
+                        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(driveUrl)}`;
+                        
+                        const response = await fetch(proxyUrl);
+                        if (!response.ok) throw new Error("Failed to fetch file");
+                        
+                        const blob = await response.blob();
+                        const file = new File([blob], fileName, { type: 'application/pdf' });
+
+                        if (navigator.canShare({ files: [file] })) {
+                            await navigator.share({
+                                files: [file],
+                                title: fileName
+                            });
+                        } else {
+                            alert('आपका डिवाइस डायरेक्ट फाइल शेयर सपोर्ट नहीं करता।');
+                        }
+                    } else {
+                        alert('आपका ब्राउज़र या कनेक्शन डायरेक्ट शेयर सपोर्ट नहीं करता।');
+                    }
+                } catch(e) {
+                    console.error("Direct Share Error: ", e);
+                    alert('फाइल को सीधे शेयर करने में समस्या आई। कृपया फाइल डाउनलोड करके शेयर करें।');
+                } finally {
+                    btn.innerHTML = origHtml;
+                    btn.disabled = false;
+                }
+            };
+        }
     }
 
-    document.getElementById('pdfViewerModal').classList.remove('hidden');
+    const modal = document.getElementById('pdfViewerModal');
+    if (modal) {
+        modal.style.display = 'flex'; 
+        modal.classList.remove('hidden'); 
+    }
     document.body.style.overflow = 'hidden';
 };
 
