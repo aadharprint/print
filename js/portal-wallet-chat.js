@@ -1216,7 +1216,7 @@ window.loadUserPayments = async function() {
     }
 };
 
-// --- UPDATED openPdfViewer WITH SHARE FEATURE ---
+// --- UPDATED openPdfViewer WITH DIRECT FILE SHARE FOR GOOGLE DRIVE ---
 window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     document.getElementById('pdfViewerTitle').innerText = fileName;
     const iframe = document.getElementById('pdfIframe');
@@ -1224,39 +1224,78 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     const spinner = document.getElementById('pdfLoadingSpinner');
     const downloadBtn = document.getElementById('modalDownloadBtn');
     const printBtn = document.getElementById('modalPrintBtn');
+    const modalStampLabel = document.getElementById('modalStampToggleLabel');
+    const modalStampCheckbox = document.getElementById('modalStampCheckbox');
     const shareBtn = document.getElementById('modalShareBtn');
 
-    if (String(fileId).startsWith('LOCAL_HTML_') && historyIndex >= 0) {
-        const record = window.historyData[historyIndex];
-        const fData = record?.formData || {};
-        const withStamp = !!record?.withStamp;
-        const stampSrc = withStamp ? await window.getTransparentStampDataUrl(record?.stampFile || 'stamp.png') : '';
+    const isAnnexure = String(fileId).startsWith('LOCAL_HTML_');
+    let initialWithStamp = false;
+    let initialStampSrc = '';
+    let initialStampFile = '';
 
+    if (historyIndex >= 0) {
+        const existingState = window.stampSelectionMap ? window.stampSelectionMap[historyIndex] : null;
+        initialWithStamp = !!(existingState && existingState.enabled);
+        initialStampSrc = existingState?.stampSrc || '';
+        initialStampFile = existingState?.stampFile || '';
+    }
+
+    if (initialWithStamp && !initialStampSrc && typeof window.preloadAllAvailableStamps === 'function') {
+        if (window.availableStampsList && window.availableStampsList.length === 0) {
+            await window.preloadAllAvailableStamps();
+        }
+        if(window.pickRandomAvailableStampObj){
+            const chosenObj = window.pickRandomAvailableStampObj();
+            initialStampSrc = chosenObj.dataUrl;
+            initialStampFile = chosenObj.name;
+            if (historyIndex >= 0 && window.stampSelectionMap) {
+                window.stampSelectionMap[historyIndex] = { enabled: true, stampFile: initialStampFile, stampSrc: initialStampSrc };
+            }
+        }
+    }
+
+    window.currentModalContext = {
+        fileId: fileId,
+        fileName: fileName,
+        historyIndex: historyIndex,
+        withStamp: initialWithStamp,
+        stampFile: initialStampFile,
+        stampSrc: initialStampSrc
+    };
+
+    // शेयर बटन दिखाएँ
+    if (shareBtn) shareBtn.style.display = 'flex';
+
+    if (isAnnexure && historyIndex >= 0) {
+        if (modalStampLabel) modalStampLabel.classList.remove('hidden');
+        if (modalStampCheckbox) modalStampCheckbox.checked = initialWithStamp;
+
+        const record = (window.historyData && window.historyData[historyIndex]) || (window.adminAllHistoryData && window.adminAllHistoryData[historyIndex]);
+        const fData = record?.formData || {};
+        
         spinner.style.display = 'none';
         iframe.style.display = 'none';
         htmlPreviewContainer.style.display = 'flex';
-        htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true, withStamp, stampSrc);
+        htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true, initialWithStamp, initialStampSrc);
 
-        downloadBtn.onclick = async function() {
-            await window.downloadHtmlDocAsPdf(fileId, fData, fileName, withStamp, stampSrc);
-        };
+        if (downloadBtn) {
+            downloadBtn.onclick = async function() {
+                await window.downloadHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc);
+            };
+        }
         if (printBtn) {
             printBtn.onclick = function() {
-                window.directPrintDocument(fileId, fData, fileName, withStamp, stampSrc);
+                window.directPrintDocument(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc);
             };
         }
         if (shareBtn) {
-            if (navigator.canShare) {
-                shareBtn.style.display = 'flex';
-                shareBtn.onclick = async function() {
-                    await window.shareHtmlDocAsPdf(fileId, fData, fileName, withStamp, stampSrc);
-                };
-            } else {
-                shareBtn.style.display = 'none';
-            }
+            shareBtn.onclick = async function() {
+                await window.shareHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc);
+            };
         }
     } else {
-        if (shareBtn) shareBtn.style.display = 'none';
+        // GOOGLE DRIVE FILES LOGIC (Domicile / Caste)
+        if (modalStampLabel) modalStampLabel.classList.add('hidden');
         
         htmlPreviewContainer.style.display = 'none';
         htmlPreviewContainer.innerHTML = '';
@@ -1264,17 +1303,64 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
         spinner.style.display = 'flex';
         iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
         
-        downloadBtn.onclick = function() {
-            window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank');
-        };
+        if (downloadBtn) {
+            downloadBtn.onclick = function() {
+                window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank');
+            };
+        }
         if (printBtn) {
             printBtn.onclick = function() {
-                window.directPrintDocument(fileId, {}, fileName, false, '');
+                window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
+            };
+        }
+        if (shareBtn) {
+            shareBtn.onclick = async function() {
+                const btn = this;
+                const origHtml = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Wait...';
+                btn.disabled = true;
+
+                try {
+                    if (navigator.canShare) {
+                        // Drive Direct Download URL
+                        const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+                        
+                        // CORS Proxy to bypass Google Drive security and fetch the actual PDF blob
+                        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(driveUrl)}`;
+                        
+                        const response = await fetch(proxyUrl);
+                        if (!response.ok) throw new Error("Failed to fetch file");
+                        
+                        const blob = await response.blob();
+                        const file = new File([blob], fileName, { type: 'application/pdf' });
+
+                        if (navigator.canShare({ files: [file] })) {
+                            await navigator.share({
+                                files: [file],
+                                title: fileName
+                            });
+                        } else {
+                            alert('आपका डिवाइस डायरेक्ट फाइल शेयर सपोर्ट नहीं करता।');
+                        }
+                    } else {
+                        alert('आपका ब्राउज़र या कनेक्शन डायरेक्ट शेयर सपोर्ट नहीं करता।');
+                    }
+                } catch(e) {
+                    console.error("Direct Share Error: ", e);
+                    alert('फाइल को सीधे शेयर करने में समस्या आई। कृपया फाइल डाउनलोड करके शेयर करें।');
+                } finally {
+                    btn.innerHTML = origHtml;
+                    btn.disabled = false;
+                }
             };
         }
     }
 
-    document.getElementById('pdfViewerModal').style.display = 'flex';
+    const modal = document.getElementById('pdfViewerModal');
+    if (modal) {
+        modal.style.display = 'flex'; 
+        modal.classList.remove('hidden'); 
+    }
     document.body.style.overflow = 'hidden';
 };
 
