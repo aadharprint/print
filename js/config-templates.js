@@ -390,7 +390,9 @@ window.buildLocalAffidavitHtml = function(fileId, d = {}, withShadow = true, wit
         `;
     }
 
-    if (fileId === 'LOCAL_HTML_ANNEXURE_3') {
+
+
+if (fileId === 'LOCAL_HTML_ANNEXURE_3') {
         return `
             <div class="affidavit-paper ${shadowClass}">
                 ${stampOverlayHtml}
@@ -662,7 +664,7 @@ window.buildLocalAffidavitHtml = function(fileId, d = {}, withShadow = true, wit
     `;
 };
 
-// ================= SHARED PDF DOWNLOAD & DIRECT PRINT FUNCTIONS =================
+// ================= SHARED PDF DOWNLOAD, DIRECT PRINT & DIRECT SHARE FUNCTIONS =================
 window.downloadHtmlDocAsPdf = async function(fileId, formDataObj, fileName, withStamp = false, stampSrc = '') {
     const btn = document.getElementById('modalDownloadBtn');
     const origHtml = btn ? btn.innerHTML : '';
@@ -806,3 +808,74 @@ window.directPrintDocument = async function(fileId, formDataObj, fileName, withS
         window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
     }
 };
+
+// ================= NEW: DIRECT MOBILE SHARE AS PDF =================
+window.shareHtmlDocAsPdf = async function(fileId, formDataObj, fileName, withStamp = false, stampSrc = '') {
+    const btn = document.getElementById('modalShareBtn');
+    const origHtml = btn ? btn.innerHTML : '';
+    
+    if (btn) {
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing...';
+        btn.disabled = true;
+    }
+
+    if (withStamp && typeof window.preloadAllAvailableStamps === 'function' && window.availableStampsList?.length === 0) {
+        await window.preloadAllAvailableStamps();
+    }
+
+    const finalStampSrc = withStamp ? (stampSrc || (typeof window.pickRandomAvailableStamp === 'function' ? window.pickRandomAvailableStamp() : 'stamp.png')) : '';
+
+    const savedScrollX = window.scrollX;
+    const savedScrollY = window.scrollY;
+    window.scrollTo(0, 0);
+
+    const tempWrapper = document.createElement('div');
+    tempWrapper.style.cssText = 'position:fixed;top:0;left:0;width:794px;height:1122px;margin:0;padding:0;z-index:99999;background:#ffffff;overflow:hidden;';
+    tempWrapper.innerHTML = window.buildLocalAffidavitHtml(fileId, formDataObj, false, withStamp, finalStampSrc);
+    document.body.appendChild(tempWrapper);
+
+    const targetEl = tempWrapper.querySelector('.affidavit-paper');
+
+    try {
+        const opt = {
+            margin: 0,
+            filename: withStamp ? fileName.replace('.pdf', ' (With Stamp).pdf') : fileName,
+            image: { type: 'jpeg', quality: 1.0 },
+            html2canvas: { scale: 2, useCORS: true, x: 0, y: 0, scrollX: 0, scrollY: 0, width: 794, height: 1122 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        const pdfBlob = await html2pdf().set(opt).from(targetEl).output('blob');
+        const finalFileName = withStamp ? fileName.replace('.pdf', ' (With Stamp).pdf') : fileName;
+        const file = new File([pdfBlob], finalFileName, { type: 'application/pdf' });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+                files: [file],
+                title: finalFileName,
+                text: 'Here is your generated document.'
+            });
+        } else {
+            alert('Aapka browser direct file share support nahi karta. Kripya PDF download karke share karein.');
+        }
+
+    } catch (err) {
+        console.error(err);
+        alert("PDF share karne mein samasya aayi.");
+    } finally {
+        document.body.removeChild(tempWrapper);
+        window.scrollTo(savedScrollX, savedScrollY);
+        if (btn) {
+            btn.innerHTML = origHtml;
+            btn.disabled = false;
+        }
+    }
+};
+
+
+
+
+
+
+
+    
