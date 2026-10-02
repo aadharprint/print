@@ -1,6 +1,6 @@
 // ============================================================================
 // FILE 3: js/portal-wallet-chat.js (UPDATED)
-// (Auth, Per-User DOB Stealth, Active=White/Inactive=Dark Tabs, Wallet & Chat)
+// (Auth, Per-User DOB Stealth, Active=White/Inactive=Dark Tabs, Wallet, Chat & Share)
 // ============================================================================
 
 import "./config-templates.js";
@@ -315,6 +315,9 @@ function startUserProfileListener(uid) {
         }
     });
 }
+
+
+
 
 // ================= REAL-TIME STEALTH MODE & BANNER LISTENER =================
 function startPortalSettingsListener() {
@@ -1073,6 +1076,7 @@ window.submitPaymentIssueTicket = async function() {
     }
 };
 
+
 // ================= USER PAYMENT HISTORY =================
 window.loadUserPayments = async function() {
     const tbody = document.getElementById('userPaymentsTableBody');
@@ -1212,7 +1216,7 @@ window.loadUserPayments = async function() {
     }
 };
 
-// ================= IN-APP PREVIEW MODAL & DOCUMENT HISTORY =================
+// --- UPDATED openPdfViewer WITH SHARE FEATURE ---
 window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     document.getElementById('pdfViewerTitle').innerText = fileName;
     const iframe = document.getElementById('pdfIframe');
@@ -1220,6 +1224,7 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     const spinner = document.getElementById('pdfLoadingSpinner');
     const downloadBtn = document.getElementById('modalDownloadBtn');
     const printBtn = document.getElementById('modalPrintBtn');
+    const shareBtn = document.getElementById('modalShareBtn');
 
     if (String(fileId).startsWith('LOCAL_HTML_') && historyIndex >= 0) {
         const record = window.historyData[historyIndex];
@@ -1240,12 +1245,25 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
                 window.directPrintDocument(fileId, fData, fileName, withStamp, stampSrc);
             };
         }
+        if (shareBtn) {
+            if (navigator.canShare) {
+                shareBtn.style.display = 'flex';
+                shareBtn.onclick = async function() {
+                    await window.shareHtmlDocAsPdf(fileId, fData, fileName, withStamp, stampSrc);
+                };
+            } else {
+                shareBtn.style.display = 'none';
+            }
+        }
     } else {
+        if (shareBtn) shareBtn.style.display = 'none';
+        
         htmlPreviewContainer.style.display = 'none';
         htmlPreviewContainer.innerHTML = '';
         iframe.style.display = 'block';
         spinner.style.display = 'flex';
         iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
+        
         downloadBtn.onclick = function() {
             window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank');
         };
