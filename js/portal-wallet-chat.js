@@ -1,6 +1,6 @@
 // ============================================================================
 // FILE 3: js/portal-wallet-chat.js (UPDATED)
-// (Auth, Per-User DOB Stealth, Active=White/Inactive=Dark Tabs, Wallet, Chat & Share)
+// (Auth, Per-User DOB Stealth, Active=White/Inactive=Dark Tabs, Wallet, Chat & Direct Share)
 // ============================================================================
 
 import "./config-templates.js";
@@ -25,15 +25,9 @@ window.currentActiveOrderId = null;
 window.currentUserChatData = { messages: [], unreadByUser: false };
 
 window.portalConfigState = {
-    showDomicile: true,
-    showCaste: true,
-    showDob18: true,
-    bannerEnabled: false,
-    bannerBadge: "UPDATE",
-    bannerTitle: "",
-    bannerMessage: "",
-    bannerBtnText: "",
-    bannerBtnLink: ""
+    showDomicile: true, showCaste: true, showDob18: true,
+    bannerEnabled: false, bannerBadge: "UPDATE", bannerTitle: "",
+    bannerMessage: "", bannerBtnText: "", bannerBtnLink: ""
 };
 
 window.currentRechargeCredits = 0;
@@ -42,7 +36,6 @@ window.currentWantsVip = false;
 window.currentVipDays = 0;
 window.currentVipPlanFee = 0;
 
-// हेल्पर: चेक करें कि इस यूज़र को DOB 18+ दिखना चाहिए या नहीं (Global + Per-User)
 window.canCurrentUserSeeDob18 = function() {
     const globalDob = window.portalConfigState.showDob18 !== false;
     const userDob = window.currentUserData ? (window.currentUserData.allowDob18 !== false) : true;
@@ -50,16 +43,9 @@ window.canCurrentUserSeeDob18 = function() {
 };
 
 async function notifyAdminSecurely(payload) {
-    try {
-        await fetch('/api/notify-admin', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-    } catch (e) {}
+    try { await fetch('/api/notify-admin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); } catch (e) {}
 }
 
-// ================= 1. OUTSIDE LOGIN: FORGOT PASSWORD TICKET =================
 window.openForgotPasswordModal = function() {
     const modal = document.getElementById('forgotPasswordModal');
     const idInp = document.getElementById('forgotUserIdInput');
@@ -70,9 +56,7 @@ window.openForgotPasswordModal = function() {
     if (!modal) return;
     resBox.style.display = 'none';
     idInp.value = document.getElementById('loginUsername')?.value.trim() || '';
-    phoneInp.value = '';
-    noteInp.value = '';
-    modal.style.display = 'flex';
+    phoneInp.value = ''; noteInp.value = ''; modal.style.display = 'flex';
 };
 
 window.closeForgotPasswordModal = function() {
@@ -88,101 +72,47 @@ window.submitForgotPasswordTicket = async function(event) {
     const btn = document.getElementById('btnSubmitForgotTicket');
     const resBox = document.getElementById('forgotResultBox');
 
-    if (!userIdText || !userPhoneText) {
-        return alert("कृपया अपनी User ID और मोबाइल/WhatsApp नंबर ज़रूर भरें!");
-    }
+    if (!userIdText || !userPhoneText) return alert("कृपया अपनी User ID और मोबाइल/WhatsApp नंबर ज़रूर भरें!");
 
     const origHtml = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Raising Ticket...';
-
+    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Raising Ticket...';
     const finalMessage = userNoteText || "मैं अपना पासवर्ड भूल गया हूँ, कृपया नया पासवर्ड जारी करें।";
 
     try {
         await addDoc(collection(db, "supportTickets"), {
-            type: "FORGOT_PASSWORD",
-            userIdentifier: userIdText,
-            userPhone: userPhoneText,
+            type: "FORGOT_PASSWORD", userIdentifier: userIdText, userPhone: userPhoneText,
             message: `🔑 Forgot Password Request: ${finalMessage} (WhatsApp: ${userPhoneText})`,
-            messages: [{
-                sender: 'user',
-                text: `🔑 [FORGOT PASSWORD TICKET]\nUser ID: ${userIdText}\nWhatsApp: ${userPhoneText}\nNote: ${finalMessage}`,
-                time: Date.now()
-            }],
-            status: "Open",
-            unreadByAdmin: true,
-            unreadByUser: false,
-            timestamp: new Date(),
-            updatedAtMs: Date.now()
+            messages: [{ sender: 'user', text: `🔑 [FORGOT PASSWORD TICKET]\nUser ID: ${userIdText}\nWhatsApp: ${userPhoneText}\nNote: ${finalMessage}`, time: Date.now() }],
+            status: "Open", unreadByAdmin: true, unreadByUser: false, timestamp: new Date(), updatedAtMs: Date.now()
         });
 
-        try {
-            await addDoc(collection(db, "forgotTickets"), {
-                userIdentifier: userIdText,
-                userPhone: userPhoneText,
-                note: finalMessage,
-                status: "Pending",
-                timestamp: new Date()
-            });
-        } catch (e) {}
+        try { await addDoc(collection(db, "forgotTickets"), { userIdentifier: userIdText, userPhone: userPhoneText, note: finalMessage, status: "Pending", timestamp: new Date() }); } catch (e) {}
 
-        notifyAdminSecurely({
-            type: "FORGOT_PASSWORD",
-            userId: userIdText,
-            phone: userPhoneText,
-            message: finalMessage
-        });
+        notifyAdminSecurely({ type: "FORGOT_PASSWORD", userId: userIdText, phone: userPhoneText, message: finalMessage });
 
         resBox.className = "p-3.5 rounded-2xl bg-green-50 border border-green-300 text-green-900 text-xs font-bold text-center space-y-1";
-        resBox.innerHTML = `
-            <div><i class="fa-solid fa-circle-check text-green-600 text-base mr-1"></i> आपका टिकट सफलतापूर्वक रेज़ हो गया है!</div>
-            <p class="text-[11px] text-green-700">एडमिन को सूचना भेज दी गई है। जल्द ही आपके नंबर (${userPhoneText}) पर नया पासवर्ड भेज दिया जाएगा।</p>
-        `;
-        resBox.style.display = 'block';
-        event.target.reset();
-    } catch (err) {
-        alert("टिकट भेजने में समस्या आई: " + err.message);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = origHtml;
-    }
+        resBox.innerHTML = `<div><i class="fa-solid fa-circle-check text-green-600 text-base mr-1"></i> आपका टिकट सफलतापूर्वक रेज़ हो गया है!</div><p class="text-[11px] text-green-700">एडमिन को सूचना भेज दी गई है। जल्द ही आपके नंबर (${userPhoneText}) पर नया पासवर्ड भेज दिया जाएगा।</p>`;
+        resBox.style.display = 'block'; event.target.reset();
+    } catch (err) { alert("टिकट भेजने में समस्या आई: " + err.message); } finally { btn.disabled = false; btn.innerHTML = origHtml; }
 };
 
-// ================= 2. INSIDE PORTAL: REAL-TIME 2-WAY LIVE SUPPORT CHAT =================
 function startUserSupportChatListener(uid) {
     if (window.userChatUnsubscribe) window.userChatUnsubscribe();
-
-    const chatDocRef = doc(db, "supportTickets", uid);
-    window.userChatUnsubscribe = onSnapshot(chatDocRef, async (snap) => {
-        if (snap.exists()) {
-            window.currentUserChatData = snap.data();
-        } else {
-            window.currentUserChatData = { messages: [], unreadByUser: false };
-        }
-
+    window.userChatUnsubscribe = onSnapshot(doc(db, "supportTickets", uid), async (snap) => {
+        if (snap.exists()) { window.currentUserChatData = snap.data(); } else { window.currentUserChatData = { messages: [], unreadByUser: false }; }
         const isUnread = window.currentUserChatData.unreadByUser === true;
         const headerBadge = document.getElementById('headerSupportUnreadBadge');
         const gearBadge = document.getElementById('gearSupportUnreadBadge');
 
         if (window.currentActiveTab === 'support_chat') {
-            if (isUnread) {
-                try { await updateDoc(chatDocRef, { unreadByUser: false }); } catch (e) {}
-            }
+            if (isUnread) { try { await updateDoc(doc(db, "supportTickets", uid), { unreadByUser: false }); } catch (e) {} }
             if (headerBadge) headerBadge.style.display = 'none';
             if (gearBadge) gearBadge.style.display = 'none';
             window.renderUserLiveChatMessages();
         } else {
-            if (headerBadge) {
-                headerBadge.innerText = '1';
-                headerBadge.style.display = isUnread ? 'inline-flex' : 'none';
-            }
-            if (gearBadge) {
-                gearBadge.innerText = 'New';
-                gearBadge.style.display = isUnread ? 'inline-block' : 'none';
-            }
+            if (headerBadge) { headerBadge.innerText = '1'; headerBadge.style.display = isUnread ? 'inline-flex' : 'none'; }
+            if (gearBadge) { gearBadge.innerText = 'New'; gearBadge.style.display = isUnread ? 'inline-block' : 'none'; }
         }
-    }, (err) => {
-        console.error("Support chat listener error:", err);
     });
 }
 
@@ -191,24 +121,10 @@ window.renderUserLiveChatMessages = function() {
     if (!box) return;
 
     let msgs = Array.isArray(window.currentUserChatData?.messages) ? [...window.currentUserChatData.messages] : [];
-    if (msgs.length === 0 && window.currentUserChatData?.message) {
-        msgs.push({
-            sender: 'user',
-            text: window.currentUserChatData.message,
-            time: Date.now()
-        });
-    }
+    if (msgs.length === 0 && window.currentUserChatData?.message) msgs.push({ sender: 'user', text: window.currentUserChatData.message, time: Date.now() });
 
     if (msgs.length === 0) {
-        box.innerHTML = `
-            <div class="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
-                <div class="w-12 h-12 rounded-full bg-royal-50 text-royal-500 flex items-center justify-center text-xl mb-2 border border-royal-200">
-                    <i class="fa-solid fa-comments"></i>
-                </div>
-                <p class="text-xs font-black text-slate-600">Ojas Live Support Chat</p>
-                <p class="text-[11px] text-slate-400 mt-0.5">कोई भी समस्या या सवाल नीचे लिखकर भेजें। एडमिन का रिप्लाई यहीं इसी चैट में लाइव दिखेगा।</p>
-            </div>
-        `;
+        box.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400"><div class="w-12 h-12 rounded-full bg-royal-50 text-royal-500 flex items-center justify-center text-xl mb-2 border border-royal-200"><i class="fa-solid fa-comments"></i></div><p class="text-xs font-black text-slate-600">Ojas Live Support Chat</p><p class="text-[11px] text-slate-400 mt-0.5">कोई भी समस्या या सवाल नीचे लिखकर भेजें। एडमिन का रिप्लाई यहीं इसी चैट में लाइव दिखेगा।</p></div>`;
         return;
     }
 
@@ -217,27 +133,11 @@ window.renderUserLiveChatMessages = function() {
         const tStr = m.time ? new Date(m.time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) : '';
         const safeText = String(m.text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         if (isMe) {
-            return `
-                <div class="flex justify-end">
-                    <div class="max-w-[80%] bg-dark-900 text-white px-3.5 py-2.5 rounded-2xl rounded-br-none shadow-sm">
-                        <p class="text-xs font-semibold whitespace-pre-line leading-relaxed">${safeText}</p>
-                        <span class="block text-[9px] text-royal-300 text-right mt-1 opacity-80">${tStr} • You</span>
-                    </div>
-                </div>
-            `;
+            return `<div class="flex justify-end"><div class="max-w-[80%] bg-dark-900 text-white px-3.5 py-2.5 rounded-2xl rounded-br-none shadow-sm"><p class="text-xs font-semibold whitespace-pre-line leading-relaxed">${safeText}</p><span class="block text-[9px] text-royal-300 text-right mt-1 opacity-80">${tStr} • You</span></div></div>`;
         } else {
-            return `
-                <div class="flex justify-start">
-                    <div class="max-w-[80%] bg-amber-50 border border-amber-300 text-slate-900 px-3.5 py-2.5 rounded-2xl rounded-bl-none shadow-sm">
-                        <span class="text-[10px] font-black text-amber-800 uppercase block mb-0.5"><i class="fa-solid fa-crown text-amber-500 mr-1"></i>Admin Support</span>
-                        <p class="text-xs font-bold whitespace-pre-line leading-relaxed">${safeText}</p>
-                        <span class="block text-[9px] text-slate-400 text-right mt-1">${tStr}</span>
-                    </div>
-                </div>
-            `;
+            return `<div class="flex justify-start"><div class="max-w-[80%] bg-amber-50 border border-amber-300 text-slate-900 px-3.5 py-2.5 rounded-2xl rounded-bl-none shadow-sm"><span class="text-[10px] font-black text-amber-800 uppercase block mb-0.5"><i class="fa-solid fa-crown text-amber-500 mr-1"></i>Admin Support</span><p class="text-xs font-bold whitespace-pre-line leading-relaxed">${safeText}</p><span class="block text-[9px] text-slate-400 text-right mt-1">${tStr}</span></div></div>`;
         }
     }).join('');
-
     box.scrollTop = box.scrollHeight;
 };
 
@@ -250,51 +150,25 @@ window.sendUserSupportMessage = async function(event) {
     const text = inp.value.trim();
     if (!text) return;
 
-    inp.value = '';
-    btn.disabled = true;
-
+    inp.value = ''; btn.disabled = true;
     const uid = window.currentUserData.uid;
-    const chatRef = doc(db, "supportTickets", uid);
-    const newMsg = {
-        sender: 'user',
-        text: text,
-        time: Date.now()
-    };
 
     try {
         const existingMsgs = Array.isArray(window.currentUserChatData?.messages) ? [...window.currentUserChatData.messages] : [];
-        existingMsgs.push(newMsg);
+        existingMsgs.push({ sender: 'user', text: text, time: Date.now() });
 
-        await setDoc(chatRef, {
-            type: 'USER_SUPPORT_CHAT',
-            userId: uid,
-            userIdentifier: window.currentUserData.email,
-            username: window.currentUserData.username,
-            message: text,
-            status: 'Open',
-            unreadByAdmin: true,
-            unreadByUser: false,
-            timestamp: new Date(),
-            updatedAtMs: Date.now(),
-            messages: existingMsgs
+        await setDoc(doc(db, "supportTickets", uid), {
+            type: 'USER_SUPPORT_CHAT', userId: uid, userIdentifier: window.currentUserData.email, username: window.currentUserData.username,
+            message: text, status: 'Open', unreadByAdmin: true, unreadByUser: false, timestamp: new Date(), updatedAtMs: Date.now(), messages: existingMsgs
         }, { merge: true });
-    } catch (err) {
-        alert("मैसेज भेजने में समस्या आई: " + err.message);
-    } finally {
-        btn.disabled = false;
-        inp.focus();
-    }
+    } catch (err) { alert("मैसेज भेजने में समस्या आई: " + err.message); } finally { btn.disabled = false; inp.focus(); }
 };
 
-// ================= REAL-TIME USER PROFILE LISTENER (FOR LIVE DOB HIDE/SHOW & CREDITS) =================
 function startUserProfileListener(uid) {
     if (window.userProfileUnsubscribe) window.userProfileUnsubscribe();
-
-    const userRef = doc(db, "users", uid);
-    window.userProfileUnsubscribe = onSnapshot(userRef, (snap) => {
+    window.userProfileUnsubscribe = onSnapshot(doc(db, "users", uid), (snap) => {
         if (!snap.exists() || !window.currentUserData) return;
         const data = snap.data();
-
         window.currentUserData.credits = data.credits || 0;
         window.currentUserData.allowDob18 = data.allowDob18 !== false;
 
@@ -308,77 +182,36 @@ function startUserProfileListener(uid) {
         window.currentUserData.isVip = isNowVip;
         window.currentUserData.vipExpiry = window.currentUserData.hasFreeAccess ? 0 : (data.vipExpiry || 0);
 
-        if (vipChanged) {
-            setupDashboard(window.currentUserData);
-        } else {
-            window.applyLivePortalControls();
-        }
+        if (vipChanged) setupDashboard(window.currentUserData); else window.applyLivePortalControls();
     });
 }
 
-
-
-
-// ================= REAL-TIME STEALTH MODE & BANNER LISTENER =================
 function startPortalSettingsListener() {
     if (window.portalSettingsUnsubscribe) window.portalSettingsUnsubscribe();
-    
-    const configRef = doc(db, "settings", "portalConfig");
-    window.portalSettingsUnsubscribe = onSnapshot(configRef, (snap) => {
+    window.portalSettingsUnsubscribe = onSnapshot(doc(db, "settings", "portalConfig"), (snap) => {
         if (snap.exists()) {
             const data = snap.data();
             window.portalConfigState = {
-                showDomicile: data.showDomicile !== false,
-                showCaste: data.showCaste !== false,
-                showDob18: data.showDob18 !== false,
-                bannerEnabled: !!data.bannerEnabled,
-                bannerBadge: data.bannerBadge || "UPDATE",
-                bannerTitle: data.bannerTitle || "",
-                bannerMessage: data.bannerMessage || "",
-                bannerBtnText: data.bannerBtnText || "",
-                bannerBtnLink: data.bannerBtnLink || ""
+                showDomicile: data.showDomicile !== false, showCaste: data.showCaste !== false, showDob18: data.showDob18 !== false,
+                bannerEnabled: !!data.bannerEnabled, bannerBadge: data.bannerBadge || "UPDATE", bannerTitle: data.bannerTitle || "",
+                bannerMessage: data.bannerMessage || "", bannerBtnText: data.bannerBtnText || "", bannerBtnLink: data.bannerBtnLink || ""
             };
         }
         window.applyLivePortalControls();
-    }, (err) => {
-        console.error("Portal config listener error:", err);
     });
 }
 
 window.applyLivePortalControls = function() {
     const cfg = window.portalConfigState;
     const canShowDob = window.canCurrentUserSeeDob18();
-
     const bannerBox = document.getElementById('liveUpdateBannerContainer');
+    
     if (bannerBox) {
         if (cfg.bannerEnabled && (cfg.bannerTitle || cfg.bannerMessage)) {
             bannerBox.style.display = 'block';
-            const btnHtml = (cfg.bannerBtnText && cfg.bannerBtnLink)
-                ? `<a href="${cfg.bannerBtnLink}" target="_blank" class="bg-amber-400 hover:bg-amber-300 text-dark-950 font-black px-3.5 py-1.5 rounded-xl text-[11px] transition shrink-0 shadow-sm">
-                     ${cfg.bannerBtnText} <i class="fa-solid fa-arrow-up-right-from-square ml-1 text-[9px]"></i>
-                   </a>`
-                : '';
-
-            bannerBox.innerHTML = `
-                <div class="p-3.5 rounded-2xl bg-gradient-to-r from-dark-950 via-slate-900 to-indigo-950 text-white border border-royal-400/60 shadow-md">
-                    <div class="flex flex-wrap items-center justify-between gap-2.5">
-                        <div class="flex items-start sm:items-center gap-2.5">
-                            <span class="bg-royal-500 text-dark-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase shrink-0 mt-0.5 sm:mt-0">
-                                <i class="fa-solid fa-bullhorn mr-1"></i>${cfg.bannerBadge}
-                            </span>
-                            <div>
-                                ${cfg.bannerTitle ? `<h4 class="text-xs md:text-sm font-black text-royal-300">${cfg.bannerTitle}</h4>` : ''}
-                                ${cfg.bannerMessage ? `<p class="text-[11px] font-semibold text-slate-200 mt-0.5">${cfg.bannerMessage}</p>` : ''}
-                            </div>
-                        </div>
-                        ${btnHtml}
-                    </div>
-                </div>
-            `;
-        } else {
-            bannerBox.style.display = 'none';
-            bannerBox.innerHTML = '';
-        }
+            const btnHtml = (cfg.bannerBtnText && cfg.bannerBtnLink) ? `<a href="${cfg.bannerBtnLink}" target="_blank" class="bg-amber-400 hover:bg-amber-300 text-dark-950 font-black px-3.5 py-1.5 rounded-xl text-[11px] transition shrink-0 shadow-sm">${cfg.bannerBtnText} <i class="fa-solid fa-arrow-up-right-from-square ml-1 text-[9px]"></i></a>` : '';
+            bannerBox.innerHTML = `<div class="p-3.5 rounded-2xl bg-gradient-to-r from-dark-950 via-slate-900 to-indigo-950 text-white border border-royal-400/60 shadow-md"><div class="flex flex-wrap items-center justify-between gap-2.5"><div class="flex items-start sm:items-center gap-2.5"><span class="bg-royal-500 text-dark-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase shrink-0 mt-0.5 sm:mt-0"><i class="fa-solid fa-bullhorn mr-1"></i>${cfg.bannerBadge}</span><div>${cfg.bannerTitle ? `<h4 class="text-xs md:text-sm font-black text-royal-300">${cfg.bannerTitle}</h4>` : ''}${cfg.bannerMessage ? `<p class="text-[11px] font-semibold text-slate-200 mt-0.5">${cfg.bannerMessage}</p>` : ''}</div></div>${btnHtml}</div></div>`;
+        } else { bannerBox.style.display = 'none'; bannerBox.innerHTML = ''; }
     }
 
     const stdGrid = document.getElementById('standardServicesGrid');
@@ -390,75 +223,38 @@ window.applyLivePortalControls = function() {
 
     if (btnDom) btnDom.style.setProperty('display', cfg.showDomicile ? 'flex' : 'none', 'important');
     if (btnCas) btnCas.style.setProperty('display', cfg.showCaste ? 'flex' : 'none', 'important');
-
     if (stdGrid) {
-        if (!cfg.showDomicile && !cfg.showCaste) {
-            stdGrid.style.setProperty('display', 'none', 'important');
-        } else if (cfg.showDomicile && cfg.showCaste) {
-            stdGrid.style.setProperty('display', 'grid', 'important');
-            stdGrid.className = "grid grid-cols-2 gap-2.5 mb-3";
-        } else {
-            stdGrid.style.setProperty('display', 'grid', 'important');
-            stdGrid.className = "grid grid-cols-1 gap-2.5 mb-3";
-        }
+        if (!cfg.showDomicile && !cfg.showCaste) { stdGrid.style.setProperty('display', 'none', 'important'); } 
+        else if (cfg.showDomicile && cfg.showCaste) { stdGrid.style.setProperty('display', 'grid', 'important'); stdGrid.className = "grid grid-cols-2 gap-2.5 mb-3"; } 
+        else { stdGrid.style.setProperty('display', 'grid', 'important'); stdGrid.className = "grid grid-cols-1 gap-2.5 mb-3"; }
     }
 
-    // अगर एडमिन ने इस यूज़र के लिए या ग्लोबली DOB 18+ बंद किया है, तो बटन और नाम दोनों छुपा दें
     if (btnDob) btnDob.style.setProperty('display', canShowDob ? 'flex' : 'none', 'important');
+    if (promoDesc) promoDesc.innerHTML = canShowDob ? `VIP लें: <strong>18+ DOB & सारे 9 Official Annexures</strong> अनलॉक करें (सभी डॉक्यूमेंट 10 Cr)!` : `VIP लें: <strong>सारे 9 Official Annexures</strong> अनलॉक करें (सभी डॉक्यूमेंट 10 Cr)!`;
+    if (vipHeaderLabel) vipHeaderLabel.innerHTML = canShowDob ? `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures)` : `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (All 9 Annexures)`;
 
-    if (promoDesc) {
-        promoDesc.innerHTML = canShowDob
-            ? `VIP लें: <strong>18+ DOB & सारे 9 Official Annexures</strong> अनलॉक करें (सभी डॉक्यूमेंट 10 Cr)!`
-            : `VIP लें: <strong>सारे 9 Official Annexures</strong> अनलॉक करें (सभी डॉक्यूमेंट 10 Cr)!`;
-    }
-    if (vipHeaderLabel) {
-        vipHeaderLabel.innerHTML = canShowDob
-            ? `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures)`
-            : `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (All 9 Annexures)`;
-    }
-
-    if (
-        (window.currentActiveTab === 'domicile' && !cfg.showDomicile) ||
-        (window.currentActiveTab === 'caste' && !cfg.showCaste) ||
-        (window.currentActiveTab === 'dob18' && !canShowDob)
-    ) {
+    if ((window.currentActiveTab === 'domicile' && !cfg.showDomicile) || (window.currentActiveTab === 'caste' && !cfg.showCaste) || (window.currentActiveTab === 'dob18' && !canShowDob)) {
         window.switchService(window.getFirstAllowedTab());
     }
 };
 
 window.getFirstAllowedTab = function() {
     const cfg = window.portalConfigState;
-    const canShowDob = window.canCurrentUserSeeDob18();
     if (cfg.showDomicile) return 'domicile';
     if (cfg.showCaste) return 'caste';
-    if (window.currentUserData && window.currentUserData.isVip) {
-        if (canShowDob) return 'dob18';
-        return 'annexure1';
-    }
+    if (window.currentUserData && window.currentUserData.isVip) return window.canCurrentUserSeeDob18() ? 'dob18' : 'annexure1';
     return 'history';
 };
 
 document.addEventListener('click', (e) => {
     const menu = document.getElementById('gearDropdownMenu');
     const btn = document.getElementById('gearMenuBtn');
-    if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) {
-        menu.classList.add('hidden');
-    }
+    if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) menu.classList.add('hidden');
 });
 
-window.toggleGearMenu = function(e) {
-    if (e) e.stopPropagation();
-    const menu = document.getElementById('gearDropdownMenu');
-    if (menu) menu.classList.toggle('hidden');
-};
+window.toggleGearMenu = function(e) { if (e) e.stopPropagation(); const menu = document.getElementById('gearDropdownMenu'); if (menu) menu.classList.toggle('hidden'); };
+window.selectGearOption = function(serviceName) { const menu = document.getElementById('gearDropdownMenu'); if (menu) menu.classList.add('hidden'); window.switchService(serviceName); };
 
-window.selectGearOption = function(serviceName) {
-    const menu = document.getElementById('gearDropdownMenu');
-    if (menu) menu.classList.add('hidden');
-    window.switchService(serviceName);
-};
-
-// ================= AUTH STATE & STRICT @print.com ENFORCEMENT =================
 onAuthStateChanged(auth, async (user) => {
     const loadingScreen = document.getElementById('loadingScreen');
     const loginSection = document.getElementById('loginSection');
@@ -467,12 +263,8 @@ onAuthStateChanged(auth, async (user) => {
     if (user) {
         try {
             const emailLower = user.email.trim().toLowerCase();
-
             if (!window.isAllowedPortalEmail(emailLower)) {
-                await signOut(auth);
-                alert("अमान्य आईडी! पोर्टल पर केवल @print.com डोमेन वाली आईडी ही मान्य है।");
-                loadingScreen.style.display = 'none';
-                return;
+                await signOut(auth); alert("अमान्य आईडी! पोर्टल पर केवल @print.com डोमेन वाली आईडी ही मान्य है।"); loadingScreen.style.display = 'none'; return;
             }
 
             try {
@@ -480,32 +272,20 @@ onAuthStateChanged(auth, async (user) => {
                 if (cfgSnap.exists()) {
                     const d = cfgSnap.data();
                     window.portalConfigState = {
-                        showDomicile: d.showDomicile !== false,
-                        showCaste: d.showCaste !== false,
-                        showDob18: d.showDob18 !== false,
-                        bannerEnabled: !!d.bannerEnabled,
-                        bannerBadge: d.bannerBadge || "UPDATE",
-                        bannerTitle: d.bannerTitle || "",
-                        bannerMessage: d.bannerMessage || "",
-                        bannerBtnText: d.bannerBtnText || "",
-                        bannerBtnLink: d.bannerBtnLink || ""
+                        showDomicile: d.showDomicile !== false, showCaste: d.showCaste !== false, showDob18: d.showDob18 !== false,
+                        bannerEnabled: !!d.bannerEnabled, bannerBadge: d.bannerBadge || "UPDATE", bannerTitle: d.bannerTitle || "",
+                        bannerMessage: d.bannerMessage || "", bannerBtnText: d.bannerBtnText || "", bannerBtnLink: d.bannerBtnLink || ""
                     };
                 }
             } catch (e) {}
 
             const userDocRef = doc(db, "users", user.uid);
             const userDoc = await getDoc(userDocRef);
-            let userCredits = 0;
-            let isVip = false;
-            let vipExpiry = 0;
-            let allowDob18 = true;
+            let userCredits = 0, isVip = false, vipExpiry = 0, allowDob18 = true;
 
             if (userDoc.exists()) {
                 const data = userDoc.data();
-                userCredits = data.credits || 0;
-                isVip = data.isVip || false;
-                vipExpiry = data.vipExpiry || 0;
-                allowDob18 = data.allowDob18 !== false;
+                userCredits = data.credits || 0; isVip = data.isVip || false; vipExpiry = data.vipExpiry || 0; allowDob18 = data.allowDob18 !== false;
             }
             
             const isAdmin = (emailLower === window.ADMIN_EMAIL);
@@ -514,23 +294,10 @@ onAuthStateChanged(auth, async (user) => {
             const now = Date.now();
 
             if (!hasFreeAccess && isVip && vipExpiry > 0 && vipExpiry <= now) {
-                isVip = false;
-                vipExpiry = 0;
-                await updateDoc(userDocRef, { isVip: false, vipExpiry: 0 });
+                isVip = false; vipExpiry = 0; await updateDoc(userDocRef, { isVip: false, vipExpiry: 0 });
             }
             
-            window.currentUserData = { 
-                uid: user.uid, 
-                email: user.email, 
-                credits: userCredits, 
-                isVip: isVip || hasFreeAccess, 
-                vipExpiry: hasFreeAccess ? 0 : vipExpiry,
-                allowDob18: allowDob18,
-                isAdmin: isAdmin,
-                isFreeVip: isFreeVip,
-                hasFreeAccess: hasFreeAccess,
-                username: user.email.split('@')[0] 
-            };
+            window.currentUserData = { uid: user.uid, email: user.email, credits: userCredits, isVip: isVip || hasFreeAccess, vipExpiry: hasFreeAccess ? 0 : vipExpiry, allowDob18: allowDob18, isAdmin: isAdmin, isFreeVip: isFreeVip, hasFreeAccess: hasFreeAccess, username: user.email.split('@')[0] };
             
             setupDashboard(window.currentUserData);
             startPortalSettingsListener();
@@ -538,10 +305,7 @@ onAuthStateChanged(auth, async (user) => {
             startUserSupportChatListener(user.uid);
             startVipCountdownLoop();
             loadingScreen.style.display = 'none'; 
-        } catch (err) {
-            console.error(err);
-            await signOut(auth);
-        }
+        } catch (err) { await signOut(auth); }
     } else {
         if (window.vipCountdownInterval) clearInterval(window.vipCountdownInterval);
         if (window.portalSettingsUnsubscribe) window.portalSettingsUnsubscribe();
@@ -549,12 +313,8 @@ onAuthStateChanged(auth, async (user) => {
         if (window.userChatUnsubscribe) window.userChatUnsubscribe();
         if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe();
 
-        window.currentUserData = null;
-        document.body.classList.remove('vip-body-bg');
-        document.getElementById('vipCornerAlert').style.display = 'none';
-        loginSection.style.display = 'flex';
-        dashboardSection.style.display = 'none';
-        loadingScreen.style.display = 'none';
+        window.currentUserData = null; document.body.classList.remove('vip-body-bg'); document.getElementById('vipCornerAlert').style.display = 'none';
+        loginSection.style.display = 'flex'; dashboardSection.style.display = 'none'; loadingScreen.style.display = 'none';
     }
 });
 
@@ -569,31 +329,20 @@ window.handleLogin = async function(event) {
     const email = emailInput.includes('@') ? emailInput : `${emailInput}@print.com`;
 
     if (!window.isAllowedPortalEmail(email)) {
-        errorDiv.innerHTML = '<i class="fa-solid fa-ban mr-1"></i> केवल <strong>@print.com</strong> डोमेन वाली User ID ही मान्य है! (जैसे: user@print.com)';
-        errorDiv.style.display = 'block';
-        return;
+        errorDiv.innerHTML = '<i class="fa-solid fa-ban mr-1"></i> केवल <strong>@print.com</strong> डोमेन वाली User ID ही मान्य है!';
+        errorDiv.style.display = 'block'; return;
     }
 
     const originalBtnHtml = loginBtn.innerHTML;
-    loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...';
-    loginBtn.disabled = true;
+    loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...'; loginBtn.disabled = true;
 
-    try {
-        await signInWithEmailAndPassword(auth, email, passInput);
-    } catch (error) {
-        errorDiv.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i> Your ID or Password are incorrect!';
-        errorDiv.style.display = 'block';
-        document.getElementById('loginPassword').value = '';
-        loginBtn.innerHTML = originalBtnHtml;
-        loginBtn.disabled = false;
-    }
+    try { await signInWithEmailAndPassword(auth, email, passInput); } 
+    catch (error) { errorDiv.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i> Your ID or Password are incorrect!'; errorDiv.style.display = 'block'; document.getElementById('loginPassword').value = ''; loginBtn.innerHTML = originalBtnHtml; loginBtn.disabled = false; }
 };
 
-// ================= LIVE VIP COUNTDOWN =================
 function startVipCountdownLoop() {
     if (window.vipCountdownInterval) clearInterval(window.vipCountdownInterval);
-    updateVipTimerAndAlerts();
-    window.vipCountdownInterval = setInterval(updateVipTimerAndAlerts, 1000);
+    updateVipTimerAndAlerts(); window.vipCountdownInterval = setInterval(updateVipTimerAndAlerts, 1000);
 }
 
 async function updateVipTimerAndAlerts() {
@@ -604,62 +353,38 @@ async function updateVipTimerAndAlerts() {
 
     if (!userData || !userData.isVip || userData.hasFreeAccess) {
         if (cornerAlert) cornerAlert.style.display = 'none';
-        if (gearVipDaysText) {
-            if (userData?.isAdmin) gearVipDaysText.innerText = '👑 Admin (Unlimited)';
-            else if (userData?.isFreeVip) gearVipDaysText.innerText = '👑 Permanent VIP (Free)';
-            else gearVipDaysText.innerText = 'Normal User (0 Days)';
-        }
+        if (gearVipDaysText) gearVipDaysText.innerText = userData?.isAdmin ? '👑 Admin (Unlimited)' : (userData?.isFreeVip ? '👑 Permanent VIP (Free)' : 'Normal User (0 Days)');
         return;
     }
 
     if (!userData.vipExpiry || userData.vipExpiry <= 0) {
         if (gearVipDaysText) gearVipDaysText.innerText = 'VIP Active';
-        if (cornerAlert) cornerAlert.style.display = 'none';
-        return;
+        if (cornerAlert) cornerAlert.style.display = 'none'; return;
     }
 
     const now = Date.now();
     const diff = userData.vipExpiry - now;
 
     if (diff <= 0) {
-        clearInterval(window.vipCountdownInterval);
-        userData.isVip = false;
-        userData.vipExpiry = 0;
-
-        try {
-            await updateDoc(doc(db, "users", userData.uid), { isVip: false, vipExpiry: 0 });
-        } catch (e) {}
-
+        clearInterval(window.vipCountdownInterval); userData.isVip = false; userData.vipExpiry = 0;
+        try { await updateDoc(doc(db, "users", userData.uid), { isVip: false, vipExpiry: 0 }); } catch (e) {}
         if (cornerAlert) cornerAlert.style.display = 'none';
-        setupDashboard(userData);
-        alert('आपकी VIP वैलिडिटी समाप्त हो गई है। आपका अकाउंट अब Normal User पोर्टल में बदल दिया गया है।');
-        return;
+        setupDashboard(userData); alert('आपकी VIP वैलिडिटी समाप्त हो गई है। आपका अकाउंट अब Normal User पोर्टल में बदल दिया गया है।'); return;
     }
 
     const totalDaysCeil = Math.ceil(diff / window.MS_PER_DAY);
     const days = Math.floor(diff / window.MS_PER_DAY);
     const hours = Math.floor((diff % window.MS_PER_DAY) / (1000 * 60 * 60));
 
-    if (gearVipDaysText) {
-        gearVipDaysText.innerText = `👑 VIP: ${totalDaysCeil} दिन बाकी (${days}d ${hours}h)`;
-    }
+    if (gearVipDaysText) gearVipDaysText.innerText = `👑 VIP: ${totalDaysCeil} दिन बाकी (${days}d ${hours}h)`;
 
     if (totalDaysCeil <= 5 && totalDaysCeil >= 1) {
-        if (!window.cornerAlertDismissed) {
-            cornerAlert.style.display = 'block';
-            cornerAlertDaysText.innerHTML = `VIP खत्म होने में सिर्फ <strong class="text-red-600 underline">${totalDaysCeil} दिन</strong> बचे हैं!`;
-        }
-    } else {
-        cornerAlert.style.display = 'none';
-    }
+        if (!window.cornerAlertDismissed) { cornerAlert.style.display = 'block'; cornerAlertDaysText.innerHTML = `VIP खत्म होने में सिर्फ <strong class="text-red-600 underline">${totalDaysCeil} दिन</strong> बचे हैं!`; }
+    } else { cornerAlert.style.display = 'none'; }
 }
 
-window.dismissCornerAlert = function() {
-    window.cornerAlertDismissed = true;
-    document.getElementById('vipCornerAlert').style.display = 'none';
-};
+window.dismissCornerAlert = function() { window.cornerAlertDismissed = true; document.getElementById('vipCornerAlert').style.display = 'none'; };
 
-// ================= SETUP DASHBOARD =================
 function setupDashboard(userData) {
     document.getElementById('displayUser').innerText = userData.username.toUpperCase();
     const adminLink = document.getElementById('adminPanelLink');
@@ -670,70 +395,42 @@ function setupDashboard(userData) {
     const portalIcon = document.getElementById('portalHeaderIcon');
     const vipBadge = document.getElementById('vipStatusBadge');
     const mainFormCard = document.getElementById('mainFormCard');
-    const gearBtnAddCredit = document.getElementById('gearBtnAddCredit');
-    const gearBtnPaymentHistory = document.getElementById('gearBtnPaymentHistory');
 
-    if (userData.isAdmin) adminLink.style.display = 'flex';
-    else adminLink.style.display = 'none';
+    adminLink.style.display = userData.isAdmin ? 'flex' : 'none';
 
-    if (userData.hasFreeAccess) {
-        creditDisplayBox.style.display = 'none';
-        if (gearBtnAddCredit) gearBtnAddCredit.style.display = 'none';
-        if (gearBtnPaymentHistory) gearBtnPaymentHistory.style.display = 'none';
-    } else {
-        creditDisplayBox.style.display = 'flex';
-        document.getElementById('displayCredits').innerText = userData.credits;
-        if (gearBtnAddCredit) gearBtnAddCredit.style.display = 'flex';
-        if (gearBtnPaymentHistory) gearBtnPaymentHistory.style.display = 'flex';
-    }
+    if (userData.hasFreeAccess) { creditDisplayBox.style.display = 'none'; } 
+    else { creditDisplayBox.style.display = 'flex'; document.getElementById('displayCredits').innerText = userData.credits; }
 
     if (userData.isVip) {
         document.body.classList.add('vip-body-bg');
         portalTitle.innerHTML = `Ojas <span class="text-royal-400">VIP</span>`;
         portalIcon.innerHTML = `<i class="fa-solid fa-crown text-sm animate-pulse"></i>`;
         portalIcon.className = "w-8 h-8 md:w-9 md:h-9 bg-gradient-to-br from-yellow-300 via-royal-500 to-amber-700 text-dark-950 rounded-xl flex items-center justify-center shadow-vip-glow border border-yellow-200";
-        vipBadge.style.display = 'inline-flex';
-        vipServicesBar.style.display = 'block';
-        normalUserVipPromo.style.display = 'none';
+        vipBadge.style.display = 'inline-flex'; vipServicesBar.style.display = 'block'; normalUserVipPromo.style.display = 'none';
         mainFormCard.className = "bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-vip-glow border-2 border-royal-400 p-4 md:p-7";
     } else {
         document.body.classList.remove('vip-body-bg');
         portalTitle.innerHTML = `Ojas <span class="text-royal-400">Portal</span>`;
         portalIcon.innerHTML = `<i class="fa-solid fa-sun text-sm"></i>`;
         portalIcon.className = "w-8 h-8 md:w-9 md:h-9 bg-gradient-to-br from-royal-400 to-royal-600 text-white rounded-xl flex items-center justify-center shadow-inner";
-        vipBadge.style.display = 'none';
-        vipServicesBar.style.display = 'none';
-        normalUserVipPromo.style.display = 'block';
+        vipBadge.style.display = 'none'; vipServicesBar.style.display = 'none'; normalUserVipPromo.style.display = 'block';
         mainFormCard.className = "bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-card border border-slate-100 p-4 md:p-7";
     }
 
     document.getElementById('loginSection').style.display = 'none';
     document.getElementById('dashboardSection').style.display = 'flex';
-    
-    window.applyLivePortalControls();
-    window.switchService(window.getFirstAllowedTab());
+    window.applyLivePortalControls(); window.switchService(window.getFirstAllowedTab());
 }
 
-window.handleLogout = async function() {
-    await signOut(auth);
-    window.location.reload();
-};
+window.handleLogout = async function() { await signOut(auth); window.location.reload(); };
 
 window.jumpToVipUpgrade = function(days = 30) {
     if (window.currentUserData?.hasFreeAccess) return;
-    const menu = document.getElementById('gearDropdownMenu');
-    if (menu) menu.classList.add('hidden');
+    const menu = document.getElementById('gearDropdownMenu'); if (menu) menu.classList.add('hidden');
     window.switchService('add_credit');
-    setTimeout(() => {
-        const planRadio = document.querySelector(`input[name="vipPlanOption"][value="${days}"]`);
-        if (planRadio) {
-            planRadio.checked = true;
-            window.calculateCredits();
-        }
-    }, 50);
+    setTimeout(() => { const planRadio = document.querySelector(`input[name="vipPlanOption"][value="${days}"]`); if (planRadio) { planRadio.checked = true; window.calculateCredits(); } }, 50);
 };
 
-// ================= PASSWORD CHANGE LOGIC =================
 window.handleChangePassword = async function(event) {
     event.preventDefault();
     const currentPass = document.getElementById('currentPassword').value;
@@ -743,262 +440,105 @@ window.handleChangePassword = async function(event) {
     const btn = document.getElementById('btnChangePass');
 
     msgBox.style.display = 'none';
+    if (newPass.length < 6) { msgBox.className = "p-3 rounded-xl text-xs font-bold bg-red-50 text-red-600 border border-red-200 text-center"; msgBox.innerText = "नया पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!"; msgBox.style.display = 'block'; return; }
+    if (newPass !== confirmPass) { msgBox.className = "p-3 rounded-xl text-xs font-bold bg-red-50 text-red-600 border border-red-200 text-center"; msgBox.innerText = "नया पासवर्ड और कन्फर्म पासवर्ड आपस में मैच नहीं कर रहे हैं!"; msgBox.style.display = 'block'; return; }
 
-    if (newPass.length < 6) {
-        msgBox.className = "p-3 rounded-xl text-xs font-bold bg-red-50 text-red-600 border border-red-200 text-center";
-        msgBox.innerText = "नया पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!";
-        msgBox.style.display = 'block';
-        return;
-    }
-
-    if (newPass !== confirmPass) {
-        msgBox.className = "p-3 rounded-xl text-xs font-bold bg-red-50 text-red-600 border border-red-200 text-center";
-        msgBox.innerText = "नया पासवर्ड और कन्फर्म पासवर्ड आपस में मैच नहीं कर रहे हैं!";
-        msgBox.style.display = 'block';
-        return;
-    }
-
-    const origText = btn.innerHTML;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> पासवर्ड बदला जा रहा है...';
-    btn.disabled = true;
+    const origText = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> पासवर्ड बदला जा रहा है...'; btn.disabled = true;
 
     try {
         const user = auth.currentUser;
         const credential = EmailAuthProvider.credential(user.email, currentPass);
         await reauthenticateWithCredential(user, credential);
         await updatePassword(user, newPass);
-
-        try {
-            await updateDoc(doc(db, "users", user.uid), {
-                passUpdatedAt: new Date()
-            });
-        } catch (e) {}
+        try { await updateDoc(doc(db, "users", user.uid), { passUpdatedAt: new Date() }); } catch (e) {}
 
         msgBox.className = "p-3 rounded-xl text-xs font-bold bg-green-50 text-green-700 border border-green-200 text-center";
-        msgBox.innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i> आपका पासवर्ड सफलतापूर्वक बदल दिया गया है।';
-        msgBox.style.display = 'block';
-        event.target.reset();
+        msgBox.innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i> आपका पासवर्ड सफलतापूर्वक बदल दिया गया है।'; msgBox.style.display = 'block'; event.target.reset();
     } catch (err) {
-        msgBox.className = "p-3 rounded-xl text-xs font-bold bg-red-50 text-red-600 border border-red-200 text-center";
-        msgBox.innerText = "आपका पुराना पासवर्ड गलत है!";
-        msgBox.style.display = 'block';
-    } finally {
-        btn.innerHTML = origText;
-        btn.disabled = false;
-    }
+        msgBox.className = "p-3 rounded-xl text-xs font-bold bg-red-50 text-red-600 border border-red-200 text-center"; msgBox.innerText = "आपका पुराना पासवर्ड गलत है!"; msgBox.style.display = 'block';
+    } finally { btn.innerHTML = origText; btn.disabled = false; }
 };
 
-// ================= PAYMENT + AUTO-CANCEL + 24-HOUR UTR TICKET SYSTEM =================
 window.calculateCredits = function() {
     const creditAmt = parseFloat(document.getElementById('rupeeAmount')?.value) || 0;
     const selectedPlanEl = document.querySelector('input[name="vipPlanOption"]:checked');
-    
-    let vipDays = 0;
-    let vipFee = 0;
-    if (selectedPlanEl) {
-        vipDays = parseInt(selectedPlanEl.value) || 0;
-        vipFee = parseInt(selectedPlanEl.getAttribute('data-price')) || 0;
-    }
+    let vipDays = 0, vipFee = 0;
+    if (selectedPlanEl) { vipDays = parseInt(selectedPlanEl.value) || 0; vipFee = parseInt(selectedPlanEl.getAttribute('data-price')) || 0; }
 
-    const wantsVip = vipDays > 0;
-    const totalPayable = creditAmt + vipFee;
+    window.currentRechargeCredits = creditAmt; window.currentWantsVip = vipDays > 0;
+    window.currentVipDays = vipDays; window.currentVipPlanFee = vipFee; window.currentTotalPayable = creditAmt + vipFee;
 
-    window.currentRechargeCredits = creditAmt;
-    window.currentWantsVip = wantsVip;
-    window.currentVipDays = vipDays;
-    window.currentVipPlanFee = vipFee;
-    window.currentTotalPayable = totalPayable;
-
-    const calcCreditsEl = document.getElementById('calculatedCredits');
-    if (calcCreditsEl) calcCreditsEl.innerText = `${creditAmt} Cr`;
-    
+    const calcCreditsEl = document.getElementById('calculatedCredits'); if (calcCreditsEl) calcCreditsEl.innerText = `${creditAmt} Cr`;
     const vipSummaryBadge = document.getElementById('vipSummaryBadge');
-    if (vipSummaryBadge) {
-        if (wantsVip) {
-            vipSummaryBadge.style.display = 'inline-block';
-            vipSummaryBadge.innerHTML = `👑 +${vipDays}d VIP`;
-        } else {
-            vipSummaryBadge.style.display = 'none';
-        }
-    }
-
-    const totalPayableDisplay = document.getElementById('totalPayableDisplay');
-    if (totalPayableDisplay) totalPayableDisplay.innerText = `₹${totalPayable}`;
+    if (vipSummaryBadge) { if (vipDays > 0) { vipSummaryBadge.style.display = 'inline-block'; vipSummaryBadge.innerHTML = `👑 +${vipDays}d VIP`; } else { vipSummaryBadge.style.display = 'none'; } }
+    const totalPayableDisplay = document.getElementById('totalPayableDisplay'); if (totalPayableDisplay) totalPayableDisplay.innerText = `₹${window.currentTotalPayable}`;
 };
 
 window.generateQR = async function() {
     if (window.currentUserData?.hasFreeAccess) return;
-
     window.calculateCredits();
-    const creditAmt = window.currentRechargeCredits;
-    const wantsVip = window.currentWantsVip;
-    const totalPayable = window.currentTotalPayable;
-    
-    if (!wantsVip && creditAmt < 100) {
-        return alert('पोर्टल पर कम से कम ₹100 के क्रेडिट रिचार्ज करना अनिवार्य है! कृपया ₹100 या उससे अधिक दर्ज करें।');
-    }
-    if (wantsVip && creditAmt > 0 && creditAmt < 100) {
-        return alert('क्रेडिट रिचार्ज की न्यूनतम वैल्यू ₹100 है! कृपया क्रेडिट में कम से कम ₹100 डालें (या सिर्फ VIP लेने के लिए क्रेडिट को 0 छोड़ें)।');
-    }
-    if (totalPayable < 100) {
-        return alert('न्यूनतम पेमेंट राशि ₹100 होनी चाहिए!');
-    }
+    if (!window.currentWantsVip && window.currentRechargeCredits < 100) return alert('पोर्टल पर कम से कम ₹100 के क्रेडिट रिचार्ज करना अनिवार्य है! कृपया ₹100 या उससे अधिक दर्ज करें।');
+    if (window.currentWantsVip && window.currentRechargeCredits > 0 && window.currentRechargeCredits < 100) return alert('क्रेडिट रिचार्ज की न्यूनतम वैल्यू ₹100 है! कृपया क्रेडिट में कम से कम ₹100 डालें (या सिर्फ VIP लेने के लिए क्रेडिट को 0 छोड़ें)।');
+    if (window.currentTotalPayable < 100) return alert('न्यूनतम पेमेंट राशि ₹100 होनी चाहिए!');
 
     const btn = document.getElementById('btnGenerateQR');
     const origBtnHtml = btn ? btn.innerHTML : '';
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> पेमेंट लिंक बन रहा है...';
-    }
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> पेमेंट लिंक बन रहा है...'; }
 
-    const upiId = "8279650137@amazonpay"; 
-    const payeeName = "Ojas Print Service";
-    const txnNote = wantsVip ? `Ojas VIP ${window.currentVipDays}d` : `Ojas Credits`;
-    const queryParams = `pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${totalPayable}&cu=INR&tn=${encodeURIComponent(txnNote)}`;
-
+    const queryParams = `pa=8279650137@amazonpay&pn=Ojas%20Print%20Service&am=${window.currentTotalPayable}&cu=INR&tn=${encodeURIComponent(window.currentWantsVip ? `Ojas VIP ${window.currentVipDays}d` : `Ojas Credits`)}`;
     let universalUpiUrl = `upi://pay?${queryParams}`;
     let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`;
     window.currentActiveOrderId = null;
 
     try {
         const res = await fetch('/api/create-order', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                userId: window.currentUserData.uid,
-                email: window.currentUserData.email,
-                username: window.currentUserData.username,
-                totalPayable: totalPayable,
-                creditsRequested: creditAmt,
-                wantsVip: wantsVip,
-                vipDaysRequested: window.currentVipDays,
-                vipPlanFee: window.currentVipPlanFee
-            })
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: window.currentUserData.uid, email: window.currentUserData.email, username: window.currentUserData.username, totalPayable: window.currentTotalPayable, creditsRequested: window.currentRechargeCredits, wantsVip: window.currentWantsVip, vipDaysRequested: window.currentVipDays, vipPlanFee: window.currentVipPlanFee })
         });
         const orderData = await res.json();
-
         if (orderData.status && orderData.orderId) {
             window.currentActiveOrderId = orderData.orderId;
-
-            if (orderData.upi_string) {
-                universalUpiUrl = orderData.upi_string;
-                qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`;
-            }
-            if (orderData.qr_code && orderData.qr_code.startsWith('http')) {
-                qrUrl = orderData.qr_code;
-            }
+            if (orderData.upi_string) { universalUpiUrl = orderData.upi_string; qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; }
+            if (orderData.qr_code && orderData.qr_code.startsWith('http')) qrUrl = orderData.qr_code;
 
             if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe();
             window.activePaymentUnsubscribe = onSnapshot(doc(db, "payments", orderData.orderId), async (snap) => {
-                if (snap.exists()) {
-                    const pData = snap.data();
-                    if (pData.status === 'Auto-Approved' || pData.status === 'Approved') {
-                        if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe();
-                        window.currentActiveOrderId = null;
-                        
-                        const uSnap = await getDoc(doc(db, "users", window.currentUserData.uid));
-                        if (uSnap.exists()) {
-                            const updatedUser = uSnap.data();
-                            window.currentUserData.credits = updatedUser.credits || 0;
-                            window.currentUserData.isVip = updatedUser.isVip || window.currentUserData.hasFreeAccess;
-                            window.currentUserData.vipExpiry = updatedUser.vipExpiry || 0;
-                            const crEl = document.getElementById('displayCredits');
-                            if (crEl) crEl.innerText = window.currentUserData.credits;
-                        }
-
-                        document.getElementById('walletMainUI').innerHTML = `
-                            <div class="p-6 bg-green-50 rounded-2xl border-2 border-green-400 text-center space-y-2">
-                                <i class="fa-solid fa-circle-check text-5xl text-green-600 mb-2 animate-bounce"></i>
-                                <h2 class="text-xl font-black text-green-900">पेमेंट सफल! (Auto-Verified)</h2>
-                                <p class="text-xs font-bold text-green-700">आपका ₹${totalPayable} का पेमेंट वेरीफाई हो गया है और आपके अकाउंट में तुरंत क्रेडिट्स/VIP जोड़ दिए गए हैं!</p>
-                                <div class="pt-3">
-                                    <button onclick="window.location.reload()" class="bg-green-600 hover:bg-green-700 text-white font-black py-2.5 px-6 rounded-xl text-xs shadow">डैशबोर्ड पर जाएँ</button>
-                                </div>
-                            </div>
-                        `;
+                if (snap.exists() && (snap.data().status === 'Auto-Approved' || snap.data().status === 'Approved')) {
+                    if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe(); window.currentActiveOrderId = null;
+                    const uSnap = await getDoc(doc(db, "users", window.currentUserData.uid));
+                    if (uSnap.exists()) {
+                        const updatedUser = uSnap.data(); window.currentUserData.credits = updatedUser.credits || 0; window.currentUserData.isVip = updatedUser.isVip || window.currentUserData.hasFreeAccess; window.currentUserData.vipExpiry = updatedUser.vipExpiry || 0;
+                        const crEl = document.getElementById('displayCredits'); if (crEl) crEl.innerText = window.currentUserData.credits;
                     }
+                    document.getElementById('walletMainUI').innerHTML = `<div class="p-6 bg-green-50 rounded-2xl border-2 border-green-400 text-center space-y-2"><i class="fa-solid fa-circle-check text-5xl text-green-600 mb-2 animate-bounce"></i><h2 class="text-xl font-black text-green-900">पेमेंट सफल! (Auto-Verified)</h2><p class="text-xs font-bold text-green-700">आपका ₹${window.currentTotalPayable} का पेमेंट वेरीफाई हो गया है और आपके अकाउंट में तुरंत क्रेडिट्स/VIP जोड़ दिए गए हैं!</p><div class="pt-3"><button onclick="window.location.reload()" class="bg-green-600 hover:bg-green-700 text-white font-black py-2.5 px-6 rounded-xl text-xs shadow">डैशबोर्ड पर जाएँ</button></div></div>`;
                 }
             });
         }
     } catch (err) {
-        try {
-            const fallbackDoc = await addDoc(collection(db, "payments"), {
-                userId: window.currentUserData.uid,
-                email: window.currentUserData.email,
-                amountPaid: totalPayable,
-                creditsRequested: creditAmt,
-                wantsVip: wantsVip,
-                vipDaysRequested: window.currentVipDays,
-                vipPlanFee: window.currentVipPlanFee,
-                utrNumber: "ONLINE_UPI",
-                timestamp: new Date(),
-                status: "Pending"
-            });
-            window.currentActiveOrderId = fallbackDoc.id;
-        } catch (e) {}
-    } finally {
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = origBtnHtml;
-        }
-    }
+        try { const fallbackDoc = await addDoc(collection(db, "payments"), { userId: window.currentUserData.uid, email: window.currentUserData.email, amountPaid: window.currentTotalPayable, creditsRequested: window.currentRechargeCredits, wantsVip: window.currentWantsVip, vipDaysRequested: window.currentVipDays, vipPlanFee: window.currentVipPlanFee, utrNumber: "ONLINE_UPI", timestamp: new Date(), status: "Pending" }); window.currentActiveOrderId = fallbackDoc.id; } catch (e) {}
+    } finally { if (btn) { btn.disabled = false; btn.innerHTML = origBtnHtml; } }
 
-    const paytmUrl = universalUpiUrl.replace('upi://pay?', 'paytmmp://pay?');
-    const phonepeUrl = universalUpiUrl.replace('upi://pay?', 'phonepe://pay?');
-    const gpayUrl = universalUpiUrl.replace('upi://pay?', 'tez://upi/pay?');
+    document.getElementById('upiQRCode').src = qrUrl; document.getElementById('qrPayableAmountText').innerText = `कुल पेमेंट: ₹${window.currentTotalPayable}`;
+    const mainUpiBtn = document.getElementById('btnDirectUpiPay'); if (mainUpiBtn) { mainUpiBtn.href = universalUpiUrl; mainUpiBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> Pay ₹${window.currentTotalPayable} Directly via UPI App`; }
+    const btnPaytm = document.getElementById('btnPaytmApp'); if (btnPaytm) btnPaytm.href = universalUpiUrl.replace('upi://pay?', 'paytmmp://pay?');
+    const btnPhonePe = document.getElementById('btnPhonePeApp'); if (btnPhonePe) btnPhonePe.href = universalUpiUrl.replace('upi://pay?', 'phonepe://pay?');
+    const btnGPay = document.getElementById('btnGPayApp'); if (btnGPay) btnGPay.href = universalUpiUrl.replace('upi://pay?', 'tez://upi/pay?');
 
-    document.getElementById('upiQRCode').src = qrUrl;
-    document.getElementById('qrPayableAmountText').innerText = `कुल पेमेंट: ₹${totalPayable}`;
-    
-    const mainUpiBtn = document.getElementById('btnDirectUpiPay');
-    if (mainUpiBtn) {
-        mainUpiBtn.href = universalUpiUrl;
-        mainUpiBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> Pay ₹${totalPayable} Directly via UPI App`;
-    }
-    const btnPaytm = document.getElementById('btnPaytmApp');
-    if (btnPaytm) btnPaytm.href = paytmUrl;
-    const btnPhonePe = document.getElementById('btnPhonePeApp');
-    if (btnPhonePe) btnPhonePe.href = phonepeUrl;
-    const btnGPay = document.getElementById('btnGPayApp');
-    if (btnGPay) btnGPay.href = gpayUrl;
-
-    const ticketBox = document.getElementById('paymentIssueTicketBox');
-    if (ticketBox) ticketBox.style.display = 'none';
-    const ticketResult = document.getElementById('paymentTicketResultMsg');
-    if (ticketResult) ticketResult.style.display = 'none';
-
-    document.getElementById('paymentStep1').style.display = 'none';
-    document.getElementById('qrSection').style.display = 'flex';
+    const ticketBox = document.getElementById('paymentIssueTicketBox'); if (ticketBox) ticketBox.style.display = 'none';
+    const ticketResult = document.getElementById('paymentTicketResultMsg'); if (ticketResult) ticketResult.style.display = 'none';
+    document.getElementById('paymentStep1').style.display = 'none'; document.getElementById('qrSection').style.display = 'flex';
 };
 
 window.cancelAndBackToPaymentStep1 = async function() {
-    if (window.activePaymentUnsubscribe) {
-        window.activePaymentUnsubscribe();
-        window.activePaymentUnsubscribe = null;
-    }
-
+    if (window.activePaymentUnsubscribe) { window.activePaymentUnsubscribe(); window.activePaymentUnsubscribe = null; }
     if (window.currentActiveOrderId) {
-        const orderIdToCancel = window.currentActiveOrderId;
-        window.currentActiveOrderId = null;
-        try {
-            await updateDoc(doc(db, "payments", orderIdToCancel), {
-                status: "Cancelled",
-                cancelledBy: "User (Back without Payment)",
-                cancelledAt: new Date()
-            });
-        } catch (e) {}
+        const orderIdToCancel = window.currentActiveOrderId; window.currentActiveOrderId = null;
+        try { await updateDoc(doc(db, "payments", orderIdToCancel), { status: "Cancelled", cancelledBy: "User (Back without Payment)", cancelledAt: new Date() }); } catch (e) {}
     }
-
-    document.getElementById('qrSection').style.display = 'none';
-    document.getElementById('paymentStep1').style.display = 'block';
-    alert("पेमेंट प्रोसेस कैंसिल कर दिया गया है (Payment Cancelled)।");
+    document.getElementById('qrSection').style.display = 'none'; document.getElementById('paymentStep1').style.display = 'block'; alert("पेमेंट प्रोसेस कैंसिल कर दिया गया है (Payment Cancelled)।");
 };
 
-window.togglePaymentTicketBox = function() {
-    const box = document.getElementById('paymentIssueTicketBox');
-    if (!box) return;
-    box.style.display = box.style.display === 'none' ? 'block' : 'none';
-};
+window.togglePaymentTicketBox = function() { const box = document.getElementById('paymentIssueTicketBox'); if (!box) return; box.style.display = box.style.display === 'none' ? 'block' : 'none'; };
 
 window.submitPaymentIssueTicket = async function() {
     const rawUtr = document.getElementById('ticketUtrInput')?.value.trim() || '';
@@ -1006,217 +546,29 @@ window.submitPaymentIssueTicket = async function() {
     const resMsg = document.getElementById('paymentTicketResultMsg');
     const btn = document.getElementById('btnRaisePaymentTicket');
 
-    if (!utr || utr.length < 10) {
-        return alert("कृपया अपना 12-अंकों का सही UTR / Reference नंबर दर्ज करें!");
-    }
+    if (!utr || utr.length < 10) return alert("कृपया अपना 12-अंकों का सही UTR / Reference नंबर दर्ज करें!");
+    const origHtml = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> टिकट सबमिट हो रहा है...';
 
-    const origHtml = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> टिकट सबमिट हो रहा है...';
-
-    const totalPaid = window.currentTotalPayable;
-    const creditsReq = window.currentRechargeCredits;
-    const vipDays = window.currentVipDays;
-
-    const ticketMsgText = `💳 [PAYMENT UTR TICKET]\nAmount: ₹${totalPaid}\nCredits: +${creditsReq} Cr${vipDays > 0 ? ` | VIP: +${vipDays}d` : ''}\nUTR No: ${utr}\nOrder ID: ${window.currentActiveOrderId || 'N/A'}\nNote: ऑनलाइन पेमेंट ऑटो-वेरीफाई नहीं हुआ, कृपया चेक करके क्रेडिट जोड़ें।`;
+    const ticketMsgText = `💳 [PAYMENT UTR TICKET]\nAmount: ₹${window.currentTotalPayable}\nCredits: +${window.currentRechargeCredits} Cr${window.currentVipDays > 0 ? ` | VIP: +${window.currentVipDays}d` : ''}\nUTR No: ${utr}\nOrder ID: ${window.currentActiveOrderId || 'N/A'}\nNote: ऑनलाइन पेमेंट ऑटो-वेरीफाई नहीं हुआ, कृपया चेक करके क्रेडिट जोड़ें।`;
 
     try {
-        if (window.currentActiveOrderId) {
-            try {
-                await updateDoc(doc(db, "payments", window.currentActiveOrderId), {
-                    utrNumber: utr,
-                    status: "Pending (Ticket Raised)",
-                    ticketRaisedAt: new Date()
-                });
-            } catch (e) {}
-        }
+        if (window.currentActiveOrderId) { try { await updateDoc(doc(db, "payments", window.currentActiveOrderId), { utrNumber: utr, status: "Pending (Ticket Raised)", ticketRaisedAt: new Date() }); } catch (e) {} }
 
         const uid = window.currentUserData.uid;
         const chatRef = doc(db, "supportTickets", uid);
         const existingMsgs = Array.isArray(window.currentUserChatData?.messages) ? [...window.currentUserChatData.messages] : [];
-        existingMsgs.push({
-            sender: 'user',
-            text: ticketMsgText,
-            time: Date.now()
-        });
+        existingMsgs.push({ sender: 'user', text: ticketMsgText, time: Date.now() });
 
-        await setDoc(chatRef, {
-            type: 'PAYMENT_ISSUE_TICKET',
-            userId: uid,
-            userIdentifier: window.currentUserData.email,
-            username: window.currentUserData.username,
-            message: `💳 Payment UTR Ticket: ₹${totalPaid} (UTR: ${utr})`,
-            status: 'Open',
-            unreadByAdmin: true,
-            unreadByUser: false,
-            timestamp: new Date(),
-            updatedAtMs: Date.now(),
-            messages: existingMsgs
-        }, { merge: true });
-
-        notifyAdminSecurely({
-            type: "PAYMENT_UTR_TICKET",
-            user: window.currentUserData.email,
-            amount: totalPaid,
-            utr: utr
-        });
+        await setDoc(chatRef, { type: 'PAYMENT_ISSUE_TICKET', userId: uid, userIdentifier: window.currentUserData.email, username: window.currentUserData.username, message: `💳 Payment UTR Ticket: ₹${window.currentTotalPayable} (UTR: ${utr})`, status: 'Open', unreadByAdmin: true, unreadByUser: false, timestamp: new Date(), updatedAtMs: Date.now(), messages: existingMsgs }, { merge: true });
+        notifyAdminSecurely({ type: "PAYMENT_UTR_TICKET", user: window.currentUserData.email, amount: window.currentTotalPayable, utr: utr });
 
         resMsg.className = "p-3.5 rounded-xl bg-green-50 border border-green-300 text-green-900 text-xs font-bold text-center space-y-1 mt-2";
-        resMsg.innerHTML = `
-            <div><i class="fa-solid fa-circle-check text-green-600 text-base mr-1"></i> आपका पेमेंट टिकट सफलतापूर्वक रेज़ हो गया है!</div>
-            <p class="text-[11px] text-green-800">आपका UTR नंबर (<strong>${utr}</strong>) दर्ज कर लिया गया है। <strong>24 घंटे के अंदर</strong> आपकी समस्या का समाधान (Resolution) कर दिया जाएगा और क्रेडिट्स आपके वॉलेट में जोड़ दिए जाएंगे।</p>
-        `;
-        resMsg.style.display = 'block';
-        document.getElementById('ticketUtrInput').value = '';
-    } catch (err) {
-        alert("टिकट रेज़ करने में समस्या आई: " + err.message);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = origHtml;
-    }
+        resMsg.innerHTML = `<div><i class="fa-solid fa-circle-check text-green-600 text-base mr-1"></i> आपका पेमेंट टिकट सफलतापूर्वक रेज़ हो गया है!</div><p class="text-[11px] text-green-800">आपका UTR नंबर (<strong>${utr}</strong>) दर्ज कर लिया गया है। <strong>24 घंटे के अंदर</strong> आपकी समस्या का समाधान (Resolution) कर दिया जाएगा और क्रेडिट्स आपके वॉलेट में जोड़ दिए जाएंगे।</p>`;
+        resMsg.style.display = 'block'; document.getElementById('ticketUtrInput').value = '';
+    } catch (err) { alert("टिकट रेज़ करने में समस्या आई: " + err.message); } finally { btn.disabled = false; btn.innerHTML = origHtml; }
 };
 
-
-// ================= USER PAYMENT HISTORY =================
-window.loadUserPayments = async function() {
-    const tbody = document.getElementById('userPaymentsTableBody');
-    if (!tbody) return;
-    tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 font-bold text-xs"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>पेमेंट हिस्ट्री लोड हो रही है...</td></tr>`;
-
-    try {
-        const userDocRef = doc(db, "users", window.currentUserData.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-            const uData = userDoc.data();
-            window.currentUserData.credits = uData.credits || 0;
-            window.currentUserData.vipExpiry = uData.vipExpiry || 0;
-            window.currentUserData.allowDob18 = uData.allowDob18 !== false;
-            const isNowVip = (uData.isVip && (!uData.vipExpiry || uData.vipExpiry > Date.now())) || window.currentUserData.hasFreeAccess;
-            window.currentUserData.isVip = isNowVip;
-            const creditEl = document.getElementById('displayCredits');
-            if (creditEl) creditEl.innerText = window.currentUserData.credits;
-        }
-
-        const validityCard = document.getElementById('userValidityInfoBox');
-        if (validityCard) {
-            const now = Date.now();
-            const exp = window.currentUserData.vipExpiry || 0;
-            const canShowDob = window.canCurrentUserSeeDob18();
-            if (window.currentUserData.isVip && exp > now) {
-                const daysLeft = Math.ceil((exp - now) / window.MS_PER_DAY);
-                const expDateStr = new Date(exp).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-                validityCard.innerHTML = `
-                    <div class="p-3.5 rounded-2xl bg-dark-900 text-white border border-royal-400 flex flex-wrap justify-between items-center gap-2">
-                        <div>
-                            <span class="text-[10px] font-black uppercase bg-amber-400 text-dark-950 px-2 py-0.5 rounded-full"><i class="fa-solid fa-crown mr-1"></i>VIP ACTIVE</span>
-                            <h4 class="text-sm md:text-base font-black text-royal-300 mt-1">VIP वैलिडिटी: <span class="text-white underline">${daysLeft} दिन बाकी हैं</span></h4>
-                            <p class="text-[11px] text-slate-300">समाप्ति: ${expDateStr}</p>
-                        </div>
-                        <button onclick="window.jumpToVipUpgrade(30)" class="bg-royal-500 text-dark-950 font-black px-3 py-2 rounded-xl text-xs">
-                            + वैलिडिटी बढ़ाएं
-                        </button>
-                    </div>
-                `;
-            } else if (window.currentUserData.isVip) {
-                validityCard.innerHTML = `<div class="p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 font-bold text-xs"><i class="fa-solid fa-crown text-amber-500 mr-1"></i> आपका VIP Access एक्टिव है!</div>`;
-            } else {
-                validityCard.innerHTML = `
-                    <div class="p-3.5 rounded-2xl bg-slate-100 border border-slate-200 text-slate-700 flex flex-wrap justify-between items-center gap-2">
-                        <div>
-                            <h4 class="text-xs md:text-sm font-black text-slate-800">अभी कोई VIP प्लान एक्टिव नहीं है (0 दिन)</h4>
-                            <p class="text-[11px] text-slate-500">${canShowDob ? 'DOB 18+ और सारे 9 Annexures' : 'सारे 9 Official Annexures'} अनलॉक करने के लिए VIP लें।</p>
-                        </div>
-                        <button onclick="window.jumpToVipUpgrade(30)" class="bg-dark-900 text-royal-300 font-black px-3 py-2 rounded-xl text-xs">
-                            👑 ₹149 में VIP लें
-                        </button>
-                    </div>
-                `;
-            }
-        }
-
-        const q = query(collection(db, "payments"), where("userId", "==", window.currentUserData.uid));
-        const snap = await getDocs(q);
-
-        window.userPaymentsData = [];
-        snap.forEach(docSnap => {
-            window.userPaymentsData.push({ id: docSnap.id, ...docSnap.data() });
-        });
-
-        window.userPaymentsData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
-
-        let totalTxns = window.userPaymentsData.length;
-        let approvedAmount = 0;
-        let pendingAmount = 0;
-        let pendingCount = 0;
-
-        window.userPaymentsData.forEach(item => {
-            const amt = parseFloat(item.amountPaid) || 0;
-            const st = (item.status || 'Pending').toLowerCase();
-            if (st === 'approved' || st === 'auto-approved') {
-                approvedAmount += amt;
-            } else if (st.includes('pending')) {
-                pendingAmount += amt;
-                pendingCount++;
-            }
-        });
-
-        const elTotalTxns = document.getElementById('sumTotalTxns');
-        const elApprovedAmt = document.getElementById('sumApprovedAmt');
-        const elPendingAmt = document.getElementById('sumPendingAmt');
-        if (elTotalTxns) elTotalTxns.innerText = totalTxns;
-        if (elApprovedAmt) elApprovedAmt.innerText = `₹${approvedAmount}`;
-        if (elPendingAmt) elPendingAmt.innerText = `₹${pendingAmount} (${pendingCount})`;
-
-        if (window.userPaymentsData.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400 font-bold text-xs">अभी तक कोई पेमेंट रिकॉर्ड नहीं मिला।</td></tr>`;
-            return;
-        }
-
-        tbody.innerHTML = '';
-        window.userPaymentsData.forEach(item => {
-            const sec = item.timestamp?.seconds || Math.floor(Date.now() / 1000);
-            const dateObj = new Date(sec * 1000);
-            const dateStr = dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-            const timeStr = dateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-
-            const creditsReq = item.creditsRequested !== undefined ? item.creditsRequested : (item.creditsAdded || 0);
-            const vipDays = item.vipDaysRequested || (item.wantsVip ? 30 : 0);
-
-            let detailsHtml = `<span class="font-bold text-slate-800">+${creditsReq} Cr</span>`;
-            if (vipDays > 0) {
-                detailsHtml += ` <span class="bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded text-[10px] font-black">+${vipDays}d VIP</span>`;
-            }
-
-            const rawStatus = (item.status || 'Pending');
-            let statusBadgeHtml = '';
-            if (rawStatus === 'Approved' || rawStatus === 'Auto-Approved') {
-                statusBadgeHtml = `<span class="bg-green-100 text-green-800 border border-green-300 px-2.5 py-1 rounded-full text-[11px] font-black">सफल (Approved)</span>`;
-            } else if (rawStatus === 'Rejected') {
-                statusBadgeHtml = `<span class="bg-red-100 text-red-700 border border-red-300 px-2.5 py-1 rounded-full text-[11px] font-black">रद्द (Rejected)</span>`;
-            } else if (rawStatus === 'Cancelled') {
-                statusBadgeHtml = `<span class="bg-slate-200 text-slate-700 border border-slate-300 px-2.5 py-1 rounded-full text-[11px] font-black">कैंसिल (Cancelled)</span>`;
-            } else if (rawStatus.includes('Ticket')) {
-                statusBadgeHtml = `<span class="bg-indigo-100 text-indigo-800 border border-indigo-300 px-2.5 py-1 rounded-full text-[11px] font-black">टिकट रेज़्ड (24h Resolution)</span>`;
-            } else {
-                statusBadgeHtml = `<span class="bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-1 rounded-full text-[11px] font-black animate-pulse">पेंडिंग (Pending)</span>`;
-            }
-
-            tbody.innerHTML += `
-                <tr class="border-b border-slate-100 text-xs hover:bg-slate-50">
-                    <td class="p-3 text-slate-600 font-bold">${dateStr}<br><span class="text-[10px] text-slate-400">${timeStr}</span></td>
-                    <td class="p-3 font-black text-sm text-slate-900">₹${item.amountPaid || 0}</td>
-                    <td class="p-3">${detailsHtml}</td>
-                    <td class="p-3 font-mono font-bold text-slate-700">${item.utrNumber || 'ONLINE'}</td>
-                    <td class="p-3 text-right whitespace-nowrap">${statusBadgeHtml}</td>
-                </tr>
-            `;
-        });
-    } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500 font-bold text-xs">लोड करने में समस्या आई।</td></tr>`;
-    }
-};
-
-// --- UPDATED openPdfViewer WITH DIRECT FILE SHARE FOR GOOGLE DRIVE ---
+// ================= NEW DIRECT SHARE LOGIC (FETCH AS BLOB) & MODAL FIX =================
 window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     document.getElementById('pdfViewerTitle').innerText = fileName;
     const iframe = document.getElementById('pdfIframe');
@@ -1229,9 +581,7 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     const shareBtn = document.getElementById('modalShareBtn');
 
     const isAnnexure = String(fileId).startsWith('LOCAL_HTML_');
-    let initialWithStamp = false;
-    let initialStampSrc = '';
-    let initialStampFile = '';
+    let initialWithStamp = false, initialStampSrc = '', initialStampFile = '';
 
     if (historyIndex >= 0) {
         const existingState = window.stampSelectionMap ? window.stampSelectionMap[historyIndex] : null;
@@ -1241,29 +591,18 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     }
 
     if (initialWithStamp && !initialStampSrc && typeof window.preloadAllAvailableStamps === 'function') {
-        if (window.availableStampsList && window.availableStampsList.length === 0) {
-            await window.preloadAllAvailableStamps();
-        }
+        if (window.availableStampsList && window.availableStampsList.length === 0) await window.preloadAllAvailableStamps();
         if(window.pickRandomAvailableStampObj){
             const chosenObj = window.pickRandomAvailableStampObj();
-            initialStampSrc = chosenObj.dataUrl;
-            initialStampFile = chosenObj.name;
+            initialStampSrc = chosenObj.dataUrl; initialStampFile = chosenObj.name;
             if (historyIndex >= 0 && window.stampSelectionMap) {
                 window.stampSelectionMap[historyIndex] = { enabled: true, stampFile: initialStampFile, stampSrc: initialStampSrc };
             }
         }
     }
 
-    window.currentModalContext = {
-        fileId: fileId,
-        fileName: fileName,
-        historyIndex: historyIndex,
-        withStamp: initialWithStamp,
-        stampFile: initialStampFile,
-        stampSrc: initialStampSrc
-    };
+    window.currentModalContext = { fileId: fileId, fileName: fileName, historyIndex: historyIndex, withStamp: initialWithStamp, stampFile: initialStampFile, stampSrc: initialStampSrc };
 
-    // शेयर बटन दिखाएँ
     if (shareBtn) shareBtn.style.display = 'flex';
 
     if (isAnnexure && historyIndex >= 0) {
@@ -1278,23 +617,11 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
         htmlPreviewContainer.style.display = 'flex';
         htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true, initialWithStamp, initialStampSrc);
 
-        if (downloadBtn) {
-            downloadBtn.onclick = async function() {
-                await window.downloadHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc);
-            };
-        }
-        if (printBtn) {
-            printBtn.onclick = function() {
-                window.directPrintDocument(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc);
-            };
-        }
-        if (shareBtn) {
-            shareBtn.onclick = async function() {
-                await window.shareHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc);
-            };
-        }
+        if (downloadBtn) { downloadBtn.onclick = async function() { await window.downloadHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc); }; }
+        if (printBtn) { printBtn.onclick = function() { window.directPrintDocument(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc); }; }
+        if (shareBtn) { shareBtn.onclick = async function() { await window.shareHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc); }; }
     } else {
-        // GOOGLE DRIVE FILES LOGIC (Domicile / Caste)
+        // GOOGLE DRIVE FILES LOGIC (Fetch Blob via Proxy)
         if (modalStampLabel) modalStampLabel.classList.add('hidden');
         
         htmlPreviewContainer.style.display = 'none';
@@ -1303,16 +630,9 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
         spinner.style.display = 'flex';
         iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
         
-        if (downloadBtn) {
-            downloadBtn.onclick = function() {
-                window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank');
-            };
-        }
-        if (printBtn) {
-            printBtn.onclick = function() {
-                window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
-            };
-        }
+        if (downloadBtn) { downloadBtn.onclick = function() { window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank'); }; }
+        if (printBtn) { printBtn.onclick = function() { window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank'); }; }
+        
         if (shareBtn) {
             shareBtn.onclick = async function() {
                 const btn = this;
@@ -1322,11 +642,9 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
 
                 try {
                     if (navigator.canShare) {
-                        // Drive Direct Download URL
                         const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-                        
-                        // CORS Proxy to bypass Google Drive security and fetch the actual PDF blob
-                        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(driveUrl)}`;
+                        // Using CORS proxy to fetch file directly as blob
+                        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(driveUrl)}`;
                         
                         const response = await fetch(proxyUrl);
                         if (!response.ok) throw new Error("Failed to fetch file");
@@ -1337,17 +655,18 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
                         if (navigator.canShare({ files: [file] })) {
                             await navigator.share({
                                 files: [file],
-                                title: fileName
+                                title: fileName,
+                                text: 'यहाँ से अपना डॉक्यूमेंट देखें / डाउनलोड करें:'
                             });
                         } else {
-                            alert('आपका डिवाइस डायरेक्ट फाइल शेयर सपोर्ट नहीं करता।');
+                            alert('आपका डिवाइस डायरेक्ट फाइल शेयर सपोर्ट नहीं करता। कृपया फाइल डाउनलोड करें।');
                         }
                     } else {
-                        alert('आपका ब्राउज़र या कनेक्शन डायरेक्ट शेयर सपोर्ट नहीं करता।');
+                        alert('आपका ब्राउज़र डायरेक्ट शेयर सपोर्ट नहीं करता।');
                     }
                 } catch(e) {
                     console.error("Direct Share Error: ", e);
-                    alert('फाइल को सीधे शेयर करने में समस्या आई। कृपया फाइल डाउनलोड करके शेयर करें।');
+                    alert('फाइल को सीधे शेयर करने में समस्या आई। कृपया ध्यान दें कि Google Apps Script में फाइल की परमिशन "Anyone with link" होनी चाहिए। अगर वह सही है, तो कृपया फाइल डाउनलोड करके शेयर करें।');
                 } finally {
                     btn.innerHTML = origHtml;
                     btn.disabled = false;
@@ -1365,10 +684,16 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
 };
 
 window.closePdfViewer = function() {
-    document.getElementById('pdfViewerModal').style.display = 'none';
-    document.getElementById('pdfIframe').src = '';
-    document.getElementById('htmlDocPreviewContainer').innerHTML = '';
-    document.body.style.overflow = 'auto';
+    const modal = document.getElementById('pdfViewerModal');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.add('hidden');
+    }
+    const iframe = document.getElementById('pdfIframe');
+    if (iframe) iframe.src = '';
+    const htmlContainer = document.getElementById('htmlDocPreviewContainer');
+    if (htmlContainer) htmlContainer.innerHTML = '';
+    document.body.style.overflow = 'auto'; // Fixes scroll lock issue
 };
 
 window.loadUserHistory = async function() {
@@ -1419,7 +744,7 @@ window.renderHistory = function(filterType) {
                 <td class="p-3 text-slate-500 text-[11px] font-medium">${dateStr} <br> ${timeStr}</td>
                 <td class="p-3 text-right whitespace-nowrap">
                     <button onclick="window.openPdfViewer('${data.fileId}', '${data.fileName}', ${data._origIndex})" class="inline-flex items-center gap-1 bg-royal-50 text-royal-700 border border-royal-200 hover:bg-royal-600 hover:text-white px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition shadow-sm">
-                        <i class="fa-solid fa-eye"></i> Preview / Print / PDF
+                        <i class="fa-solid fa-eye"></i> Preview / PDF / Share
                     </button>
                 </td>
             </tr>
@@ -1427,155 +752,43 @@ window.renderHistory = function(filterType) {
     });
 };
 
-function getPaymentHistorySectionHtml() {
-    return `
-        <div class="space-y-4">
-            <div id="userValidityInfoBox"></div>
-
-            <div class="grid grid-cols-3 gap-2 md:gap-4">
-                <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                    <p class="text-[10px] font-bold text-slate-400 uppercase">कुल ट्रांजैक्शन</p>
-                    <p id="sumTotalTxns" class="text-lg md:text-2xl font-black text-dark-900">0</p>
-                </div>
-                <div class="p-3 rounded-xl bg-green-50 border border-green-200">
-                    <p class="text-[10px] font-bold text-green-700 uppercase">सफल (Approved)</p>
-                    <p id="sumApprovedAmt" class="text-lg md:text-2xl font-black text-green-700">₹0</p>
-                </div>
-                <div class="p-3 rounded-xl bg-amber-50 border border-amber-200">
-                    <p class="text-[10px] font-bold text-amber-800 uppercase">पेंडिंग (Pending)</p>
-                    <p id="sumPendingAmt" class="text-lg md:text-2xl font-black text-amber-700">₹0 (0)</p>
-                </div>
-            </div>
-
-            <div>
-                <div class="flex justify-between items-center mb-2">
-                    <h4 class="text-sm md:text-base font-black text-dark-900"><i class="fa-solid fa-receipt text-royal-500 mr-1.5"></i> पेमेंट और VIP हिस्ट्री</h4>
-                    <button onclick="window.loadUserPayments()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold"><i class="fa-solid fa-rotate-right mr-1"></i> Refresh</button>
-                </div>
-                <div class="overflow-x-auto border border-slate-200 rounded-xl">
-                    <table class="w-full text-left border-collapse bg-white min-w-[520px]">
-                        <thead class="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase">
-                            <tr>
-                                <th class="p-3">तारीख (Date)</th>
-                                <th class="p-3">राशि</th>
-                                <th class="p-3">क्रेडिट्स / VIP</th>
-                                <th class="p-3">UTR / Mode</th>
-                                <th class="p-3 text-right">स्टेटस</th>
-                            </tr>
-                        </thead>
-                        <tbody id="userPaymentsTableBody" class="text-xs text-slate-700"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-// ================= MAIN SERVICE SWITCHER (ACTIVE = WHITE, INACTIVE = DARK) =================
 window.switchService = async function(serviceName) {
     const cfg = window.portalConfigState;
     const canShowDob = window.canCurrentUserSeeDob18();
 
-    if (window.currentUserData?.hasFreeAccess && (serviceName === 'add_credit' || serviceName === 'payments_history')) {
-        serviceName = window.getFirstAllowedTab();
-    }
-
+    if (window.currentUserData?.hasFreeAccess && (serviceName === 'add_credit' || serviceName === 'payments_history')) serviceName = window.getFirstAllowedTab();
     if (serviceName === 'domicile' && !cfg.showDomicile) serviceName = window.getFirstAllowedTab();
     else if (serviceName === 'caste' && !cfg.showCaste) serviceName = window.getFirstAllowedTab();
     else if (serviceName === 'dob18' && !canShowDob) serviceName = window.getFirstAllowedTab();
 
     window.currentActiveTab = serviceName;
 
-    // 1. सभी अनसेलेक्टेड बटन्स को थीम के हिसाब से डार्क (Dark) रखें
-    document.querySelectorAll('.service-tab').forEach(btn => {
-        btn.className = "service-tab bg-dark-900 text-royal-300 font-bold py-2.5 px-3 rounded-xl hover:bg-dark-800 transition shadow-sm border border-slate-700 text-xs md:text-sm flex-1 flex justify-center items-center gap-1.5";
-    });
-    document.querySelectorAll('.vip-tab').forEach(btn => {
-        btn.className = "vip-tab bg-dark-800 text-royal-300 border border-royal-500/30 font-bold py-2 px-2.5 rounded-xl hover:bg-dark-700 transition text-[11px] md:text-xs flex items-center justify-center gap-1 shadow-sm";
-    });
+    document.querySelectorAll('.service-tab').forEach(btn => { btn.className = "service-tab bg-dark-900 text-royal-300 font-bold py-2.5 px-3 rounded-xl hover:bg-dark-800 transition shadow-sm border border-slate-700 text-xs md:text-sm flex-1 flex justify-center items-center gap-1.5"; });
+    document.querySelectorAll('.vip-tab').forEach(btn => { btn.className = "vip-tab bg-dark-800 text-royal-300 border border-royal-500/30 font-bold py-2 px-2.5 rounded-xl hover:bg-dark-700 transition text-[11px] md:text-xs flex items-center justify-center gap-1 shadow-sm"; });
 
-    // 🌟 2. जिस बटन पर क्लिक किया गया है (Active), उसे व्हाइट (White) बनाएं
-    // अगर कोई भी एनेक्ज़र सेलेक्ट हुआ है, तो सिर्फ 'All Annexures' वाले टैब को ही हाईलाइट करें
-    let tabIdToHighlight = serviceName;
-    if (serviceName.startsWith('annexure')) {
-        tabIdToHighlight = 'annexures'; 
-    }
-
+    let tabIdToHighlight = serviceName.startsWith('annexure') ? 'annexures' : serviceName;
     const activeBtn = document.getElementById('btn-' + tabIdToHighlight);
     if (activeBtn) {
-        if (activeBtn.classList.contains('vip-tab')) {
-            activeBtn.className = "vip-tab bg-white text-dark-950 font-black py-2 px-2.5 rounded-xl shadow-vip-glow transition text-[11px] md:text-xs flex items-center justify-center gap-1 border-2 border-royal-400";
-        } else {
-            activeBtn.className = "service-tab bg-white text-dark-950 font-black py-2.5 px-3 rounded-xl shadow-glow transition text-xs md:text-sm flex-1 flex justify-center items-center gap-1.5 border-2 border-royal-500";
-        }
+        if (activeBtn.classList.contains('vip-tab')) { activeBtn.className = "vip-tab bg-white text-dark-950 font-black py-2 px-2.5 rounded-xl shadow-vip-glow transition text-[11px] md:text-xs flex items-center justify-center gap-1 border-2 border-royal-400"; } 
+        else { activeBtn.className = "service-tab bg-white text-dark-950 font-black py-2.5 px-3 rounded-xl shadow-glow transition text-xs md:text-sm flex-1 flex justify-center items-center gap-1.5 border-2 border-royal-500"; }
     }
 
     window.applyLivePortalControls();
-
     const container = document.getElementById('formContainer');
     if (!container) return;
 
-    const submitBtnText = window.currentUserData && window.currentUserData.hasFreeAccess 
-        ? 'Generate Document (VIP Free) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' 
-        : 'Generate Document (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>';
-                                                     
-    const statusTagHtml = window.currentUserData && window.currentUserData.hasFreeAccess 
-        ? '<span class="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-[10px] font-black border border-green-300 uppercase"><i class="fa-solid fa-crown mr-1"></i>Lifetime VIP Free</span>' 
-        : (window.currentUserData && window.currentUserData.isVip 
-            ? '<span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-md text-[10px] font-black border border-amber-300 uppercase"><i class="fa-solid fa-crown mr-1"></i>10 Credits</span>' 
-            : '<span class="bg-royal-100 text-royal-900 px-2.5 py-1 rounded-md text-[10px] font-black border border-royal-300 uppercase">10 Credits</span>');
+    const submitBtnText = window.currentUserData && window.currentUserData.hasFreeAccess ? 'Generate Document (VIP Free) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' : 'Generate Document (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>';
+    const statusTagHtml = window.currentUserData && window.currentUserData.hasFreeAccess ? '<span class="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-[10px] font-black border border-green-300 uppercase"><i class="fa-solid fa-crown mr-1"></i>Lifetime VIP Free</span>' : (window.currentUserData && window.currentUserData.isVip ? '<span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-md text-[10px] font-black border border-amber-300 uppercase"><i class="fa-solid fa-crown mr-1"></i>10 Credits</span>' : '<span class="bg-royal-100 text-royal-900 px-2.5 py-1 rounded-md text-[10px] font-black border border-royal-300 uppercase">10 Credits</span>');
 
-    const canShowDobForForm = window.canCurrentUserSeeDob18();
-    if (serviceName === 'dob18' && !canShowDobForForm) {
-        return;
-    }
+    if (serviceName === 'dob18' && !canShowDob) return;
+    if (window.renderServiceFormHtml(serviceName, container, submitBtnText, statusTagHtml)) return;
 
-    // सर्टिफिकेट या Annexure फॉर्म रेंडर करें (portal-forms.js से)
-    if (window.renderServiceFormHtml(serviceName, container, submitBtnText, statusTagHtml)) {
-        return;
-    }
-
-    // LIVE 2-WAY SUPPORT CHAT TAB
     if (serviceName === 'support_chat') {
-        container.innerHTML = `
-            <div class="max-w-2xl mx-auto flex flex-col h-[460px] md:h-[520px] border border-slate-200 rounded-2xl overflow-hidden bg-slate-50 shadow-inner">
-                <div class="bg-dark-950 text-white px-4 py-3 flex justify-between items-center border-b border-royal-500">
-                    <div class="flex items-center gap-2.5">
-                        <div class="w-8 h-8 rounded-xl bg-green-500/20 border border-green-400 text-green-400 flex items-center justify-center">
-                            <i class="fa-solid fa-headset text-sm"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-xs md:text-sm font-black text-white flex items-center gap-1.5">
-                                Live Admin Support Chat
-                                <span class="w-2 h-2 rounded-full bg-green-400 animate-ping"></span>
-                            </h3>
-                            <p class="text-[10px] text-slate-400 font-semibold">User ID: <span class="text-royal-300 font-bold">${window.currentUserData?.email || ''}</span></p>
-                        </div>
-                    </div>
-                    <span class="text-[10px] bg-dark-800 text-royal-300 border border-slate-700 px-2.5 py-1 rounded-lg font-bold">2-Way Live</span>
-                </div>
-
-                <div id="userLiveChatMessagesBox" class="flex-1 p-3.5 md:p-4 overflow-y-auto space-y-3 bg-slate-100/80"></div>
-
-                <form onsubmit="window.sendUserSupportMessage(event)" class="p-3 bg-white border-t border-slate-200 flex gap-2">
-                    <input type="text" id="userSupportChatInput" required placeholder="यहाँ अपनी समस्या या मैसेज लिखें..." class="flex-1 px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs md:text-sm font-semibold bg-slate-50 focus:bg-white focus:border-royal-500 outline-none">
-                    <button type="submit" id="btnSendUserChat" class="bg-dark-900 hover:bg-black text-royal-300 font-black px-5 py-2.5 rounded-xl text-xs md:text-sm shadow-glow transition flex items-center gap-1.5 shrink-0">
-                        <span>Send</span> <i class="fa-solid fa-paper-plane text-xs"></i>
-                    </button>
-                </form>
-            </div>
-        `;
+        container.innerHTML = `<div class="max-w-2xl mx-auto flex flex-col h-[460px] md:h-[520px] border border-slate-200 rounded-2xl overflow-hidden bg-slate-50 shadow-inner"><div class="bg-dark-950 text-white px-4 py-3 flex justify-between items-center border-b border-royal-500"><div class="flex items-center gap-2.5"><div class="w-8 h-8 rounded-xl bg-green-500/20 border border-green-400 text-green-400 flex items-center justify-center"><i class="fa-solid fa-headset text-sm"></i></div><div><h3 class="text-xs md:text-sm font-black text-white flex items-center gap-1.5">Live Admin Support Chat <span class="w-2 h-2 rounded-full bg-green-400 animate-ping"></span></h3><p class="text-[10px] text-slate-400 font-semibold">User ID: <span class="text-royal-300 font-bold">${window.currentUserData?.email || ''}</span></p></div></div><span class="text-[10px] bg-dark-800 text-royal-300 border border-slate-700 px-2.5 py-1 rounded-lg font-bold">2-Way Live</span></div><div id="userLiveChatMessagesBox" class="flex-1 p-3.5 md:p-4 overflow-y-auto space-y-3 bg-slate-100/80"></div><form onsubmit="window.sendUserSupportMessage(event)" class="p-3 bg-white border-t border-slate-200 flex gap-2"><input type="text" id="userSupportChatInput" required placeholder="यहाँ अपनी समस्या या मैसेज लिखें..." class="flex-1 px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs md:text-sm font-semibold bg-slate-50 focus:bg-white focus:border-royal-500 outline-none"><button type="submit" id="btnSendUserChat" class="bg-dark-900 hover:bg-black text-royal-300 font-black px-5 py-2.5 rounded-xl text-xs md:text-sm shadow-glow transition flex items-center gap-1.5 shrink-0"><span>Send</span> <i class="fa-solid fa-paper-plane text-xs"></i></button></form></div>`;
         window.renderUserLiveChatMessages();
-        if (window.currentUserData && window.currentUserChatData?.unreadByUser === true) {
-            try {
-                await updateDoc(doc(db, "supportTickets", window.currentUserData.uid), { unreadByUser: false });
-            } catch (e) {}
-        }
-        const headerBadge = document.getElementById('headerSupportUnreadBadge');
-        const gearBadge = document.getElementById('gearSupportUnreadBadge');
-        if (headerBadge) headerBadge.style.display = 'none';
-        if (gearBadge) gearBadge.style.display = 'none';
-        return;
+        if (window.currentUserData && window.currentUserChatData?.unreadByUser === true) { try { await updateDoc(doc(db, "supportTickets", window.currentUserData.uid), { unreadByUser: false }); } catch (e) {} }
+        const headerBadge = document.getElementById('headerSupportUnreadBadge'); const gearBadge = document.getElementById('gearSupportUnreadBadge');
+        if (headerBadge) headerBadge.style.display = 'none'; if (gearBadge) gearBadge.style.display = 'none'; return;
     }
 
     // ADD CREDITS + VIP PAGE
@@ -1715,97 +928,21 @@ window.switchService = async function(serviceName) {
     }
 
     if (serviceName === 'payments_history') {
-        container.innerHTML = getPaymentHistorySectionHtml();
-        window.loadUserPayments();
-        return;
+        container.innerHTML = `<div class="space-y-4"><div id="userValidityInfoBox"></div><div class="grid grid-cols-3 gap-2 md:gap-4"><div class="p-3 rounded-xl bg-slate-50 border border-slate-200"><p class="text-[10px] font-bold text-slate-400 uppercase">कुल ट्रांजैक्शन</p><p id="sumTotalTxns" class="text-lg md:text-2xl font-black text-dark-900">0</p></div><div class="p-3 rounded-xl bg-green-50 border border-green-200"><p class="text-[10px] font-bold text-green-700 uppercase">सफल (Approved)</p><p id="sumApprovedAmt" class="text-lg md:text-2xl font-black text-green-700">₹0</p></div><div class="p-3 rounded-xl bg-amber-50 border border-amber-200"><p class="text-[10px] font-bold text-amber-800 uppercase">पेंडिंग (Pending)</p><p id="sumPendingAmt" class="text-lg md:text-2xl font-black text-amber-700">₹0 (0)</p></div></div><div><div class="flex justify-between items-center mb-2"><h4 class="text-sm md:text-base font-black text-dark-900"><i class="fa-solid fa-receipt text-royal-500 mr-1.5"></i> पेमेंट और VIP हिस्ट्री</h4><button onclick="window.loadUserPayments()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold"><i class="fa-solid fa-rotate-right mr-1"></i> Refresh</button></div><div class="overflow-x-auto border border-slate-200 rounded-xl"><table class="w-full text-left border-collapse bg-white min-w-[520px]"><thead class="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase"><tr><th class="p-3">तारीख (Date)</th><th class="p-3">राशि</th><th class="p-3">क्रेडिट्स / VIP</th><th class="p-3">UTR / Mode</th><th class="p-3 text-right">स्टेटस</th></tr></thead><tbody id="userPaymentsTableBody" class="text-xs text-slate-700"></tbody></table></div></div></div>`;
+        window.loadUserPayments(); return;
     }
 
     if (serviceName === 'password') {
-        container.innerHTML = `
-            <div class="max-w-md mx-auto">
-                <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                    <div class="flex items-center gap-2.5">
-                        <div class="w-9 h-9 bg-royal-100 text-royal-600 rounded-xl flex items-center justify-center text-base font-bold"><i class="fa-solid fa-key"></i></div>
-                        <div>
-                            <h3 class="text-base font-black text-dark-900">Change Password</h3>
-                            <p class="text-[11px] text-slate-400">पुराना पासवर्ड डालकर नया पासवर्ड सेट करें</p>
-                        </div>
-                    </div>
-                    <button type="button" onclick="window.selectGearOption('support_chat')" class="text-[11px] font-bold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 px-2.5 py-1.5 rounded-xl">
-                        <i class="fa-solid fa-comments mr-1"></i> Support Chat
-                    </button>
-                </div>
-
-                <form onsubmit="window.handleChangePassword(event)" class="space-y-3.5">
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Current Password (पुराना पासवर्ड)</label>
-                        <input type="password" id="currentPassword" required placeholder="Enter current password" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">New Password (नया पासवर्ड)</label>
-                        <input type="password" id="newPassword" required minlength="6" placeholder="Minimum 6 characters" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Confirm New Password (दोबारा लिखें)</label>
-                        <input type="password" id="confirmPassword" required minlength="6" placeholder="Re-enter new password" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none">
-                    </div>
-                    <div id="passwordMsgBox" style="display: none;"></div>
-                    <button type="submit" id="btnChangePass" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-glow transition text-sm">
-                        Update Password <i class="fa-solid fa-lock ml-1"></i>
-                    </button>
-                </form>
-            </div>
-        `;
+        container.innerHTML = `<div class="max-w-md mx-auto"><div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4"><div class="flex items-center gap-2.5"><div class="w-9 h-9 bg-royal-100 text-royal-600 rounded-xl flex items-center justify-center text-base font-bold"><i class="fa-solid fa-key"></i></div><div><h3 class="text-base font-black text-dark-900">Change Password</h3><p class="text-[11px] text-slate-400">पुराना पासवर्ड डालकर नया पासवर्ड सेट करें</p></div></div><button type="button" onclick="window.selectGearOption('support_chat')" class="text-[11px] font-bold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 px-2.5 py-1.5 rounded-xl"><i class="fa-solid fa-comments mr-1"></i> Support Chat</button></div><form onsubmit="window.handleChangePassword(event)" class="space-y-3.5"><div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Current Password (पुराना पासवर्ड)</label><input type="password" id="currentPassword" required placeholder="Enter current password" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none"></div><div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">New Password (नया पासवर्ड)</label><input type="password" id="newPassword" required minlength="6" placeholder="Minimum 6 characters" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none"></div><div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Confirm New Password (दोबारा लिखें)</label><input type="password" id="confirmPassword" required minlength="6" placeholder="Re-enter new password" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none"></div><div id="passwordMsgBox" style="display: none;"></div><button type="submit" id="btnChangePass" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-glow transition text-sm">Update Password <i class="fa-solid fa-lock ml-1"></i></button></form></div>`;
         return;
     }
 
     if (serviceName === 'history') {
         const isVipUser = window.currentUserData && window.currentUserData.isVip;
         const canShowDob = window.canCurrentUserSeeDob18();
-        const domOpt = cfg.showDomicile ? `<option value="Domicile">मूल निवास</option>` : '';
-        const casOpt = cfg.showCaste ? `<option value="Caste">जाति प्रमाण पत्र</option>` : '';
-        const dobOpt = (isVipUser && canShowDob) ? `<option value="DOB 18+">DOB (18+)</option>` : '';
-
-        const vipFilterOptions = isVipUser ? `
-            ${dobOpt}
-            <option value="Annexure 1">Annexure 1</option>
-            <option value="Annexure 1A">Annexure 1A</option>
-            <option value="Annexure 3">Annexure 3</option>
-            <option value="Annexure 3A">Annexure 3A</option>
-            <option value="Annexure B">Annexure B</option>
-            <option value="Annexure C">Annexure C</option>
-            <option value="Annexure D">Annexure D</option>
-            <option value="Annexure E">Annexure E</option>
-            <option value="Annexure F">Annexure F</option>
-        ` : '';
-
-        container.innerHTML = `
-            <div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-100 pb-3 mb-4">
-                <div>
-                    <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-folder-open text-royal-500 mr-1.5"></i> Document History</h3>
-                    <p id="userHistoryCount" class="text-[11px] font-bold text-royal-600">Total Files: 0</p>
-                </div>
-                
-                <div class="flex items-center gap-2">
-                    <select onchange="window.renderHistory(this.value)" class="p-2 border border-slate-200 rounded-xl text-xs bg-slate-50 font-semibold outline-none">
-                        <option value="ALL">All Documents</option>
-                        ${domOpt}
-                        ${casOpt}
-                        ${vipFilterOptions}
-                    </select>
-                    <button onclick="window.loadUserHistory()" class="bg-slate-100 text-slate-600 px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-200"><i class="fa-solid fa-rotate-right"></i></button>
-                </div>
-            </div>
-            
-            <div class="overflow-x-auto border border-slate-200 rounded-xl">
-                <table class="w-full text-left border-collapse bg-white min-w-[500px]">
-                    <thead class="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase">
-                        <tr><th class="p-3">File Name</th><th class="p-3">Type</th><th class="p-3">Date & Time</th><th class="p-3 text-right">Action</th></tr>
-                    </thead>
-                    <tbody id="historyTableBody" class="text-xs text-slate-700"></tbody>
-                </table>
-            </div>
-        `;
+        const domOpt = cfg.showDomicile ? `<option value="Domicile">मूल निवास</option>` : ''; const casOpt = cfg.showCaste ? `<option value="Caste">जाति प्रमाण पत्र</option>` : ''; const dobOpt = (isVipUser && canShowDob) ? `<option value="DOB 18+">DOB (18+)</option>` : '';
+        const vipFilterOptions = isVipUser ? `${dobOpt}<option value="Annexure 1">Annexure 1</option><option value="Annexure 1A">Annexure 1A</option><option value="Annexure 3">Annexure 3</option><option value="Annexure 3A">Annexure 3A</option><option value="Annexure B">Annexure B</option><option value="Annexure C">Annexure C</option><option value="Annexure D">Annexure D</option><option value="Annexure E">Annexure E</option><option value="Annexure F">Annexure F</option>` : '';
+        container.innerHTML = `<div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-100 pb-3 mb-4"><div><h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-folder-open text-royal-500 mr-1.5"></i> Document History</h3><p id="userHistoryCount" class="text-[11px] font-bold text-royal-600">Total Files: 0</p></div><div class="flex items-center gap-2"><select onchange="window.renderHistory(this.value)" class="p-2 border border-slate-200 rounded-xl text-xs bg-slate-50 font-semibold outline-none"><option value="ALL">All Documents</option>${domOpt}${casOpt}${vipFilterOptions}</select><button onclick="window.loadUserHistory()" class="bg-slate-100 text-slate-600 px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-200"><i class="fa-solid fa-rotate-right"></i></button></div></div><div class="overflow-x-auto border border-slate-200 rounded-xl"><table class="w-full text-left border-collapse bg-white min-w-[500px]"><thead class="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase"><tr><th class="p-3">File Name</th><th class="p-3">Type</th><th class="p-3">Date & Time</th><th class="p-3 text-right">Action</th></tr></thead><tbody id="historyTableBody" class="text-xs text-slate-700"></tbody></table></div>`;
         window.loadUserHistory();
     }
 };
