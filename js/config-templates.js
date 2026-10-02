@@ -27,12 +27,47 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// अन्य सभी JS फाइलों के लिए ग्लोबल Firebase ऑब्जेक्ट
 window.fb = {
     firebaseConfig, app, auth, db,
     signInWithEmailAndPassword, signOut, onAuthStateChanged,
     updatePassword, EmailAuthProvider, reauthenticateWithCredential,
     doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, query, where, onSnapshot, deleteDoc
+};
+
+// ================= CUSTOM STYLISH ALERT (OVERRIDE DEFAULT ALERT) =================
+window.alert = function(message) {
+    let alertModal = document.getElementById('customAlertModal');
+    if (!alertModal) {
+        alertModal = document.createElement('div');
+        alertModal.id = 'customAlertModal';
+        alertModal.className = 'fixed inset-0 z-[99999] flex items-center justify-center bg-dark-950/85 backdrop-blur-sm p-4 opacity-0 pointer-events-none transition-all duration-300';
+        alertModal.innerHTML = `
+            <div class="bg-white rounded-3xl shadow-2xl border-t-4 border-royal-500 max-w-sm w-full p-6 text-center transform scale-95 transition-transform duration-300">
+                <div class="mx-auto w-16 h-16 mb-4 flex items-center justify-center rounded-2xl bg-white border border-slate-100 shadow-sm overflow-hidden p-2">
+                    <img src="logo.png" alt="Ojas Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">
+                </div>
+                <h2 class="text-lg font-black text-dark-900 mb-2">Ojas Print Service</h2>
+                <p id="customAlertMessage" class="text-sm font-semibold text-slate-600 mb-6 whitespace-pre-line"></p>
+                <button onclick="window.closeCustomAlert()" class="bg-dark-900 hover:bg-black text-royal-300 font-black py-3 px-6 rounded-xl shadow-glow transition w-full text-sm">
+                    OK, Got it!
+                </button>
+            </div>
+        `;
+        document.body.appendChild(alertModal);
+        
+        window.closeCustomAlert = function() {
+            alertModal.classList.remove('opacity-100', 'pointer-events-auto');
+            alertModal.classList.add('opacity-0', 'pointer-events-none');
+            alertModal.querySelector('div').classList.remove('scale-100');
+            alertModal.querySelector('div').classList.add('scale-95');
+        };
+    }
+    
+    document.getElementById('customAlertMessage').innerText = message;
+    alertModal.classList.remove('opacity-0', 'pointer-events-none');
+    alertModal.classList.add('opacity-100', 'pointer-events-auto');
+    alertModal.querySelector('div').classList.remove('scale-95');
+    alertModal.querySelector('div').classList.add('scale-100');
 };
 
 // ================= STRICT ADMIN, FREE VIP & @print.com CONFIG =================
@@ -387,9 +422,7 @@ window.buildLocalAffidavitHtml = function(fileId, d = {}, withShadow = true, wit
         `;
     }
 
-
-
-if (fileId === 'LOCAL_HTML_ANNEXURE_3') {
+    if (fileId === 'LOCAL_HTML_ANNEXURE_3') {
         return `
             <div class="affidavit-paper ${shadowClass}">
                 ${stampOverlayHtml}
@@ -806,7 +839,6 @@ window.directPrintDocument = async function(fileId, formDataObj, fileName, withS
     }
 };
 
-// ================= NEW: DIRECT MOBILE SHARE AS PDF =================
 window.shareHtmlDocAsPdf = async function(fileId, formDataObj, fileName, withStamp = false, stampSrc = '') {
     const btn = document.getElementById('modalShareBtn');
     const origHtml = btn ? btn.innerHTML : '';
@@ -868,11 +900,3 @@ window.shareHtmlDocAsPdf = async function(fileId, formDataObj, fileName, withSta
         }
     }
 };
-
-
-
-
-
-
-
-    
