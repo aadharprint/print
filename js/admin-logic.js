@@ -347,3 +347,380 @@ window.savePortalSettings = async function(event) {
     const payload = { showDomicile: document.getElementById('chkShowDomicile').checked, showCaste: document.getElementById('chkShowCaste').checked, showDob18: document.getElementById('chkShowDob18').checked, bannerEnabled: document.getElementById('chkBannerEnabled').checked, bannerBadge: document.getElementById('inpBannerBadge').value.trim() || 'UPDATE', bannerTitle: document.getElementById('inpBannerTitle').value.trim(), bannerMessage: document.getElementById('inpBannerMessage').value.trim(), bannerBtnText: document.getElementById('inpBannerBtnText').value.trim(), bannerBtnLink: document.getElementById('inpBannerBtnLink').value.trim(), supportWhatsapp: cleanSupWa, updatedAt: new Date() };
     try { await setDoc(doc(db, "settings", "portalConfig"), payload, { merge: true }); window.adminSupportWhatsapp = cleanSupWa; window.updateStealthStatusPill(); if (msg) { msg.className = "p-3 bg-green-50 text-green-800 border border-green-300 rounded-xl text-xs font-black text-center"; msg.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> पोर्टल सेटिंग्स और बैनर सफलतापूर्वक अपडेट हो गए हैं!`; msg.classList.remove('hidden'); setTimeout(() => msg.classList.add('hidden'), 4000); } } catch (err) { alert("Error saving portal settings: " + err.message); } finally { if (btn) { btn.disabled = false; btn.innerHTML = origText; } }
 };
+window.loadAllPayments = async function() {
+    const container = document.getElementById('adminPaymentsCardsContainer'); container.innerHTML = `<div class="col-span-1 md:col-span-2 p-10 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2 text-royal-500"></i><br>सभी पेमेंट और हिस्ट्री लोड हो रही हैं...</div>`;
+    try { const querySnapshot = await getDocs(collection(db, "payments")); window.allPaymentsData = []; querySnapshot.forEach((docSnap) => { window.allPaymentsData.push({ id: docSnap.id, ...docSnap.data() }); }); window.allPaymentsData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)); window.updatePaymentStatsAndBadges(); window.renderPaymentsByFilter(); } catch (err) { container.innerHTML = `<div class="col-span-1 md:col-span-2 p-6 text-center text-red-500 font-bold bg-white rounded-2xl">Error: ${err.message}</div>`; }
+};
+
+window.updatePaymentStatsAndBadges = function() {
+    let pendingCount = 0, pendingAmt = 0, approvedCount = 0, approvedAmt = 0, rejectedCount = 0, rejectedAmt = 0;
+    window.allPaymentsData.forEach(item => { const amt = parseFloat(item.amountPaid) || 0; const st = (item.status || 'Pending'); if (st === 'Pending' || st.includes('Ticket')) { pendingCount++; pendingAmt += amt; } else if (st === 'Approved' || st === 'Auto-Approved') { approvedCount++; approvedAmt += amt; } else if (st === 'Rejected' || st === 'Cancelled') { rejectedCount++; rejectedAmt += amt; } });
+    document.getElementById('statPendingCount').innerText = `${pendingCount} Requests`; document.getElementById('statPendingAmt').innerText = `₹${pendingAmt}`; document.getElementById('statApprovedCount').innerText = `${approvedCount} Txns`; document.getElementById('statApprovedAmt').innerText = `₹${approvedAmt}`; document.getElementById('statRejectedCount').innerText = `${rejectedCount} Txns`; document.getElementById('statRejectedAmt').innerText = `₹${rejectedAmt}`; document.getElementById('pillCountPending').innerText = pendingCount; document.getElementById('pillCountApproved').innerText = approvedCount; document.getElementById('pillCountRejected').innerText = rejectedCount; document.getElementById('pillCountAll').innerText = window.allPaymentsData.length;
+    const navBadge = document.getElementById('navPendingBadge'); if (navBadge) { navBadge.innerText = pendingCount; navBadge.style.display = pendingCount > 0 ? 'inline-flex' : 'none'; }
+};
+
+window.setPaymentFilter = function(filterStatus) {
+    window.currentPaymentFilter = filterStatus; const filters = ['Pending', 'Approved', 'Rejected', 'ALL'];
+    filters.forEach(f => { const btn = document.getElementById(`filterPill-${f}`); if (!btn) return; if (f === filterStatus) { btn.className = "px-3 py-2.5 rounded-xl text-xs font-black bg-dark-900 text-royal-300 shadow-sm transition flex items-center justify-center gap-1.5 border border-royal-500/40"; } else { btn.className = "px-3 py-2.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition flex items-center justify-center gap-1.5 border border-slate-200"; } });
+    window.renderPaymentsByFilter();
+};
+
+window.renderPaymentsByFilter = function() {
+    const container = document.getElementById('adminPaymentsCardsContainer'); const searchQuery = (document.getElementById('paymentSearchInput')?.value || '').trim().toLowerCase(); const activeFilter = window.currentPaymentFilter;
+    let list = window.allPaymentsData.filter(item => { const st = (item.status || 'Pending'); if (activeFilter === 'Pending' && st !== 'Pending' && !st.includes('Ticket')) return false; if (activeFilter === 'Approved' && st !== 'Approved' && st !== 'Auto-Approved') return false; if (activeFilter === 'Rejected' && st !== 'Rejected' && st !== 'Cancelled') return false; if (searchQuery) { const emailMatch = (item.email || '').toLowerCase().includes(searchQuery); const utrMatch = (item.utrNumber || '').toLowerCase().includes(searchQuery); const amtMatch = String(item.amountPaid || '').includes(searchQuery); return emailMatch || utrMatch || amtMatch; } return true; });
+    container.innerHTML = '';
+    if (list.length === 0) { const emptyTitle = activeFilter === 'Pending' ? 'कोई पेंडिंग पेमेंट या टिकट नहीं है!' : 'इस फिल्टर में कोई पेमेंट रिकॉर्ड नहीं मिला!'; container.innerHTML = `<div class="col-span-1 md:col-span-2 p-10 text-center bg-white rounded-3xl border border-slate-100 shadow-card"><div class="w-14 h-14 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl"><i class="fa-solid fa-receipt"></i></div><h4 class="text-sm font-black text-slate-700">${emptyTitle}</h4><p class="text-xs text-slate-400 font-semibold mt-1">आप ऊपर दिए गए टैब्स से Approved, Rejected या All History देख सकते हैं।</p></div>`; return; }
+
+    list.forEach(data => {
+        const sec = data.timestamp?.seconds || Math.floor(Date.now() / 1000); const dateObj = new Date(sec * 1000); const dateStr = dateObj.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'}); const timeStr = dateObj.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+        const vipDays = data.vipDaysRequested || (data.wantsVip ? 30 : 0); const vipFee = data.vipPlanFee || (data.wantsVip ? 100 : 0); const creditsReq = data.creditsRequested !== undefined ? data.creditsRequested : (data.creditsAdded || 0); const status = data.status || 'Pending';
+        let statusBadge = '', cardBorder = 'border-slate-200';
+        if (status.includes('Ticket')) { statusBadge = `<span class="bg-indigo-100 text-indigo-800 border border-indigo-300 px-2.5 py-0.5 rounded-full text-[10px] font-black animate-pulse"><i class="fa-solid fa-ticket mr-1"></i>UTR Ticket Raised</span>`; cardBorder = 'border-indigo-400'; } else if (status === 'Pending') { statusBadge = `<span class="bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 rounded-full text-[10px] font-black animate-pulse"><i class="fa-solid fa-clock mr-1"></i>Pending</span>`; cardBorder = 'border-amber-300'; } else if (status === 'Approved' || status === 'Auto-Approved') { statusBadge = `<span class="bg-green-100 text-green-800 border border-green-300 px-2.5 py-0.5 rounded-full text-[10px] font-black"><i class="fa-solid fa-check-circle mr-1"></i>Approved</span>`; cardBorder = 'border-green-200'; } else if (status === 'Cancelled') { statusBadge = `<span class="bg-slate-200 text-slate-700 border border-slate-300 px-2.5 py-0.5 rounded-full text-[10px] font-black"><i class="fa-solid fa-ban mr-1"></i>Cancelled by User</span>`; cardBorder = 'border-slate-300'; } else { statusBadge = `<span class="bg-red-100 text-red-700 border border-red-300 px-2.5 py-0.5 rounded-full text-[10px] font-black"><i class="fa-solid fa-circle-xmark mr-1"></i>Rejected</span>`; cardBorder = 'border-red-200'; }
+
+        const vipBanner = vipDays > 0 ? `<div class="flex items-center justify-between bg-amber-50 border border-amber-300 px-3 py-1.5 rounded-xl"><span class="text-[11px] font-black text-amber-900"><i class="fa-solid fa-crown text-amber-500 mr-1"></i> VIP Plan</span><span class="bg-amber-400 text-dark-950 text-[11px] font-black px-2 py-0.5 rounded-full">+${vipDays} Days (₹${vipFee})</span></div>` : `<div class="flex items-center justify-between bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl"><span class="text-[11px] font-bold text-slate-500">Plan Type</span><span class="text-[11px] font-bold text-slate-700">Normal Credit Recharge</span></div>`;
+
+        let actionButtonsHtml = '';
+        if (status === 'Pending' || status.includes('Ticket')) { actionButtonsHtml = `<div class="grid grid-cols-2 gap-2 pt-1"><button onclick="window.approvePayment('${data.id}', '${data.userId}', ${creditsReq}, ${vipDays}, false)" class="bg-green-600 hover:bg-green-700 active:scale-95 text-white py-2.5 rounded-xl text-xs font-black shadow-sm transition flex items-center justify-center gap-1.5"><i class="fa-solid fa-check-circle"></i> Approve</button><button onclick="window.rejectPayment('${data.id}')" class="bg-red-50 hover:bg-red-600 active:scale-95 text-red-600 hover:text-white border border-red-200 py-2.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5"><i class="fa-solid fa-circle-xmark"></i> Reject</button></div>`; } else if (status === 'Rejected' || status === 'Cancelled') { actionButtonsHtml = `<div class="flex items-center gap-2 pt-1"><button onclick="window.approvePayment('${data.id}', '${data.userId}', ${creditsReq}, ${vipDays}, true)" class="flex-1 bg-amber-500 hover:bg-amber-600 active:scale-95 text-dark-950 py-2.5 px-3 rounded-xl text-xs font-black shadow-sm transition flex items-center justify-center gap-1.5"><i class="fa-solid fa-wand-magic-sparkles"></i> Resolve &amp; Approve (+${creditsReq} Cr)</button><button onclick="window.deletePaymentRecord('${data.id}')" class="w-9 h-9 bg-slate-100 hover:bg-red-500 text-slate-500 hover:text-white rounded-xl text-xs transition flex items-center justify-center" title="Delete Record"><i class="fa-solid fa-trash"></i></button></div>`; } else { actionButtonsHtml = `<div class="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px] text-green-700 font-bold"><span><i class="fa-solid fa-circle-check mr-1"></i> क्रेडिट्स और प्लान यूज़र को मिल चुके हैं</span><button onclick="window.deletePaymentRecord('${data.id}')" class="text-slate-400 hover:text-red-600 px-2 py-1 rounded transition" title="Delete History Record"><i class="fa-solid fa-trash"></i></button></div>`; }
+
+        container.innerHTML += `<div class="bg-white rounded-2xl p-4 shadow-card border-2 ${cardBorder} transition flex flex-col justify-between space-y-3"><div class="flex justify-between items-start gap-2 border-b border-slate-100 pb-2.5"><div class="overflow-hidden"><div class="flex items-center gap-1.5 mb-1">${statusBadge}<span class="text-[11px] font-semibold text-slate-400">${dateStr} • ${timeStr}</span></div><p class="text-xs md:text-sm font-black text-dark-900 truncate"><i class="fa-solid fa-user text-royal-500 mr-1"></i> ${data.email}</p></div><div class="text-right shrink-0"><span class="bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-xl text-base md:text-lg font-black block">₹${data.amountPaid || 0}</span></div></div><div class="space-y-2"><div class="flex items-center justify-between bg-slate-100 px-3 py-2 rounded-xl border border-slate-200"><div><span class="text-[9px] font-bold text-slate-400 uppercase block">UTR / Ref Number</span><span class="font-mono font-black text-xs md:text-sm text-slate-900 tracking-wider">${data.utrNumber || 'ONLINE_UPI'}</span></div><button onclick="window.copyUtrText('${data.utrNumber || ''}', this)" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-2.5 py-1 rounded-lg text-[11px] font-bold shadow-sm transition"><i class="fa-regular fa-copy mr-1"></i> Copy</button></div><div class="flex items-center justify-between bg-royal-50/60 border border-royal-200 px-3 py-1.5 rounded-xl"><span class="text-[11px] font-bold text-royal-900">Credits Requested:</span><span class="text-xs font-black text-royal-600">+${creditsReq} Credits</span></div>${vipBanner}</div>${actionButtonsHtml}</div>`;
+    });
+};
+
+window.approvePayment = async function(paymentDocId, userId, creditsToAdd, vipDaysToAdd, isResolution = false) {
+    const titleText = isResolution ? `Resolve & Approve Payment:` : `Approve Payment:`;
+    const confirmMsg = vipDaysToAdd > 0 ? `${titleText}\n• Add +${creditsToAdd} Credits\n• Add +${vipDaysToAdd} Days VIP Access\n\nक्या आप कन्फर्म हैं?` : `${titleText}\n• Add +${creditsToAdd} Credits to this user?\n\nक्या आप कन्फर्म हैं?`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const userRef = doc(db, "users", userId); const userSnap = await getDoc(userRef); let currentCredits = 0, currentExpiry = 0;
+        if (userSnap.exists()) { const uData = userSnap.data(); currentCredits = uData.credits || 0; currentExpiry = uData.vipExpiry || 0; }
+        const newCredits = currentCredits + creditsToAdd; const updatePayload = { credits: newCredits };
+        if (vipDaysToAdd > 0) { const now = Date.now(); const baseTime = (currentExpiry > now) ? currentExpiry : now; updatePayload.isVip = true; updatePayload.vipExpiry = baseTime + (vipDaysToAdd * MS_PER_DAY); }
+        await updateDoc(userRef, updatePayload); await updateDoc(doc(db, "payments", paymentDocId), { status: "Approved", resolvedAt: new Date() });
+        alert(vipDaysToAdd > 0 ? `सफलतापूर्वक अप्रूव हो गया! +${creditsToAdd} Credits और +${vipDaysToAdd} Days VIP वैलिडिटी जोड़ दी गई है!` : `सफलतापूर्वक अप्रूव हो गया! +${creditsToAdd} Credits यूज़र के वॉलेट में जोड़ दिए गए हैं।`);
+        await window.loadAllUsersForDropdown(); window.loadAllPayments();
+    } catch (err) { alert('Error: ' + err.message); }
+};
+window.rejectPayment = async function(paymentDocId) { if (!confirm(`क्या आप इस पेमेंट को REJECT करना चाहते हैं?\n(यह आपकी Rejected History में सेव रहेगा)`)) return; try { await updateDoc(doc(db, "payments", paymentDocId), { status: "Rejected" }); window.loadAllPayments(); } catch (err) {} };
+window.deletePaymentRecord = async function(paymentDocId) { if (!confirm(`क्या आप इस पेमेंट हिस्ट्री रिकॉर्ड को हमेशा के लिए डिलीट करना चाहते हैं?`)) return; try { await deleteDoc(doc(db, "payments", paymentDocId)); window.loadAllPayments(); } catch (err) {} };
+
+// ================= HISTORY, STAMP & NEW CERTIFICATE CHECKBOX LOGIC (WITH CACHE & STRICT DD/MM/YYYY DATE FORMATTING) =================
+window.loadAdminHistory = async function() {
+    const container = document.getElementById('adminHistoryListContainer');
+    container.innerHTML = `<div class="p-10 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>रिकॉर्ड्स लोड हो रहे हैं...</div>`;
+    await window.preloadAllAvailableStamps();
+
+    try {
+        const filterUserDropdown = document.getElementById('filterUser'); const currUserFilter = filterUserDropdown.value; filterUserDropdown.innerHTML = '<option value="ALL">All Users</option>'; filterUserDropdown.innerHTML += `<option value="${window.currentUserData.uid}">👑 Harish Kumar (Admin)</option>`;
+        for (const [uid, data] of Object.entries(window.usersDataList)) { window.allUsersMap[uid] = data.email; if (uid !== window.currentUserData.uid) filterUserDropdown.innerHTML += `<option value="${uid}">${data.email}</option>`; }
+        filterUserDropdown.value = currUserFilter || 'ALL';
+
+        const historySnap = await getDocs(collection(db, "history")); window.adminAllHistoryData = [];
+        historySnap.forEach(docSnap => { window.adminAllHistoryData.push({ id: docSnap.id, ...docSnap.data() }); });
+        window.adminAllHistoryData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+
+        window.stampSelectionMap = {};
+        window.certificateSelectionMap = {};
+
+        window.adminAllHistoryData.forEach((rec, idx) => {
+            if (rec.withStamp) { window.stampSelectionMap[idx] = { enabled: true, stampFile: rec.stampFile || 'stamp.png', stampSrc: window.getStampDataUrlByName(rec.stampFile || 'stamp.png') }; }
+            if (rec.certificateFileId) { window.certificateSelectionMap[idx] = { enabled: true, certificateFileId: rec.certificateFileId }; }
+        });
+        window.renderAdminHistory();
+    } catch (err) {}
+};
+
+window.toggleRowStampCheckbox = async function(origIndex, isChecked) {
+    const record = window.adminAllHistoryData[origIndex]; if (!record) return;
+    if (isChecked) {
+        if (window.availableStampsList.length === 0) await window.preloadAllAvailableStamps();
+        const chosenObj = window.pickRandomAvailableStampObj();
+        window.stampSelectionMap[origIndex] = { enabled: true, stampFile: chosenObj.name, stampSrc: chosenObj.dataUrl };
+        record.withStamp = true; record.stampFile = chosenObj.name;
+        try { await updateDoc(doc(db, "history", record.id), { withStamp: true, stampFile: chosenObj.name, stampedAt: new Date() }); } catch (e) {}
+    } else {
+        window.stampSelectionMap[origIndex] = { enabled: false, stampFile: '', stampSrc: '' }; record.withStamp = false; record.stampFile = '';
+        try { await updateDoc(doc(db, "history", record.id), { withStamp: false, stampFile: '' }); } catch (e) {}
+    }
+    window.renderAdminHistory();
+};
+
+// --- रिलेशन कोड (S/o -> SO) में बदलने वाला फंक्शन ---
+window.formatRelationCodeForScript = function(relStr = '') {
+    const clean = String(relStr).trim().toUpperCase();
+    if (clean.includes('S/') || clean === 'S/O') return 'SO';
+    if (clean.includes('D/') || clean === 'D/O') return 'DO';
+    if (clean.includes('W/') || clean === 'W/O') return 'WO';
+    return 'SO';
+};
+
+// --- (NEW) STRICT DD/MM/YYYY FORMATTER ---
+window.formatDateForCertificate = function(fData) {
+    const months = {
+        "JAN": "01", "FEB": "02", "MAR": "03", "APR": "04", "MAY": "05", "JUN": "06",
+        "JUL": "07", "AUG": "08", "SEP": "09", "OCT": "10", "NOV": "11", "DEC": "12"
+    };
+
+    if (fData.day && fData.monthYear) {
+        // Example: day = "3rd", monthYear = "OCTOBER 2026"
+        let dStr = fData.day.replace(/\D/g, ''); 
+        let d = parseInt(dStr) || 1;
+        let dayNum = d < 10 ? '0' + d : '' + d;
+
+        let parts = fData.monthYear.trim().split(/\s+/);
+        let mStr = (parts[0] || 'JAN').substring(0, 3).toUpperCase();
+        let monthNum = months[mStr] || '01';
+        let yearNum = parts[1] || new Date().getFullYear();
+
+        return `${dayNum}/${monthNum}/${yearNum}`; 
+    } else if (fData.date) {
+        let dStr = fData.date; 
+        if (dStr.includes('-')) {
+            let parts = dStr.split('-');
+            if (parts.length === 3 && parts[0].length === 4) { 
+                return `${parts[2]}/${parts[1]}/${parts[0]}`; 
+            }
+        } else if (dStr.includes('/')) {
+            let parts = dStr.split('/');
+            if (parts.length === 3 && parts[2].length === 4) { 
+                return dStr; 
+            }
+            else if (parts.length === 3 && parts[0].length === 4) { 
+                return `${parts[2]}/${parts[1]}/${parts[0]}`; 
+            }
+        }
+    }
+    
+    // Agar koi format match na ho toh aaj ki date bhej do (DD/MM/YYYY me)
+    let now = new Date();
+    let dd = String(now.getDate()).padStart(2, '0');
+    let mm = String(now.getMonth() + 1).padStart(2, '0');
+    let yyyy = now.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+};
+
+// --- सर्टिफिकेट चेकबॉक्स को हैंडल करने वाला फंक्शन ---
+window.toggleCertificateCheckbox = async function(origIndex, isChecked) {
+    const record = window.adminAllHistoryData[origIndex]; if (!record) return;
+    const checkboxEl = document.getElementById(`certChk-${origIndex}`); if (checkboxEl) checkboxEl.disabled = true;
+
+    if (isChecked) {
+        // Caching Logic: Agar file pehle se mojud hai toh dobara generate mat karo
+        if (record.certificateFileId) {
+            window.certificateSelectionMap[origIndex] = { enabled: true, certificateFileId: record.certificateFileId };
+            if (checkboxEl) checkboxEl.disabled = false;
+            window.renderAdminHistory();
+            return;
+        }
+
+        try {
+            const fData = record.formData || {};
+            const candidateName = fData.applicantName || fData.parentName || fData.childName || fData.newName || 'CUSTOMER';
+            const rawRel = fData.rel || 'S/o';
+            const relationCode = window.formatRelationCodeForScript(rawRel);
+            const fatherName = fData.relativeName || '';
+            const docDate = window.formatDateForCertificate(fData); // <--- Ye sirf DD/MM/YYYY jayega (jaise 03/10/2026)
+
+            const payload = {
+                candidateName: candidateName,
+                relationCode: relationCode,
+                fatherName: fatherName,
+                date: docDate
+            };
+
+            const targetUrl = window.API_URLS["certificate"];
+            if (!targetUrl || targetUrl.includes('yahan_apna_certificate')) {
+                alert('Kripya pehle config-templates.js mein certificate generator ka sahi Web App URL (API_URLS.certificate) darj karein!');
+                if (checkboxEl) { checkboxEl.checked = false; checkboxEl.disabled = false; } return;
+            }
+
+            const response = await fetch(targetUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
+            const resData = await response.json();
+
+            if (resData.success && resData.fileId) {
+                window.certificateSelectionMap[origIndex] = { enabled: true, certificateFileId: resData.fileId };
+                record.certificateFileId = resData.fileId;
+                await updateDoc(doc(db, "history", record.id), { certificateFileId: resData.fileId, certificateAttachedAt: new Date() });
+                alert('सर्टिफिकेट सफलतापूर्वक जनरेट होकर एनेक्सर के साथ अटैच हो गया है!');
+            } else { throw new Error(resData.error || 'सर्टिफिकेट जनरेशन फेल हो गया'); }
+        } catch (err) {
+            alert('सर्टिफिकेट जोड़ने में समस्या आई: ' + err.message); if (checkboxEl) checkboxEl.checked = false;
+        }
+    } else {
+        // Checkbox hatane par sirf map ko disable karo, fileId delete mat karo, taki wapas cache reuse ho sake.
+        window.certificateSelectionMap[origIndex] = { enabled: false, certificateFileId: record.certificateFileId };
+    }
+
+    if (checkboxEl) checkboxEl.disabled = false; window.renderAdminHistory();
+};
+
+window.renderAdminHistory = function() {
+    const container = document.getElementById('adminHistoryListContainer');
+    const fUser = document.getElementById('filterUser').value; const fType = document.getElementById('filterType').value;
+    const indexedData = window.adminAllHistoryData.map((item, idx) => ({ ...item, _origIndex: idx }));
+    let filteredData = indexedData;
+    if (fUser !== 'ALL') filteredData = filteredData.filter(item => item.userId === fUser);
+    if (fType !== 'ALL') filteredData = filteredData.filter(item => item.serviceType === fType);
+
+    document.getElementById('historyCount').innerText = `Total Files: ${filteredData.length}`; container.innerHTML = '';
+    if (filteredData.length === 0) { container.innerHTML = `<div class="p-10 text-center text-slate-400 bg-white rounded-2xl border border-slate-100"><i class="fa-regular fa-folder-open text-4xl mb-2 text-slate-300"></i><br>कोई फाइल नहीं मिली।</div>`; return; }
+
+    filteredData.forEach(data => {
+        const sec = data.timestamp?.seconds || Math.floor(Date.now() / 1000); const dateObj = new Date(sec * 1000);
+        const dateStr = dateObj.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'}); const timeStr = dateObj.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+        const userBadge = (data.userId === window.currentUserData.uid) ? '<span class="text-royal-700 font-black bg-royal-100 px-2 py-0.5 rounded text-[10px] border border-royal-200">👑 Admin</span>' : `<span class="font-bold text-slate-600 text-xs">${window.allUsersMap[data.userId] || 'User'}</span>`;
+        const safeFileName = String(data.fileName || 'Document.pdf').replace(/'/g, "\\'");
+        
+        const isAnnexure = String(data.fileId || '').startsWith('LOCAL_HTML_');
+        const stampState = window.stampSelectionMap[data._origIndex]; const isStampChecked = !!(stampState && stampState.enabled);
+        const certState = window.certificateSelectionMap[data._origIndex] || { enabled: !!data.certificateFileId, certificateFileId: data.certificateFileId || '' }; const isCertChecked = !!certState.enabled;
+
+        const certificateCheckboxHtml = isAnnexure ? `
+            <label class="inline-flex items-center gap-1.5 ${isCertChecked ? 'bg-indigo-100 text-indigo-900 border-indigo-400' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'} border px-2.5 py-2 rounded-xl text-xs font-black cursor-pointer select-none transition shadow-sm" title="सर्टिफिकेट ऑटोमैटिक जनरेट करके अटैच करें">
+                <input type="checkbox" id="certChk-${data._origIndex}" ${isCertChecked ? 'checked' : ''} onchange="window.toggleCertificateCheckbox(${data._origIndex}, this.checked)" class="w-4 h-4 accent-indigo-600 rounded cursor-pointer">
+                <span><i class="fa-solid fa-certificate ${isCertChecked ? 'text-indigo-700' : 'text-slate-500'} mr-0.5"></i> ${isCertChecked ? 'Cert Attached' : 'Attach Cert'}</span>
+            </label>
+        ` : '';
+
+        const stampCheckboxHtml = isAnnexure ? `
+            <label class="inline-flex items-center gap-1.5 ${isStampChecked ? 'bg-green-100 text-green-900 border-green-400' : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'} border px-2.5 py-2 rounded-xl text-xs font-black cursor-pointer select-none transition shadow-sm">
+                <input type="checkbox" id="stampChk-${data._origIndex}" ${isStampChecked ? 'checked' : ''} onchange="window.toggleRowStampCheckbox(${data._origIndex}, this.checked)" class="w-4 h-4 accent-green-600 rounded cursor-pointer">
+                <span><i class="fa-solid fa-stamp ${isStampChecked ? 'text-green-700' : 'text-amber-600'} mr-0.5"></i> ${isStampChecked ? 'Stamped for User' : 'Apply Stamp'}</span>
+            </label>
+        ` : '';
+
+        container.innerHTML += `
+            <div class="bg-white p-3.5 md:p-4 rounded-2xl border ${isStampChecked || isCertChecked ? 'border-royal-300 bg-slate-50/50' : 'border-slate-200'} shadow-sm flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3 hover:border-royal-400 transition">
+                <div class="space-y-1 overflow-hidden w-full">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-md text-[10px] font-black uppercase">${data.serviceType}</span>
+                        ${userBadge}
+                        <span class="text-[11px] text-slate-400 font-medium ml-auto xl:ml-0">${dateStr} • ${timeStr}</span>
+                    </div>
+                    <p class="font-black text-slate-800 text-xs md:text-sm truncate">${data.fileName}</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-end shrink-0 border-t xl:border-t-0 pt-2 xl:pt-0 border-slate-100">
+                    ${certificateCheckboxHtml}
+                    ${stampCheckboxHtml}
+                    <button onclick="window.openPdfViewer('${data.fileId}', '${safeFileName}', ${data._origIndex})" class="flex-1 sm:flex-initial justify-center inline-flex items-center gap-1.5 bg-royal-50 text-royal-700 px-3 py-2 rounded-xl text-xs font-black hover:bg-royal-50 hover:text-white transition border border-royal-200"><i class="fa-solid fa-eye"></i> Preview</button>
+                    <button onclick="window.triggerDirectPrintByIndex(${data._origIndex}, this)" class="inline-flex items-center justify-center gap-1 bg-amber-500 hover:bg-amber-600 text-dark-950 px-3 py-2 rounded-xl text-xs font-black transition shadow-sm"><i class="fa-solid fa-print"></i> Print</button>
+                    <button onclick="window.deleteHistoryRecord('${data.id}')" class="w-9 h-9 inline-flex items-center justify-center bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition border border-red-100"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            </div>
+        `;
+    });
+};
+
+window.deleteHistoryRecord = async function(docId) { if (!confirm('क्या आप इस फाइल को हमेशा के लिए डिलीट करना चाहते हैं?')) return; try { await deleteDoc(doc(db, "history", docId)); window.loadAdminHistory(); } catch (err) {} };
+
+window.bulkDeleteFilteredHistory = async function() {
+    const fUser = document.getElementById('filterUser').value; const fType = document.getElementById('filterType').value;
+    let filteredData = window.adminAllHistoryData;
+    if (fUser !== 'ALL') filteredData = filteredData.filter(item => item.userId === fUser); if (fType !== 'ALL') filteredData = filteredData.filter(item => item.serviceType === fType);
+    if (filteredData.length === 0) return alert('डिलीट करने के लिए कोई फाइल नहीं है!');
+    if (!confirm(`चेतावनी!\nक्या आप वाकई इन ${filteredData.length} फाइलों को हमेशा के लिए डिलीट करना चाहते हैं?`)) return;
+    const btn = document.getElementById('bulkDeleteBtn'); const origHTML = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Deleting...'; btn.disabled = true;
+    try { await Promise.all(filteredData.map(item => deleteDoc(doc(db, "history", item.id)))); alert(`Success! ${filteredData.length} फाइलें डिलीट कर दी गईं।`); window.loadAdminHistory(); } catch (err) {} finally { btn.innerHTML = origHTML; btn.disabled = false; }
+};
+
+window.triggerDirectPrintByIndex = async function(historyIndex, btnEl) {
+    const record = window.adminAllHistoryData[historyIndex]; if (!record) return;
+    const stampState = window.stampSelectionMap[historyIndex]; const withStamp = !!(stampState && stampState.enabled); let chosenSrc = stampState?.stampSrc || '';
+    if (withStamp && !chosenSrc) {
+        if (window.availableStampsList.length === 0) await window.preloadAllAvailableStamps();
+        const chosenObj = window.pickRandomAvailableStampObj(); chosenSrc = chosenObj.dataUrl; window.stampSelectionMap[historyIndex] = { enabled: true, stampFile: chosenObj.name, stampSrc: chosenSrc };
+    }
+    const certState = window.certificateSelectionMap[historyIndex]; const certFileId = certState?.certificateFileId || '';
+    window.directPrintDocument(record.fileId, record.formData || {}, record.fileName || 'Document.pdf', withStamp, chosenSrc, certFileId);
+};
+
+window.toggleModalStampPreview = async function(isChecked) {
+    const ctx = window.currentModalContext; if (!ctx || !String(ctx.fileId).startsWith('LOCAL_HTML_')) return;
+    if (isChecked) { if (window.availableStampsList.length === 0) await window.preloadAllAvailableStamps(); const chosenObj = window.pickRandomAvailableStampObj(); ctx.withStamp = true; ctx.stampFile = chosenObj.name; ctx.stampSrc = chosenObj.dataUrl; } else { ctx.withStamp = false; ctx.stampFile = ''; ctx.stampSrc = ''; }
+    if (ctx.historyIndex >= 0) { window.stampSelectionMap[ctx.historyIndex] = { enabled: ctx.withStamp, stampFile: ctx.stampFile, stampSrc: ctx.stampSrc }; const record = window.adminAllHistoryData[ctx.historyIndex]; if (record) { record.withStamp = ctx.withStamp; record.stampFile = ctx.stampFile; try { await updateDoc(doc(db, "history", record.id), { withStamp: ctx.withStamp, stampFile: ctx.stampFile || '', stampedAt: new Date() }); } catch (e) {} } window.renderAdminHistory(); }
+    const record = window.adminAllHistoryData[ctx.historyIndex]; const fData = record?.formData || {}; const htmlPreviewContainer = document.getElementById('htmlDocPreviewContainer');
+    htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(ctx.fileId, fData, true, ctx.withStamp, ctx.stampSrc);
+};
+
+window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
+    document.getElementById('pdfViewerTitle').innerText = fileName;
+    const iframe = document.getElementById('pdfIframe'); const htmlPreviewContainer = document.getElementById('htmlDocPreviewContainer');
+    const spinner = document.getElementById('pdfLoadingSpinner'); const downloadBtn = document.getElementById('modalDownloadBtn');
+    const printBtn = document.getElementById('modalPrintBtn'); const modalStampLabel = document.getElementById('modalStampToggleLabel');
+    const modalStampCheckbox = document.getElementById('modalStampCheckbox'); const shareBtn = document.getElementById('modalShareBtn');
+
+    const isAnnexure = String(fileId).startsWith('LOCAL_HTML_');
+    let initialWithStamp = false, initialStampSrc = '', initialStampFile = '', initialCertFileId = '';
+
+    if (historyIndex >= 0) {
+        const existingState = window.stampSelectionMap ? window.stampSelectionMap[historyIndex] : null;
+        initialWithStamp = !!(existingState && existingState.enabled); initialStampSrc = existingState?.stampSrc || ''; initialStampFile = existingState?.stampFile || '';
+        const existingCert = window.certificateSelectionMap ? window.certificateSelectionMap[historyIndex] : null;
+        initialCertFileId = existingCert?.certificateFileId || '';
+    }
+
+    if (initialWithStamp && !initialStampSrc && typeof window.preloadAllAvailableStamps === 'function') {
+        if (window.availableStampsList && window.availableStampsList.length === 0) await window.preloadAllAvailableStamps();
+        if(window.pickRandomAvailableStampObj){ const chosenObj = window.pickRandomAvailableStampObj(); initialStampSrc = chosenObj.dataUrl; initialStampFile = chosenObj.name; if (historyIndex >= 0 && window.stampSelectionMap) { window.stampSelectionMap[historyIndex] = { enabled: true, stampFile: initialStampFile, stampSrc: initialStampSrc }; } }
+    }
+
+    window.currentModalContext = { fileId: fileId, fileName: fileName, historyIndex: historyIndex, withStamp: initialWithStamp, stampFile: initialStampFile, stampSrc: initialStampSrc, certificateFileId: initialCertFileId };
+    if (shareBtn) shareBtn.style.display = 'none';
+
+    const previewParent = iframe.parentElement;
+    previewParent.classList.add('flex', 'flex-col');
+
+    if (isAnnexure && historyIndex >= 0) {
+        if (shareBtn) shareBtn.style.display = 'flex';
+        if (modalStampLabel) modalStampLabel.classList.remove('hidden');
+        if (modalStampCheckbox) modalStampCheckbox.checked = initialWithStamp;
+
+        const record = (window.historyData && window.historyData[historyIndex]) || (window.adminAllHistoryData && window.adminAllHistoryData[historyIndex]);
+        const fData = record?.formData || {};
+        
+        spinner.style.display = 'none';
+        
+        if (initialCertFileId) {
+            iframe.style.display = 'block';
+            iframe.style.flex = '1';
+            iframe.style.minHeight = '350px';
+            iframe.style.borderBottom = '4px solid #cbd5e1';
+            iframe.src = `https://drive.google.com/file/d/${initialCertFileId}/preview`;
+            
+            htmlPreviewContainer.style.display = 'flex';
+            htmlPreviewContainer.style.flex = '1';
+            htmlPreviewContainer.style.minHeight = '350px';
+            htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true, initialWithStamp, initialStampSrc);
+        } else {
+            iframe.style.display = 'none';
+            htmlPreviewContainer.style.display = 'flex';
+            htmlPreviewContainer.style.flex = '1';
+            htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true, initialWithStamp, initialStampSrc);
+        }
+
+        if (downloadBtn) { downloadBtn.onclick = async function() { await window.downloadHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc, window.currentModalContext.certificateFileId); }; }
+        if (printBtn) { printBtn.onclick = function() { window.directPrintDocument(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc, window.currentModalContext.certificateFileId); }; }
+        if (shareBtn) { shareBtn.onclick = async function() { await window.shareHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc, window.currentModalContext.certificateFileId); }; }
+    } else {
+        if (modalStampLabel) modalStampLabel.classList.add('hidden');
+        if (shareBtn) shareBtn.style.display = 'none'; 
+        
+        htmlPreviewContainer.style.display = 'none'; htmlPreviewContainer.innerHTML = '';
+        iframe.style.display = 'block'; iframe.style.flex = '1'; spinner.style.display = 'flex';
+        iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
+        
+        if (downloadBtn) { downloadBtn.onclick = function() { window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank'); }; }
+        if (printBtn) { printBtn.onclick = function() { window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank'); }; }
+    }
+    const modal = document.getElementById('pdfViewerModal'); if (modal) { modal.style.display = 'flex'; modal.classList.remove('hidden'); } document.body.style.overflow = 'hidden';
+};
+
+window.closePdfViewer = function() { const modal = document.getElementById('pdfViewerModal'); if (modal) { modal.style.display = 'none'; modal.classList.add('hidden'); } const iframe = document.getElementById('pdfIframe'); if (iframe) iframe.src = ''; const htmlContainer = document.getElementById('htmlDocPreviewContainer'); if (htmlContainer) htmlContainer.innerHTML = ''; document.body.style.overflow = 'auto'; };
+window.switchAdminMainTab = function(tabName) { const tabs = ['payments', 'users', 'create_user', 'support', 'history', 'controls']; tabs.forEach(t => { const btn = document.getElementById(`tab-${t}`); if (btn) btn.className = "bg-slate-50 text-slate-600 font-bold py-2.5 px-3 rounded-xl hover:bg-slate-100 transition border border-slate-200/80 text-xs flex justify-center items-center gap-1.5"; const section = document.getElementById(`section-${t}`); if (section) section.classList.add('hidden'); }); const activeBtn = document.getElementById(`tab-${tabName}`); if (activeBtn) activeBtn.className = "bg-dark-950 text-royal-300 font-black py-2.5 px-3 rounded-xl shadow-glow transition text-xs flex justify-center items-center gap-1.5 border border-royal-500/50"; const activeSection = document.getElementById(`section-${tabName}`); if (activeSection) { activeSection.removeAttribute('class'); if (tabName === 'payments') activeSection.className = 'space-y-4'; if (tabName === 'users') activeSection.className = 'space-y-4'; if (tabName === 'create_user') activeSection.className = 'block'; if (tabName === 'support') activeSection.className = 'space-y-4'; if (tabName === 'history') activeSection.className = 'space-y-4'; if (tabName === 'controls') activeSection.className = 'grid grid-cols-1 md:grid-cols-2 gap-4'; } if (tabName === 'payments') window.loadAllPayments(); if (tabName === 'support') { window.populateSupportUserDropdown(); window.renderSupportChatSidebar(); if (!window.selectedChatTicketId && window.allSupportTickets.length > 0) window.selectSupportChatThread(window.allSupportTickets[0].id); } if (tabName === 'history') window.loadAdminHistory(); if (tabName === 'controls') window.loadPortalSettingsForAdmin(); };
+
+window.loadAllUsersForDropdown = async function() { try { const querySnapshot = await getDocs(collection(db, "users")); window.usersDataList = {}; window.allUsersMap = {}; const selectDropdown = document.getElementById('userSelectDropdown'); if (selectDropdown) { selectDropdown.innerHTML = '<option value="">-- किसी यूज़र को चुनें --</option>'; } querySnapshot.forEach((docSnap) => { const data = docSnap.data(); window.usersDataList[docSnap.id] = data; window.allUsersMap[docSnap.id] = data.email || 'Unknown User'; if (selectDropdown && (data.email || '').toLowerCase() !== ADMIN_EMAIL.toLowerCase()) { selectDropdown.innerHTML += `<option value="${docSnap.id}">${data.email} (${data.userPhone || 'No Phone'})</option>`; } }); if (typeof window.populateSupportUserDropdown === 'function') { window.populateSupportUserDropdown(); } } catch (err) {} };
+window.handleUserSelection = function() { const uid = document.getElementById('userSelectDropdown').value; if (!uid || !window.usersDataList[uid]) { document.getElementById('currentUserCreditsDisplay').innerText = '--'; document.getElementById('selectedUserVipBadge').innerText = '--'; if(document.getElementById('selectedUserPhoneInput')) document.getElementById('selectedUserPhoneInput').value = ''; if(document.getElementById('selectedUserSavedPass')) document.getElementById('selectedUserSavedPass').innerText = '--'; return; } const uData = window.usersDataList[uid]; document.getElementById('currentUserCreditsDisplay').innerText = uData.credits || 0; const now = Date.now(); let vipStatus = "Normal User"; if (uData.isVip) { if (uData.vipExpiry && uData.vipExpiry > now) { const days = Math.ceil((uData.vipExpiry - now) / MS_PER_DAY); vipStatus = `👑 VIP (${days} Days)`; } else if (!uData.vipExpiry) { vipStatus = "👑 VIP (Lifetime)"; } else { vipStatus = "Expired VIP"; } } document.getElementById('selectedUserVipBadge').innerText = vipStatus; if(document.getElementById('selectedUserPhoneInput')) document.getElementById('selectedUserPhoneInput').value = uData.userPhone || ''; if(document.getElementById('selectedUserSavedPass')) document.getElementById('selectedUserSavedPass').innerText = uData.userPass || 'Not Set'; if(document.getElementById('userDobToggle')) document.getElementById('userDobToggle').checked = uData.allowDob18 !== false; };
+window.adminSetNewUserPassword = async function() { const uid = document.getElementById('userSelectDropdown').value; if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले यूज़र चुनें!'); const newPass = document.getElementById('adminNewResetPass').value.trim(); if (newPass.length < 6) return alert('पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!'); const btn = document.getElementById('btnAdminSetPass'); const orig = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; btn.disabled = true; try { const uData = window.usersDataList[uid]; if (uData.userPass) { try { const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: uData.email, password: uData.userPass, returnSecureToken: true }) }); const signInData = await signInRes.json(); if (signInData.idToken) { await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${firebaseConfig.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: signInData.idToken, password: newPass, returnSecureToken: true }) }); } } catch (e) { } } await updateDoc(doc(db, "users", uid), { userPass: newPass, adminResetPass: newPass, passUpdatedAt: new Date() }); window.usersDataList[uid].userPass = newPass; document.getElementById('selectedUserSavedPass').innerText = newPass; document.getElementById('adminNewResetPass').value = ''; alert('पासवर्ड सफलतापूर्वक बदल दिया गया है!'); } catch (err) { alert('Error: ' + err.message); } finally { btn.innerHTML = orig; btn.disabled = false; } };
+window.adminUpdateVipDays = async function(daysToAdd) { const uid = document.getElementById('userSelectDropdown').value; if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले यूज़र चुनें!'); const uData = window.usersDataList[uid]; let newIsVip = false; let newExpiry = 0; const now = Date.now(); if (daysToAdd > 0) { newIsVip = true; const baseTime = (uData.vipExpiry && uData.vipExpiry > now) ? uData.vipExpiry : now; newExpiry = baseTime + (daysToAdd * MS_PER_DAY); } try { await updateDoc(doc(db, "users", uid), { isVip: newIsVip, vipExpiry: newExpiry }); window.usersDataList[uid].isVip = newIsVip; window.usersDataList[uid].vipExpiry = newExpiry; window.handleUserSelection(); alert(daysToAdd > 0 ? `VIP ${daysToAdd} दिन के लिए बढ़ा दिया गया है!` : `VIP हटा दिया गया है।`); } catch (err) { alert('Error: ' + err.message); } };
+window.adjustCredits = async function(action) { const uid = document.getElementById('userSelectDropdown').value; if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले यूज़र चुनें!'); const amtVal = parseInt(document.getElementById('creditAdjustmentAmount').value); if (isNaN(amtVal) || amtVal <= 0) return alert('कृपया सही क्रेडिट वैल्यू डालें!'); const uData = window.usersDataList[uid]; let currentCredits = uData.credits || 0; let newCredits = action === 'add' ? currentCredits + amtVal : currentCredits - amtVal; if (newCredits < 0) newCredits = 0; try { await updateDoc(doc(db, "users", uid), { credits: newCredits }); window.usersDataList[uid].credits = newCredits; window.handleUserSelection(); document.getElementById('creditAdjustmentAmount').value = ''; alert(`क्रेडिट्स सफलतापूर्वक ${action === 'add' ? 'जोड़' : 'घटा'} दिए गए हैं!`); } catch (err) { alert('Error: ' + err.message); } };
+window.createNewUserByAdmin = async function(e) { e.preventDefault(); const emailInp = document.getElementById('newAdminUserEmail').value.trim().toLowerCase(); const pass = document.getElementById('newAdminUserPass').value.trim(); const phone = document.getElementById('newAdminUserPhone').value.trim(); const credits = parseInt(document.getElementById('newAdminUserCredits').value) || 0; const vipDays = parseInt(document.getElementById('newAdminUserVipDays').value) || 0; const msg = document.getElementById('adminCreateMsg'); const email = emailInp.includes('@') ? emailInp : `${emailInp}@print.com`; if (pass.length < 6) return alert('पासवर्ड 6 अक्षरों का होना चाहिए!'); msg.className = "p-3 bg-blue-50 text-blue-800 rounded-xl text-xs font-bold text-center"; msg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating user account...'; msg.classList.remove('hidden'); try { const signUpRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email, password: pass, returnSecureToken: true }) }); const signUpData = await signUpRes.json(); if (signUpData.error) throw new Error(signUpData.error.message); const uid = signUpData.localId; const now = Date.now(); const isVip = vipDays > 0; const vipExpiry = isVip ? now + (vipDays * MS_PER_DAY) : 0; await setDoc(doc(db, "users", uid), { email: email, username: email.split('@')[0], credits: credits, isVip: isVip, vipExpiry: vipExpiry, allowDob18: true, userPass: pass, adminResetPass: pass, userPhone: phone, createdAt: new Date() }); await window.loadAllUsersForDropdown(); msg.className = "p-3.5 bg-green-50 text-green-900 border border-green-300 rounded-xl text-xs font-black text-center"; msg.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> यूज़र <strong>${email}</strong> सफलतापूर्वक बन गया है!`; e.target.reset(); setTimeout(() => msg.classList.add('hidden'), 5000); } catch (err) { msg.className = "p-3 bg-red-50 text-red-800 border border-red-300 rounded-xl text-xs font-bold text-center"; msg.innerText = "Error: " + err.message; } };
