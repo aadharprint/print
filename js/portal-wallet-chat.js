@@ -568,6 +568,7 @@ window.submitPaymentIssueTicket = async function() {
     } catch (err) { alert("टिकट रेज़ करने में समस्या आई: " + err.message); } finally { btn.disabled = false; btn.innerHTML = origHtml; }
 };
 
+// ================= NEW DIRECT SHARE LOGIC WITH ERROR PREVENTION =================
 window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     document.getElementById('pdfViewerTitle').innerText = fileName;
     const iframe = document.getElementById('pdfIframe');
@@ -602,9 +603,11 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
 
     window.currentModalContext = { fileId: fileId, fileName: fileName, historyIndex: historyIndex, withStamp: initialWithStamp, stampFile: initialStampFile, stampSrc: initialStampSrc };
 
+    // शुरुआत में Share बटन को छिपा दें (Hidden)
     if (shareBtn) shareBtn.style.display = 'none';
 
     if (isAnnexure && historyIndex >= 0) {
+        // यह Annexure है, यहाँ Share बटन दिखाएँ
         if (shareBtn) shareBtn.style.display = 'flex';
         
         if (modalStampLabel) modalStampLabel.classList.remove('hidden');
@@ -622,6 +625,8 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
         if (printBtn) { printBtn.onclick = function() { window.directPrintDocument(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc); }; }
         if (shareBtn) { shareBtn.onclick = async function() { await window.shareHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc); }; }
     } else {
+        // GOOGLE DRIVE FILES LOGIC (Domicile, Caste, DOB)
+        // यहाँ Share बटन पूरी तरह से छिपा रहेगा, जिससे एरर नहीं आएगी
         if (modalStampLabel) modalStampLabel.classList.add('hidden');
         if (shareBtn) shareBtn.style.display = 'none'; 
         
@@ -697,23 +702,16 @@ window.renderHistory = function(filterType) {
             ? `<span class="bg-green-100 text-green-800 border border-green-300 px-2 py-0.5 rounded-full text-[10px] font-black ml-1.5"><i class="fa-solid fa-stamp mr-0.5"></i>Stamped</span>`
             : '';
         
-        let actionHtml = '';
-        if (data.status === 'Pending' || data.fileId === 'PENDING') {
-            actionHtml = `<span class="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1.5 rounded-lg text-[11px] font-bold"><i class="fa-solid fa-spinner fa-spin"></i> Processing...</span>`;
-        } else if (data.status === 'Failed' || data.fileId === 'FAILED') {
-            actionHtml = `<span class="inline-flex items-center gap-1 bg-red-50 text-red-600 border border-red-200 px-2.5 py-1.5 rounded-lg text-[11px] font-bold" title="${data.errorMsg || 'Timeout / Server Error'}"><i class="fa-solid fa-triangle-exclamation"></i> Failed</span>`;
-        } else {
-            actionHtml = `<button onclick="window.openPdfViewer('${data.fileId}', '${data.fileName}', ${data._origIndex})" class="inline-flex items-center gap-1 bg-royal-50 text-royal-700 border border-royal-200 hover:bg-royal-600 hover:text-white px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition shadow-sm">
-                            <i class="fa-solid fa-eye"></i> Preview / PDF
-                        </button>`;
-        }
-        
         historyContainer.innerHTML += `
             <tr class="border-b border-slate-100 text-xs hover:bg-slate-50 transition">
                 <td class="p-3 font-bold text-slate-800">${data.fileName}${stampBadgeHtml}</td>
                 <td class="p-3"><span class="bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">${data.serviceType}</span></td>
                 <td class="p-3 text-slate-500 text-[11px] font-medium">${dateStr} <br> ${timeStr}</td>
-                <td class="p-3 text-right whitespace-nowrap">${actionHtml}</td>
+                <td class="p-3 text-right whitespace-nowrap">
+                    <button onclick="window.openPdfViewer('${data.fileId}', '${data.fileName}', ${data._origIndex})" class="inline-flex items-center gap-1 bg-royal-50 text-royal-700 border border-royal-200 hover:bg-royal-600 hover:text-white px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition shadow-sm">
+                        <i class="fa-solid fa-eye"></i> Preview / PDF / Share
+                    </button>
+                </td>
             </tr>
         `;
     });
@@ -883,7 +881,7 @@ window.switchService = async function(serviceName) {
                             <button type="button" id="btnRaisePaymentTicket" onclick="window.submitPaymentIssueTicket()" class="w-full bg-dark-900 text-royal-300 hover:bg-black font-black py-2.5 rounded-xl text-xs shadow transition">
                                 Submit Ticket (24 Hours Resolution) <i class="fa-solid fa-clock-rotate-left ml-1"></i>
                             </button>
-                            <p class="text-[10px] text-amber-800 text-center font-medium">टिकट रेज़ होने पर 24 घंटे के अंदर आपकी समस्या का समाधान करके क्रेडिट जोड़ दिया जाएगा.</p>
+                            <p class="text-[10px] text-amber-800 text-center font-medium">टिकट रेज़ होने पर 24 घंटे के अंदर आपकी समस्या का समाधान करके क्रेडिट जोड़ दिया जाएगा।</p>
                             <div id="paymentTicketResultMsg" style="display: none;"></div>
                         </div>
                     </div>
