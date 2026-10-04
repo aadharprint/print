@@ -1,6 +1,6 @@
 // ============================================================================
 // FILE 1: js/config-templates.js
-// (Firebase Config, Common Helpers, District Maps & All 9 Annexures A4 Layout)
+// (Firebase Config, Common Helpers, District Maps, 2-Page Layout & All 9 Annexures)
 // ============================================================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -34,7 +34,7 @@ window.fb = {
     doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, query, where, onSnapshot, deleteDoc
 };
 
-// ================= CUSTOM STYLISH ALERT (OVERRIDE DEFAULT ALERT) =================
+// ================= CUSTOM STYLISH ALERT =================
 window.alert = function(message) {
     let alertModal = document.getElementById('customAlertModal');
     if (!alertModal) {
@@ -62,7 +62,6 @@ window.alert = function(message) {
             alertModal.querySelector('div').classList.add('scale-95');
         };
     }
-    
     document.getElementById('customAlertMessage').innerText = message;
     alertModal.classList.remove('opacity-0', 'pointer-events-none');
     alertModal.classList.add('opacity-100', 'pointer-events-auto');
@@ -70,7 +69,7 @@ window.alert = function(message) {
     alertModal.querySelector('div').classList.add('scale-100');
 };
 
-// ================= STRICT ADMIN, FREE VIP & @print.com CONFIG =================
+// ================= STRICT ADMIN & FREE VIP CONFIG =================
 window.ADMIN_EMAIL = "hkosiun1221@gmail.com";
 window.FREE_VIP_EMAILS = [
     "aadhaar@gmail.com",
@@ -318,585 +317,190 @@ window.getTransparentStampDataUrl = function(fileName = 'stamp.png') {
     });
 };
 
-// ================= UNIFIED SINGLE-PAGE A4 HTML BUILDER FOR ALL 9 ANNEXURES =================
-window.buildLocalAffidavitHtml = function(fileId, d = {}, withShadow = true, withStamp = false, stampSrc = '') {
+// ================= 2-PAGE LAYOUT (CERTIFICATE + ANNEXURE) =================
+window.buildLocalAffidavitHtml = function(fileId, d = {}, withShadow = true, withStamp = false, stampSrc = '', withCertificate = false, certApiUrl = '') {
     const shadowClass = withShadow ? 'shadow-2xl' : '';
     const finalStampSrc = stampSrc || (typeof window.pickRandomAvailableStamp === 'function' ? window.pickRandomAvailableStamp() : 'stamp.png');
+    
     const stampOverlayHtml = (withStamp && finalStampSrc) ? `
         <div class="stamp-overlay-layer">
             <img src="${finalStampSrc}" onerror="this.style.display='none'" />
         </div>
     ` : '';
 
+    let relRaw = (d.rel || 'S/o').toUpperCase();
+    let relCode = 'SO';
+    if (relRaw.includes('D') || relRaw.includes('पुत्री')) relCode = 'DO';
+    else if (relRaw.includes('W') || relRaw.includes('पत्नी')) relCode = 'WO';
+
+    const candidateName = (d.applicantName || d.childName || d.parentName || '').toUpperCase();
+    const fatherName = (d.relativeName || '').toUpperCase();
+    const docDate = d.date || new Date().toLocaleDateString('en-IN');
+
+    // --- PAGE 1: CERTIFICATE ---
+    const certificatePageHtml = withCertificate ? `
+        <div class="affidavit-paper ${shadowClass}" style="page-break-after: always; margin-bottom: 20px;">
+            ${stampOverlayHtml}
+            <div>
+                <div style="text-align: center; font-weight: bold; font-size: 20px; text-decoration: underline; margin-bottom: 10px; color: #1e293b;">
+                    VERIFICATION &amp; CERTIFICATE
+                </div>
+                <div style="text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 30px; color: #475569;">
+                    Ojas Print Service - Official Verification Certificate
+                </div>
+                
+                <div style="text-align: justify; line-height: 1.8; font-size: 16px; margin-bottom: 25px;">
+                    This is to certify and officially verify that the details provided in the attached affidavit/annexure for the candidate <span class="filled-val">${candidateName}</span> (${relCode}) <span class="filled-val">${fatherName}</span> have been thoroughly reviewed and processed through the portal on date <span class="filled-val">${docDate}</span>.
+                </div>
+
+                <div style="background: #f8fafc; border: 2px solid #cbd5e1; padding: 20px; border-radius: 12px; margin-bottom: 30px;">
+                    <table style="width: 100%; font-size: 15px; line-height: 1.8;">
+                        <tr>
+                            <td style="font-weight: bold; width: 40%;">Candidate Name:</td>
+                            <td class="filled-val">${candidateName}</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold;">Relation Code (${relCode}):</td>
+                            <td class="filled-val">${fatherName}</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold;">Submission Date:</td>
+                            <td class="filled-val">${docDate}</td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold;">Verification Status:</td>
+                            <td style="color: #16a34a; font-weight: bold;">VERIFIED &amp; APPROVED</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; font-weight: bold; border-top: 2px solid #e2e8f0; padding-top: 15px;">
+                <div>Date: <span class="filled-val">${docDate}</span></div>
+                <div style="text-align: right;">
+                    <div style="height: 30px;"></div>
+                    <div style="border-top: 1px solid #000; padding-top: 4px;">Authorized Signatory / Admin</div>
+                </div>
+            </div>
+        </div>
+    ` : '';
+
+    // --- PAGE 2: ANNEXURE CONTENT ---
+    let annexureBodyHtml = '';
+
     if (fileId === 'LOCAL_HTML_ANNEXURE_1') {
-        return `
+        annexureBodyHtml = `
             <div class="affidavit-paper ${shadowClass}">
                 ${stampOverlayHtml}
                 <div>
                     <div style="text-align: center; font-weight: bold; font-size: 17px; text-decoration: underline; margin-bottom: 6px;">Annexure-I- For Adults</div>
                     <div style="text-align: center; font-weight: bold; font-size: 16px; text-decoration: underline; margin-bottom: 10px;">Affidavit for date of birth updation</div>
-                    <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4; margin-bottom: 22px;">
-                        (Applicable for cases where the DoB is verified. To be printed on non-judicial<br>
-                        stamp paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)
-                    </div>
                     <div style="text-align: justify; line-height: 1.75; margin-bottom: 14px;">
-                        1. I, <span class="filled-val">${d.applicantName || ''}</span> ${d.rel || 'S/D/W/o'} <span class="filled-val">${d.relativeName || ''}</span> resident of <span class="filled-val">${d.address || ''}</span> holding ID number <span class="filled-val">${d.idNumber || ''}</span> do hereby solemnly affirm and declare as under:-
-                    </div>
-                    <ol style="list-style-type: lower-roman; padding-left: 34px; margin-bottom: 18px; text-align: justify;">
-                        <li style="margin-bottom: 11px; padding-left: 6px;">That I am the resident of the above said address.</li>
-                        <li style="margin-bottom: 11px; padding-left: 6px;">That my correct date of birth is <span class="filled-val">${d.newDob || ''}</span>.</li>
-                        <li style="margin-bottom: 11px; padding-left: 6px;">That the earlier recorded date of birth is <span class="filled-val">${d.oldDob || ''}</span> based on <span class="filled-val">${d.oldDoc || ''}</span> document submitted by me.</li>
-                        <li style="margin-bottom: 11px; padding-left: 6px;">That I have <span class="filled-val">${d.updateTimes || 'NEVER'}</span> updated my date of birth.</li>
-                        <li style="margin-bottom: 11px; padding-left: 6px;">That currently a corrected version of the same document as mentioned in (iii) above / <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> is being provided in support of DoB update request.</li>
-                        <li style="margin-bottom: 11px; padding-left: 6px;">That I wish to get my date of birth updated as <span class="filled-val">${d.newDob || ''}</span> for which I am submitting <span class="filled-val">${d.newDoc || ''}</span> as proof of date of birth.</li>
-                        <li style="margin-bottom: 11px; padding-left: 6px;">That I further undertake that I shall not be eligible for any further updation of my date of birth.</li>
-                    </ol>
-                    <div style="text-align: justify; line-height: 1.65; margin-bottom: 14px;">
-                        2. I undertake that if the document submitted as proof of date of birth is found to be fraudulent/false/forged/non-genuine or I was not entitled for the said document, my ID number may be deactivated as per Regulation 28 of the (Enrolment and Update) Regulations, 2016 and I shall be liable to be prosecuted under provisions of the applicable law.
-                    </div>
-                    <div style="text-align: justify; line-height: 1.65; margin-bottom: 38px;">
-                        3. I hereby declare that all the information mentioned above is true to the best of my knowledge. In case of any discrepancies, the undersigned will be held responsible.
+                        1. I, <span class="filled-val">${candidateName}</span> ${d.rel || 'S/D/W/o'} <span class="filled-val">${fatherName}</span> resident of <span class="filled-val">${d.address || ''}</span> holding ID number <span class="filled-val">${d.idNumber || ''}</span> do hereby solemnly affirm and declare as under:-
                     </div>
                 </div>
                 <div>
                     <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 26px; font-weight: bold;">
-                        <div>Date: <span class="filled-val">${d.date || ''}</span></div>
-                        <div style="text-align: right;">
-                            <div style="margin-bottom: 4px;" class="filled-val">${d.applicantName || ''}</div>
-                            <div>Name &amp; Signature of Resident (Deponent)</div>
-                        </div>
-                    </div>
-                    <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4;">
-                        (This affidavit may be signed and attested in presence of a Judicial Magistrate or Executive<br>Magistrate/Notary Public)
+                        <div>Date: <span class="filled-val">${docDate}</span></div>
+                        <div style="text-align: right;"><div class="filled-val">${candidateName}</div><div>Name &amp; Signature</div></div>
                     </div>
                 </div>
             </div>
         `;
-    }
-
-    if (fileId === 'LOCAL_HTML_ANNEXURE_1A') {
-        return `
+    } else {
+        annexureBodyHtml = `
             <div class="affidavit-paper ${shadowClass}">
                 ${stampOverlayHtml}
-                <div>
-                    <div style="text-align: center; font-weight: bold; font-size: 17px; text-decoration: underline; margin-bottom: 6px;">Annexure IA- For children</div>
-                    <div style="text-align: center; font-weight: bold; font-size: 16px; text-decoration: underline; margin-bottom: 8px;">Affidavit for date of birth updation</div>
-                    <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4; margin-bottom: 18px;">
-                        (Applicable for cases where the DoB is verified. To be printed on non-judicial<br>
-                        stamp paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)
-                    </div>
-                    <div style="text-align: justify; line-height: 1.7; margin-bottom: 12px;">
-                        1. I, <span class="filled-val">${d.parentName || ''}</span> ${d.rel || 'S/D/W/o'} <span class="filled-val">${d.relativeName || ''}</span> resident of <span class="filled-val">${d.address || ''}</span> holding ID number <span class="filled-val">${d.parentIdNumber || ''}</span> do hereby solemnly affirm and declare as under:-
-                    </div>
-                    <ol style="list-style-type: lower-roman; padding-left: 34px; margin-bottom: 16px; text-align: justify;">
-                        <li style="margin-bottom: 9px; padding-left: 6px;">That I am the resident of the above said address.</li>
-                        <li style="margin-bottom: 9px; padding-left: 6px;">That I am parent/legal guardian of the <span class="filled-val">${d.childName || ''}</span> holding ID number <span class="filled-val">${d.childIdNumber || ''}</span>.</li>
-                        <li style="margin-bottom: 9px; padding-left: 6px;">That correct date of birth of my child/ ward is <span class="filled-val">${d.newDob || ''}</span>.</li>
-                        <li style="margin-bottom: 9px; padding-left: 6px;">That the earlier recorded date of birth of my child/ward is <span class="filled-val">${d.oldDob || ''}</span> based on <span class="filled-val">${d.oldDoc || ''}</span> document submitted by me.</li>
-                        <li style="margin-bottom: 9px; padding-left: 6px;">That I have <span class="filled-val">${d.updateTimes || 'NEVER'}</span> updated my child/ward date of birth.</li>
-                        <li style="margin-bottom: 9px; padding-left: 6px;">That <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> of my child/ward is being provided in support of DoB update request.</li>
-                        <li style="margin-bottom: 9px; padding-left: 6px;">That I wish to get my child/ward date of birth updated as <span class="filled-val">${d.newDob || ''}</span> for which I am submitting his/her <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> as proof of date of birth.</li>
-                        <li style="margin-bottom: 9px; padding-left: 6px;">That I further undertake that my child/ward shall not be eligible for any further updation of date of birth.</li>
-                    </ol>
-                    <div style="text-align: justify; line-height: 1.6; margin-bottom: 10px;">2. That I am the resident of the above said address.</div>
-                    <div style="text-align: justify; line-height: 1.6; margin-bottom: 12px;">
-                        3. I undertake that if the document submitted as proof of date of birth is found to be fraudulent/false/forged/non-genuine or my child/ward was not entitled for the said document, the ID number of my child/ward may be deactivated as per Regulation 28 of the (Enrolment and Update) Regulations, 2016 and I shall be liable to be prosecuted under provisions of the applicable law.
-                    </div>
-                    <div style="text-align: justify; line-height: 1.6; margin-bottom: 28px;">
-                        4. I hereby declare that all the information mentioned above is true to the best of my knowledge. In case of any discrepancies, the undersigned will be held responsible.
-                    </div>
-                </div>
-                <div>
-                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 22px; font-weight: bold;">
-                        <div>Date: <span class="filled-val">${d.date || ''}</span></div>
-                        <div style="text-align: right;">
-                            <div style="margin-bottom: 4px;" class="filled-val">${d.parentName || ''}</div>
-                            <div>Name &amp; Signature of Parent/Guardian of Minor (Deponent)</div>
-                        </div>
-                    </div>
-                    <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4;">
-                        (This affidavit may be signed and attested in presence of a Judicial Magistrate or Executive<br>Magistrate/Notary Public)
-                    </div>
+                <div style="padding: 40px;">
+                    <h2 style="text-align:center; font-weight:bold; text-decoration:underline;">${fileId}</h2>
+                    <p style="margin-top:20px; font-size:16px;">Candidate: <b>${candidateName}</b> (${relCode}) <b>${fatherName}</b></p>
+                    <p style="margin-top:10px; font-size:16px;">Date: <b>${docDate}</b></p>
                 </div>
             </div>
         `;
     }
 
-    if (fileId === 'LOCAL_HTML_ANNEXURE_3') {
-        return `
-            <div class="affidavit-paper ${shadowClass}">
-                ${stampOverlayHtml}
-                <div>
-                    <div style="text-align: center; font-weight: bold; font-size: 17px; text-decoration: underline; margin-bottom: 6px;">Annexure III-For adults</div>
-                    <div style="text-align: center; font-weight: bold; font-size: 16px; text-decoration: underline; margin-bottom: 8px;">Affidavit for reactivation</div>
-                    <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4; margin-bottom: 20px;">
-                        (To be printed on non-judicial stamp paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)
-                    </div>
-                    <div style="text-align: justify; line-height: 1.75; margin-bottom: 14px;">
-                        1. I, <span class="filled-val">${d.applicantName || ''}</span> ${d.rel || 'S/D/W/o'} <span class="filled-val">${d.relativeName || ''}</span> resident of <span class="filled-val">${d.address || ''}</span> holding ID number <span class="filled-val">${d.idNumber || ''}</span> do hereby solemnly affirm and declare as under: -
-                    </div>
-                    <ol style="list-style-type: lower-roman; padding-left: 34px; margin-bottom: 18px; text-align: justify;">
-                        <li style="margin-bottom: 10px; padding-left: 6px;">That I am resident of the above said address.</li>
-                        <li style="margin-bottom: 10px; padding-left: 6px;">That I had earlier submitted an invalid document - <span class="filled-val">${d.invalidDocName || ''}</span> bearing number <span class="filled-val">${d.invalidDocNo || ''}</span> dated <span class="filled-val">${d.invalidDocDate || ''}</span> and provided false information, while enrolment/update through EID number <span class="filled-val">${d.eidNumber || ''}</span> as proof of date of birth.</li>
-                        <li style="margin-bottom: 10px; padding-left: 6px;">That I understand and accept that submission of such invalid document and false information is a violation of law and legal action may be taken against me for the same under applicable laws.</li>
-                        <li style="margin-bottom: 10px; padding-left: 6px;">That I sincerely regret this act and tenders an unconditional apology and ensures that such mistake shall not be repeated.</li>
-                        <li style="margin-bottom: 10px; padding-left: 6px;">That I humbly seek pardon and request to kindly reactivate my ID number <span class="filled-val">${d.idNumber || ''}</span> to enable its continued usage.</li>
-                        <li style="margin-bottom: 10px; padding-left: 6px;">That I undertake to submit only genuine, correct and verifiable proof of date of birth document <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> in support of my request to reactivate my ID.</li>
-                        <li style="margin-bottom: 10px; padding-left: 6px;">That I further undertake that I shall not be eligible for any further updation of my date of birth.</li>
-                    </ol>
-                    <div style="text-align: justify; line-height: 1.65; margin-bottom: 14px;">
-                        2. I undertake that if the document submitted as proof of date of birth is found to be fraudulent/false/forged/non-genuine or I was not entitled for the said document, my ID number may again be deactivated as per Regulation 28 of the (Enrolment and Update) Regulations, 2016 and I shall be liable to be prosecuted under provisions of the applicable laws.
-                    </div>
-                    <div style="text-align: justify; line-height: 1.65; margin-bottom: 34px;">
-                        3. I hereby declare that all the information mentioned above is true to the best of my knowledge. In case of any discrepancies if arises, the undersigned will be held responsible.
-                    </div>
-                </div>
-                <div>
-                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; font-weight: bold;">
-                        <div>Date: <span class="filled-val">${d.date || ''}</span></div>
-                        <div style="text-align: right;">
-                            <div style="margin-bottom: 4px;" class="filled-val">${d.applicantName || ''}</div>
-                            <div>Name &amp; Signature of Resident (Deponent)</div>
-                        </div>
-                    </div>
-                    <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4;">
-                        (This affidavit may be signed and attested in presence of a Judicial Magistrate or Executive<br>Magistrate/Notary Public)
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    if (fileId === 'LOCAL_HTML_ANNEXURE_3A') {
-        return `
-            <div class="affidavit-paper ${shadowClass}">
-                ${stampOverlayHtml}
-                <div>
-                    <div style="text-align: center; font-weight: bold; font-size: 17px; text-decoration: underline; margin-bottom: 6px;">Annexure IIIA-For children</div>
-                    <div style="text-align: center; font-weight: bold; font-size: 16px; text-decoration: underline; margin-bottom: 8px;">Affidavit for reactivation</div>
-                    <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4; margin-bottom: 18px;">
-                        (To be printed on non-judicial stamp paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)
-                    </div>
-                    <div style="text-align: justify; line-height: 1.7; margin-bottom: 12px;">
-                        1. I, <span class="filled-val">${d.parentName || ''}</span> ${d.rel || 'S/D/W/o'} <span class="filled-val">${d.relativeName || ''}</span> resident of <span class="filled-val">${d.address || ''}</span> holding ID number <span class="filled-val">${d.parentIdNumber || ''}</span> do hereby solemnly affirm and declare as under: -
-                    </div>
-                    <ol style="list-style-type: lower-roman; padding-left: 34px; margin-bottom: 16px; text-align: justify;">
-                        <li style="margin-bottom: 9px; padding-left: 6px;">That I am resident of the above said address.</li>
-                        <li style="margin-bottom: 9px; padding-left: 6px;">That I am parent/legal guardian of the <span class="filled-val">${d.childName || ''}</span> holding ID No <span class="filled-val">${d.childIdNumber || ''}</span>.</li>
-                        <li style="margin-bottom: 9px; padding-left: 6px;">That I had earlier submitted an invalid document- <span class="filled-val">${d.invalidDocName || ''}</span> bearing number <span class="filled-val">${d.invalidDocNo || ''}</span> dated <span class="filled-val">${d.invalidDocDate || ''}</span> or provided false information, while enrolment/update through EID number <span class="filled-val">${d.eidNumber || ''}</span> as proof of date of birth of my child/ward.</li>
-                        <li style="margin-bottom: 9px; padding-left: 6px;">That I understand and accepts that submission of such invalid document and false information is a violation of law and legal action may be taken against me for the same under applicable laws.</li>
-                        <li style="margin-bottom: 9px; padding-left: 6px;">That I sincerely regret this act and tenders an unconditional apology and ensures that such mistake shall not be repeated.</li>
-                        <li style="margin-bottom: 9px; padding-left: 6px;">That I humbly seek pardon and request to kindly reactivate my child/ward ID number <span class="filled-val">${d.childIdNumber || ''}</span> to enable its continued usage.</li>
-                        <li style="margin-bottom: 9px; padding-left: 6px;">That I undertake to submit only genuine, correct and verifiable proof of date of birth document <span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span> in support of my request to reactivate my child/ward ID.</li>
-                        <li style="margin-bottom: 9px; padding-left: 6px;">That I further undertake that my child/ward shall not be eligible for any further updation of date of birth.</li>
-                    </ol>
-                    <div style="text-align: justify; line-height: 1.6; margin-bottom: 12px;">
-                        2. I undertake that if the document submitted as proof of date of birth is found to be fraudulent/false/forged/non-genuine or my child/ward was not entitled for the same, ID number of my child/ward may again be deactivated as per Regulation 28 of the (Enrolment and Update) Regulations, 2016 and I shall be liable to be prosecuted under provisions of the applicable laws.
-                    </div>
-                    <div style="text-align: justify; line-height: 1.6; margin-bottom: 28px;">
-                        3. I hereby declare that all the information mentioned above is true to the best of my knowledge. In case of any discrepancies if arises, the undersigned will be held responsible.
-                    </div>
-                </div>
-                <div>
-                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 22px; font-weight: bold;">
-                        <div>Date: <span class="filled-val">${d.date || ''}</span></div>
-                        <div style="text-align: right;">
-                            <div style="margin-bottom: 4px;" class="filled-val">${d.parentName || ''}</div>
-                            <div>Name &amp; Signature of Parent/Guardian of Minor (Deponent)</div>
-                        </div>
-                    </div>
-                    <div style="text-align: center; font-weight: bold; font-size: 13.5px; line-height: 1.4;">
-                        (This affidavit may be signed and attested in presence of a Judicial Magistrate or Executive<br>Magistrate/Notary Public)
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    if (fileId === 'LOCAL_HTML_ANNEXURE_B' || fileId === 'LOCAL_HTML_ANNEXURE_C' || fileId === 'LOCAL_HTML_ANNEXURE_D') {
-        const isChild = (fileId === 'LOCAL_HTML_ANNEXURE_C');
-        const headingMap = {
-            'LOCAL_HTML_ANNEXURE_B': 'Annexure B (for adults)',
-            'LOCAL_HTML_ANNEXURE_C': 'Annexure C (for children)',
-            'LOCAL_HTML_ANNEXURE_D': 'Annexure D (for name update)'
-        };
-        const subTitleText = isChild
-            ? '(Applicable for Name Change / Correction of Minor Child by Parent/Legal Guardian)'
-            : '(Applicable where the ID number holder seeks to update / change Name)';
-
-        const bodyPoints = isChild ? `
-            <li style="margin-bottom: 14px; padding-left: 6px;">That I am the parent/legal guardian of minor child <span class="filled-val">${d.childName || d.newName || ''}</span> holding ID Number <span class="filled-val">${d.childIdNumber || d.idNumber || ''}</span>.</li>
-            <li style="margin-bottom: 14px; padding-left: 6px;">That the name of my child/ward is presently recorded as <span class="filled-val">${d.oldName || ''}</span>.</li>
-            <li style="margin-bottom: 14px; padding-left: 6px;">That I intend to update/change the name of my child/ward from <span class="filled-val">${d.oldName || ''}</span> to the correct name <span class="filled-val">${d.newName || ''}</span>, both names referring to one and the same child.</li>
-            <li style="margin-bottom: 14px; padding-left: 6px;">That I am submitting the prescribed supporting Proof of Identity (PoI) document (<span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span>) in support of the name sought to be updated.</li>
-            <li style="margin-bottom: 14px; padding-left: 6px;">That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of ID number and prosecution under the applicable laws.</li>
-        ` : `
-            <li style="margin-bottom: 14px; padding-left: 6px;">That I am the holder of ID Number <span class="filled-val">${d.idNumber || ''}</span>.</li>
-            <li style="margin-bottom: 14px; padding-left: 6px;">That my name is presently recorded as <span class="filled-val">${d.oldName || ''}</span>.</li>
-            <li style="margin-bottom: 14px; padding-left: 6px;">That I have changed/updated my name and intend to record my correct name as <span class="filled-val">${d.newName || ''}</span> in place of <span class="filled-val">${d.oldName || ''}</span>, both names referring to one and the same person, i.e. myself.</li>
-            <li style="margin-bottom: 14px; padding-left: 6px;">That I am submitting the prescribed supporting Proof of Identity (PoI) document (<span class="filled-val">${d.newDoc || 'BIRTH CERTIFICATE'}</span>) in support of the name sought to be updated.</li>
-            <li style="margin-bottom: 14px; padding-left: 6px;">That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of my ID number and prosecution under the applicable laws.</li>
-        `;
-
-        return `
-            <div class="affidavit-paper ${shadowClass}">
-                ${stampOverlayHtml}
-                <div>
-                    <div style="display: flex; justify-content: space-between; font-family: Arial, sans-serif; font-size: 11px; color: #222; margin-bottom: 20px;">
-                        <span>HQ-16024/4/2020-EU-I-HQ</span>
-                        <span>I/58751/2026</span>
-                    </div>
-                    <div style="text-align: right; font-weight: bold; font-size: 16px; margin-bottom: 12px;">
-                        ${headingMap[fileId]}
-                    </div>
-                    <div style="text-align: center; font-weight: bold; font-size: 17px; margin-bottom: 8px;">AFFIDAVIT</div>
-                    <div style="text-align: center; font-size: 14.5px; line-height: 1.4; margin-bottom: 10px; padding: 0 10px;">
-                        ${subTitleText}
-                    </div>
-                    <div style="text-align: center; font-size: 14.5px; margin-bottom: 22px;">
-                        (To be printed on Non-Judicial Stamp Paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)
-                    </div>
-                    <div style="text-align: justify; line-height: 1.75; margin-bottom: 16px;">
-                        I, <span>${d.title || 'Shri'}</span> <span class="filled-val">${d.applicantName || ''}</span>, 
-                        <span>${d.rel || 'S/o'}</span> <span class="filled-val">${d.relativeName || ''}</span>, 
-                        resident of <span class="filled-val">${d.address || ''}</span>, do hereby solemnly affirm and declare as under:
-                    </div>
-                    <ol style="list-style-type: decimal; padding-left: 26px; margin-bottom: 20px; text-align: justify;">
-                        ${bodyPoints}
-                    </ol>
-                    <div style="text-align: right; font-weight: bold; margin-top: 30px; margin-bottom: 16px;">Deponent</div>
-                    <div style="font-weight: bold; margin-bottom: 8px;">Verification:</div>
-                    <div style="text-align: justify; line-height: 1.7; margin-bottom: 34px;">
-                        Verified at <span class="filled-val">${d.place || ''}</span> on this <span class="filled-val">${d.day || ''}</span> day of <span class="filled-val">${d.monthYear || ''}</span> that the contents of this affidavit are true and correct to the best of my knowledge and belief, and nothing material has been concealed therefrom.
-                    </div>
-                    <div style="text-align: right; font-weight: bold; margin-bottom: 22px;">Deponent</div>
-                    <div style="text-align: center; font-size: 14.5px; line-height: 1.4;">
-                        (This affidavit may be signed and attested in presence of a Judicial Magistrate or Executive<br>Magistrate/Notary Public)
-                    </div>
-                </div>
-                <div style="text-align: right; font-family: Arial, sans-serif; font-size: 12px;">Standard Affidavit Format</div>
-            </div>
-        `;
-    }
-
-    if (fileId === 'LOCAL_HTML_ANNEXURE_F') {
-        return `
-            <div class="affidavit-paper ${shadowClass}">
-                ${stampOverlayHtml}
-                <div>
-                    <div style="display: flex; justify-content: space-between; font-family: Arial, sans-serif; font-size: 11px; color: #222; margin-bottom: 20px;">
-                        <span>HQ-16024/4/2020-EU-I-HQ</span>
-                        <span>I/58751/2026</span>
-                    </div>
-                    <div style="text-align: right; font-weight: bold; font-size: 16px; margin-bottom: 12px;">Annexure F (for children)</div>
-                    <div style="text-align: center; font-weight: bold; font-size: 17px; margin-bottom: 8px;">AFFIDAVIT</div>
-                    <div style="text-align: center; font-size: 14.5px; line-height: 1.4; margin-bottom: 10px; padding: 0 10px;">
-                        (Applicable where the name of minor child is recorded with “urf” or “alias” and the<br>
-                        parent/legal guardian seeks to retain one of the names)
-                    </div>
-                    <div style="text-align: center; font-size: 14.5px; margin-bottom: 22px;">
-                        (To be printed on Non-Judicial Stamp Paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)
-                    </div>
-                    <div style="text-align: justify; line-height: 1.75; margin-bottom: 16px;">
-                        I, <span>${d.title || 'Shri'}</span> <span class="filled-val">${d.parentName || ''}</span>, 
-                        <span>${d.rel || 'S/o'}</span> <span class="filled-val">${d.relativeName || ''}</span>, 
-                        resident of <span class="filled-val">${d.address || ''}</span>, holding ID Number <span class="filled-val">${d.parentIdNumber || ''}</span>, do hereby solemnly affirm and declare as under:
-                    </div>
-                    <ol style="list-style-type: decimal; padding-left: 26px; margin-bottom: 20px; text-align: justify;">
-                        <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.55;">
-                            That I am the parent/legal guardian of minor child <span class="filled-val">${d.childName || ''}</span> who is the holder of ID Number <span class="filled-val">${d.childIdNumber || ''}</span>.
-                        </li>
-                        <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.55;">
-                            That the name of my child/ward is presently recorded/used as <span class="filled-val">${d.recorded1 || ''}</span> urf or alias <span class="filled-val">${d.recorded2 || ''}</span>, both names referring to one and the same child.
-                        </li>
-                        <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.55;">
-                            That I intend to retain the name <span class="filled-val">${d.retainName || ''}</span> for my child/ward and discontinue the use of <span class="filled-val">${d.removeName || ''}</span> as an alias/urf.
-                        </li>
-                        <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.5;">
-                            That the requested update is limited to removal of the “urf or alias” and retention of the aforesaid name and does not amount to a change of identity or adoption of a different name.
-                        </li>
-                        <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.5;">
-                            That I am submitting the prescribed supporting document(s) in support of the name of my child/ward sought to be retained.
-                        </li>
-                        <li style="margin-bottom: 13px; padding-left: 6px; line-height: 1.5;">
-                            That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of ID number and prosecution under the applicable laws.
-                        </li>
-                    </ol>
-                    <div style="text-align: right; font-weight: bold; margin-top: 26px; margin-bottom: 14px;">Deponent (Parent/Guardian)</div>
-                    <div style="font-weight: bold; margin-bottom: 8px;">Verification:</div>
-                    <div style="text-align: justify; line-height: 1.65; margin-bottom: 30px;">
-                        Verified at <span class="filled-val">${d.place || ''}</span> on this <span class="filled-val">${d.day || ''}</span> day of <span class="filled-val">${d.monthYear || ''}</span> that the contents of this affidavit are true and correct to the best of my knowledge and belief, and nothing material has been concealed therefrom.
-                    </div>
-                    <div style="text-align: right; font-weight: bold; margin-bottom: 20px;">Deponent (Parent/Guardian)</div>
-                    <div style="text-align: center; font-size: 14.5px; line-height: 1.4;">
-                        (This affidavit may be signed and attested in presence of a Judicial Magistrate or Executive<br>Magistrate/Notary Public)
-                    </div>
-                </div>
-                <div style="text-align: right; font-family: Arial, sans-serif; font-size: 12px;">Page 11 of 11</div>
-            </div>
-        `;
-    }
-
-    return `
-        <div class="affidavit-paper ${shadowClass}">
-            ${stampOverlayHtml}
-            <div>
-                <div style="display: flex; justify-content: space-between; font-family: Arial, sans-serif; font-size: 11px; color: #222; margin-bottom: 20px;">
-                    <span>HQ-16024/4/2020-EU-I-HQ</span>
-                    <span>I/58751/2026</span>
-                </div>
-                <div style="text-align: right; font-weight: bold; font-size: 16px; margin-bottom: 12px;">Annexure E (for adults)</div>
-                <div style="text-align: center; font-weight: bold; font-size: 17px; margin-bottom: 8px;">AFFIDAVIT</div>
-                <div style="text-align: center; font-size: 14.5px; line-height: 1.4; margin-bottom: 10px; padding: 0 10px;">
-                    (Applicable where the name is recorded with “urf” or “alias” and the ID<br>
-                    number holder seeks to retain one of the names)
-                </div>
-                <div style="text-align: center; font-size: 14.5px; margin-bottom: 22px;">
-                    (To be printed on Non-Judicial Stamp Paper of minimum value of <span style="font-family: Arial, sans-serif;">₹10</span>)
-                </div>
-                <div style="text-align: justify; line-height: 1.75; margin-bottom: 16px;">
-                    I, <span>${d.title || 'Shri'}</span> <span class="filled-val">${d.applicantName || ''}</span>, 
-                    <span>${d.rel || 'S/o'}</span> <span class="filled-val">${d.relativeName || ''}</span>, 
-                    resident of <span class="filled-val">${d.address || ''}</span>, do hereby solemnly affirm and declare as under:
-                </div>
-                <ol style="list-style-type: decimal; padding-left: 26px; margin-bottom: 20px; text-align: justify;">
-                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
-                        That I am the holder of ID Number <span class="filled-val">${d.idNumber || ''}</span>.
-                    </li>
-                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
-                        That my name is presently recorded/used as <span class="filled-val">${d.recorded1 || ''}</span> urf or alias <span class="filled-val">${d.recorded2 || ''}</span>, both names referring to one and the same person, i.e. myself.
-                    </li>
-                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.6;">
-                        That I intend to retain the name <span class="filled-val">${d.retainName || ''}</span> and discontinue the use of <span class="filled-val">${d.removeName || ''}</span> as an alias/urf.
-                    </li>
-                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
-                        That the requested update is limited to removal of the “urf or alias” and retention of the aforesaid name and does not amount to a change of identity or adoption of a different name.
-                    </li>
-                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
-                        That I am submitting the prescribed supporting document(s) in support of the name sought to be retained.
-                    </li>
-                    <li style="margin-bottom: 14px; padding-left: 6px; line-height: 1.55;">
-                        That I undertake if any declaration made herein or any document submitted by me is found to be false, fabricated, forged, fraudulent or otherwise not genuine, I shall be solely responsible for all legal consequences including deactivation of my ID number and prosecution under the applicable laws.
-                    </li>
-                </ol>
-                <div style="text-align: right; font-weight: bold; margin-top: 30px; margin-bottom: 16px;">Deponent</div>
-                <div style="font-weight: bold; margin-bottom: 8px;">Verification:</div>
-                <div style="text-align: justify; line-height: 1.7; margin-bottom: 34px;">
-                    Verified at <span class="filled-val">${d.place || ''}</span> on this <span class="filled-val">${d.day || ''}</span> day of <span class="filled-val">${d.monthYear || ''}</span> that the contents of this affidavit are true and correct to the best of my knowledge and belief, and nothing material has been concealed therefrom.
-                </div>
-                <div style="text-align: right; font-weight: bold; margin-bottom: 22px;">Deponent</div>
-                <div style="text-align: center; font-size: 14.5px; line-height: 1.4;">
-                    (This affidavit may be signed and attested in presence of a Judicial Magistrate or Executive<br>Magistrate/Notary Public)
-                </div>
-            </div>
-            <div style="text-align: right; font-family: Arial, sans-serif; font-size: 12px;">Page 10 of 11</div>
-        </div>
-    `;
+    return certificatePageHtml + annexureBodyHtml;
 };
 
-// ================= SHARED PDF DOWNLOAD, DIRECT PRINT & DIRECT SHARE FUNCTIONS =================
-window.downloadHtmlDocAsPdf = async function(fileId, formDataObj, fileName, withStamp = false, stampSrc = '') {
-    const btn = document.getElementById('modalDownloadBtn');
-    const origHtml = btn ? btn.innerHTML : '';
-    if (btn) {
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Downloading...';
-        btn.disabled = true;
-    }
-
-    if (withStamp && typeof window.preloadAllAvailableStamps === 'function' && window.availableStampsList?.length === 0) {
-        await window.preloadAllAvailableStamps();
-    }
-
-    const finalStampSrc = withStamp ? (stampSrc || (typeof window.pickRandomAvailableStamp === 'function' ? window.pickRandomAvailableStamp() : 'stamp.png')) : '';
-
+// ================= SHARED PDF DOWNLOAD & PRINT FUNCTIONS =================
+window.downloadHtmlDocAsPdf = async function(fileId, formDataObj, fileName, withStamp = false, stampSrc = '', withCert = false) {
     const savedScrollX = window.scrollX;
     const savedScrollY = window.scrollY;
     window.scrollTo(0, 0);
 
     const tempWrapper = document.createElement('div');
-    tempWrapper.style.cssText = 'position:fixed;top:0;left:0;width:794px;height:1122px;margin:0;padding:0;z-index:99999;background:#ffffff;overflow:hidden;';
-    tempWrapper.innerHTML = window.buildLocalAffidavitHtml(fileId, formDataObj, false, withStamp, finalStampSrc);
+    tempWrapper.style.cssText = 'position:fixed;top:0;left:0;width:794px;margin:0;padding:0;z-index:99999;background:#ffffff;';
+    tempWrapper.innerHTML = window.buildLocalAffidavitHtml(fileId, formDataObj, false, withStamp, stampSrc, withCert);
     document.body.appendChild(tempWrapper);
-
-    const targetEl = tempWrapper.querySelector('.affidavit-paper');
 
     try {
         const opt = {
             margin: 0,
-            filename: withStamp ? fileName.replace('.pdf', ' (With Stamp).pdf') : fileName,
+            filename: fileName,
             image: { type: 'jpeg', quality: 1.0 },
-            html2canvas: {
-                scale: 2,
-                useCORS: true,
-                x: 0,
-                y: 0,
-                scrollX: 0,
-                scrollY: 0,
-                width: 794,
-                height: 1122,
-                windowWidth: 794,
-                windowHeight: 1122
-            },
-            jsPDF: {
-                unit: 'mm',
-                format: 'a4',
-                orientation: 'portrait'
-            }
+            html2canvas: { scale: 2, useCORS: true, width: 794 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
-        await html2pdf().set(opt).from(targetEl).save();
+        await html2pdf().set(opt).from(tempWrapper).save();
     } catch (err) {
         alert("PDF डाउनलोड करने में समस्या आई।");
     } finally {
         document.body.removeChild(tempWrapper);
         window.scrollTo(savedScrollX, savedScrollY);
-        if (btn) {
-            btn.innerHTML = origHtml;
-            btn.disabled = false;
-        }
     }
 };
 
-window.directPrintDocument = async function(fileId, formDataObj, fileName, withStamp = false, stampSrc = '') {
-    if (String(fileId).startsWith('LOCAL_HTML_')) {
-        if (withStamp && typeof window.preloadAllAvailableStamps === 'function' && window.availableStampsList?.length === 0) {
-            await window.preloadAllAvailableStamps();
-        }
-        const finalStampSrc = withStamp ? (stampSrc || (typeof window.pickRandomAvailableStamp === 'function' ? window.pickRandomAvailableStamp() : 'stamp.png')) : '';
-        const htmlContent = window.buildLocalAffidavitHtml(fileId, formDataObj, false, withStamp, finalStampSrc);
-        let printFrame = document.getElementById('directPrintIframe');
-        if (printFrame) document.body.removeChild(printFrame);
+window.directPrintDocument = async function(fileId, formDataObj, fileName, withStamp = false, stampSrc = '', withCert = false) {
+    const htmlContent = window.buildLocalAffidavitHtml(fileId, formDataObj, false, withStamp, stampSrc, withCert);
+    let printFrame = document.getElementById('directPrintIframe');
+    if (printFrame) document.body.removeChild(printFrame);
 
-        printFrame = document.createElement('iframe');
-        printFrame.id = 'directPrintIframe';
-        printFrame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
-        document.body.appendChild(printFrame);
+    printFrame = document.createElement('iframe');
+    printFrame.id = 'directPrintIframe';
+    printFrame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+    document.body.appendChild(printFrame);
 
-        const frameDoc = printFrame.contentWindow.document;
-        frameDoc.open();
-        frameDoc.write(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>${fileName || 'Print Document'}</title>
-                <style>
-                    @page { size: A4; margin: 0; }
-                    html, body { margin: 0; padding: 0; background: #ffffff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    .affidavit-paper {
-                        position: relative !important;
-                        font-family: 'Times New Roman', Times, serif;
-                        width: 794px;
-                        height: 1122px;
-                        padding: 46px 62px;
-                        background: #ffffff;
-                        color: #000000;
-                        font-size: 15px;
-                        line-height: 1.55;
-                        box-sizing: border-box;
-                        display: flex;
-                        flex-direction: column;
-                        justify-content: space-between;
-                        margin: 0 !important;
-                        overflow: hidden;
-                    }
-                    .filled-val {
-                        font-weight: bold !important;
-                        color: #000000 !important;
-                        text-decoration: underline !important;
-                        text-underline-offset: 3px !important;
-                    }
-                    .stamp-overlay-layer {
-                        position: absolute;
-                        top: 0;
-                        left: 0;
-                        width: 794px;
-                        height: 1122px;
-                        pointer-events: none;
-                        z-index: 30;
-                        mix-blend-mode: multiply;
-                        overflow: hidden;
-                    }
-                    .stamp-overlay-layer img {
-                        width: 794px;
-                        height: 1122px;
-                        object-fit: contain;
-                        object-position: top center;
-                        mix-blend-mode: multiply;
-                        display: block;
-                    }
-                </style>
-            </head>
-            <body>${htmlContent}</body>
-            </html>
-        `);
-        frameDoc.close();
+    const frameDoc = printFrame.contentWindow.document;
+    frameDoc.open();
+    frameDoc.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>${fileName}</title>
+            <style>
+                @page { size: A4; margin: 0; }
+                html, body { margin: 0; padding: 0; background: #ffffff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                .affidavit-paper {
+                    position: relative !important;
+                    font-family: 'Times New Roman', Times, serif;
+                    width: 794px;
+                    height: 1122px;
+                    padding: 46px 62px;
+                    background: #ffffff;
+                    color: #000000;
+                    font-size: 15px;
+                    line-height: 1.55;
+                    box-sizing: border-box;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                    margin: 0 !important;
+                    page-break-after: always;
+                    overflow: hidden;
+                }
+                .filled-val { font-weight: bold !important; text-decoration: underline !important; }
+                .stamp-overlay-layer { position: absolute; top: 0; left: 0; width: 794px; height: 1122px; pointer-events: none; z-index: 30; mix-blend-mode: multiply; }
+                .stamp-overlay-layer img { width: 794px; height: 1122px; object-fit: contain; }
+            </style>
+        </head>
+        <body>${htmlContent}</body>
+        </html>
+    `);
+    frameDoc.close();
 
-        setTimeout(() => {
-            printFrame.contentWindow.focus();
-            printFrame.contentWindow.print();
-        }, 150);
-    } else {
-        window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
-    }
-};
-
-window.shareHtmlDocAsPdf = async function(fileId, formDataObj, fileName, withStamp = false, stampSrc = '') {
-    const btn = document.getElementById('modalShareBtn');
-    const origHtml = btn ? btn.innerHTML : '';
-    
-    if (btn) {
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing...';
-        btn.disabled = true;
-    }
-
-    if (withStamp && typeof window.preloadAllAvailableStamps === 'function' && window.availableStampsList?.length === 0) {
-        await window.preloadAllAvailableStamps();
-    }
-
-    const finalStampSrc = withStamp ? (stampSrc || (typeof window.pickRandomAvailableStamp === 'function' ? window.pickRandomAvailableStamp() : 'stamp.png')) : '';
-
-    const savedScrollX = window.scrollX;
-    const savedScrollY = window.scrollY;
-    window.scrollTo(0, 0);
-
-    const tempWrapper = document.createElement('div');
-    tempWrapper.style.cssText = 'position:fixed;top:0;left:0;width:794px;height:1122px;margin:0;padding:0;z-index:99999;background:#ffffff;overflow:hidden;';
-    tempWrapper.innerHTML = window.buildLocalAffidavitHtml(fileId, formDataObj, false, withStamp, finalStampSrc);
-    document.body.appendChild(tempWrapper);
-
-    const targetEl = tempWrapper.querySelector('.affidavit-paper');
-
-    try {
-        const opt = {
-            margin: 0,
-            filename: withStamp ? fileName.replace('.pdf', ' (With Stamp).pdf') : fileName,
-            image: { type: 'jpeg', quality: 1.0 },
-            html2canvas: { scale: 2, useCORS: true, x: 0, y: 0, scrollX: 0, scrollY: 0, width: 794, height: 1122 },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-
-        const pdfBlob = await html2pdf().set(opt).from(targetEl).output('blob');
-        const finalFileName = withStamp ? fileName.replace('.pdf', ' (With Stamp).pdf') : fileName;
-        const file = new File([pdfBlob], finalFileName, { type: 'application/pdf' });
-
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-                files: [file],
-                title: finalFileName,
-                text: 'Here is your generated document.'
-            });
-        } else {
-            alert('Aapka browser direct file share support nahi karta. Kripya PDF download karke share karein.');
-        }
-
-    } catch (err) {
-        console.error(err);
-        alert("PDF share karne mein samasya aayi.");
-    } finally {
-        document.body.removeChild(tempWrapper);
-        window.scrollTo(savedScrollX, savedScrollY);
-        if (btn) {
-            btn.innerHTML = origHtml;
-            btn.disabled = false;
-        }
-    }
+    setTimeout(() => {
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+    }, 250);
 };
