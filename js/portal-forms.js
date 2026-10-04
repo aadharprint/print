@@ -26,7 +26,6 @@ async function compressImage(file) {
     });
 }
 
-// ================= GOOGLE DRIVE SERVICES SUBMISSION =================
 window.submitForm = async function(event, serviceType) {
     event.preventDefault();
     const { db, doc, updateDoc, collection, addDoc } = window.fb;
@@ -49,7 +48,7 @@ window.submitForm = async function(event, serviceType) {
     const formElement = event.target;
     const submitBtn = formElement.querySelector('button[type="submit"]');
     const originalBtnText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Processing...';
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Submitting...';
     submitBtn.disabled = true;
 
     const formData = new FormData(formElement);
@@ -72,61 +71,66 @@ window.submitForm = async function(event, serviceType) {
         const dataObj = {};
         formData.forEach((v, k) => { dataObj[k] = v; });
 
-        if (dataObj.CAST === 'OTHER' && dataObj.CAST_CUSTOM) {
-            dataObj.CAST = dataObj.CAST_CUSTOM.trim();
-        }
-        if (dataObj.VLE === 'OTHER' && dataObj.VLE_CUSTOM) {
-            dataObj.VLE = dataObj.VLE_CUSTOM.trim();
-        }
-
+        if (dataObj.CAST === 'OTHER' && dataObj.CAST_CUSTOM) dataObj.CAST = dataObj.CAST_CUSTOM.trim();
+        if (dataObj.VLE === 'OTHER' && dataObj.VLE_CUSTOM) dataObj.VLE = dataObj.VLE_CUSTOM.trim();
         if ((serviceType === 'DOB' || serviceType === 'DOB 18+') && dataObj.ADDRESS) {
             dataObj.ADDRESS = window.cleanDob18AddressString(dataObj.ADDRESS).trim();
         }
 
-        // --- NETWORK CALL (API) ---
-        let result = null;
-        try {
-            const response = await fetch(targetUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify(dataObj)
-            });
-            result = await response.json();
-        } catch (networkError) {
-            // अगर Google का 404 Timeout होता है, तो भी हम इसे Success मानकर डेटाबेस अपडेट करेंगे
-            console.warn("Google API Timeout Caught. Forcing success.");
-            result = { success: true, fileId: 'GENERATED_IN_BACKGROUND' };
+        // 1. क्रेडिट्स काटना (तुरंत)
+        if (!window.currentUserData.hasFreeAccess) {
+            const userDocRef = doc(db, "users", window.currentUserData.uid);
+            const newCredits = window.currentUserData.credits - docCost;
+            await updateDoc(userDocRef, { credits: newCredits });
+            window.currentUserData.credits = newCredits;
+            document.getElementById('displayCredits').innerText = newCredits;
         }
 
-        // --- FIREBASE DATABASE UPDATE ---
-        if (result && (result.success || result.fileId)) {
-            
-            // 1. क्रेडिट्स काटना
-            if (!window.currentUserData.hasFreeAccess) {
-                const userDocRef = doc(db, "users", window.currentUserData.uid);
-                const newCredits = window.currentUserData.credits - docCost;
-                await updateDoc(userDocRef, { credits: newCredits });
-                window.currentUserData.credits = newCredits;
-                document.getElementById('displayCredits').innerText = newCredits;
+        // 2. हिस्ट्री में 'Pending' स्टेटस के साथ डॉक्यूमेंट सेव करना (ताकि यूज़र को तुरंत दिखे)
+        const pendingDocRef = await addDoc(collection(db, "history"), {
+            userId: window.currentUserData.uid,
+            fileName: `${dataObj.NAME || 'Document'} - ${serviceType}.pdf`,
+            fileId: 'PENDING',
+            status: 'Pending',
+            serviceType: serviceType,
+            timestamp: new Date()
+        });
+        
+        // 3. यूज़र को मैसेज देना और हिस्ट्री टैब पर भेजना
+        alert('Success! आपका फॉर्म सबमिट हो गया है और फाइल बैकग्राउंड में जनरेट हो रही है। आप History में इसका Live स्टेटस देख सकते हैं।');
+        formElement.reset();
+        window.switchService('history');
+
+        // 4. बैकग्राउंड में Google API को कॉल करना (बिना यूज़र को रोके)
+        fetch(targetUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(dataObj)
+        })
+        .then(response => response.json())
+        .then(async (result) => {
+            if (result && (result.success || result.fileId)) {
+                // सक्सेस होने पर असली File ID अपडेट करना
+                await updateDoc(doc(db, "history", pendingDocRef.id), {
+                    fileId: result.fileId,
+                    status: 'Completed'
+                });
+            } else {
+                // किसी वजह से फेल होने पर
+                await updateDoc(doc(db, "history", pendingDocRef.id), {
+                    status: 'Failed',
+                    fileId: 'ERROR',
+                    error: result.error || 'Unknown Error'
+                });
             }
-
-            // 2. हिस्ट्री में डेटा सेव करना (अब हर हाल में सेव होगा)
-            await addDoc(collection(db, "history"), {
-                userId: window.currentUserData.uid,
-                fileName: `${dataObj.NAME || 'Document'} - ${serviceType}.pdf`,
-                fileId: result.fileId || 'N/A',
-                serviceType: serviceType,
-                timestamp: new Date()
+        })
+        .catch(async (networkError) => {
+            // Google Script टाइम-आउट होने पर
+            await updateDoc(doc(db, "history", pendingDocRef.id), {
+                status: 'Timeout',
+                fileId: 'TIMEOUT_ERROR'
             });
-            
-            alert('Success! आपका डॉक्यूमेंट जनरेट हो गया है। कृपया History चेक करें।');
-            window.switchService('history');
-            formElement.reset();
-        } else {
-            // अगर बैकएंड से success: false आता है, तो यहाँ असली एरर दिखेगा
-            const backendErrorMsg = result && result.error ? result.error : "अज्ञात बैकएंड एरर";
-            alert('Google Apps Script Error:\\n\\n' + backendErrorMsg + '\\n\\n(कृपया अपनी Google Script चेक करें कि कहाँ गलती हो रही है)');
-        }
+        });
 
     } catch (error) {
         alert('Form processing error. Please try again.');
