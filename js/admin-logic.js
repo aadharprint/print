@@ -1,6 +1,6 @@
 // ============================================================================
 // FILE 4: js/admin-logic.js (PART 1)
-// (Complete Admin Logic: Auth, Users, Support Chat, Settings)
+// (Complete Admin Logic: Auth, Users, Support Chat, Settings, Date Format & Cert Caching)
 // ============================================================================
 
 import "./config-templates.js";
@@ -347,6 +347,8 @@ window.savePortalSettings = async function(event) {
     const payload = { showDomicile: document.getElementById('chkShowDomicile').checked, showCaste: document.getElementById('chkShowCaste').checked, showDob18: document.getElementById('chkShowDob18').checked, bannerEnabled: document.getElementById('chkBannerEnabled').checked, bannerBadge: document.getElementById('inpBannerBadge').value.trim() || 'UPDATE', bannerTitle: document.getElementById('inpBannerTitle').value.trim(), bannerMessage: document.getElementById('inpBannerMessage').value.trim(), bannerBtnText: document.getElementById('inpBannerBtnText').value.trim(), bannerBtnLink: document.getElementById('inpBannerBtnLink').value.trim(), supportWhatsapp: cleanSupWa, updatedAt: new Date() };
     try { await setDoc(doc(db, "settings", "portalConfig"), payload, { merge: true }); window.adminSupportWhatsapp = cleanSupWa; window.updateStealthStatusPill(); if (msg) { msg.className = "p-3 bg-green-50 text-green-800 border border-green-300 rounded-xl text-xs font-black text-center"; msg.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> पोर्टल सेटिंग्स और बैनर सफलतापूर्वक अपडेट हो गए हैं!`; msg.classList.remove('hidden'); setTimeout(() => msg.classList.add('hidden'), 4000); } } catch (err) { alert("Error saving portal settings: " + err.message); } finally { if (btn) { btn.disabled = false; btn.innerHTML = origText; } }
 };
+
+
 window.loadAllPayments = async function() {
     const container = document.getElementById('adminPaymentsCardsContainer'); container.innerHTML = `<div class="col-span-1 md:col-span-2 p-10 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2 text-royal-500"></i><br>सभी पेमेंट और हिस्ट्री लोड हो रही हैं...</div>`;
     try { const querySnapshot = await getDocs(collection(db, "payments")); window.allPaymentsData = []; querySnapshot.forEach((docSnap) => { window.allPaymentsData.push({ id: docSnap.id, ...docSnap.data() }); }); window.allPaymentsData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)); window.updatePaymentStatsAndBadges(); window.renderPaymentsByFilter(); } catch (err) { container.innerHTML = `<div class="col-span-1 md:col-span-2 p-6 text-center text-red-500 font-bold bg-white rounded-2xl">Error: ${err.message}</div>`; }
@@ -424,7 +426,10 @@ window.loadAdminHistory = async function() {
 
         window.adminAllHistoryData.forEach((rec, idx) => {
             if (rec.withStamp) { window.stampSelectionMap[idx] = { enabled: true, stampFile: rec.stampFile || 'stamp.png', stampSrc: window.getStampDataUrlByName(rec.stampFile || 'stamp.png') }; }
-            if (rec.certificateFileId) { window.certificateSelectionMap[idx] = { enabled: true, certificateFileId: rec.certificateFileId }; }
+            
+            // Check for persistent attachment status
+            let certEnabled = rec.certificateFileId ? (rec.isCertificateAttached !== false) : false;
+            if (rec.certificateFileId) { window.certificateSelectionMap[idx] = { enabled: certEnabled, certificateFileId: rec.certificateFileId }; }
         });
         window.renderAdminHistory();
     } catch (err) {}
@@ -462,7 +467,6 @@ window.formatDateForCertificate = function(fData) {
     };
 
     if (fData.day && fData.monthYear) {
-        // Example: day = "3rd", monthYear = "OCTOBER 2026"
         let dStr = fData.day.replace(/\D/g, ''); 
         let d = parseInt(dStr) || 1;
         let dayNum = d < 10 ? '0' + d : '' + d;
@@ -491,7 +495,6 @@ window.formatDateForCertificate = function(fData) {
         }
     }
     
-    // Agar koi format match na ho toh aaj ki date bhej do (DD/MM/YYYY me)
     let now = new Date();
     let dd = String(now.getDate()).padStart(2, '0');
     let mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -508,6 +511,8 @@ window.toggleCertificateCheckbox = async function(origIndex, isChecked) {
         // Caching Logic: Agar file pehle se mojud hai toh dobara generate mat karo
         if (record.certificateFileId) {
             window.certificateSelectionMap[origIndex] = { enabled: true, certificateFileId: record.certificateFileId };
+            record.isCertificateAttached = true;
+            try { await updateDoc(doc(db, "history", record.id), { isCertificateAttached: true }); } catch (e) {}
             if (checkboxEl) checkboxEl.disabled = false;
             window.renderAdminHistory();
             return;
@@ -519,7 +524,7 @@ window.toggleCertificateCheckbox = async function(origIndex, isChecked) {
             const rawRel = fData.rel || 'S/o';
             const relationCode = window.formatRelationCodeForScript(rawRel);
             const fatherName = fData.relativeName || '';
-            const docDate = window.formatDateForCertificate(fData); // <--- Ye sirf DD/MM/YYYY jayega (jaise 03/10/2026)
+            const docDate = window.formatDateForCertificate(fData); // DD/MM/YYYY
 
             const payload = {
                 candidateName: candidateName,
@@ -529,8 +534,8 @@ window.toggleCertificateCheckbox = async function(origIndex, isChecked) {
             };
 
             const targetUrl = window.API_URLS["certificate"];
-            if (!targetUrl || targetUrl.includes('yahan_apna_certificate')) {
-                alert('Kripya pehle config-templates.js mein certificate generator ka sahi Web App URL (API_URLS.certificate) darj karein!');
+            if (!targetUrl || targetUrl.includes('यहाँ_अपना_सर्टिफिकेट')) {
+                alert('कृपया पहले config-templates.js में सर्टिफिकेट जनरेटर का सही Web App URL (API_URLS.certificate) दर्ज करें!');
                 if (checkboxEl) { checkboxEl.checked = false; checkboxEl.disabled = false; } return;
             }
 
@@ -540,15 +545,22 @@ window.toggleCertificateCheckbox = async function(origIndex, isChecked) {
             if (resData.success && resData.fileId) {
                 window.certificateSelectionMap[origIndex] = { enabled: true, certificateFileId: resData.fileId };
                 record.certificateFileId = resData.fileId;
-                await updateDoc(doc(db, "history", record.id), { certificateFileId: resData.fileId, certificateAttachedAt: new Date() });
+                record.isCertificateAttached = true;
+                await updateDoc(doc(db, "history", record.id), { 
+                    certificateFileId: resData.fileId, 
+                    isCertificateAttached: true,
+                    certificateAttachedAt: new Date() 
+                });
                 alert('सर्टिफिकेट सफलतापूर्वक जनरेट होकर एनेक्सर के साथ अटैच हो गया है!');
             } else { throw new Error(resData.error || 'सर्टिफिकेट जनरेशन फेल हो गया'); }
         } catch (err) {
             alert('सर्टिफिकेट जोड़ने में समस्या आई: ' + err.message); if (checkboxEl) checkboxEl.checked = false;
         }
     } else {
-        // Checkbox hatane par sirf map ko disable karo, fileId delete mat karo, taki wapas cache reuse ho sake.
+        // Checkbox hatane par preveiw se hatao aur DB mein isCertificateAttached false karo (taki reload par wapas na dikhe)
         window.certificateSelectionMap[origIndex] = { enabled: false, certificateFileId: record.certificateFileId };
+        record.isCertificateAttached = false;
+        try { await updateDoc(doc(db, "history", record.id), { isCertificateAttached: false }); } catch(e){}
     }
 
     if (checkboxEl) checkboxEl.disabled = false; window.renderAdminHistory();
@@ -573,7 +585,10 @@ window.renderAdminHistory = function() {
         
         const isAnnexure = String(data.fileId || '').startsWith('LOCAL_HTML_');
         const stampState = window.stampSelectionMap[data._origIndex]; const isStampChecked = !!(stampState && stampState.enabled);
-        const certState = window.certificateSelectionMap[data._origIndex] || { enabled: !!data.certificateFileId, certificateFileId: data.certificateFileId || '' }; const isCertChecked = !!certState.enabled;
+        
+        // Hide UI and Checkbox if disabled
+        const certState = window.certificateSelectionMap[data._origIndex] || { enabled: false, certificateFileId: data.certificateFileId || '' }; 
+        const isCertChecked = !!certState.enabled;
 
         const certificateCheckboxHtml = isAnnexure ? `
             <label class="inline-flex items-center gap-1.5 ${isCertChecked ? 'bg-indigo-100 text-indigo-900 border-indigo-400' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'} border px-2.5 py-2 rounded-xl text-xs font-black cursor-pointer select-none transition shadow-sm" title="सर्टिफिकेट ऑटोमैटिक जनरेट करके अटैच करें">
@@ -602,7 +617,7 @@ window.renderAdminHistory = function() {
                 <div class="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-end shrink-0 border-t xl:border-t-0 pt-2 xl:pt-0 border-slate-100">
                     ${certificateCheckboxHtml}
                     ${stampCheckboxHtml}
-                    <button onclick="window.openPdfViewer('${data.fileId}', '${safeFileName}', ${data._origIndex})" class="flex-1 sm:flex-initial justify-center inline-flex items-center gap-1.5 bg-royal-50 text-royal-700 px-3 py-2 rounded-xl text-xs font-black hover:bg-royal-50 hover:text-white transition border border-royal-200"><i class="fa-solid fa-eye"></i> Preview</button>
+                    <button onclick="window.openPdfViewer('${data.fileId}', '${safeFileName}', ${data._origIndex})" class="flex-1 sm:flex-initial justify-center inline-flex items-center gap-1.5 bg-royal-50 text-royal-700 px-3 py-2 rounded-xl text-xs font-black hover:bg-royal-500 hover:text-white transition border border-royal-200"><i class="fa-solid fa-eye"></i> Preview</button>
                     <button onclick="window.triggerDirectPrintByIndex(${data._origIndex}, this)" class="inline-flex items-center justify-center gap-1 bg-amber-500 hover:bg-amber-600 text-dark-950 px-3 py-2 rounded-xl text-xs font-black transition shadow-sm"><i class="fa-solid fa-print"></i> Print</button>
                     <button onclick="window.deleteHistoryRecord('${data.id}')" class="w-9 h-9 inline-flex items-center justify-center bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition border border-red-100"><i class="fa-solid fa-trash"></i></button>
                 </div>
@@ -630,7 +645,8 @@ window.triggerDirectPrintByIndex = async function(historyIndex, btnEl) {
         if (window.availableStampsList.length === 0) await window.preloadAllAvailableStamps();
         const chosenObj = window.pickRandomAvailableStampObj(); chosenSrc = chosenObj.dataUrl; window.stampSelectionMap[historyIndex] = { enabled: true, stampFile: chosenObj.name, stampSrc: chosenSrc };
     }
-    const certState = window.certificateSelectionMap[historyIndex]; const certFileId = certState?.certificateFileId || '';
+    const certState = window.certificateSelectionMap[historyIndex]; 
+    const certFileId = (certState && certState.enabled) ? certState.certificateFileId : '';
     window.directPrintDocument(record.fileId, record.formData || {}, record.fileName || 'Document.pdf', withStamp, chosenSrc, certFileId);
 };
 
@@ -655,8 +671,10 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     if (historyIndex >= 0) {
         const existingState = window.stampSelectionMap ? window.stampSelectionMap[historyIndex] : null;
         initialWithStamp = !!(existingState && existingState.enabled); initialStampSrc = existingState?.stampSrc || ''; initialStampFile = existingState?.stampFile || '';
+        
+        // Only load if explicitly enabled
         const existingCert = window.certificateSelectionMap ? window.certificateSelectionMap[historyIndex] : null;
-        initialCertFileId = existingCert?.certificateFileId || '';
+        initialCertFileId = (existingCert && existingCert.enabled) ? existingCert.certificateFileId : '';
     }
 
     if (initialWithStamp && !initialStampSrc && typeof window.preloadAllAvailableStamps === 'function') {
