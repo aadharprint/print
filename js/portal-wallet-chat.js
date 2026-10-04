@@ -1,6 +1,6 @@
 // ============================================================================
 // FILE 3: js/portal-wallet-chat.js (UPDATED)
-// (Auth, Wallet, Chat, User Preview Fix - Syncs Certificate Visibility with Admin)
+// (Auth, Wallet, Chat, User Preview Fix - Perfect Stamp & Cert Visibility)
 // ============================================================================
 
 import "./config-templates.js";
@@ -190,7 +190,7 @@ window.submitPaymentIssueTicket = async function() {
     } catch (err) { alert("टिकट रेज़ करने में समस्या आई: " + err.message); } finally { btn.disabled = false; btn.innerHTML = origHtml; }
 };
 
-// ================= USER PREVIEW FIX: Sync Certificate Visibility =================
+// ================= USER PREVIEW FIX: PERFECT STAMP & CERTIFICATE VISIBILITY =================
 window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     document.getElementById('pdfViewerTitle').innerText = fileName;
     const iframe = document.getElementById('pdfIframe'); const htmlPreviewContainer = document.getElementById('htmlDocPreviewContainer');
@@ -202,22 +202,24 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     let initialWithStamp = false, initialStampSrc = '', initialStampFile = '', initialCertFileId = '';
 
     if (historyIndex >= 0) {
-        const existingState = window.stampSelectionMap ? window.stampSelectionMap[historyIndex] : null;
-        initialWithStamp = !!(existingState && existingState.enabled); initialStampSrc = existingState?.stampSrc || ''; initialStampFile = existingState?.stampFile || '';
+        // Read directly from historyData record, ignoring any Maps that are admin-only
         const record = (window.historyData && window.historyData[historyIndex]) || (window.adminAllHistoryData && window.adminAllHistoryData[historyIndex]);
-        
-        // NEW FIX: Only load Certificate if 'isCertificateAttached' is NOT false
-        initialCertFileId = (record && record.certificateFileId && record.isCertificateAttached !== false) ? record.certificateFileId : ''; 
+        if (record) {
+            initialWithStamp = !!record.withStamp;
+            initialStampFile = record.stampFile || 'stamp.png';
+            
+            // Only load Certificate if 'isCertificateAttached' is NOT false
+            initialCertFileId = (record.certificateFileId && record.isCertificateAttached !== false) ? record.certificateFileId : ''; 
+        }
     }
 
-    if (initialWithStamp && !initialStampSrc && typeof window.preloadAllAvailableStamps === 'function') {
-        if (window.availableStampsList && window.availableStampsList.length === 0) await window.preloadAllAvailableStamps();
-        if(window.pickRandomAvailableStampObj){ const chosenObj = window.pickRandomAvailableStampObj(); initialStampSrc = chosenObj.dataUrl; initialStampFile = chosenObj.name; }
+    if (initialWithStamp && !initialStampSrc && typeof window.getTransparentStampDataUrl === 'function') {
+        // Build Data URL for the stamp so it renders properly in user panel
+        initialStampSrc = await window.getTransparentStampDataUrl(initialStampFile);
     }
 
     window.currentModalContext = { fileId: fileId, fileName: fileName, historyIndex: historyIndex, withStamp: initialWithStamp, stampFile: initialStampFile, stampSrc: initialStampSrc, certificateFileId: initialCertFileId };
     
-    // Stack items vertically
     const previewParent = iframe.parentElement;
     previewParent.classList.add('flex', 'flex-col');
     if (shareBtn) shareBtn.style.display = 'none';
@@ -232,14 +234,12 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
         spinner.style.display = 'none';
         
         if (initialCertFileId) {
-            // Both Certificate and Annexure
             iframe.style.display = 'block'; iframe.style.flex = '1'; iframe.style.minHeight = '350px'; iframe.style.borderBottom = '4px solid #cbd5e1';
             iframe.src = `https://drive.google.com/file/d/${initialCertFileId}/preview`;
             
             htmlPreviewContainer.style.display = 'flex'; htmlPreviewContainer.style.flex = '1'; htmlPreviewContainer.style.minHeight = '350px';
             htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true, initialWithStamp, initialStampSrc);
         } else {
-            // Only Annexure
             iframe.style.display = 'none';
             htmlPreviewContainer.style.display = 'flex'; htmlPreviewContainer.style.flex = '1';
             htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true, initialWithStamp, initialStampSrc);
@@ -287,10 +287,7 @@ window.renderHistory = function(filterType) {
         const dateStr = dateObj.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'}); const timeStr = dateObj.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
         
         let badgesHtml = '';
-        // NEW FIX: Only show Cert Badge if it is NOT disabled
-        if (data.certificateFileId && data.isCertificateAttached !== false) { 
-            badgesHtml += `<span class="bg-indigo-100 text-indigo-800 border border-indigo-300 px-2 py-0.5 rounded-full text-[10px] font-black ml-1.5"><i class="fa-solid fa-certificate mr-0.5"></i>Cert</span>`; 
-        }
+        if (data.certificateFileId && data.isCertificateAttached !== false) { badgesHtml += `<span class="bg-indigo-100 text-indigo-800 border border-indigo-300 px-2 py-0.5 rounded-full text-[10px] font-black ml-1.5"><i class="fa-solid fa-certificate mr-0.5"></i>Cert</span>`; }
         if (data.withStamp) { badgesHtml += `<span class="bg-green-100 text-green-800 border border-green-300 px-2 py-0.5 rounded-full text-[10px] font-black ml-1.5"><i class="fa-solid fa-stamp mr-0.5"></i>Stamped</span>`; }
         
         historyContainer.innerHTML += `
@@ -330,3 +327,4 @@ window.loadUserPayments = async function() {
     const tableBody = document.getElementById('userPaymentsTableBody'); if (!tableBody) return; tableBody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 font-bold text-xs"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>Loading payment history...</td></tr>`;
     try { const querySnapshot = await getDocs(query(collection(db, "payments"), where("userId", "==", window.currentUserData.uid))); window.userPaymentsData = []; querySnapshot.forEach((docSnap) => { window.userPaymentsData.push({ id: docSnap.id, ...docSnap.data() }); }); window.userPaymentsData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)); let sumApproved = 0, sumPending = 0, pendingCount = 0; window.userPaymentsData.forEach(item => { const amt = parseFloat(item.amountPaid) || 0; if (item.status === 'Approved' || item.status === 'Auto-Approved') { sumApproved += amt; } else if (item.status === 'Pending' || (item.status || '').includes('Ticket')) { sumPending += amt; pendingCount++; } }); document.getElementById('sumTotalTxns').innerText = window.userPaymentsData.length; document.getElementById('sumApprovedAmt').innerText = `₹${sumApproved}`; document.getElementById('sumPendingAmt').innerText = `₹${sumPending} (${pendingCount})`; tableBody.innerHTML = ''; if (window.userPaymentsData.length === 0) { tableBody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400 text-xs"><i class="fa-solid fa-receipt text-3xl mb-2 text-slate-300"></i><br>आपने अभी तक कोई पेमेंट नहीं किया है।</td></tr>`; return; } window.userPaymentsData.forEach(data => { const sec = data.timestamp?.seconds || Math.floor(Date.now() / 1000); const dateObj = new Date(sec * 1000); const dateStr = dateObj.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'}); const timeStr = dateObj.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'}); let statusBadge = ''; if ((data.status || '').includes('Ticket')) { statusBadge = `<span class="bg-indigo-100 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded text-[10px] font-black"><i class="fa-solid fa-ticket mr-1"></i>Ticket Raised</span>`; } else if (data.status === 'Pending') { statusBadge = `<span class="bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded text-[10px] font-black"><i class="fa-solid fa-clock mr-1"></i>Pending</span>`; } else if (data.status === 'Approved' || data.status === 'Auto-Approved') { statusBadge = `<span class="bg-green-100 text-green-800 border border-green-200 px-2 py-0.5 rounded text-[10px] font-black"><i class="fa-solid fa-check-circle mr-1"></i>Approved</span>`; } else { statusBadge = `<span class="bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded text-[10px] font-black"><i class="fa-solid fa-circle-xmark mr-1"></i>${data.status}</span>`; } const vipDays = data.vipDaysRequested || (data.wantsVip ? 30 : 0); const creds = data.creditsRequested !== undefined ? data.creditsRequested : (data.creditsAdded || 0); tableBody.innerHTML += `<tr class="border-b border-slate-100 text-xs hover:bg-slate-50 transition"><td class="p-3 text-slate-500 font-medium">${dateStr} <br> ${timeStr}</td><td class="p-3 font-black text-slate-800 text-sm">₹${data.amountPaid || 0}</td><td class="p-3"><div class="flex flex-col gap-1"><span class="font-bold text-royal-600">+${creds} Cr</span>${vipDays > 0 ? `<span class="bg-amber-400 text-dark-950 px-1.5 py-0.5 rounded text-[9px] font-black inline-block w-max">👑 +${vipDays}d VIP</span>` : ''}</div></td><td class="p-3 font-mono font-bold text-slate-600 text-[11px]">${data.utrNumber || 'ONLINE_UPI'}</td><td class="p-3 text-right whitespace-nowrap">${statusBadge}</td></tr>`; }); } catch (err) { tableBody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500 text-xs">Failed to load payment history.</td></tr>`; }
 };
+
