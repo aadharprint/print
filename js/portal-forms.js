@@ -97,7 +97,7 @@ window.submitForm = async function(event, serviceType) {
         });
         
         // 3. यूज़र को मैसेज देना और हिस्ट्री टैब पर भेजना
-        alert('Success! आपका फॉर्म सबमिट हो गया है और फाइल बैकग्राउंड में जनरेट हो रही है। आप History में इसका Live स्टेटस देख सकते हैं।');
+        alert('Success! आपका फॉर्म सबमिट हो गया है और फाइल बैकग्राउंड में जनरेट हो रही है।');
         formElement.reset();
         window.switchService('history');
 
