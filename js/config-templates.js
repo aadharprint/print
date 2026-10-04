@@ -34,7 +34,6 @@ window.fb = {
     doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, query, where, onSnapshot, deleteDoc
 };
 
-// ================= CUSTOM STYLISH ALERT (OVERRIDE DEFAULT ALERT) =================
 window.alert = function(message) {
     let alertModal = document.getElementById('customAlertModal');
     if (!alertModal) {
@@ -62,7 +61,6 @@ window.alert = function(message) {
             alertModal.querySelector('div').classList.add('scale-95');
         };
     }
-    
     document.getElementById('customAlertMessage').innerText = message;
     alertModal.classList.remove('opacity-0', 'pointer-events-none');
     alertModal.classList.add('opacity-100', 'pointer-events-auto');
@@ -70,222 +68,52 @@ window.alert = function(message) {
     alertModal.querySelector('div').classList.add('scale-100');
 };
 
-// ================= STRICT ADMIN, FREE VIP & @print.com CONFIG =================
 window.ADMIN_EMAIL = "hkosiun1221@gmail.com";
-window.FREE_VIP_EMAILS = [
-    "aadhaar@gmail.com",
-    "danish@print.com"
-];
+window.FREE_VIP_EMAILS = ["aadhaar@gmail.com", "danish@print.com"];
 window.MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 window.isAllowedPortalEmail = function(email) {
     if (!email) return false;
     const cleanEmail = String(email).trim().toLowerCase();
-    if (cleanEmail === window.ADMIN_EMAIL) return true;
-    if (window.FREE_VIP_EMAILS.includes(cleanEmail)) return true;
+    if (cleanEmail === window.ADMIN_EMAIL || window.FREE_VIP_EMAILS.includes(cleanEmail)) return true;
     return cleanEmail.endsWith("@print.com");
 };
 
-// ================= DEPLOYED GOOGLE APPS SCRIPT API URLS =================
+// ================= API URLS (यहाँ नया सर्टिफिकेट URL जोड़ा गया है) =================
 window.API_URLS = {
     "domicile": "https://script.google.com/macros/s/AKfycbwqvv_hWDzTltYcP7UDC41uPM7X2wvCzYFvu_eKu8t82TJf_f4QD5tLQtZ23_JCgYlgFA/exec",
     "DOB": "https://script.google.com/macros/s/AKfycbyncAUbXWLplC_uHgodCqhPCDLTWFiWEQVzxPAInLP7zedGUQRdRbvix_jdDBJrYMlc9w/exec",
-    "CASTE": "https://script.google.com/macros/s/AKfycbzUs_e_ga3Ly3SQ9qq5inqHgfC23-jzav8sjUES7XnPw7cyUn3DHhVEBFdgxqUejU5Y/exec"
+    "CASTE": "https://script.google.com/macros/s/AKfycbzUs_e_ga3Ly3SQ9qq5inqHgfC23-jzav8sjUES7XnPw7cyUn3DHhVEBFdgxqUejU5Y/exec",
+    "certificate": "यहाँ_अपना_सर्टिफिकेट_वाला_Apps_Script_URL_डालें" // <--- यहाँ अपना लिंक डालें
 };
 
-// ================= GLOBAL DROPDOWN OPTIONS LISTS =================
-window.DOC_OPTIONS_LIST = [
-    "BIRTH CERTIFICATE",
-    "INVALID BIRTH CERTIFICATE",
-    "MARKSHEET",
-    "SCHOOL LEAVING CERTIFICATE",
-    "TRANSFER CERTIFICATE",
-    "PASSPORT",
-];
+window.DOC_OPTIONS_LIST = ["BIRTH CERTIFICATE", "INVALID BIRTH CERTIFICATE", "MARKSHEET", "SCHOOL LEAVING CERTIFICATE", "TRANSFER CERTIFICATE", "PASSPORT"];
+window.VLE_NAMES_LIST = ["कपिल", "सचिन", "नसीम", "शौकीन", "राहुल", "अमन", "मोहित"];
 
-window.VLE_NAMES_LIST = [
-    "कपिल", "सचिन", "नसीम", "शौकीन", "राहुल", "अमन", "मोहित"
-];
-
-window.CASTE_OPTIONS_LIST = [
-    "गुर्जर", "कश्यप", "अहीर", "ब्राह्मण", "सैनी", "प्रजापति", "राजपूत", "त्यागी", "वाल्मीकि"
-];
+window.CASTE_OPTIONS_LIST = ["गुर्जर", "कश्यप", "अहीर", "ब्राह्मण", "सैनी", "प्रजापति", "राजपूत", "त्यागी", "वाल्मीकि"];
 
 window.DISTRICT_DATA_MAP = {
-    'BAGHPAT': {
-        tehsils: ['बड़ौत', 'खेकड़ा', 'बागपत'],
-        thanas: ['बड़ौत', 'खेकड़ा', 'बागपत', 'छपरोली', 'बिनौली', 'रमाला', 'दोघट', 'सिंघावली अहीर', 'बालैनी', 'चांदीनगर']
-    },
-    'SHAMLI': {
-        tehsils: ['कैराना', 'ऊन', 'शामली'],
-        thanas: ['थाना भवन', 'कैराना', 'झिंझाना', 'शामली', 'बाबरी', 'कांधला', 'गढ़ी पुख्ता', 'आदर्श मंडी']
-    },
-    'MUZAFFARNAGAR': {
-        tehsils: ['बुढ़ाना', 'खतौली', 'जानसठ', 'मुजफ्फरनगर'],
-        thanas: ['बुढ़ाना', 'खतौली', 'जानसठ', 'मीरापुर', 'सिविल लाइन', 'कोतवाली नगर', 'नई मंडी', 'चरथावल', 'पुरकाजी', 'छपार', 'मंसूरपुर', 'शाहपुर', 'सिखेड़ा', 'फुगाना', 'भौराकलां', 'ककरौली', 'भोपा', 'रतनपुरी', 'तितावी', 'रामराज']
-    },
-    'MEERUT': {
-        tehsils: ['मेरठ', 'मवाना', 'सरधना'],
-        thanas: ['मवाना', 'सरधना', 'जानी', 'रोहटा', 'परतापुर', 'कंकरखेड़ा', 'दौराला', 'हस्तिनापुर', 'बहसूमा', 'फलावदा', 'किठौर', 'मुंडाली', 'खरखौदा', 'इंचौली', 'गंगानगर', 'मेडिकल', 'नौचंदी', 'सिविल लाइन', 'कोतवाली', 'देहली गेट', 'लिसाड़ी गेट', 'ब्रह्मपुरी', 'टीपी नगर', 'पल्लवपुरम', 'सरूरपुर', 'लालकुर्ती', 'सदर बाजार', 'रेलवे रोड', 'लोहियानगर']
-    },
-    'SAHARANPUR': {
-        tehsils: ['सहारनपुर', 'बेहट', 'देवबंद', 'रामपुर मनिहारन', 'नकुड़'],
-        thanas: ['बेहट', 'देवबंद', 'रामपुर मनिहारन', 'नकुड़', 'गंगोह', 'चिलकाना', 'सरसावा', 'तीतरों', 'नानौता', 'बड़गांव', 'मिर्जापुर', 'फतेहपुर', 'गागलहेड़ी', 'नागल', 'कोतवाली देहात', 'कोतवाली नगर', 'सदर बाजार', 'कुतुबशेर', 'जनकपुरी', 'मंडी', 'बिहारीगढ़']
-    },
-    'GHAZIABAD': {
-        tehsils: ['गाजियाबाद', 'मोदीनगर', 'लोनी'],
-        thanas: ['मोदीनगर', 'लोनी', 'मुरादनगर', 'भोजपुर', 'निवाड़ी', 'लोनी बॉर्डर', 'ट्रॉनिका सिटी', 'अंकुर विहार', 'साहिबाबाद', 'लिंक रोड', 'टीला मोड़', 'शालीमार गार्डन', 'इंदिरापुरम', 'कौशांबी', 'खोड़ा', 'विजयनगर', 'क्रॉसिंग रिपब्लिक', 'कोतवाली घंटाघर', 'सिहानी गेट', 'नंदग्राम', 'कविनगर', 'मधुबन बापूधाम', 'मसूरी', 'वेव सिटी']
-    }
+    'BAGHPAT': { tehsils: ['बड़ौत', 'खेकड़ा', 'बागपत'], thanas: ['बड़ौत', 'खेकड़ा', 'बागपत', 'छपरोली', 'बिनौली', 'रमाला', 'दोघट', 'सिंघावली अहीर', 'बालैनी', 'चांदीनगर'] },
+    'SHAMLI': { tehsils: ['कैराना', 'ऊन', 'शामली'], thanas: ['थाना भवन', 'कैराना', 'झिंझाना', 'शामली', 'बाबरी', 'कांधला', 'गढ़ी पुख्ता', 'आदर्श मंडी'] },
+    'MUZAFFARNAGAR': { tehsils: ['बुढ़ाना', 'खतौली', 'जानसठ', 'मुजफ्फरनगर'], thanas: ['बुढ़ाना', 'खतौली', 'जानसठ', 'मीरापुर', 'सिविल लाइन', 'कोतवाली नगर', 'नई मंडी', 'चरथावल', 'पुरकाजी', 'छपार', 'मंसूरपुर', 'शाहपुर', 'सिखेड़ा', 'फुगाना', 'भौराकलां', 'ककरौली', 'भोपा', 'रतनपुरी', 'तितावी', 'रामराज'] },
+    'MEERUT': { tehsils: ['मेरठ', 'मवाना', 'सरधना'], thanas: ['मवाना', 'सरधना', 'जानी', 'रोहटा', 'परतापुर', 'कंकरखेड़ा', 'दौराला', 'हस्तिनापुर', 'बहसूमा', 'फलावदा', 'किठौर', 'मुंडाली', 'खरखौदा', 'इंचौली', 'गंगानगर', 'मेडिकल', 'नौचंदी', 'सिविल लाइन', 'कोतवाली', 'देहली गेट', 'लिसाड़ी गेट', 'ब्रह्मपुरी', 'टीपी नगर', 'पल्लवपुरम', 'सरूरपुर', 'लालकुर्ती', 'सदर बाजार', 'रेलवे रोड', 'लोहियानगर'] },
+    'SAHARANPUR': { tehsils: ['सहारनपुर', 'बेहट', 'देवबंद', 'रामपुर मनिहारन', 'नकुड़'], thanas: ['बेहट', 'देवबंद', 'रामपुर मनिहारन', 'नकुड़', 'गंगोह', 'चिलकाना', 'सरसावा', 'तीतरों', 'नानौता', 'बड़गांव', 'मिर्जापुर', 'फतेहपुर', 'गागलहेड़ी', 'नागल', 'कोतवाली देहात', 'कोतवाली नगर', 'सदर बाजार', 'कुतुबशेर', 'जनकपुरी', 'मंडी', 'बिहारीगढ़'] },
+    'GHAZIABAD': { tehsils: ['गाजियाबाद', 'मोदीनगर', 'लोनी'], thanas: ['मोदीनगर', 'लोनी', 'मुरादनगर', 'भोजपुर', 'निवाड़ी', 'लोनी बॉर्डर', 'ट्रॉनिका सिटी', 'अंकुर विहार', 'साहिबाबाद', 'लिंक रोड', 'टीला मोड़', 'शालीमार गार्डन', 'इंदिरापुरम', 'कौशांबी', 'खोड़ा', 'विजयनगर', 'क्रॉसिंग रिपब्लिक', 'कोतवाली घंटाघर', 'सिहानी गेट', 'नंदग्राम', 'कविनगर', 'मधुबन बापूधाम', 'मसूरी', 'वेव सिटी'] }
 };
 
-// ================= COMMON FORM HELPERS =================
-window.buildDocSelectOptions = function(defaultVal = "BIRTH CERTIFICATE") {
-    return window.DOC_OPTIONS_LIST.map(docName => 
-        `<option value="${docName}" ${docName === defaultVal ? 'selected' : ''}>${docName}</option>`
-    ).join('') + `<option value="OTHER">OTHER (खुद टाइप करें)</option>`;
-};
+window.buildDocSelectOptions = function(defaultVal = "BIRTH CERTIFICATE") { return window.DOC_OPTIONS_LIST.map(docName => `<option value="${docName}" ${docName === defaultVal ? 'selected' : ''}>${docName}</option>`).join('') + `<option value="OTHER">OTHER (खुद टाइप करें)</option>`; };
+window.toggleCustomInput = function(selectEl, customInputId) { const customInp = document.getElementById(customInputId); if (!customInp) return; if (selectEl.value === 'OTHER') { customInp.style.display = 'block'; customInp.required = true; customInp.focus(); } else { customInp.style.display = 'none'; customInp.required = false; customInp.value = ''; } };
+window.format12DigitId = function(el) { const digits = el.value.replace(/\D/g, '').substring(0, 12); el.value = digits.match(/.{1,4}/g)?.join(' ') || ''; };
+window.toggleNaField = function(checkbox, inputId, originalType = 'text') { const inp = document.getElementById(inputId); if (!inp) return; if (checkbox.checked) { if (inp.type === 'date') inp.type = 'text'; inp.value = 'NA'; inp.readOnly = true; inp.classList.add('bg-slate-200', 'text-slate-600', 'cursor-not-allowed'); } else { inp.type = originalType; inp.value = ''; inp.readOnly = false; inp.classList.remove('bg-slate-200', 'text-slate-600', 'cursor-not-allowed'); inp.focus(); } };
+window.cleanDob18AddressString = function(rawVal = '') { let val = String(rawVal).toUpperCase(); val = val.replace(/[\s,\-\/]*(?:UTT[AE]R\s*PRADESH|उत्तर\s*प्रदेश|उत्तरप्रदेश)[\s,\-\/]*/gi, ' '); val = val.replace(/\s{2,}/g, ' '); if (val.trim() !== 'VILL -') { val = val.replace(/[,\-]+$/, ''); } if (val.length > 38) { val = val.substring(0, 38); } return val; };
+window.handleDob18AddressInput = function(el) { const rawUpper = el.value.toUpperCase(); const hasUP = /(?:UTT[AE]R\s*PRADESH|उत्तर\s*प्रदेश|उत्तरप्रदेश)/i.test(rawUpper); if (hasUP || rawUpper.length > 38) { el.value = window.cleanDob18AddressString(rawUpper); } else { el.value = rawUpper; } const counterEl = document.getElementById('dobAddressCharCount'); if (counterEl) { const len = el.value.length; counterEl.innerText = `${len} / 38 Characters`; counterEl.className = len >= 38 ? "text-[10px] font-black text-red-600" : "text-[10px] font-bold text-slate-400"; } };
+window.updateTehsilsAndThanas = function() { const districtEl = document.getElementById('districtSelect'); const tehsilSelect = document.getElementById('tehsilSelect'); const thanaSelect = document.getElementById('thanaSelect'); if (!districtEl || !tehsilSelect) return; const selectedDistrict = districtEl.value; const data = window.DISTRICT_DATA_MAP[selectedDistrict] || window.DISTRICT_DATA_MAP['BAGHPAT']; tehsilSelect.innerHTML = data.tehsils.map(t => `<option value="${t}">${t}</option>`).join(''); if (thanaSelect) { thanaSelect.innerHTML = data.thanas.map(th => `<option value="${th}">${th}</option>`).join(''); } };
+window.formatDateIN = function(dateStr) { if (!dateStr) return ''; const parts = String(dateStr).split('-'); if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`; return dateStr; };
+window.getOrdinalDay = function(n) { const s = ["th", "st", "nd", "rd"]; const v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+window.initVerificationDefaults = function() { const now = new Date(); const dayEl = document.getElementById('inpDay'); const myEl = document.getElementById('inpMonthYear'); if (dayEl) dayEl.value = window.getOrdinalDay(now.getDate()); if (myEl) myEl.value = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase(); };
+window.syncAnnexureENames = function() { const appName = document.getElementById('inpApplicantName')?.value.trim().toUpperCase() || ''; const rec1Input = document.getElementById('inpRecorded1'); const rec2Input = document.getElementById('inpRecorded2'); const retainInput = document.getElementById('inpRetainName'); const removeInput = document.getElementById('inpRemoveName'); if (appName && document.activeElement?.id === 'inpApplicantName') { const urfSplit = appName.split(/\s+(?:URF|ALIAS|उर्फ|उर्फ़)\s+/i); if (urfSplit.length >= 2) { const firstName = urfSplit[0].trim(); const aliasName = urfSplit.slice(1).join(' ').trim(); if (rec1Input) rec1Input.value = firstName; if (rec2Input) rec2Input.value = aliasName; if (retainInput) retainInput.value = firstName; if (removeInput) removeInput.value = aliasName; } else { if (rec1Input) rec1Input.value = appName; if (retainInput) retainInput.value = appName; } } else if (document.activeElement?.id === 'inpRecorded1' && retainInput) { retainInput.value = rec1Input.value.toUpperCase(); } else if (document.activeElement?.id === 'inpRecorded2' && removeInput) { removeInput.value = rec2Input.value.toUpperCase(); } };
+window.swapAnnexureERetainRemove = function() { const retainInput = document.getElementById('inpRetainName'); const removeInput = document.getElementById('inpRemoveName'); if (!retainInput || !removeInput) return; const temp = retainInput.value; retainInput.value = removeInput.value; removeInput.value = temp; };
 
-window.toggleCustomInput = function(selectEl, customInputId) {
-    const customInp = document.getElementById(customInputId);
-    if (!customInp) return;
-    if (selectEl.value === 'OTHER') {
-        customInp.style.display = 'block';
-        customInp.required = true;
-        customInp.focus();
-    } else {
-        customInp.style.display = 'none';
-        customInp.required = false;
-        customInp.value = '';
-    }
-};
-
-window.format12DigitId = function(el) {
-    const digits = el.value.replace(/\D/g, '').substring(0, 12);
-    el.value = digits.match(/.{1,4}/g)?.join(' ') || '';
-};
-
-window.toggleNaField = function(checkbox, inputId, originalType = 'text') {
-    const inp = document.getElementById(inputId);
-    if (!inp) return;
-    if (checkbox.checked) {
-        if (inp.type === 'date') inp.type = 'text';
-        inp.value = 'NA';
-        inp.readOnly = true;
-        inp.classList.add('bg-slate-200', 'text-slate-600', 'cursor-not-allowed');
-    } else {
-        inp.type = originalType;
-        inp.value = '';
-        inp.readOnly = false;
-        inp.classList.remove('bg-slate-200', 'text-slate-600', 'cursor-not-allowed');
-        inp.focus();
-    }
-};
-
-window.cleanDob18AddressString = function(rawVal = '') {
-    let val = String(rawVal).toUpperCase();
-    val = val.replace(/[\s,\-\/]*(?:UTT[AE]R\s*PRADESH|उत्तर\s*प्रदेश|उत्तरप्रदेश)[\s,\-\/]*/gi, ' ');
-    val = val.replace(/\s{2,}/g, ' ');
-    if (val.trim() !== 'VILL -') {
-        val = val.replace(/[,\-]+$/, '');
-    }
-    if (val.length > 38) {
-        val = val.substring(0, 38);
-    }
-    return val;
-};
-
-window.handleDob18AddressInput = function(el) {
-    const rawUpper = el.value.toUpperCase();
-    const hasUP = /(?:UTT[AE]R\s*PRADESH|उत्तर\s*प्रदेश|उत्तरप्रदेश)/i.test(rawUpper);
-    if (hasUP || rawUpper.length > 38) {
-        el.value = window.cleanDob18AddressString(rawUpper);
-    } else {
-        el.value = rawUpper;
-    }
-
-    const counterEl = document.getElementById('dobAddressCharCount');
-    if (counterEl) {
-        const len = el.value.length;
-        counterEl.innerText = `${len} / 38 Characters`;
-        counterEl.className = len >= 38 
-            ? "text-[10px] font-black text-red-600" 
-            : "text-[10px] font-bold text-slate-400";
-    }
-};
-
-window.updateTehsilsAndThanas = function() {
-    const districtEl = document.getElementById('districtSelect');
-    const tehsilSelect = document.getElementById('tehsilSelect');
-    const thanaSelect = document.getElementById('thanaSelect');
-    if (!districtEl || !tehsilSelect) return;
-
-    const selectedDistrict = districtEl.value;
-    const data = window.DISTRICT_DATA_MAP[selectedDistrict] || window.DISTRICT_DATA_MAP['BAGHPAT'];
-
-    tehsilSelect.innerHTML = data.tehsils.map(t => `<option value="${t}">${t}</option>`).join('');
-    if (thanaSelect) {
-        thanaSelect.innerHTML = data.thanas.map(th => `<option value="${th}">${th}</option>`).join('');
-    }
-};
-
-window.formatDateIN = function(dateStr) {
-    if (!dateStr) return '';
-    const parts = String(dateStr).split('-');
-    if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
-    return dateStr;
-};
-
-window.getOrdinalDay = function(n) {
-    const s = ["th", "st", "nd", "rd"];
-    const v = n % 100;
-    return n + (s[(v - 20) % 10] || s[v] || s[0]);
-};
-
-window.initVerificationDefaults = function() {
-    const now = new Date();
-    const dayEl = document.getElementById('inpDay');
-    const myEl = document.getElementById('inpMonthYear');
-    if (dayEl) dayEl.value = window.getOrdinalDay(now.getDate());
-    if (myEl) myEl.value = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase();
-};
-
-window.syncAnnexureENames = function() {
-    const appName = document.getElementById('inpApplicantName')?.value.trim().toUpperCase() || '';
-    const rec1Input = document.getElementById('inpRecorded1');
-    const rec2Input = document.getElementById('inpRecorded2');
-    const retainInput = document.getElementById('inpRetainName');
-    const removeInput = document.getElementById('inpRemoveName');
-
-    if (appName && document.activeElement?.id === 'inpApplicantName') {
-        const urfSplit = appName.split(/\s+(?:URF|ALIAS|उर्फ|उर्फ़)\s+/i);
-        if (urfSplit.length >= 2) {
-            const firstName = urfSplit[0].trim();
-            const aliasName = urfSplit.slice(1).join(' ').trim();
-            if (rec1Input) rec1Input.value = firstName;
-            if (rec2Input) rec2Input.value = aliasName;
-            if (retainInput) retainInput.value = firstName;
-            if (removeInput) removeInput.value = aliasName;
-        } else {
-            if (rec1Input) rec1Input.value = appName;
-            if (retainInput) retainInput.value = appName;
-        }
-    } else if (document.activeElement?.id === 'inpRecorded1' && retainInput) {
-        retainInput.value = rec1Input.value.toUpperCase();
-    } else if (document.activeElement?.id === 'inpRecorded2' && removeInput) {
-        removeInput.value = rec2Input.value.toUpperCase();
-    }
-};
-
-window.swapAnnexureERetainRemove = function() {
-    const retainInput = document.getElementById('inpRetainName');
-    const removeInput = document.getElementById('inpRemoveName');
-    if (!retainInput || !removeInput) return;
-    const temp = retainInput.value;
-    retainInput.value = removeInput.value;
-    removeInput.value = temp;
-};
-
-// ================= TRANSPARENT STAMP LOADER =================
 window.userStampCache = {};
 window.getTransparentStampDataUrl = function(fileName = 'stamp.png') {
     if (window.userStampCache[fileName]) return Promise.resolve(window.userStampCache[fileName]);
@@ -293,32 +121,17 @@ window.getTransparentStampDataUrl = function(fileName = 'stamp.png') {
         const img = new Image();
         img.onload = () => {
             try {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                canvas.width = img.naturalWidth || 794;
-                canvas.height = img.naturalHeight || 1122;
-                ctx.drawImage(img, 0, 0);
-                const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const data = imgData.data;
-                for (let i = 0; i < data.length; i += 4) {
-                    if (data[i] > 240 && data[i + 1] > 240 && data[i + 2] > 240) {
-                        data[i + 3] = 0;
-                    }
-                }
-                ctx.putImageData(imgData, 0, 0);
-                const url = canvas.toDataURL('image/png');
-                window.userStampCache[fileName] = url;
-                resolve(url);
-            } catch (e) {
-                resolve(fileName);
-            }
+                const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+                canvas.width = img.naturalWidth || 794; canvas.height = img.naturalHeight || 1122;
+                ctx.drawImage(img, 0, 0); const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height); const data = imgData.data;
+                for (let i = 0; i < data.length; i += 4) { if (data[i] > 240 && data[i + 1] > 240 && data[i + 2] > 240) { data[i + 3] = 0; } }
+                ctx.putImageData(imgData, 0, 0); const url = canvas.toDataURL('image/png'); window.userStampCache[fileName] = url; resolve(url);
+            } catch (e) { resolve(fileName); }
         };
-        img.onerror = () => resolve(fileName);
-        img.src = fileName;
+        img.onerror = () => resolve(fileName); img.src = fileName;
     });
 };
 
-// ================= UNIFIED SINGLE-PAGE A4 HTML BUILDER FOR ALL 9 ANNEXURES =================
 window.buildLocalAffidavitHtml = function(fileId, d = {}, withShadow = true, withStamp = false, stampSrc = '') {
     const shadowClass = withShadow ? 'shadow-2xl' : '';
     const finalStampSrc = stampSrc || (typeof window.pickRandomAvailableStamp === 'function' ? window.pickRandomAvailableStamp() : 'stamp.png');
@@ -520,9 +333,7 @@ window.buildLocalAffidavitHtml = function(fileId, d = {}, withShadow = true, wit
             'LOCAL_HTML_ANNEXURE_C': 'Annexure C (for children)',
             'LOCAL_HTML_ANNEXURE_D': 'Annexure D (for name update)'
         };
-        const subTitleText = isChild
-            ? '(Applicable for Name Change / Correction of Minor Child by Parent/Legal Guardian)'
-            : '(Applicable where the ID number holder seeks to update / change Name)';
+        const subTitleText = isChild ? '(Applicable for Name Change / Correction of Minor Child by Parent/Legal Guardian)' : '(Applicable where the ID number holder seeks to update / change Name)';
 
         const bodyPoints = isChild ? `
             <li style="margin-bottom: 14px; padding-left: 6px;">That I am the parent/legal guardian of minor child <span class="filled-val">${d.childName || d.newName || ''}</span> holding ID Number <span class="filled-val">${d.childIdNumber || d.idNumber || ''}</span>.</li>
@@ -694,85 +505,68 @@ window.buildLocalAffidavitHtml = function(fileId, d = {}, withShadow = true, wit
     `;
 };
 
-// ================= SHARED PDF DOWNLOAD, DIRECT PRINT & DIRECT SHARE FUNCTIONS =================
-window.downloadHtmlDocAsPdf = async function(fileId, formDataObj, fileName, withStamp = false, stampSrc = '') {
+// ================= SHARED PDF DOWNLOAD, DIRECT PRINT & SHARE =================
+window.downloadHtmlDocAsPdf = async function(fileId, formDataObj, fileName, withStamp = false, stampSrc = '', certificateFileId = '') {
     const btn = document.getElementById('modalDownloadBtn');
     const origHtml = btn ? btn.innerHTML : '';
-    if (btn) {
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Downloading...';
-        btn.disabled = true;
-    }
+    if (btn) { btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Downloading...'; btn.disabled = true; }
 
     if (withStamp && typeof window.preloadAllAvailableStamps === 'function' && window.availableStampsList?.length === 0) {
         await window.preloadAllAvailableStamps();
     }
 
     const finalStampSrc = withStamp ? (stampSrc || (typeof window.pickRandomAvailableStamp === 'function' ? window.pickRandomAvailableStamp() : 'stamp.png')) : '';
-
-    const savedScrollX = window.scrollX;
-    const savedScrollY = window.scrollY;
-    window.scrollTo(0, 0);
+    const savedScrollX = window.scrollX; const savedScrollY = window.scrollY; window.scrollTo(0, 0);
 
     const tempWrapper = document.createElement('div');
     tempWrapper.style.cssText = 'position:fixed;top:0;left:0;width:794px;height:1122px;margin:0;padding:0;z-index:99999;background:#ffffff;overflow:hidden;';
     tempWrapper.innerHTML = window.buildLocalAffidavitHtml(fileId, formDataObj, false, withStamp, finalStampSrc);
     document.body.appendChild(tempWrapper);
-
     const targetEl = tempWrapper.querySelector('.affidavit-paper');
 
     try {
         const opt = {
-            margin: 0,
-            filename: withStamp ? fileName.replace('.pdf', ' (With Stamp).pdf') : fileName,
+            margin: 0, filename: withStamp ? fileName.replace('.pdf', ' (With Stamp).pdf') : fileName,
             image: { type: 'jpeg', quality: 1.0 },
-            html2canvas: {
-                scale: 2,
-                useCORS: true,
-                x: 0,
-                y: 0,
-                scrollX: 0,
-                scrollY: 0,
-                width: 794,
-                height: 1122,
-                windowWidth: 794,
-                windowHeight: 1122
-            },
-            jsPDF: {
-                unit: 'mm',
-                format: 'a4',
-                orientation: 'portrait'
-            }
+            html2canvas: { scale: 2, useCORS: true, x: 0, y: 0, scrollX: 0, scrollY: 0, width: 794, height: 1122, windowWidth: 794, windowHeight: 1122 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
         await html2pdf().set(opt).from(targetEl).save();
+        
+        // यदि सर्टिफिकेट अटैच है, तो उसे भी एक साथ डाउनलोड करें
+        if (certificateFileId) {
+            setTimeout(() => {
+                window.open(`https://drive.google.com/uc?export=download&id=${certificateFileId}`, '_blank');
+            }, 800);
+        }
     } catch (err) {
         alert("PDF डाउनलोड करने में समस्या आई।");
     } finally {
-        document.body.removeChild(tempWrapper);
-        window.scrollTo(savedScrollX, savedScrollY);
-        if (btn) {
-            btn.innerHTML = origHtml;
-            btn.disabled = false;
-        }
+        document.body.removeChild(tempWrapper); window.scrollTo(savedScrollX, savedScrollY);
+        if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
     }
 };
 
-window.directPrintDocument = async function(fileId, formDataObj, fileName, withStamp = false, stampSrc = '') {
+window.directPrintDocument = async function(fileId, formDataObj, fileName, withStamp = false, stampSrc = '', certificateFileId = '') {
     if (String(fileId).startsWith('LOCAL_HTML_')) {
         if (withStamp && typeof window.preloadAllAvailableStamps === 'function' && window.availableStampsList?.length === 0) {
             await window.preloadAllAvailableStamps();
         }
+        
+        if (certificateFileId) {
+            window.open(`https://drive.google.com/file/d/${certificateFileId}/view`, '_blank');
+        }
+
         const finalStampSrc = withStamp ? (stampSrc || (typeof window.pickRandomAvailableStamp === 'function' ? window.pickRandomAvailableStamp() : 'stamp.png')) : '';
         const htmlContent = window.buildLocalAffidavitHtml(fileId, formDataObj, false, withStamp, finalStampSrc);
         let printFrame = document.getElementById('directPrintIframe');
         if (printFrame) document.body.removeChild(printFrame);
 
-        printFrame = document.createElement('iframe');
-        printFrame.id = 'directPrintIframe';
+        printFrame = document.createElement('iframe'); printFrame.id = 'directPrintIframe';
         printFrame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
         document.body.appendChild(printFrame);
 
-        const frameDoc = printFrame.contentWindow.document;
-        frameDoc.open();
+        const frameDoc = printFrame.contentWindow.document; frameDoc.open();
         frameDoc.write(`
             <!DOCTYPE html>
             <html>
@@ -781,122 +575,59 @@ window.directPrintDocument = async function(fileId, formDataObj, fileName, withS
                 <style>
                     @page { size: A4; margin: 0; }
                     html, body { margin: 0; padding: 0; background: #ffffff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    .affidavit-paper {
-                        position: relative !important;
-                        font-family: 'Times New Roman', Times, serif;
-                        width: 794px;
-                        height: 1122px;
-                        padding: 46px 62px;
-                        background: #ffffff;
-                        color: #000000;
-                        font-size: 15px;
-                        line-height: 1.55;
-                        box-sizing: border-box;
-                        display: flex;
-                        flex-direction: column;
-                        justify-content: space-between;
-                        margin: 0 !important;
-                        overflow: hidden;
-                    }
-                    .filled-val {
-                        font-weight: bold !important;
-                        color: #000000 !important;
-                        text-decoration: underline !important;
-                        text-underline-offset: 3px !important;
-                    }
-                    .stamp-overlay-layer {
-                        position: absolute;
-                        top: 0;
-                        left: 0;
-                        width: 794px;
-                        height: 1122px;
-                        pointer-events: none;
-                        z-index: 30;
-                        mix-blend-mode: multiply;
-                        overflow: hidden;
-                    }
-                    .stamp-overlay-layer img {
-                        width: 794px;
-                        height: 1122px;
-                        object-fit: contain;
-                        object-position: top center;
-                        mix-blend-mode: multiply;
-                        display: block;
-                    }
+                    .affidavit-paper { position: relative !important; font-family: 'Times New Roman', Times, serif; width: 794px; height: 1122px; padding: 46px 62px; background: #ffffff; color: #000000; font-size: 15px; line-height: 1.55; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 !important; overflow: hidden; }
+                    .filled-val { font-weight: bold !important; color: #000000 !important; text-decoration: underline !important; text-underline-offset: 3px !important; }
+                    .stamp-overlay-layer { position: absolute; top: 0; left: 0; width: 794px; height: 1122px; pointer-events: none; z-index: 30; mix-blend-mode: multiply; overflow: hidden; }
+                    .stamp-overlay-layer img { width: 794px; height: 1122px; object-fit: contain; object-position: top center; mix-blend-mode: multiply; display: block; }
                 </style>
             </head>
             <body>${htmlContent}</body>
             </html>
         `);
         frameDoc.close();
-
-        setTimeout(() => {
-            printFrame.contentWindow.focus();
-            printFrame.contentWindow.print();
-        }, 150);
+        setTimeout(() => { printFrame.contentWindow.focus(); printFrame.contentWindow.print(); }, 250);
     } else {
         window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank');
     }
 };
 
-window.shareHtmlDocAsPdf = async function(fileId, formDataObj, fileName, withStamp = false, stampSrc = '') {
+window.shareHtmlDocAsPdf = async function(fileId, formDataObj, fileName, withStamp = false, stampSrc = '', certificateFileId = '') {
     const btn = document.getElementById('modalShareBtn');
     const origHtml = btn ? btn.innerHTML : '';
-    
-    if (btn) {
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing...';
-        btn.disabled = true;
-    }
+    if (btn) { btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing...'; btn.disabled = true; }
 
     if (withStamp && typeof window.preloadAllAvailableStamps === 'function' && window.availableStampsList?.length === 0) {
         await window.preloadAllAvailableStamps();
     }
-
     const finalStampSrc = withStamp ? (stampSrc || (typeof window.pickRandomAvailableStamp === 'function' ? window.pickRandomAvailableStamp() : 'stamp.png')) : '';
-
-    const savedScrollX = window.scrollX;
-    const savedScrollY = window.scrollY;
-    window.scrollTo(0, 0);
+    const savedScrollX = window.scrollX; const savedScrollY = window.scrollY; window.scrollTo(0, 0);
 
     const tempWrapper = document.createElement('div');
     tempWrapper.style.cssText = 'position:fixed;top:0;left:0;width:794px;height:1122px;margin:0;padding:0;z-index:99999;background:#ffffff;overflow:hidden;';
     tempWrapper.innerHTML = window.buildLocalAffidavitHtml(fileId, formDataObj, false, withStamp, finalStampSrc);
     document.body.appendChild(tempWrapper);
-
     const targetEl = tempWrapper.querySelector('.affidavit-paper');
 
     try {
-        const opt = {
-            margin: 0,
-            filename: withStamp ? fileName.replace('.pdf', ' (With Stamp).pdf') : fileName,
-            image: { type: 'jpeg', quality: 1.0 },
-            html2canvas: { scale: 2, useCORS: true, x: 0, y: 0, scrollX: 0, scrollY: 0, width: 794, height: 1122 },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-
+        const opt = { margin: 0, filename: withStamp ? fileName.replace('.pdf', ' (With Stamp).pdf') : fileName, image: { type: 'jpeg', quality: 1.0 }, html2canvas: { scale: 2, useCORS: true, x: 0, y: 0, scrollX: 0, scrollY: 0, width: 794, height: 1122 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
         const pdfBlob = await html2pdf().set(opt).from(targetEl).output('blob');
         const finalFileName = withStamp ? fileName.replace('.pdf', ' (With Stamp).pdf') : fileName;
         const file = new File([pdfBlob], finalFileName, { type: 'application/pdf' });
 
+        if (certificateFileId) {
+            alert('सर्टिफिकेट की फाइल भी सुरक्षित रखने के लिए अलग टैब में खोली जा रही है।');
+            window.open(`https://drive.google.com/file/d/${certificateFileId}/view`, '_blank');
+        }
+
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-                files: [file],
-                title: finalFileName,
-                text: 'Here is your generated document.'
-            });
+            await navigator.share({ files: [file], title: finalFileName, text: 'Here is your generated document.' });
         } else {
             alert('Aapka browser direct file share support nahi karta. Kripya PDF download karke share karein.');
         }
-
     } catch (err) {
-        console.error(err);
-        alert("PDF share karne mein samasya aayi.");
+        console.error(err); alert("PDF share karne mein samasya aayi.");
     } finally {
-        document.body.removeChild(tempWrapper);
-        window.scrollTo(savedScrollX, savedScrollY);
-        if (btn) {
-            btn.innerHTML = origHtml;
-            btn.disabled = false;
-        }
+        document.body.removeChild(tempWrapper); window.scrollTo(savedScrollX, savedScrollY);
+        if (btn) { btn.innerHTML = origHtml; btn.disabled = false; }
     }
 };
