@@ -26,6 +26,7 @@ async function compressImage(file) {
     });
 }
 
+// ================= GOOGLE DRIVE SERVICES SUBMISSION =================
 window.submitForm = async function(event, serviceType) {
     event.preventDefault();
     const { db, doc, updateDoc, collection, addDoc } = window.fb;
@@ -48,7 +49,7 @@ window.submitForm = async function(event, serviceType) {
     const formElement = event.target;
     const submitBtn = formElement.querySelector('button[type="submit"]');
     const originalBtnText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Submitting...';
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Processing...';
     submitBtn.disabled = true;
 
     const formData = new FormData(formElement);
@@ -59,6 +60,8 @@ window.submitForm = async function(event, serviceType) {
     if (serviceType === 'Domicile') targetUrl = window.API_URLS["domicile"];
     else if (serviceType === 'Caste') targetUrl = window.API_URLS["CASTE"];
     else if (serviceType === 'DOB' || serviceType === 'DOB 18+') targetUrl = window.API_URLS["DOB"];
+
+    let newHistoryRef = null;
 
     try {
         const photoInput = formElement.querySelector('input[type="file"]');
@@ -73,67 +76,67 @@ window.submitForm = async function(event, serviceType) {
 
         if (dataObj.CAST === 'OTHER' && dataObj.CAST_CUSTOM) dataObj.CAST = dataObj.CAST_CUSTOM.trim();
         if (dataObj.VLE === 'OTHER' && dataObj.VLE_CUSTOM) dataObj.VLE = dataObj.VLE_CUSTOM.trim();
-        if ((serviceType === 'DOB' || serviceType === 'DOB 18+') && dataObj.ADDRESS) {
-            dataObj.ADDRESS = window.cleanDob18AddressString(dataObj.ADDRESS).trim();
-        }
+        if ((serviceType === 'DOB' || serviceType === 'DOB 18+') && dataObj.ADDRESS) dataObj.ADDRESS = window.cleanDob18AddressString(dataObj.ADDRESS).trim();
 
-        // 1. क्रेडिट्स काटना (तुरंत)
-        if (!window.currentUserData.hasFreeAccess) {
-            const userDocRef = doc(db, "users", window.currentUserData.uid);
-            const newCredits = window.currentUserData.credits - docCost;
-            await updateDoc(userDocRef, { credits: newCredits });
-            window.currentUserData.credits = newCredits;
-            document.getElementById('displayCredits').innerText = newCredits;
-        }
-
-        // 2. हिस्ट्री में 'Pending' स्टेटस के साथ डॉक्यूमेंट सेव करना (ताकि यूज़र को तुरंत दिखे)
-        const pendingDocRef = await addDoc(collection(db, "history"), {
+        // 1. क्रिएट पेंडिंग हिस्ट्री (बिना क्रेडिट काटे)
+        newHistoryRef = await addDoc(collection(db, "history"), {
             userId: window.currentUserData.uid,
             fileName: `${dataObj.NAME || 'Document'} - ${serviceType}.pdf`,
             fileId: 'PENDING',
-            status: 'Pending',
             serviceType: serviceType,
+            status: "Pending", // नया पेंडिंग स्टेटस
             timestamp: new Date()
         });
-        
-        // 3. यूज़र को मैसेज देना और हिस्ट्री टैब पर भेजना
-        alert('Success! आपका फॉर्म सबमिट हो गया है और फाइल बैकग्राउंड में जनरेट हो रही है।');
-        formElement.reset();
-        window.switchService('history');
 
-        // 4. बैकग्राउंड में Google API को कॉल करना (बिना यूज़र को रोके)
-        fetch(targetUrl, {
+        // 2. यूज़र को तुरंत हिस्ट्री टैब पर भेजें
+        alert('आपकी रिक्वेस्ट सबमिट हो गई है। फाइल बैकग्राउंड में जनरेट हो रही है, कृपया History में "Pending" स्टेटस चेक करें।');
+        window.switchService('history');
+        formElement.reset();
+
+        // 3. असली नेटवर्क कॉल (API)
+        const response = await fetch(targetUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify(dataObj)
-        })
-        .then(response => response.json())
-        .then(async (result) => {
-            if (result && (result.success || result.fileId)) {
-                // सक्सेस होने पर असली File ID अपडेट करना
-                await updateDoc(doc(db, "history", pendingDocRef.id), {
-                    fileId: result.fileId,
-                    status: 'Completed'
-                });
-            } else {
-                // किसी वजह से फेल होने पर
-                await updateDoc(doc(db, "history", pendingDocRef.id), {
-                    status: 'Failed',
-                    fileId: 'ERROR',
-                    error: result.error || 'Unknown Error'
-                });
-            }
-        })
-        .catch(async (networkError) => {
-            // Google Script टाइम-आउट होने पर
-            await updateDoc(doc(db, "history", pendingDocRef.id), {
-                status: 'Timeout',
-                fileId: 'TIMEOUT_ERROR'
-            });
         });
+        const result = await response.json();
+
+        // 4. सक्सेस होने पर क्रेडिट काटना और असली लिंक अपडेट करना
+        if (result && (result.success || result.fileId)) {
+            if (!window.currentUserData.hasFreeAccess) {
+                const userDocRef = doc(db, "users", window.currentUserData.uid);
+                const newCredits = window.currentUserData.credits - docCost;
+                await updateDoc(userDocRef, { credits: newCredits });
+                window.currentUserData.credits = newCredits;
+                const creditEl = document.getElementById('displayCredits');
+                if (creditEl) creditEl.innerText = newCredits;
+            }
+
+            await updateDoc(doc(db, "history", newHistoryRef.id), {
+                fileId: result.fileId,
+                status: "Completed",
+                updatedAt: new Date()
+            });
+
+            if (window.currentActiveTab === 'history') window.loadUserHistory();
+        } else {
+            throw new Error(result?.error || "अज्ञात बैकएंड एरर");
+        }
 
     } catch (error) {
-        alert('Form processing error. Please try again.');
+        console.error("API Timeout or Error:", error);
+        // 5. फेल/टाइमआउट होने पर स्टेटस फेल्ड करना (क्रेडिट सुरक्षित रहेंगे)
+        if (newHistoryRef) {
+            await updateDoc(doc(db, "history", newHistoryRef.id), {
+                status: "Failed",
+                fileId: "FAILED",
+                errorMsg: error.message || "Timeout / Server Error",
+                updatedAt: new Date()
+            });
+            if (window.currentActiveTab === 'history') window.loadUserHistory();
+        } else {
+            alert('फॉर्म प्रोसेस करने में समस्या आई। आपके पॉइंट नहीं काटे गए हैं।');
+        }
     } finally {
         submitBtn.innerHTML = originalBtnText;
         submitBtn.disabled = false;
