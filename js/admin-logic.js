@@ -261,7 +261,7 @@ window.deleteSelectedUserAccount = async function() {
 
     const uData = window.usersDataList[uid];
     if ((uData.email || '').toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
-        return alert('आप मुख्य सुपर एडमिन अकाउंट को डिलीट नहीं कर सकते!');
+        return alert('आप मुख्य सुपर एडमिन अकाउंट को डिलीट চৈতন্য नहीं कर सकते!');
     }
 
     const confirmDelete = confirm(`⚠️ चेतावनी (Permanent Delete)!\n\nक्या आप वाकई यूज़र "${uData.email}" का अकाउंट हमेशा के लिए डिलीट करना चाहते हैं?\n\nडिलीट करने के बाद यह यूज़र लॉगिन नहीं कर पाएगा।`);
@@ -1122,6 +1122,34 @@ window.renderAdminHistory = function() {
             </label>
         ` : '';
 
+        // एडमिन के लिए डायनामिक बटन लॉजिक
+        let rightSideControlsHtml = '';
+        if (data.status === 'Pending' || data.fileId === 'PENDING') {
+            rightSideControlsHtml = `
+                <span class="text-amber-600 text-[11px] font-black px-3 py-2 border border-amber-200 bg-amber-50 rounded-xl"><i class="fa-solid fa-spinner fa-spin mr-1"></i> User Generating...</span>
+                <button onclick="window.deleteHistoryRecord('${data.id}')" class="w-9 h-9 inline-flex items-center justify-center bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition border border-red-100" title="Delete">
+                    <i class="fa-solid fa-trash"></i>
+                </button>`;
+        } else if (data.status === 'Failed' || data.fileId === 'FAILED') {
+            rightSideControlsHtml = `
+                <span class="text-red-600 text-[11px] font-black px-3 py-2 border border-red-200 bg-red-50 rounded-xl"><i class="fa-solid fa-circle-xmark mr-1"></i> Script Failed</span>
+                <button onclick="window.deleteHistoryRecord('${data.id}')" class="w-9 h-9 inline-flex items-center justify-center bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition border border-red-100" title="Delete">
+                    <i class="fa-solid fa-trash"></i>
+                </button>`;
+        } else {
+            rightSideControlsHtml = `
+                ${stampCheckboxHtml}
+                <button onclick="window.openPdfViewer('${data.fileId}', '${safeFileName}', ${data._origIndex})" class="flex-1 sm:flex-initial justify-center inline-flex items-center gap-1.5 bg-royal-50 text-royal-700 px-3 py-2 rounded-xl text-xs font-black hover:bg-royal-500 hover:text-white transition border border-royal-200">
+                    <i class="fa-solid fa-eye"></i> Preview / PDF / Share
+                </button>
+                <button onclick="window.triggerDirectPrintByIndex(${data._origIndex}, this)" class="inline-flex items-center justify-center gap-1 bg-amber-500 hover:bg-amber-600 text-dark-950 px-3 py-2 rounded-xl text-xs font-black transition shadow-sm" title="Direct Print">
+                    <i class="fa-solid fa-print"></i> Print
+                </button>
+                <button onclick="window.deleteHistoryRecord('${data.id}')" class="w-9 h-9 inline-flex items-center justify-center bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition border border-red-100" title="Delete">
+                    <i class="fa-solid fa-trash"></i>
+                </button>`;
+        }
+
         container.innerHTML += `
             <div class="bg-white p-3.5 md:p-4 rounded-2xl border ${isStampChecked ? 'border-green-300 bg-green-50/20' : 'border-slate-200'} shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 hover:border-royal-400 transition">
                 <div class="space-y-1 overflow-hidden w-full">
@@ -1134,16 +1162,7 @@ window.renderAdminHistory = function() {
                     <p class="font-black text-slate-800 text-xs md:text-sm truncate">${data.fileName}</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
-                    ${stampCheckboxHtml}
-                    <button onclick="window.openPdfViewer('${data.fileId}', '${safeFileName}', ${data._origIndex})" class="flex-1 sm:flex-initial justify-center inline-flex items-center gap-1.5 bg-royal-50 text-royal-700 px-3 py-2 rounded-xl text-xs font-black hover:bg-royal-500 hover:text-white transition border border-royal-200">
-                        <i class="fa-solid fa-eye"></i> Preview / PDF / Share
-                    </button>
-                    <button onclick="window.triggerDirectPrintByIndex(${data._origIndex}, this)" class="inline-flex items-center justify-center gap-1 bg-amber-500 hover:bg-amber-600 text-dark-950 px-3 py-2 rounded-xl text-xs font-black transition shadow-sm" title="Direct Print">
-                        <i class="fa-solid fa-print"></i> Print
-                    </button>
-                    <button onclick="window.deleteHistoryRecord('${data.id}')" class="w-9 h-9 inline-flex items-center justify-center bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition border border-red-100" title="Delete">
-                        <i class="fa-solid fa-trash"></i>
-                    </button>
+                    ${rightSideControlsHtml}
                 </div>
             </div>
         `;
