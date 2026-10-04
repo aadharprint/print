@@ -661,19 +661,34 @@ window.closePdfViewer = function() {
     document.body.style.overflow = 'auto'; // Fixes scroll lock issue
 };
 
-window.loadUserHistory = async function() {
+window.historyUnsubscribe = null; // इसे फंक्शन के ऊपर रखें ताकि पुरानी लिसनर हट सके
+
+window.loadUserHistory = function() {
     const historyContainer = document.getElementById('historyTableBody');
     if (!historyContainer) return;
     historyContainer.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-400 font-bold text-xs"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>Loading records...</td></tr>`;
 
     try {
+        const { db, collection, query, where, onSnapshot } = window.fb;
         const q = query(collection(db, "history"), where("userId", "==", window.currentUserData.uid));
-        const querySnapshot = await getDocs(q);
+        
+        // अगर पहले से कोई लिसनर चल रहा है, तो उसे बंद करें
+        if (window.historyUnsubscribe) window.historyUnsubscribe();
 
-        window.historyData = [];
-        querySnapshot.forEach((docSnap) => { window.historyData.push({ id: docSnap.id, ...docSnap.data() }); });
-        window.historyData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
-        window.renderHistory('ALL');
+        // Real-Time (Live) Listener चालू करें
+        window.historyUnsubscribe = onSnapshot(q, (querySnapshot) => {
+            window.historyData = [];
+            querySnapshot.forEach((docSnap) => { 
+                window.historyData.push({ id: docSnap.id, ...docSnap.data() }); 
+            });
+            
+            window.historyData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+            
+            // वर्तमान फ़िल्टर के हिसाब से हिस्ट्री अपडेट करें
+            const filterDropdown = document.querySelector('select[onchange="window.renderHistory(this.value)"]');
+            const currentFilter = filterDropdown ? filterDropdown.value : 'ALL';
+            window.renderHistory(currentFilter);
+        });
     } catch (err) {
         historyContainer.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-500 text-xs">Failed to load history.</td></tr>`;
     }
