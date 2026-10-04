@@ -568,7 +568,6 @@ window.submitPaymentIssueTicket = async function() {
     } catch (err) { alert("टिकट रेज़ करने में समस्या आई: " + err.message); } finally { btn.disabled = false; btn.innerHTML = origHtml; }
 };
 
-// ================= NEW DIRECT SHARE LOGIC WITH ERROR PREVENTION =================
 window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     document.getElementById('pdfViewerTitle').innerText = fileName;
     const iframe = document.getElementById('pdfIframe');
@@ -603,11 +602,9 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
 
     window.currentModalContext = { fileId: fileId, fileName: fileName, historyIndex: historyIndex, withStamp: initialWithStamp, stampFile: initialStampFile, stampSrc: initialStampSrc };
 
-    // शुरुआत में Share बटन को छिपा दें (Hidden)
     if (shareBtn) shareBtn.style.display = 'none';
 
     if (isAnnexure && historyIndex >= 0) {
-        // यह Annexure है, यहाँ Share बटन दिखाएँ
         if (shareBtn) shareBtn.style.display = 'flex';
         
         if (modalStampLabel) modalStampLabel.classList.remove('hidden');
@@ -625,8 +622,6 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
         if (printBtn) { printBtn.onclick = function() { window.directPrintDocument(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc); }; }
         if (shareBtn) { shareBtn.onclick = async function() { await window.shareHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc); }; }
     } else {
-        // GOOGLE DRIVE FILES LOGIC (Domicile, Caste, DOB)
-        // यहाँ Share बटन पूरी तरह से छिपा रहेगा, जिससे एरर नहीं आएगी
         if (modalStampLabel) modalStampLabel.classList.add('hidden');
         if (shareBtn) shareBtn.style.display = 'none'; 
         
@@ -661,34 +656,19 @@ window.closePdfViewer = function() {
     document.body.style.overflow = 'auto'; // Fixes scroll lock issue
 };
 
-window.historyUnsubscribe = null; // इसे फंक्शन के ऊपर रखें ताकि पुरानी लिसनर हट सके
-
-window.loadUserHistory = function() {
+window.loadUserHistory = async function() {
     const historyContainer = document.getElementById('historyTableBody');
     if (!historyContainer) return;
     historyContainer.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-400 font-bold text-xs"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>Loading records...</td></tr>`;
 
     try {
-        const { db, collection, query, where, onSnapshot } = window.fb;
         const q = query(collection(db, "history"), where("userId", "==", window.currentUserData.uid));
-        
-        // अगर पहले से कोई लिसनर चल रहा है, तो उसे बंद करें
-        if (window.historyUnsubscribe) window.historyUnsubscribe();
+        const querySnapshot = await getDocs(q);
 
-        // Real-Time (Live) Listener चालू करें
-        window.historyUnsubscribe = onSnapshot(q, (querySnapshot) => {
-            window.historyData = [];
-            querySnapshot.forEach((docSnap) => { 
-                window.historyData.push({ id: docSnap.id, ...docSnap.data() }); 
-            });
-            
-            window.historyData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
-            
-            // वर्तमान फ़िल्टर के हिसाब से हिस्ट्री अपडेट करें
-            const filterDropdown = document.querySelector('select[onchange="window.renderHistory(this.value)"]');
-            const currentFilter = filterDropdown ? filterDropdown.value : 'ALL';
-            window.renderHistory(currentFilter);
-        });
+        window.historyData = [];
+        querySnapshot.forEach((docSnap) => { window.historyData.push({ id: docSnap.id, ...docSnap.data() }); });
+        window.historyData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+        window.renderHistory('ALL');
     } catch (err) {
         historyContainer.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-500 text-xs">Failed to load history.</td></tr>`;
     }
@@ -717,27 +697,23 @@ window.renderHistory = function(filterType) {
             ? `<span class="bg-green-100 text-green-800 border border-green-300 px-2 py-0.5 rounded-full text-[10px] font-black ml-1.5"><i class="fa-solid fa-stamp mr-0.5"></i>Stamped</span>`
             : '';
         
-        // --- नया लॉजिक: Pending है या Completed? ---
         let actionHtml = '';
-        if (data.fileId === 'PENDING' || data.status === 'Pending') {
-            // जनरेट होते समय
-            actionHtml = `<span class="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-300 px-3 py-1.5 rounded-lg text-[11px] font-black animate-pulse shadow-sm cursor-wait"><i class="fa-solid fa-spinner fa-spin"></i> Generating...</span>`;
-        } else if (data.status === 'Failed' || data.status === 'Timeout' || data.fileId === 'TIMEOUT_ERROR' || data.fileId === 'ERROR') {
-            // एरर आने पर
-            actionHtml = `<span class="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-300 px-3 py-1.5 rounded-lg text-[11px] font-black shadow-sm"><i class="fa-solid fa-triangle-exclamation"></i> Failed</span>`;
+        if (data.status === 'Pending' || data.fileId === 'PENDING') {
+            actionHtml = `<span class="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1.5 rounded-lg text-[11px] font-bold"><i class="fa-solid fa-spinner fa-spin"></i> Processing...</span>`;
+        } else if (data.status === 'Failed' || data.fileId === 'FAILED') {
+            actionHtml = `<span class="inline-flex items-center gap-1 bg-red-50 text-red-600 border border-red-200 px-2.5 py-1.5 rounded-lg text-[11px] font-bold" title="${data.errorMsg || 'Timeout / Server Error'}"><i class="fa-solid fa-triangle-exclamation"></i> Failed</span>`;
         } else {
-            // सक्सेस होने पर (नॉर्मल बटन)
-            actionHtml = `<button onclick="window.openPdfViewer('${data.fileId}', '${data.fileName}', ${data._origIndex})" class="inline-flex items-center gap-1 bg-royal-50 text-royal-700 border border-royal-200 hover:bg-royal-600 hover:text-white px-3 py-1.5 rounded-lg text-[11px] font-black transition shadow-sm"><i class="fa-solid fa-eye"></i> Preview / PDF / Share</button>`;
+            actionHtml = `<button onclick="window.openPdfViewer('${data.fileId}', '${data.fileName}', ${data._origIndex})" class="inline-flex items-center gap-1 bg-royal-50 text-royal-700 border border-royal-200 hover:bg-royal-600 hover:text-white px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition shadow-sm">
+                            <i class="fa-solid fa-eye"></i> Preview / PDF
+                        </button>`;
         }
-
+        
         historyContainer.innerHTML += `
             <tr class="border-b border-slate-100 text-xs hover:bg-slate-50 transition">
                 <td class="p-3 font-bold text-slate-800">${data.fileName}${stampBadgeHtml}</td>
                 <td class="p-3"><span class="bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">${data.serviceType}</span></td>
                 <td class="p-3 text-slate-500 text-[11px] font-medium">${dateStr} <br> ${timeStr}</td>
-                <td class="p-3 text-right whitespace-nowrap">
-                    ${actionHtml}
-                </td>
+                <td class="p-3 text-right whitespace-nowrap">${actionHtml}</td>
             </tr>
         `;
     });
@@ -907,7 +883,7 @@ window.switchService = async function(serviceName) {
                             <button type="button" id="btnRaisePaymentTicket" onclick="window.submitPaymentIssueTicket()" class="w-full bg-dark-900 text-royal-300 hover:bg-black font-black py-2.5 rounded-xl text-xs shadow transition">
                                 Submit Ticket (24 Hours Resolution) <i class="fa-solid fa-clock-rotate-left ml-1"></i>
                             </button>
-                            <p class="text-[10px] text-amber-800 text-center font-medium">टिकट रेज़ होने पर 24 घंटे के अंदर आपकी समस्या का समाधान करके क्रेडिट जोड़ दिया जाएगा।</p>
+                            <p class="text-[10px] text-amber-800 text-center font-medium">टिकट रेज़ होने पर 24 घंटे के अंदर आपकी समस्या का समाधान करके क्रेडिट जोड़ दिया जाएगा.</p>
                             <div id="paymentTicketResultMsg" style="display: none;"></div>
                         </div>
                     </div>
