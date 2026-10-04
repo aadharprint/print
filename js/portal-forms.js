@@ -1,6 +1,6 @@
 // ============================================================================
 // FILE 2: js/portal-forms.js
-// (All Service Forms: Domicile, Caste, DOB 18+, DOB MINOR & All 9 Official Annexures)
+// (Complete Service Forms & Strict Real File ID Submission Logic)
 // ============================================================================
 
 import "./config-templates.js";
@@ -15,12 +15,12 @@ async function compressImage(file) {
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-                const MAX_WIDTH = 250; // साइज़ घटाया ताकि टाइम-आउट न हो
+                const MAX_WIDTH = 250; 
                 const scaleSize = MAX_WIDTH / img.width;
                 canvas.width = MAX_WIDTH;
                 canvas.height = img.height * scaleSize;
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                resolve(canvas.toDataURL('image/jpeg', 0.2)); // क्वालिटी कम की ताकि पेलोड हल्का रहे
+                resolve(canvas.toDataURL('image/jpeg', 0.2)); 
             };
         };
     });
@@ -49,7 +49,9 @@ window.submitForm = async function(event, serviceType) {
     const formElement = event.target;
     const submitBtn = formElement.querySelector('button[type="submit"]');
     const originalBtnText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Processing...';
+    
+    // --- 1. Processing Loading State on Button ---
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Generating Document... Please Wait';
     submitBtn.disabled = true;
 
     const formData = new FormData(formElement);
@@ -60,8 +62,6 @@ window.submitForm = async function(event, serviceType) {
     if (serviceType === 'Domicile') targetUrl = window.API_URLS["domicile"];
     else if (serviceType === 'Caste') targetUrl = window.API_URLS["CASTE"];
     else if (serviceType === 'DOB' || serviceType === 'DOB 18+') targetUrl = window.API_URLS["DOB"];
-
-    let newHistoryRef = null;
 
     try {
         const photoInput = formElement.querySelector('input[type="file"]');
@@ -74,26 +74,18 @@ window.submitForm = async function(event, serviceType) {
         const dataObj = {};
         formData.forEach((v, k) => { dataObj[k] = v; });
 
-        if (dataObj.CAST === 'OTHER' && dataObj.CAST_CUSTOM) dataObj.CAST = dataObj.CAST_CUSTOM.trim();
-        if (dataObj.VLE === 'OTHER' && dataObj.VLE_CUSTOM) dataObj.VLE = dataObj.VLE_CUSTOM.trim();
-        if ((serviceType === 'DOB' || serviceType === 'DOB 18+') && dataObj.ADDRESS) dataObj.ADDRESS = window.cleanDob18AddressString(dataObj.ADDRESS).trim();
+        if (dataObj.CAST === 'OTHER' && dataObj.CAST_CUSTOM) {
+            dataObj.CAST = dataObj.CAST_CUSTOM.trim();
+        }
+        if (dataObj.VLE === 'OTHER' && dataObj.VLE_CUSTOM) {
+            dataObj.VLE = dataObj.VLE_CUSTOM.trim();
+        }
 
-        // 1. क्रिएट पेंडिंग हिस्ट्री (बिना क्रेडिट काटे)
-        newHistoryRef = await addDoc(collection(db, "history"), {
-            userId: window.currentUserData.uid,
-            fileName: `${dataObj.NAME || 'Document'} - ${serviceType}.pdf`,
-            fileId: 'PENDING',
-            serviceType: serviceType,
-            status: "Pending", // नया पेंडिंग स्टेटस
-            timestamp: new Date()
-        });
+        if ((serviceType === 'DOB' || serviceType === 'DOB 18+') && dataObj.ADDRESS) {
+            dataObj.ADDRESS = window.cleanDob18AddressString(dataObj.ADDRESS).trim();
+        }
 
-        // 2. यूज़र को तुरंत हिस्ट्री टैब पर भेजें
-        alert('आपकी रिक्वेस्ट सबमिट हो गई है। फाइल बैकग्राउंड में जनरेट हो रही है, कृपया History में "Pending" स्टेटस चेक करें।');
-        window.switchService('history');
-        formElement.reset();
-
-        // 3. असली नेटवर्क कॉल (API)
+        // --- 2. Strict Request to Apps Script (Waiting for Real File ID) ---
         const response = await fetch(targetUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -101,43 +93,39 @@ window.submitForm = async function(event, serviceType) {
         });
         const result = await response.json();
 
-        // 4. सक्सेस होने पर क्रेडिट काटना और असली लिंक अपडेट करना
-        if (result && (result.success || result.fileId)) {
+        // --- 3. Verification: Proceed ONLY if Apps Script returns true success & real fileId ---
+        if (result && result.success && result.fileId) {
+            
+            // A. Credit Deduction (Only after real file ID is confirmed)
             if (!window.currentUserData.hasFreeAccess) {
                 const userDocRef = doc(db, "users", window.currentUserData.uid);
                 const newCredits = window.currentUserData.credits - docCost;
                 await updateDoc(userDocRef, { credits: newCredits });
                 window.currentUserData.credits = newCredits;
-                const creditEl = document.getElementById('displayCredits');
-                if (creditEl) creditEl.innerText = newCredits;
+                document.getElementById('displayCredits').innerText = newCredits;
             }
 
-            await updateDoc(doc(db, "history", newHistoryRef.id), {
-                fileId: result.fileId,
-                status: "Completed",
-                updatedAt: new Date()
+            // B. Firebase History Save (With Real Google Drive File ID)
+            await addDoc(collection(db, "history"), {
+                userId: window.currentUserData.uid,
+                fileName: `${dataObj.NAME || 'Document'} - ${serviceType}.pdf`,
+                fileId: result.fileId, // Asli Google Drive ID
+                serviceType: serviceType,
+                timestamp: new Date()
             });
-
-            if (window.currentActiveTab === 'history') window.loadUserHistory();
+            
+            alert('Success! आपका डॉक्यूमेंट सफलतापूर्वक जनरेट हो गया है।');
+            window.switchService('history');
+            formElement.reset();
         } else {
-            throw new Error(result?.error || "अज्ञात बैकएंड एरर");
+            const backendErrorMsg = result && result.error ? result.error : "Apps Script से सही रिस्पॉन्स नहीं मिला।";
+            alert('Document Generation Failed:\n\n' + backendErrorMsg);
         }
 
     } catch (error) {
-        console.error("API Timeout or Error:", error);
-        // 5. फेल/टाइमआउट होने पर स्टेटस फेल्ड करना (क्रेडिट सुरक्षित रहेंगे)
-        if (newHistoryRef) {
-            await updateDoc(doc(db, "history", newHistoryRef.id), {
-                status: "Failed",
-                fileId: "FAILED",
-                errorMsg: error.message || "Timeout / Server Error",
-                updatedAt: new Date()
-            });
-            if (window.currentActiveTab === 'history') window.loadUserHistory();
-        } else {
-            alert('फॉर्म प्रोसेस करने में समस्या आई। आपके पॉइंट नहीं काटे गए हैं।');
-        }
+        alert('Network or Server Error: ' + error.message);
     } finally {
+        // --- 4. Reset Button State ---
         submitBtn.innerHTML = originalBtnText;
         submitBtn.disabled = false;
     }
@@ -210,7 +198,7 @@ window.submitLocalAnnexureForm = async function(event, serviceType, fileIdKey) {
             document.getElementById('displayCredits').innerText = newCredits;
         }
 
-        alert(`आपका डॉक्यूमेंट (${serviceType}) जनरेट हो चुका है! अब आप यहाँ History से इसे Preview, Print और Download कर सकते हैं।`);
+        alert(`आपका डॉक्यूमेंट (${serviceType}) जनरेट हो चुका है!`);
         formEl.reset();
         window.switchService('history');
     } catch (err) {
@@ -223,7 +211,7 @@ window.submitLocalAnnexureForm = async function(event, serviceType, fileIdKey) {
     }
 };
 
-// ================= BACKGROUND WATERMARK HELPER (ADVANCED FORM OVERLAY) =================
+// ================= BACKGROUND WATERMARK HELPER =================
 const getWatermarkHtml = (srv) => {
     const wMap = {
         'domicile': { emoji: '🏠', text: 'DOMICILE' },
@@ -237,8 +225,8 @@ const getWatermarkHtml = (srv) => {
         'annexureb': { emoji: '🧑', text: 'ANNEXURE B' },
         'annexurec': { emoji: '👧', text: 'ANNEXURE C' },
         'annexured': { emoji: '💍', text: 'ANNEXURE D' },
-        'annexuree': { emoji: '✂️', text: 'ANNEXURE E' },
-        'annexuref': { emoji: '🖍️', text: 'ANNEXURE F' },
+        'annexuree': { emoji: '✂️️', text: 'ANNEXURE E' },
+        'annexuref': { emoji: '🖍️️', text: 'ANNEXURE F' },
     };
     const wm = wMap[srv] || { emoji: '📄', text: srv.toUpperCase() };
     
@@ -905,7 +893,7 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
 
                     <div class="grid grid-cols-3 gap-2.5 relative z-10">
                         <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">स्थान (Place)</label><input type="text" id="inpPlace" name="place" placeholder="BARAUT" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold uppercase bg-slate-50 relative z-10"></div>
-                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">दिन (Day)</label><input type="text" id="inpDay" name="day" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 relative z-10"></div>
+                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">दिन (Day)</label><input type="text" id="inpDay" name="day" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold uppercase bg-slate-50 relative z-10"></div>
                         <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">महीना व वर्ष</label><input type="text" id="inpMonthYear" name="monthYear" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold uppercase bg-slate-50 relative z-10"></div>
                     </div>
 
@@ -976,7 +964,7 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
 
                     <div class="grid grid-cols-3 gap-2.5 relative z-10">
                         <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">स्थान (Place)</label><input type="text" id="inpPlace" name="place" placeholder="BARAUT" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold uppercase bg-slate-50 relative z-10"></div>
-                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">दिन (Day)</label><input type="text" id="inpDay" name="day" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 relative z-10"></div>
+                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">दिन (Day)</label><input type="text" id="inpDay" name="day" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold uppercase bg-slate-50 relative z-10"></div>
                         <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">महीना व वर्ष</label><input type="text" id="inpMonthYear" name="monthYear" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold uppercase bg-slate-50 relative z-10"></div>
                     </div>
 
