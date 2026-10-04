@@ -1,6 +1,6 @@
 // ============================================================================
 // FILE 3: js/portal-wallet-chat.js (UPDATED)
-// (Auth, Per-User DOB Stealth, Active=White/Inactive=Dark Tabs, Wallet, Chat & User Preview Fix)
+// (Auth, Wallet, Chat, User Preview Fix - Syncs Certificate Visibility with Admin)
 // ============================================================================
 
 import "./config-templates.js";
@@ -37,7 +37,7 @@ async function notifyAdminSecurely(payload) { try { await fetch('/api/notify-adm
 
 window.openForgotPasswordModal = function() { const modal = document.getElementById('forgotPasswordModal'); const idInp = document.getElementById('forgotUserIdInput'); const phoneInp = document.getElementById('forgotUserPhoneInput'); const noteInp = document.getElementById('forgotUserNoteInput'); const resBox = document.getElementById('forgotResultBox'); if (!modal) return; resBox.style.display = 'none'; idInp.value = document.getElementById('loginUsername')?.value.trim() || ''; phoneInp.value = ''; noteInp.value = ''; modal.style.display = 'flex'; };
 window.closeForgotPasswordModal = function() { const modal = document.getElementById('forgotPasswordModal'); if (modal) modal.style.display = 'none'; };
-window.submitForgotPasswordTicket = async function(event) { event.preventDefault(); const userIdText = document.getElementById('forgotUserIdInput').value.trim(); const userPhoneText = document.getElementById('forgotUserPhoneInput').value.trim(); const userNoteText = document.getElementById('forgotUserNoteInput').value.trim(); const btn = document.getElementById('btnSubmitForgotTicket'); const resBox = document.getElementById('forgotResultBox'); if (!userIdText || !userPhoneText) return alert("कृपया अपनी User ID और मोबाइल/WhatsApp नंबर ज़रूर भरें!"); const origHtml = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Raising Ticket...'; const finalMessage = userNoteText || "मैं अपना पासवर्ड भूल गया हूँ, कृपया नया पासवर्ड जारी करें।"; try { await addDoc(collection(db, "supportTickets"), { type: "FORGOT_PASSWORD", userIdentifier: userIdText, userPhone: userPhoneText, message: `🔑 Forgot Password Request: ${finalMessage} (WhatsApp: ${userPhoneText})`, messages: [{ sender: 'user', text: `🔑 [FORGOT PASSWORD TICKET]\nUser ID: ${userIdText}\nWhatsApp: ${userPhoneText}\nNote: ${finalMessage}`, time: Date.now() }], status: "Open", unreadByAdmin: true, unreadByUser: false, timestamp: new Date(), updatedAtMs: Date.now() }); try { await addDoc(collection(db, "forgotTickets"), { userIdentifier: userIdText, userPhone: userPhoneText, note: finalMessage, status: "Pending", timestamp: new Date() }); } catch (e) {} notifyAdminSecurely({ type: "FORGOT_PASSWORD", userId: userIdText, phone: userPhoneText, message: finalMessage }); resBox.className = "p-3.5 rounded-2xl bg-green-50 border border-green-300 text-green-900 text-xs font-bold text-center space-y-1"; resBox.innerHTML = `<div><i class="fa-solid fa-circle-check text-green-600 text-base mr-1"></i> आपका टिकट सफलतापूर्वक रेज़ हो गया है!</div><p class="text-[11px] text-green-700">एडमिन को सूचना भेज दी गई है। जल्द ही आपके नंबर (${userPhoneText}) पर नया पासवर्ड भेज दिया जाएगा。</p>`; resBox.style.display = 'block'; event.target.reset(); } catch (err) { alert("टिकट भेजने में समस्या आई: " + err.message); } finally { btn.disabled = false; btn.innerHTML = origHtml; } };
+window.submitForgotPasswordTicket = async function(event) { event.preventDefault(); const userIdText = document.getElementById('forgotUserIdInput').value.trim(); const userPhoneText = document.getElementById('forgotUserPhoneInput').value.trim(); const userNoteText = document.getElementById('forgotUserNoteInput').value.trim(); const btn = document.getElementById('btnSubmitForgotTicket'); const resBox = document.getElementById('forgotResultBox'); if (!userIdText || !userPhoneText) return alert("कृपया अपनी User ID और मोबाइल/WhatsApp नंबर ज़रूर भरें!"); const origHtml = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Raising Ticket...'; const finalMessage = userNoteText || "मैं अपना पासवर्ड भूल गया हूँ, कृपया नया पासवर्ड जारी करें।"; try { await addDoc(collection(db, "supportTickets"), { type: "FORGOT_PASSWORD", userIdentifier: userIdText, userPhone: userPhoneText, message: `🔑 Forgot Password Request: ${finalMessage} (WhatsApp: ${userPhoneText})`, messages: [{ sender: 'user', text: `🔑 [FORGOT PASSWORD TICKET]\nUser ID: ${userIdText}\nWhatsApp: ${userPhoneText}\nNote: ${finalMessage}`, time: Date.now() }], status: "Open", unreadByAdmin: true, unreadByUser: false, timestamp: new Date(), updatedAtMs: Date.now() }); try { await addDoc(collection(db, "forgotTickets"), { userIdentifier: userIdText, userPhone: userPhoneText, note: finalMessage, status: "Pending", timestamp: new Date() }); } catch (e) {} notifyAdminSecurely({ type: "FORGOT_PASSWORD", userId: userIdText, phone: userPhoneText, message: finalMessage }); resBox.className = "p-3.5 rounded-2xl bg-green-50 border border-green-300 text-green-900 text-xs font-bold text-center space-y-1"; resBox.innerHTML = `<div><i class="fa-solid fa-circle-check text-green-600 text-base mr-1"></i> आपका टिकट सफलतापूर्वक रेज़ हो गया है!</div><p class="text-[11px] text-green-700">एडमिन को सूचना भेज दी गई है। जल्द ही आपके नंबर (${userPhoneText}) पर नया पासवर्ड भेज दिया जाएगा।</p>`; resBox.style.display = 'block'; event.target.reset(); } catch (err) { alert("टिकट भेजने में समस्या आई: " + err.message); } finally { btn.disabled = false; btn.innerHTML = origHtml; } };
 
 function startUserSupportChatListener(uid) { if (window.userChatUnsubscribe) window.userChatUnsubscribe(); window.userChatUnsubscribe = onSnapshot(doc(db, "supportTickets", uid), async (snap) => { if (snap.exists()) { window.currentUserChatData = snap.data(); } else { window.currentUserChatData = { messages: [], unreadByUser: false }; } const isUnread = window.currentUserChatData.unreadByUser === true; const headerBadge = document.getElementById('headerSupportUnreadBadge'); const gearBadge = document.getElementById('gearSupportUnreadBadge'); if (window.currentActiveTab === 'support_chat') { if (isUnread) { try { await updateDoc(doc(db, "supportTickets", uid), { unreadByUser: false }); } catch (e) {} } if (headerBadge) headerBadge.style.display = 'none'; if (gearBadge) gearBadge.style.display = 'none'; window.renderUserLiveChatMessages(); } else { if (headerBadge) { headerBadge.innerText = '1'; headerBadge.style.display = isUnread ? 'inline-flex' : 'none'; } if (gearBadge) { gearBadge.innerText = 'New'; gearBadge.style.display = isUnread ? 'inline-block' : 'none'; } } }); }
 window.renderUserLiveChatMessages = function() { const box = document.getElementById('userLiveChatMessagesBox'); if (!box) return; let msgs = Array.isArray(window.currentUserChatData?.messages) ? [...window.currentUserChatData.messages] : []; if (msgs.length === 0 && window.currentUserChatData?.message) msgs.push({ sender: 'user', text: window.currentUserChatData.message, time: Date.now() }); if (msgs.length === 0) { box.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400"><div class="w-12 h-12 rounded-full bg-royal-50 text-royal-500 flex items-center justify-center text-xl mb-2 border border-royal-200"><i class="fa-solid fa-comments"></i></div><p class="text-xs font-black text-slate-600">Ojas Live Support Chat</p><p class="text-[11px] text-slate-400 mt-0.5">कोई भी समस्या या सवाल नीचे लिखकर भेजें। एडमिन का रिप्लाई यहीं इसी चैट में लाइव दिखेगा।</p></div>`; return; } box.innerHTML = msgs.map(m => { const isMe = m.sender === 'user'; const tStr = m.time ? new Date(m.time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) : ''; const safeText = String(m.text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;'); if (isMe) { return `<div class="flex justify-end"><div class="max-w-[80%] bg-dark-900 text-white px-3.5 py-2.5 rounded-2xl rounded-br-none shadow-sm"><p class="text-xs font-semibold whitespace-pre-line leading-relaxed">${safeText}</p><span class="block text-[9px] text-royal-300 text-right mt-1 opacity-80">${tStr} • You</span></div></div>`; } else { return `<div class="flex justify-start"><div class="max-w-[80%] bg-amber-50 border border-amber-300 text-slate-900 px-3.5 py-2.5 rounded-2xl rounded-bl-none shadow-sm"><span class="text-[10px] font-black text-amber-800 uppercase block mb-0.5"><i class="fa-solid fa-crown text-amber-500 mr-1"></i>Admin Support</span><p class="text-xs font-bold whitespace-pre-line leading-relaxed">${safeText}</p><span class="block text-[9px] text-slate-400 text-right mt-1">${tStr}</span></div></div>`; } }).join(''); box.scrollTop = box.scrollHeight; };
@@ -114,7 +114,83 @@ function setupDashboard(userData) {
 }
 window.handleLogout = async function() { await signOut(auth); window.location.reload(); };
 
-// User PDF Viewer Updated to Stack Certificate and HTML side-by-side
+window.calculateCredits = function() {
+    const creditAmt = parseFloat(document.getElementById('rupeeAmount')?.value) || 0;
+    const selectedPlanEl = document.querySelector('input[name="vipPlanOption"]:checked');
+    let vipDays = 0, vipFee = 0;
+    if (selectedPlanEl) { vipDays = parseInt(selectedPlanEl.value) || 0; vipFee = parseInt(selectedPlanEl.getAttribute('data-price')) || 0; }
+
+    window.currentRechargeCredits = creditAmt; window.currentWantsVip = vipDays > 0;
+    window.currentVipDays = vipDays; window.currentVipPlanFee = vipFee; window.currentTotalPayable = creditAmt + vipFee;
+
+    const calcCreditsEl = document.getElementById('calculatedCredits'); if (calcCreditsEl) calcCreditsEl.innerText = `${creditAmt} Cr`;
+    const vipSummaryBadge = document.getElementById('vipSummaryBadge');
+    if (vipSummaryBadge) { if (vipDays > 0) { vipSummaryBadge.style.display = 'inline-block'; vipSummaryBadge.innerHTML = `👑 +${vipDays}d VIP`; } else { vipSummaryBadge.style.display = 'none'; } }
+    const totalPayableDisplay = document.getElementById('totalPayableDisplay'); if (totalPayableDisplay) totalPayableDisplay.innerText = `₹${window.currentTotalPayable}`;
+};
+
+window.generateQR = async function() {
+    if (window.currentUserData?.hasFreeAccess) return; window.calculateCredits();
+    if (!window.currentWantsVip && window.currentRechargeCredits < 100) return alert('पोर्टल पर कम से कम ₹100 के क्रेडिट रिचार्ज करना अनिवार्य है!');
+    if (window.currentWantsVip && window.currentRechargeCredits > 0 && window.currentRechargeCredits < 100) return alert('क्रेडिट रिचार्ज की न्यूनतम वैल्यू ₹100 है!');
+    if (window.currentTotalPayable < 100) return alert('न्यूनतम पेमेंट राशि ₹100 होनी चाहिए!');
+
+    const btn = document.getElementById('btnGenerateQR'); const origBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> पेमेंट लिंक बन रहा है...'; }
+
+    const queryParams = `pa=8279650137@amazonpay&pn=Ojas%20Print%20Service&am=${window.currentTotalPayable}&cu=INR&tn=${encodeURIComponent(window.currentWantsVip ? `Ojas VIP ${window.currentVipDays}d` : `Ojas Credits`)}`;
+    let universalUpiUrl = `upi://pay?${queryParams}`; let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; window.currentActiveOrderId = null;
+
+    try {
+        const res = await fetch('/api/create-order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: window.currentUserData.uid, email: window.currentUserData.email, username: window.currentUserData.username, totalPayable: window.currentTotalPayable, creditsRequested: window.currentRechargeCredits, wantsVip: window.currentWantsVip, vipDaysRequested: window.currentVipDays, vipPlanFee: window.currentVipPlanFee }) });
+        const orderData = await res.json();
+        if (orderData.status && orderData.orderId) {
+            window.currentActiveOrderId = orderData.orderId;
+            if (orderData.upi_string) { universalUpiUrl = orderData.upi_string; qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; }
+            if (orderData.qr_code && orderData.qr_code.startsWith('http')) qrUrl = orderData.qr_code;
+
+            if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe();
+            window.activePaymentUnsubscribe = onSnapshot(doc(db, "payments", orderData.orderId), async (snap) => {
+                if (snap.exists() && (snap.data().status === 'Auto-Approved' || snap.data().status === 'Approved')) {
+                    if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe(); window.currentActiveOrderId = null;
+                    const uSnap = await getDoc(doc(db, "users", window.currentUserData.uid));
+                    if (uSnap.exists()) { const updatedUser = uSnap.data(); window.currentUserData.credits = updatedUser.credits || 0; window.currentUserData.isVip = updatedUser.isVip || window.currentUserData.hasFreeAccess; window.currentUserData.vipExpiry = updatedUser.vipExpiry || 0; const crEl = document.getElementById('displayCredits'); if (crEl) crEl.innerText = window.currentUserData.credits; }
+                    document.getElementById('walletMainUI').innerHTML = `<div class="p-6 bg-green-50 rounded-2xl border-2 border-green-400 text-center space-y-2"><i class="fa-solid fa-circle-check text-5xl text-green-600 mb-2 animate-bounce"></i><h2 class="text-xl font-black text-green-900">पेमेंट सफल! (Auto-Verified)</h2><p class="text-xs font-bold text-green-700">आपका ₹${window.currentTotalPayable} का पेमेंट वेरीफाई हो गया है और आपके अकाउंट में तुरंत क्रेडिट्स/VIP जोड़ दिए गए हैं!</p><div class="pt-3"><button onclick="window.location.reload()" class="bg-green-600 hover:bg-green-700 text-white font-black py-2.5 px-6 rounded-xl text-xs shadow">डैशबोर्ड पर जाएँ</button></div></div>`;
+                }
+            });
+        }
+    } catch (err) { try { const fallbackDoc = await addDoc(collection(db, "payments"), { userId: window.currentUserData.uid, email: window.currentUserData.email, amountPaid: window.currentTotalPayable, creditsRequested: window.currentRechargeCredits, wantsVip: window.currentWantsVip, vipDaysRequested: window.currentVipDays, vipPlanFee: window.currentVipPlanFee, utrNumber: "ONLINE_UPI", timestamp: new Date(), status: "Pending" }); window.currentActiveOrderId = fallbackDoc.id; } catch (e) {} } finally { if (btn) { btn.disabled = false; btn.innerHTML = origBtnHtml; } }
+
+    document.getElementById('upiQRCode').src = qrUrl; document.getElementById('qrPayableAmountText').innerText = `कुल पेमेंट: ₹${window.currentTotalPayable}`;
+    const mainUpiBtn = document.getElementById('btnDirectUpiPay'); if (mainUpiBtn) { mainUpiBtn.href = universalUpiUrl; mainUpiBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> Pay ₹${window.currentTotalPayable} Directly via UPI App`; }
+    document.getElementById('paymentStep1').style.display = 'none'; document.getElementById('qrSection').style.display = 'flex';
+};
+
+window.cancelAndBackToPaymentStep1 = async function() {
+    if (window.activePaymentUnsubscribe) { window.activePaymentUnsubscribe(); window.activePaymentUnsubscribe = null; }
+    if (window.currentActiveOrderId) { const orderIdToCancel = window.currentActiveOrderId; window.currentActiveOrderId = null; try { await updateDoc(doc(db, "payments", orderIdToCancel), { status: "Cancelled", cancelledBy: "User (Back without Payment)", cancelledAt: new Date() }); } catch (e) {} }
+    document.getElementById('qrSection').style.display = 'none'; document.getElementById('paymentStep1').style.display = 'block'; alert("पेमेंट प्रोसेस कैंसिल कर दिया गया है (Payment Cancelled)।");
+};
+
+window.togglePaymentTicketBox = function() { const box = document.getElementById('paymentIssueTicketBox'); if (!box) return; box.style.display = box.style.display === 'none' ? 'block' : 'none'; };
+
+window.submitPaymentIssueTicket = async function() {
+    const rawUtr = document.getElementById('ticketUtrInput')?.value.trim() || ''; const utr = rawUtr.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    const resMsg = document.getElementById('paymentTicketResultMsg'); const btn = document.getElementById('btnRaisePaymentTicket');
+    if (!utr || utr.length < 10) return alert("कृपया अपना 12-अंकों का सही UTR / Reference नंबर दर्ज करें!");
+    const origHtml = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> टिकट सबमिट हो रहा है...';
+
+    const ticketMsgText = `💳 [PAYMENT UTR TICKET]\nAmount: ₹${window.currentTotalPayable}\nCredits: +${window.currentRechargeCredits} Cr${window.currentVipDays > 0 ? ` | VIP: +${window.currentVipDays}d` : ''}\nUTR No: ${utr}\nOrder ID: ${window.currentActiveOrderId || 'N/A'}\nNote: ऑनलाइन पेमेंट ऑटो-वेरीफाई नहीं हुआ, कृपया चेक करके क्रेडिट जोड़ें।`;
+    try {
+        if (window.currentActiveOrderId) { try { await updateDoc(doc(db, "payments", window.currentActiveOrderId), { utrNumber: utr, status: "Pending (Ticket Raised)", ticketRaisedAt: new Date() }); } catch (e) {} }
+        const uid = window.currentUserData.uid; const chatRef = doc(db, "supportTickets", uid); const existingMsgs = Array.isArray(window.currentUserChatData?.messages) ? [...window.currentUserChatData.messages] : []; existingMsgs.push({ sender: 'user', text: ticketMsgText, time: Date.now() });
+        await setDoc(chatRef, { type: 'PAYMENT_ISSUE_TICKET', userId: uid, userIdentifier: window.currentUserData.email, username: window.currentUserData.username, message: `💳 Payment UTR Ticket: ₹${window.currentTotalPayable} (UTR: ${utr})`, status: 'Open', unreadByAdmin: true, unreadByUser: false, timestamp: new Date(), updatedAtMs: Date.now(), messages: existingMsgs }, { merge: true });
+        notifyAdminSecurely({ type: "PAYMENT_UTR_TICKET", user: window.currentUserData.email, amount: window.currentTotalPayable, utr: utr });
+        resMsg.className = "p-3.5 rounded-xl bg-green-50 border border-green-300 text-green-900 text-xs font-bold text-center space-y-1 mt-2"; resMsg.innerHTML = `<div><i class="fa-solid fa-circle-check text-green-600 text-base mr-1"></i> आपका पेमेंट टिकट सफलतापूर्वक रेज़ हो गया है!</div><p class="text-[11px] text-green-800">आपका UTR नंबर (<strong>${utr}</strong>) दर्ज कर लिया गया है।</p>`; resMsg.style.display = 'block'; document.getElementById('ticketUtrInput').value = '';
+    } catch (err) { alert("टिकट रेज़ करने में समस्या आई: " + err.message); } finally { btn.disabled = false; btn.innerHTML = origHtml; }
+};
+
+// ================= USER PREVIEW FIX: Sync Certificate Visibility =================
 window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     document.getElementById('pdfViewerTitle').innerText = fileName;
     const iframe = document.getElementById('pdfIframe'); const htmlPreviewContainer = document.getElementById('htmlDocPreviewContainer');
@@ -129,7 +205,9 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
         const existingState = window.stampSelectionMap ? window.stampSelectionMap[historyIndex] : null;
         initialWithStamp = !!(existingState && existingState.enabled); initialStampSrc = existingState?.stampSrc || ''; initialStampFile = existingState?.stampFile || '';
         const record = (window.historyData && window.historyData[historyIndex]) || (window.adminAllHistoryData && window.adminAllHistoryData[historyIndex]);
-        initialCertFileId = record?.certificateFileId || ''; // Fetch cert file ID if available
+        
+        // NEW FIX: Only load Certificate if 'isCertificateAttached' is NOT false
+        initialCertFileId = (record && record.certificateFileId && record.isCertificateAttached !== false) ? record.certificateFileId : ''; 
     }
 
     if (initialWithStamp && !initialStampSrc && typeof window.preloadAllAvailableStamps === 'function') {
@@ -139,10 +217,9 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
 
     window.currentModalContext = { fileId: fileId, fileName: fileName, historyIndex: historyIndex, withStamp: initialWithStamp, stampFile: initialStampFile, stampSrc: initialStampSrc, certificateFileId: initialCertFileId };
     
-    // Container को कॉलम (Stack) में बदलें
+    // Stack items vertically
     const previewParent = iframe.parentElement;
     previewParent.classList.add('flex', 'flex-col');
-
     if (shareBtn) shareBtn.style.display = 'none';
 
     if (isAnnexure && historyIndex >= 0) {
@@ -152,26 +229,19 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
 
         const record = (window.historyData && window.historyData[historyIndex]) || (window.adminAllHistoryData && window.adminAllHistoryData[historyIndex]);
         const fData = record?.formData || {};
-        
         spinner.style.display = 'none';
         
         if (initialCertFileId) {
-            // अगर सर्टिफिकेट अटैच है: ऊपर सर्टिफिकेट, नीचे एनेक्सर
-            iframe.style.display = 'block';
-            iframe.style.flex = '1';
-            iframe.style.minHeight = '350px';
-            iframe.style.borderBottom = '4px solid #cbd5e1';
+            // Both Certificate and Annexure
+            iframe.style.display = 'block'; iframe.style.flex = '1'; iframe.style.minHeight = '350px'; iframe.style.borderBottom = '4px solid #cbd5e1';
             iframe.src = `https://drive.google.com/file/d/${initialCertFileId}/preview`;
             
-            htmlPreviewContainer.style.display = 'flex';
-            htmlPreviewContainer.style.flex = '1';
-            htmlPreviewContainer.style.minHeight = '350px';
+            htmlPreviewContainer.style.display = 'flex'; htmlPreviewContainer.style.flex = '1'; htmlPreviewContainer.style.minHeight = '350px';
             htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true, initialWithStamp, initialStampSrc);
         } else {
-            // केवल एनेक्सर
+            // Only Annexure
             iframe.style.display = 'none';
-            htmlPreviewContainer.style.display = 'flex';
-            htmlPreviewContainer.style.flex = '1';
+            htmlPreviewContainer.style.display = 'flex'; htmlPreviewContainer.style.flex = '1';
             htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true, initialWithStamp, initialStampSrc);
         }
 
@@ -181,7 +251,6 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     } else {
         if (modalStampLabel) modalStampLabel.classList.add('hidden');
         if (shareBtn) shareBtn.style.display = 'none'; 
-        
         htmlPreviewContainer.style.display = 'none'; htmlPreviewContainer.innerHTML = '';
         iframe.style.display = 'block'; iframe.style.flex = '1'; spinner.style.display = 'flex';
         iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
@@ -189,7 +258,6 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
         if (downloadBtn) { downloadBtn.onclick = function() { window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank'); }; }
         if (printBtn) { printBtn.onclick = function() { window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank'); }; }
     }
-
     const modal = document.getElementById('pdfViewerModal'); if (modal) { modal.style.display = 'flex'; modal.classList.remove('hidden'); } document.body.style.overflow = 'hidden';
 };
 
@@ -219,7 +287,10 @@ window.renderHistory = function(filterType) {
         const dateStr = dateObj.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'}); const timeStr = dateObj.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
         
         let badgesHtml = '';
-        if (data.certificateFileId) { badgesHtml += `<span class="bg-indigo-100 text-indigo-800 border border-indigo-300 px-2 py-0.5 rounded-full text-[10px] font-black ml-1.5"><i class="fa-solid fa-certificate mr-0.5"></i>Cert</span>`; }
+        // NEW FIX: Only show Cert Badge if it is NOT disabled
+        if (data.certificateFileId && data.isCertificateAttached !== false) { 
+            badgesHtml += `<span class="bg-indigo-100 text-indigo-800 border border-indigo-300 px-2 py-0.5 rounded-full text-[10px] font-black ml-1.5"><i class="fa-solid fa-certificate mr-0.5"></i>Cert</span>`; 
+        }
         if (data.withStamp) { badgesHtml += `<span class="bg-green-100 text-green-800 border border-green-300 px-2 py-0.5 rounded-full text-[10px] font-black ml-1.5"><i class="fa-solid fa-stamp mr-0.5"></i>Stamped</span>`; }
         
         historyContainer.innerHTML += `
