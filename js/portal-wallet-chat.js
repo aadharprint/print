@@ -717,15 +717,26 @@ window.renderHistory = function(filterType) {
             ? `<span class="bg-green-100 text-green-800 border border-green-300 px-2 py-0.5 rounded-full text-[10px] font-black ml-1.5"><i class="fa-solid fa-stamp mr-0.5"></i>Stamped</span>`
             : '';
         
+        // --- नया लॉजिक: Pending है या Completed? ---
+        let actionHtml = '';
+        if (data.fileId === 'PENDING' || data.status === 'Pending') {
+            // जनरेट होते समय
+            actionHtml = `<span class="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-300 px-3 py-1.5 rounded-lg text-[11px] font-black animate-pulse shadow-sm cursor-wait"><i class="fa-solid fa-spinner fa-spin"></i> Generating...</span>`;
+        } else if (data.status === 'Failed' || data.status === 'Timeout' || data.fileId === 'TIMEOUT_ERROR' || data.fileId === 'ERROR') {
+            // एरर आने पर
+            actionHtml = `<span class="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-300 px-3 py-1.5 rounded-lg text-[11px] font-black shadow-sm"><i class="fa-solid fa-triangle-exclamation"></i> Failed</span>`;
+        } else {
+            // सक्सेस होने पर (नॉर्मल बटन)
+            actionHtml = `<button onclick="window.openPdfViewer('${data.fileId}', '${data.fileName}', ${data._origIndex})" class="inline-flex items-center gap-1 bg-royal-50 text-royal-700 border border-royal-200 hover:bg-royal-600 hover:text-white px-3 py-1.5 rounded-lg text-[11px] font-black transition shadow-sm"><i class="fa-solid fa-eye"></i> Preview / PDF / Share</button>`;
+        }
+
         historyContainer.innerHTML += `
             <tr class="border-b border-slate-100 text-xs hover:bg-slate-50 transition">
                 <td class="p-3 font-bold text-slate-800">${data.fileName}${stampBadgeHtml}</td>
                 <td class="p-3"><span class="bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">${data.serviceType}</span></td>
                 <td class="p-3 text-slate-500 text-[11px] font-medium">${dateStr} <br> ${timeStr}</td>
                 <td class="p-3 text-right whitespace-nowrap">
-                    <button onclick="window.openPdfViewer('${data.fileId}', '${data.fileName}', ${data._origIndex})" class="inline-flex items-center gap-1 bg-royal-50 text-royal-700 border border-royal-200 hover:bg-royal-600 hover:text-white px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition shadow-sm">
-                        <i class="fa-solid fa-eye"></i> Preview / PDF / Share
-                    </button>
+                    ${actionHtml}
                 </td>
             </tr>
         `;
