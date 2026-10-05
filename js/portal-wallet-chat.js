@@ -1,6 +1,6 @@
 // ============================================================================
-// FILE 3: js/portal-wallet-chat.js (UPDATED)
-// (Auth, Wallet, Chat, User Preview Fix & Per-User Service Stealth Logic)
+// FILE 3: js/portal-wallet-chat.js (UPDATED COMPLETE)
+// (Auth, Wallet, Chat, User Preview, Password Reset Fix & Stealth Logic)
 // ============================================================================
 
 import "./config-templates.js";
@@ -32,7 +32,7 @@ window.portalConfigState = {
 
 window.currentRechargeCredits = 0; window.currentTotalPayable = 0; window.currentWantsVip = false; window.currentVipDays = 0; window.currentVipPlanFee = 0;
 
-// === NEW: PER-USER VISIBILITY CHECKER ===
+// === PER-USER VISIBILITY CHECKER ===
 window.canCurrentUserSeeService = function(srv) {
     const cfg = window.portalConfigState || {};
     const u = window.currentUserData;
@@ -67,7 +67,7 @@ function startUserSupportChatListener(uid) { if (window.userChatUnsubscribe) win
 window.renderUserLiveChatMessages = function() { const box = document.getElementById('userLiveChatMessagesBox'); if (!box) return; let msgs = Array.isArray(window.currentUserChatData?.messages) ? [...window.currentUserChatData.messages] : []; if (msgs.length === 0 && window.currentUserChatData?.message) msgs.push({ sender: 'user', text: window.currentUserChatData.message, time: Date.now() }); if (msgs.length === 0) { box.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400"><div class="w-12 h-12 rounded-full bg-royal-50 text-royal-500 flex items-center justify-center text-xl mb-2 border border-royal-200"><i class="fa-solid fa-comments"></i></div><p class="text-xs font-black text-slate-600">Ojas Live Support Chat</p><p class="text-[11px] text-slate-400 mt-0.5">कोई भी समस्या या सवाल नीचे लिखकर भेजें। एडमिन का रिप्लाई यहीं इसी चैट में लाइव दिखेगा।</p></div>`; return; } box.innerHTML = msgs.map(m => { const isMe = m.sender === 'user'; const tStr = m.time ? new Date(m.time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) : ''; const safeText = String(m.text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;'); if (isMe) { return `<div class="flex justify-end"><div class="max-w-[80%] bg-dark-900 text-white px-3.5 py-2.5 rounded-2xl rounded-br-none shadow-sm"><p class="text-xs font-semibold whitespace-pre-line leading-relaxed">${safeText}</p><span class="block text-[9px] text-royal-300 text-right mt-1 opacity-80">${tStr} • You</span></div></div>`; } else { return `<div class="flex justify-start"><div class="max-w-[80%] bg-amber-50 border border-amber-300 text-slate-900 px-3.5 py-2.5 rounded-2xl rounded-bl-none shadow-sm"><span class="text-[10px] font-black text-amber-800 uppercase block mb-0.5"><i class="fa-solid fa-crown text-amber-500 mr-1"></i>Admin Support</span><p class="text-xs font-bold whitespace-pre-line leading-relaxed">${safeText}</p><span class="block text-[9px] text-slate-400 text-right mt-1">${tStr}</span></div></div>`; } }).join(''); box.scrollTop = box.scrollHeight; };
 window.sendUserSupportMessage = async function(event) { event.preventDefault(); if (!window.currentUserData) return; const inp = document.getElementById('userSupportChatInput'); const btn = document.getElementById('btnSendUserChat'); const text = inp.value.trim(); if (!text) return; inp.value = ''; btn.disabled = true; const uid = window.currentUserData.uid; try { const existingMsgs = Array.isArray(window.currentUserChatData?.messages) ? [...window.currentUserChatData.messages] : []; existingMsgs.push({ sender: 'user', text: text, time: Date.now() }); await setDoc(doc(db, "supportTickets", uid), { type: 'USER_SUPPORT_CHAT', userId: uid, userIdentifier: window.currentUserData.email, username: window.currentUserData.username, message: text, status: 'Open', unreadByAdmin: true, unreadByUser: false, timestamp: new Date(), updatedAtMs: Date.now(), messages: existingMsgs }, { merge: true }); } catch (err) { alert("मैसेज भेजने में समस्या आई: " + err.message); } finally { btn.disabled = false; inp.focus(); } };
 
-// === UPDATED: SYNC ALL 4 PER-USER STEALTH VALUES ===
+// === SYNC ALL 4 PER-USER STEALTH VALUES ===
 function startUserProfileListener(uid) { 
     if (window.userProfileUnsubscribe) window.userProfileUnsubscribe(); 
     window.userProfileUnsubscribe = onSnapshot(doc(db, "users", uid), (snap) => { 
@@ -125,6 +125,7 @@ window.applyLivePortalControls = function() {
     if (promoDesc) promoDesc.innerHTML = canDob18 ? `VIP लें: <strong>18+ DOB & सारे 9 Official Annexures</strong> अनलॉक करें (सभी डॉक्यूमेंट 10 Cr)!` : `VIP लें: <strong>सारे 9 Official Annexures</strong> अनलॉक करें (सभी डॉक्यूमेंट 10 Cr)!`;
     if (vipHeaderLabel) vipHeaderLabel.innerHTML = canDob18 ? `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures)` : `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (All 9 Annexures)`;
     
+    // Auto-switch tab if current tab becomes hidden
     if ((window.currentActiveTab === 'domicile' && !canDom) || (window.currentActiveTab === 'caste' && !canCas) || (window.currentActiveTab === 'dob18' && !canDob18) || (window.currentActiveTab === 'dob_minor' && !canDobMinor)) { 
         window.switchService(window.getFirstAllowedTab()); 
     }
@@ -184,6 +185,58 @@ function setupDashboard(userData) {
     window.applyLivePortalControls(); window.switchService(window.getFirstAllowedTab());
 }
 window.handleLogout = async function() { await signOut(auth); window.location.reload(); };
+
+// === UPDATED USER PASSWORD CHANGE LOGIC ===
+window.changeUserPassword = async function(event) {
+    event.preventDefault();
+    const currPass = document.getElementById('currentPassInput').value;
+    const newPass = document.getElementById('newPassInput').value;
+    const msgBox = document.getElementById('passChangeMsg');
+    const btn = document.getElementById('btnChangePass');
+    
+    if (newPass.length < 6) {
+        return alert("नया पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!");
+    }
+    
+    const origHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Updating Password...';
+    btn.disabled = true;
+    msgBox.style.display = 'none';
+    
+    try {
+        const user = auth.currentUser;
+        const credential = EmailAuthProvider.credential(user.email, currPass);
+        
+        // Re-authenticate to confirm identity
+        await reauthenticateWithCredential(user, credential);
+        
+        // Update Password in Auth System
+        await updatePassword(user, newPass);
+        
+        // Update Password in Database for Admin to manage if needed
+        await updateDoc(doc(db, "users", user.uid), { 
+            userPass: newPass, 
+            passUpdatedAt: new Date() 
+        });
+        
+        msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-green-50 text-green-700 border-green-200 mt-4";
+        msgBox.innerHTML = "<i class='fa-solid fa-check-circle mr-1 text-base'></i> पासवर्ड सफलतापूर्वक बदल दिया गया है!";
+        msgBox.style.display = 'block';
+        event.target.reset();
+        
+    } catch (error) {
+        msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-red-50 text-red-600 border-red-200 mt-4";
+        if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+            msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> आपका पुराना पासवर्ड गलत है!";
+        } else {
+            msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> " + error.message;
+        }
+        msgBox.style.display = 'block';
+    } finally {
+        btn.innerHTML = origHtml;
+        btn.disabled = false;
+    }
+};
 
 window.calculateCredits = function() {
     const creditAmt = parseFloat(document.getElementById('rupeeAmount')?.value) || 0;
@@ -367,11 +420,13 @@ window.renderHistory = function(filterType) {
     });
 };
 
-// === UPDATED: MISSING PAYMENT UI INCLUDED & PER-USER STEALTH CHECKS ADDED ===
+// === UPDATED SERVICE SWITCH LOGIC (WITH NEW PASSWORD CHANGE SECTION) ===
 window.switchService = async function(serviceName) {
+    if (!serviceName) serviceName = window.getFirstAllowedTab();
+
     if (window.currentUserData?.hasFreeAccess && (serviceName === 'add_credit' || serviceName === 'payments_history')) serviceName = window.getFirstAllowedTab();
     
-    // Validate Tab Access
+    // Validate Document Tab Access
     if (serviceName === 'domicile' && !window.canCurrentUserSeeService('domicile')) serviceName = window.getFirstAllowedTab(); 
     else if (serviceName === 'caste' && !window.canCurrentUserSeeService('caste')) serviceName = window.getFirstAllowedTab(); 
     else if (serviceName === 'dob18' && !window.canCurrentUserSeeService('dob18')) serviceName = window.getFirstAllowedTab();
@@ -388,7 +443,30 @@ window.switchService = async function(serviceName) {
     const submitBtnText = window.currentUserData && window.currentUserData.hasFreeAccess ? 'Generate Document (VIP Free) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' : 'Generate Document (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>';
     const statusTagHtml = window.currentUserData && window.currentUserData.hasFreeAccess ? '<span class="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-[10px] font-black border border-green-300 uppercase"><i class="fa-solid fa-crown mr-1"></i>Lifetime VIP Free</span>' : (window.currentUserData && window.currentUserData.isVip ? '<span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-md text-[10px] font-black border border-amber-300 uppercase"><i class="fa-solid fa-crown mr-1"></i>10 Credits</span>' : '<span class="bg-royal-100 text-royal-900 px-2.5 py-1 rounded-md text-[10px] font-black border border-royal-300 uppercase">10 Credits</span>');
 
-    // Wallet UI Re-Added
+    // === ADDED: CHANGE PASSWORD UI ===
+    if (serviceName === 'password') {
+        container.innerHTML = `
+        <div class="max-w-md mx-auto space-y-4 pt-2">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+                <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-key text-royal-500 mr-1.5"></i> Change Portal Password</h3>
+            </div>
+            <form onsubmit="window.changeUserPassword(event)" class="bg-slate-50 p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Current Password (पुराना पासवर्ड)</label>
+                    <input type="password" id="currentPassInput" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-royal-500 bg-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">New Password (नया पासवर्ड)</label>
+                    <input type="password" id="newPassInput" required minlength="6" placeholder="कम से कम 6 अक्षर का होना चाहिए" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-royal-500 bg-white">
+                </div>
+                <div id="passChangeMsg" style="display:none;"></div>
+                <button type="submit" id="btnChangePass" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-glow transition">Update Password</button>
+            </form>
+        </div>`;
+        return;
+    }
+
+    // Wallet UI
     if (serviceName === 'add_credit') {
         container.innerHTML = `
         <div id="walletMainUI" class="max-w-xl mx-auto space-y-4">
@@ -439,6 +517,7 @@ window.switchService = async function(serviceName) {
     }
 
     if (window.renderServiceFormHtml(serviceName, container, submitBtnText, statusTagHtml)) return;
+    
     if (serviceName === 'support_chat') { container.innerHTML = `<div class="max-w-2xl mx-auto flex flex-col h-[460px] md:h-[520px] border border-slate-200 rounded-2xl overflow-hidden bg-slate-50 shadow-inner"><div class="bg-dark-950 text-white px-4 py-3 flex justify-between items-center border-b border-royal-500"><div class="flex items-center gap-2.5"><div class="w-8 h-8 rounded-xl bg-green-500/20 border border-green-400 text-green-400 flex items-center justify-center"><i class="fa-solid fa-headset text-sm"></i></div><div><h3 class="text-xs md:text-sm font-black text-white flex items-center gap-1.5">Live Admin Support Chat <span class="w-2 h-2 rounded-full bg-green-400 animate-ping"></span></h3><p class="text-[10px] text-slate-400 font-semibold">User ID: <span class="text-royal-300 font-bold">${window.currentUserData?.email || ''}</span></p></div></div><span class="text-[10px] bg-dark-800 text-royal-300 border border-slate-700 px-2.5 py-1 rounded-lg font-bold">2-Way Live</span></div><div id="userLiveChatMessagesBox" class="flex-1 p-3.5 md:p-4 overflow-y-auto space-y-3 bg-slate-100/80"></div><form onsubmit="window.sendUserSupportMessage(event)" class="p-3 bg-white border-t border-slate-200 flex gap-2"><input type="text" id="userSupportChatInput" required placeholder="यहाँ अपनी समस्या या मैसेज लिखें..." class="flex-1 px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs md:text-sm font-semibold bg-slate-50 focus:bg-white focus:border-royal-500 outline-none"><button type="submit" id="btnSendUserChat" class="bg-dark-900 hover:bg-black text-royal-300 font-black px-5 py-2.5 rounded-xl text-xs md:text-sm shadow-glow transition flex items-center gap-1.5 shrink-0"><span>Send</span> <i class="fa-solid fa-paper-plane text-xs"></i></button></form></div>`; window.renderUserLiveChatMessages(); if (window.currentUserData && window.currentUserChatData?.unreadByUser === true) { try { await updateDoc(doc(db, "supportTickets", window.currentUserData.uid), { unreadByUser: false }); } catch (e) {} } const headerBadge = document.getElementById('headerSupportUnreadBadge'); const gearBadge = document.getElementById('gearSupportUnreadBadge'); if (headerBadge) headerBadge.style.display = 'none'; if (gearBadge) gearBadge.style.display = 'none'; return; }
     if (serviceName === 'payments_history') { container.innerHTML = `<div class="space-y-4"><div id="userValidityInfoBox"></div><div class="grid grid-cols-3 gap-2 md:gap-4"><div class="p-3 rounded-xl bg-slate-50 border border-slate-200"><p class="text-[10px] font-bold text-slate-400 uppercase">कुल ट्रांजैक्शन</p><p id="sumTotalTxns" class="text-lg md:text-2xl font-black text-dark-900">0</p></div><div class="p-3 rounded-xl bg-green-50 border border-green-200"><p class="text-[10px] font-bold text-green-700 uppercase">सफल (Approved)</p><p id="sumApprovedAmt" class="text-lg md:text-2xl font-black text-green-700">₹0</p></div><div class="p-3 rounded-xl bg-amber-50 border border-amber-200"><p class="text-[10px] font-bold text-amber-800 uppercase">पेंडिंग (Pending)</p><p id="sumPendingAmt" class="text-lg md:text-2xl font-black text-amber-700">₹0 (0)</p></div></div><div><div class="flex justify-between items-center mb-2"><h4 class="text-sm md:text-base font-black text-dark-900"><i class="fa-solid fa-receipt text-royal-500 mr-1.5"></i> पेमेंट और VIP हिस्ट्री</h4><button onclick="window.loadUserPayments()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold"><i class="fa-solid fa-rotate-right mr-1"></i> Refresh</button></div><div class="overflow-x-auto border border-slate-200 rounded-xl"><table class="w-full text-left border-collapse bg-white min-w-[520px]"><thead class="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase"><tr><th class="p-3">तारीख (Date)</th><th class="p-3">राशि</th><th class="p-3">क्रेडिट्स / VIP</th><th class="p-3">UTR / Mode</th><th class="p-3 text-right">स्टेटस</th></tr></thead><tbody id="userPaymentsTableBody" class="text-xs text-slate-700"></tbody></table></div></div></div>`; window.loadUserPayments(); return; }
     if (serviceName === 'history') { const isVipUser = window.currentUserData && window.currentUserData.isVip; const canShowDob = window.canCurrentUserSeeService('dob18'); const domOpt = cfg.showDomicile ? `<option value="Domicile">मूल निवास</option>` : ''; const casOpt = cfg.showCaste ? `<option value="Caste">जाति प्रमाण पत्र</option>` : ''; const dobOpt = (isVipUser && canShowDob) ? `<option value="DOB 18+">DOB (18+)</option>` : ''; const vipFilterOptions = isVipUser ? `${dobOpt}<option value="Annexure 1">Annexure 1</option><option value="Annexure 1A">Annexure 1A</option><option value="Annexure 3">Annexure 3</option><option value="Annexure 3A">Annexure 3A</option><option value="Annexure B">Annexure B</option><option value="Annexure C">Annexure C</option><option value="Annexure D">Annexure D</option><option value="Annexure E">Annexure E</option><option value="Annexure F">Annexure F</option>` : ''; container.innerHTML = `<div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-100 pb-3 mb-4"><div><h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-folder-open text-royal-500 mr-1.5"></i> Document History</h3><p id="userHistoryCount" class="text-[11px] font-bold text-royal-600">Total Files: 0</p></div><div class="flex items-center gap-2"><select onchange="window.renderHistory(this.value)" class="p-2 border border-slate-200 rounded-xl text-xs bg-slate-50 font-semibold outline-none"><option value="ALL">All Documents</option>${domOpt}${casOpt}${vipFilterOptions}</select><button onclick="window.loadUserHistory()" class="bg-slate-100 text-slate-600 px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-200"><i class="fa-solid fa-rotate-right"></i></button></div></div><div class="overflow-x-auto border border-slate-200 rounded-xl"><table class="w-full text-left border-collapse bg-white min-w-[500px]"><thead class="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase"><tr><th class="p-3">File Name</th><th class="p-3">Type</th><th class="p-3">Date & Time</th><th class="p-3 text-right">Action</th></tr></thead><tbody id="historyTableBody" class="text-xs text-slate-700"></tbody></table></div>`; window.loadUserHistory(); }
@@ -448,5 +527,3 @@ window.loadUserPayments = async function() {
     const tableBody = document.getElementById('userPaymentsTableBody'); if (!tableBody) return; tableBody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400 font-bold text-xs"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>Loading payment history...</td></tr>`;
     try { const querySnapshot = await getDocs(query(collection(db, "payments"), where("userId", "==", window.currentUserData.uid))); window.userPaymentsData = []; querySnapshot.forEach((docSnap) => { window.userPaymentsData.push({ id: docSnap.id, ...docSnap.data() }); }); window.userPaymentsData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)); let sumApproved = 0, sumPending = 0, pendingCount = 0; window.userPaymentsData.forEach(item => { const amt = parseFloat(item.amountPaid) || 0; if (item.status === 'Approved' || item.status === 'Auto-Approved') { sumApproved += amt; } else if (item.status === 'Pending' || (item.status || '').includes('Ticket')) { sumPending += amt; pendingCount++; } }); document.getElementById('sumTotalTxns').innerText = window.userPaymentsData.length; document.getElementById('sumApprovedAmt').innerText = `₹${sumApproved}`; document.getElementById('sumPendingAmt').innerText = `₹${sumPending} (${pendingCount})`; tableBody.innerHTML = ''; if (window.userPaymentsData.length === 0) { tableBody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400 text-xs"><i class="fa-solid fa-receipt text-3xl mb-2 text-slate-300"></i><br>आपने अभी तक कोई पेमेंट नहीं किया है।</td></tr>`; return; } window.userPaymentsData.forEach(data => { const sec = data.timestamp?.seconds || Math.floor(Date.now() / 1000); const dateObj = new Date(sec * 1000); const dateStr = dateObj.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'}); const timeStr = dateObj.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'}); let statusBadge = ''; if ((data.status || '').includes('Ticket')) { statusBadge = `<span class="bg-indigo-100 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded text-[10px] font-black"><i class="fa-solid fa-ticket mr-1"></i>Ticket Raised</span>`; } else if (data.status === 'Pending') { statusBadge = `<span class="bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded text-[10px] font-black"><i class="fa-solid fa-clock mr-1"></i>Pending</span>`; } else if (data.status === 'Approved' || data.status === 'Auto-Approved') { statusBadge = `<span class="bg-green-100 text-green-800 border border-green-200 px-2 py-0.5 rounded text-[10px] font-black"><i class="fa-solid fa-check-circle mr-1"></i>Approved</span>`; } else { statusBadge = `<span class="bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded text-[10px] font-black"><i class="fa-solid fa-circle-xmark mr-1"></i>${data.status}</span>`; } const vipDays = data.vipDaysRequested || (data.wantsVip ? 30 : 0); const creds = data.creditsRequested !== undefined ? data.creditsRequested : (data.creditsAdded || 0); tableBody.innerHTML += `<tr class="border-b border-slate-100 text-xs hover:bg-slate-50 transition"><td class="p-3 text-slate-500 font-medium">${dateStr} <br> ${timeStr}</td><td class="p-3 font-black text-slate-800 text-sm">₹${data.amountPaid || 0}</td><td class="p-3"><div class="flex flex-col gap-1"><span class="font-bold text-royal-600">+${creds} Cr</span>${vipDays > 0 ? `<span class="bg-amber-400 text-dark-950 px-1.5 py-0.5 rounded text-[9px] font-black inline-block w-max">👑 +${vipDays}d VIP</span>` : ''}</div></td><td class="p-3 font-mono font-bold text-slate-600 text-[11px]">${data.utrNumber || 'ONLINE_UPI'}</td><td class="p-3 text-right whitespace-nowrap">${statusBadge}</td></tr>`; }); } catch (err) { tableBody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500 text-xs">Failed to load payment history.</td></tr>`; }
 };
-
-
