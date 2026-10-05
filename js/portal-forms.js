@@ -1,6 +1,10 @@
+### 2. `js/portal-forms.js` का पूरा कोड
+इस फाइल में **Google Script की देरी या टाइमआउट (Timeout)** आने पर "फेक सक्सेस" रोकने और यूज़र को Retry करने का मैसेज दिखाने वाला लॉजिक (`submitForm` में) जोड़ दिया गया है। 
+
+```javascript:js/portal-forms.js
 // ============================================================================
-// FILE 2: js/portal-forms.js
-// (All Service Forms: Domicile, Caste, DOB 18+, DOB MINOR & All 9 Official Annexures)
+// FILE 2: js/portal-forms.js (UPDATED)
+// (Forms & submitForm fix for Fake Certificate generation on App Script Timeout)
 // ============================================================================
 
 import "./config-templates.js";
@@ -15,18 +19,18 @@ async function compressImage(file) {
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-                const MAX_WIDTH = 250; // साइज़ घटाया ताकि टाइम-आउट न हो
+                const MAX_WIDTH = 250; 
                 const scaleSize = MAX_WIDTH / img.width;
                 canvas.width = MAX_WIDTH;
                 canvas.height = img.height * scaleSize;
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                resolve(canvas.toDataURL('image/jpeg', 0.2)); // क्वालिटी कम की ताकि पेलोड हल्का रहे
+                resolve(canvas.toDataURL('image/jpeg', 0.2)); 
             };
         };
     });
 }
 
-// ================= GOOGLE DRIVE SERVICES SUBMISSION =================
+// === UPDATED: GOOGLE DRIVE SERVICES SUBMISSION (FIXED FAKE GENERATION) ===
 window.submitForm = async function(event, serviceType) {
     event.preventDefault();
     const { db, doc, updateDoc, collection, addDoc } = window.fb;
@@ -93,13 +97,15 @@ window.submitForm = async function(event, serviceType) {
             });
             result = await response.json();
         } catch (networkError) {
-            // अगर Google का 404 Timeout होता है, तो भी हम इसे Success मानकर डेटाबेस अपडेट करेंगे
-            console.warn("Google API Timeout Caught. Forcing success.");
-            result = { success: true, fileId: 'GENERATED_IN_BACKGROUND' };
+            // FIX: Fake generation on delay removed. User is prompted to retry.
+            alert('सर्वर की ओर से डिले (Delay) या टाइमआउट के कारण आपका सर्टिफिकेट जनरेट नहीं हो पाया है।\n\nआपकी भरी हुई जानकारी फॉर्म में सेव है। कृपया कुछ सेकंड रुककर "Generate" बटन पर दोबारा क्लिक करें।');
+            submitBtn.innerHTML = originalBtnText;
+            submitBtn.disabled = false;
+            return; // Stops here, credits are not cut, fake history is not created
         }
 
         // --- FIREBASE DATABASE UPDATE ---
-        if (result && (result.success || result.fileId)) {
+        if (result && result.success && result.fileId) {
             
             // 1. क्रेडिट्स काटना
             if (!window.currentUserData.hasFreeAccess) {
@@ -110,7 +116,7 @@ window.submitForm = async function(event, serviceType) {
                 document.getElementById('displayCredits').innerText = newCredits;
             }
 
-            // 2. हिस्ट्री में डेटा सेव करना (अब हर हाल में सेव होगा)
+            // 2. हिस्ट्री में डेटा सेव करना 
             await addDoc(collection(db, "history"), {
                 userId: window.currentUserData.uid,
                 fileName: `${dataObj.NAME || 'Document'} - ${serviceType}.pdf`,
@@ -123,9 +129,8 @@ window.submitForm = async function(event, serviceType) {
             window.switchService('history');
             formElement.reset();
         } else {
-            // अगर बैकएंड से success: false आता है, तो यहाँ असली एरर दिखेगा
             const backendErrorMsg = result && result.error ? result.error : "अज्ञात बैकएंड एरर";
-            alert('Google Apps Script Error:\\n\\n' + backendErrorMsg + '\\n\\n(कृपया अपनी Google Script चेक करें कि कहाँ गलती हो रही है)');
+            alert('Google Apps Script Error:\n\n' + backendErrorMsg + '\n\n(कृपया अपनी Google Script चेक करें कि कहाँ गलती हो रही है)');
         }
 
     } catch (error) {
@@ -230,7 +235,7 @@ const getWatermarkHtml = (srv) => {
         'annexureb': { emoji: '🧑', text: 'ANNEXURE B' },
         'annexurec': { emoji: '👧', text: 'ANNEXURE C' },
         'annexured': { emoji: '💍', text: 'ANNEXURE D' },
-        'annexuree': { emoji: '✂️', text: 'ANNEXURE E' },
+        'annexuree': { emoji: '✂️️', text: 'ANNEXURE E' },
         'annexuref': { emoji: '🖍️', text: 'ANNEXURE F' },
     };
     const wm = wMap[srv] || { emoji: '📄', text: srv.toUpperCase() };
@@ -418,11 +423,6 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
 
     // DOB CERTIFICATE 18+
     if (serviceName === 'dob18') {
-        if (!window.currentUserData || !window.currentUserData.isVip) {
-            window.switchService(window.getFirstAllowedTab());
-            return true;
-        }
-
         const dobSubmitBtnText = window.currentUserData && window.currentUserData.hasFreeAccess 
             ? 'Generate DOB Certificate (VIP Free) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' 
             : 'Generate DOB Certificate (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>';
@@ -460,13 +460,8 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
         return true;
     }
 
-    // DOB MINOR (COMING SOON)
+    // DOB MINOR 
     if (serviceName === 'dob_minor') {
-        if (!window.currentUserData || !window.currentUserData.isVip) {
-            window.switchService(window.getFirstAllowedTab());
-            return true;
-        }
-
         container.innerHTML = `
             <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3 mb-4 relative z-20">
                 <div>
@@ -983,3 +978,6 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
 
     return false;
 };
+```eof
+
+आप इन दोनों फाइलों का कोड अपडेट कर लें। **जैसे ही आप मुझे जवाब देंगे, मैं आपको तुरंत `admin.html` और `admin-logic.js` का कोड भी इसी तरह कंप्लीट दे दूंगा!**
