@@ -1,7 +1,6 @@
-
 // ============================================================================
-// FILE 2: js/portal-forms.js (UPDATED)
-// (Forms & submitForm fix for Fake Certificate generation on App Script Timeout)
+// FILE 2: js/portal-forms.js (UPDATED COMPLETE)
+// (Forms, submitForm fix & FORM DRAFT PERSISTENCE LOGIC)
 // ============================================================================
 
 import "./config-templates.js";
@@ -27,7 +26,44 @@ async function compressImage(file) {
     });
 }
 
-// === UPDATED: GOOGLE DRIVE SERVICES SUBMISSION (FIXED FAKE GENERATION) ===
+// === FORM DRAFT SAVING LOGIC ===
+window.saveFormDataToSession = function(serviceName) {
+    const form = document.querySelector('#formContainer form');
+    if (!form) return;
+    const fd = new FormData(form);
+    const dataObj = {};
+    fd.forEach((val, key) => {
+        // फोटो को सेशन में सेव नहीं करते क्योंकि वह भारी होती है और एरर दे सकती है
+        if (key !== 'PHOTO' && typeof val === 'string') {
+            dataObj[key] = val;
+        }
+    });
+    sessionStorage.setItem('ojas_draft_' + serviceName, JSON.stringify(dataObj));
+};
+
+window.restoreFormDataFromSession = function(serviceName) {
+    const savedStr = sessionStorage.getItem('ojas_draft_' + serviceName);
+    if (!savedStr) return;
+    try {
+        const dataObj = JSON.parse(savedStr);
+        const form = document.querySelector('#formContainer form');
+        if (!form) return;
+        Object.keys(dataObj).forEach(key => {
+            const input = form.querySelector(`[name="${key}"]`);
+            if (input && input.type !== 'file') {
+                if (input.type === 'checkbox' || input.type === 'radio') {
+                     if (input.value === dataObj[key]) input.checked = true;
+                } else {
+                     input.value = dataObj[key];
+                }
+                // ट्रिगर करें ताकि अगर कोई "OTHER" सेलेक्ट हो तो कस्टम बॉक्स खुल जाए
+                input.dispatchEvent(new Event('change'));
+            }
+        });
+    } catch (e) {}
+};
+
+// === GOOGLE DRIVE SERVICES SUBMISSION ===
 window.submitForm = async function(event, serviceType) {
     event.preventDefault();
     const { db, doc, updateDoc, collection, addDoc } = window.fb;
@@ -84,7 +120,6 @@ window.submitForm = async function(event, serviceType) {
             dataObj.ADDRESS = window.cleanDob18AddressString(dataObj.ADDRESS).trim();
         }
 
-        // --- NETWORK CALL (API) ---
         let result = null;
         try {
             const response = await fetch(targetUrl, {
@@ -94,17 +129,14 @@ window.submitForm = async function(event, serviceType) {
             });
             result = await response.json();
         } catch (networkError) {
-            // FIX: Fake generation on delay removed. User is prompted to retry.
             alert('सर्वर की ओर से डिले (Delay) या टाइमआउट के कारण आपका सर्टिफिकेट जनरेट नहीं हो पाया है।\n\nआपकी भरी हुई जानकारी फॉर्म में सेव है। कृपया कुछ सेकंड रुककर "Generate" बटन पर दोबारा क्लिक करें।');
             submitBtn.innerHTML = originalBtnText;
             submitBtn.disabled = false;
-            return; // Stops here, credits are not cut, fake history is not created
+            return; 
         }
 
-        // --- FIREBASE DATABASE UPDATE ---
         if (result && result.success && result.fileId) {
             
-            // 1. क्रेडिट्स काटना
             if (!window.currentUserData.hasFreeAccess) {
                 const userDocRef = doc(db, "users", window.currentUserData.uid);
                 const newCredits = window.currentUserData.credits - docCost;
@@ -113,7 +145,6 @@ window.submitForm = async function(event, serviceType) {
                 document.getElementById('displayCredits').innerText = newCredits;
             }
 
-            // 2. हिस्ट्री में डेटा सेव करना 
             await addDoc(collection(db, "history"), {
                 userId: window.currentUserData.uid,
                 fileName: `${dataObj.NAME || 'Document'} - ${serviceType}.pdf`,
@@ -122,6 +153,9 @@ window.submitForm = async function(event, serviceType) {
                 timestamp: new Date()
             });
             
+            // क्लियर ड्राफ्ट
+            sessionStorage.removeItem('ojas_draft_' + serviceType);
+
             alert('Success! आपका डॉक्यूमेंट जनरेट हो गया है। कृपया History चेक करें।');
             window.switchService('history');
             formElement.reset();
@@ -138,7 +172,7 @@ window.submitForm = async function(event, serviceType) {
     }
 };
 
-// ================= LOCAL ANNEXURE FORM SUBMISSION =================
+// === LOCAL ANNEXURE FORM SUBMISSION ===
 window.submitLocalAnnexureForm = async function(event, serviceType, fileIdKey) {
     event.preventDefault();
     const { db, doc, updateDoc, collection, addDoc } = window.fb;
@@ -205,6 +239,14 @@ window.submitLocalAnnexureForm = async function(event, serviceType, fileIdKey) {
             document.getElementById('displayCredits').innerText = newCredits;
         }
 
+        // क्लियर ड्राफ्ट
+        const mapping = {
+            'Annexure 1': 'annexure1', 'Annexure 1A': 'annexure1a', 'Annexure 3': 'annexure3',
+            'Annexure 3A': 'annexure3a', 'Annexure B': 'annexureb', 'Annexure C': 'annexurec',
+            'Annexure D': 'annexured', 'Annexure E': 'annexuree', 'Annexure F': 'annexuref'
+        };
+        sessionStorage.removeItem('ojas_draft_' + (mapping[serviceType] || serviceType));
+
         alert(`आपका डॉक्यूमेंट (${serviceType}) जनरेट हो चुका है! अब आप यहाँ History से इसे Preview, Print और Download कर सकते हैं।`);
         formEl.reset();
         window.switchService('history');
@@ -218,7 +260,7 @@ window.submitLocalAnnexureForm = async function(event, serviceType, fileIdKey) {
     }
 };
 
-// ================= BACKGROUND WATERMARK HELPER (ADVANCED FORM OVERLAY) =================
+// === BACKGROUND WATERMARK HELPER ===
 const getWatermarkHtml = (srv) => {
     const wMap = {
         'domicile': { emoji: '🏠', text: 'DOMICILE' },
@@ -232,7 +274,7 @@ const getWatermarkHtml = (srv) => {
         'annexureb': { emoji: '🧑', text: 'ANNEXURE B' },
         'annexurec': { emoji: '👧', text: 'ANNEXURE C' },
         'annexured': { emoji: '💍', text: 'ANNEXURE D' },
-        'annexuree': { emoji: '✂️️', text: 'ANNEXURE E' },
+        'annexuree': { emoji: '✂', text: 'ANNEXURE E' },
         'annexuref': { emoji: '🖍️', text: 'ANNEXURE F' },
     };
     const wm = wMap[srv] || { emoji: '📄', text: srv.toUpperCase() };
@@ -251,7 +293,7 @@ const getWatermarkHtml = (srv) => {
     `;
 };
 
-// ================= RENDER DOCUMENT FORMS INTO CONTAINER =================
+// === RENDER DOCUMENT FORMS INTO CONTAINER ===
 window.renderServiceFormHtml = function(serviceName, container, submitBtnText, statusTagHtml) {
     const todayISO = new Date().toISOString().split('T')[0];
 
@@ -278,11 +320,13 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
                     <option value="annexurec" ${serviceName==='annexurec'?'selected':''}>👧 Annexure C (Children Name Update)</option>
                     <option value="annexured" ${serviceName==='annexured'?'selected':''}>💍 Annexure D (Name Update after Marriage)</option>
                     <option value="annexuree" ${serviceName==='annexuree'?'selected':''}>✂️ Annexure E (Adults Urf/Alias Removal)</option>
-                    <option value="annexuref" ${serviceName==='annexuref'?'selected':''}>🖍️ Annexure F (Children Urf/Alias Removal)</option>
+                    <option value="annexuref" ${serviceName==='annexuref'?'selected':''}>🖍️️ Annexure F (Children Urf/Alias Removal)</option>
                 </select>
             </div>
         </div>
     ` : '';
+
+    let isFormRendered = false;
 
     // DOMICILE
     if (serviceName === 'domicile') {
@@ -339,7 +383,7 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">House Number (मकान नंबर - MN)</label>
-                            <input type="text" name="MN" placeholder="Enter House No" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10">
+                            <input type="text" name="MN" placeholder="Enter House No" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Area / Locality (मोहल्ला / पोस्ट)</label>
@@ -363,11 +407,11 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
             </div>
         `;
         window.updateTehsilsAndThanas();
-        return true;
+        isFormRendered = true;
     }
 
     // CASTE
-    if (serviceName === 'caste') {
+    else if (serviceName === 'caste') {
         container.innerHTML = `
             <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4 relative z-20">
                 <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-users text-royal-500 mr-1.5"></i> Caste Certificate (जाति प्रमाण पत्र)</h3>
@@ -402,24 +446,25 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
                         <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Hindi Name (Optional)</label><input type="text" name="HNAME" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none relative z-10"></div>
                         <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Father/Husband Name</label><input type="text" name="FNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"></div>
                         <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Mother Name</label><input type="text" name="MNAME" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"></div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Area / Locality</label><input type="text" name="AREA" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">House Number (मकान नंबर - MN)</label><input type="text" name="MN" placeholder="Enter House No" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"></div>
+                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Area / Locality</label><input type="text" name="AREA" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"></div>
                         <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Village / Ward Name</label><input type="text" name="GRAM" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"></div>
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">VLE Name</label>
                             ${vleSelectHtml}
                         </div>
-                        <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Upload Photo</label><input type="file" name="PHOTO" accept="image/*" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-royal-100 file:text-royal-700 cursor-pointer relative z-10"></div>
+                        <div class="md:col-span-2"><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Upload Photo</label><input type="file" name="PHOTO" accept="image/*" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-royal-100 file:text-royal-700 cursor-pointer relative z-10"></div>
                     </div>
                     <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-glow transition text-sm md:text-base relative z-10">${submitBtnText}</button>
                 </form>
             </div>
         `;
         window.updateTehsilsAndThanas();
-        return true;
+        isFormRendered = true;
     }
 
     // DOB CERTIFICATE 18+
-    if (serviceName === 'dob18') {
+    else if (serviceName === 'dob18') {
         const dobSubmitBtnText = window.currentUserData && window.currentUserData.hasFreeAccess 
             ? 'Generate DOB Certificate (VIP Free) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' 
             : 'Generate DOB Certificate (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>';
@@ -454,11 +499,11 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
                 </form>
             </div>
         `;
-        return true;
+        isFormRendered = true;
     }
 
     // DOB MINOR 
-    if (serviceName === 'dob_minor') {
+    else if (serviceName === 'dob_minor') {
         container.innerHTML = `
             <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3 mb-4 relative z-20">
                 <div>
@@ -482,7 +527,7 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
     }
 
     // 1. ANNEXURE-I
-    if (serviceName === 'annexure1') {
+    else if (serviceName === 'annexure1') {
         if (!window.currentUserData || !window.currentUserData.isVip) { window.switchService(window.getFirstAllowedTab()); return true; }
         container.innerHTML = `
             ${annexureDropdownHtml}
@@ -537,11 +582,11 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
                 </form>
             </div>
         `;
-        return true;
+        isFormRendered = true;
     }
 
     // 2. ANNEXURE-IA
-    if (serviceName === 'annexure1a') {
+    else if (serviceName === 'annexure1a') {
         if (!window.currentUserData || !window.currentUserData.isVip) { window.switchService(window.getFirstAllowedTab()); return true; }
         container.innerHTML = `
             ${annexureDropdownHtml}
@@ -601,11 +646,11 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
                 </form>
             </div>
         `;
-        return true;
+        isFormRendered = true;
     }
 
     // 3. ANNEXURE-III
-    if (serviceName === 'annexure3') {
+    else if (serviceName === 'annexure3') {
         if (!window.currentUserData || !window.currentUserData.isVip) { window.switchService(window.getFirstAllowedTab()); return true; }
         container.innerHTML = `
             ${annexureDropdownHtml}
@@ -681,11 +726,11 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
                 </form>
             </div>
         `;
-        return true;
+        isFormRendered = true;
     }
 
     // 4. ANNEXURE-IIIA
-    if (serviceName === 'annexure3a') {
+    else if (serviceName === 'annexure3a') {
         if (!window.currentUserData || !window.currentUserData.isVip) { window.switchService(window.getFirstAllowedTab()); return true; }
         container.innerHTML = `
             ${annexureDropdownHtml}
@@ -766,11 +811,11 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
                 </form>
             </div>
         `;
-        return true;
+        isFormRendered = true;
     }
 
     // 5, 6, 7. ANNEXURE B, C, D
-    if (serviceName === 'annexureb' || serviceName === 'annexurec' || serviceName === 'annexured') {
+    else if (serviceName === 'annexureb' || serviceName === 'annexurec' || serviceName === 'annexured') {
         if (!window.currentUserData || !window.currentUserData.isVip) { window.switchService(window.getFirstAllowedTab()); return true; }
         const isChild = (serviceName === 'annexurec');
         const mapInfo = {
@@ -833,11 +878,11 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
             </div>
         `;
         window.initVerificationDefaults();
-        return true;
+        isFormRendered = true;
     }
 
     // 8. ANNEXURE E
-    if (serviceName === 'annexuree') {
+    else if (serviceName === 'annexuree') {
         if (!window.currentUserData || !window.currentUserData.isVip) { window.switchService(window.getFirstAllowedTab()); return true; }
         container.innerHTML = `
             ${annexureDropdownHtml}
@@ -899,11 +944,11 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
             </div>
         `;
         window.initVerificationDefaults();
-        return true;
+        isFormRendered = true;
     }
 
     // 9. ANNEXURE F
-    if (serviceName === 'annexuref') {
+    else if (serviceName === 'annexuref') {
         if (!window.currentUserData || !window.currentUserData.isVip) { window.switchService(window.getFirstAllowedTab()); return true; }
         container.innerHTML = `
             ${annexureDropdownHtml}
@@ -970,6 +1015,19 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
             </div>
         `;
         window.initVerificationDefaults();
+        isFormRendered = true;
+    }
+
+    // === ATTACH SESSION STORAGE LOGIC ===
+    if (isFormRendered) {
+        setTimeout(() => {
+            window.restoreFormDataFromSession(serviceName);
+            const form = container.querySelector('form');
+            if (form) {
+                form.addEventListener('input', () => window.saveFormDataToSession(serviceName));
+                form.addEventListener('change', () => window.saveFormDataToSession(serviceName));
+            }
+        }, 50);
         return true;
     }
 
