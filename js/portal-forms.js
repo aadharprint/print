@@ -1,7 +1,4 @@
-### 2. `js/portal-forms.js` का पूरा कोड
-इस फाइल में **Google Script की देरी या टाइमआउट (Timeout)** आने पर "फेक सक्सेस" रोकने और यूज़र को Retry करने का मैसेज दिखाने वाला लॉजिक (`submitForm` में) जोड़ दिया गया है। 
 
-```javascript:js/portal-forms.js
 // ============================================================================
 // FILE 2: js/portal-forms.js (UPDATED)
 // (Forms & submitForm fix for Fake Certificate generation on App Script Timeout)
