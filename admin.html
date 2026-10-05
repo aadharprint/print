@@ -250,7 +250,7 @@
             <!-- 2-Column Control Grid for Selected User -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
-                <!-- LEFT COLUMN: Profile Status, DOB 18+ Stealth Control, Share & DELETE USER -->
+                <!-- LEFT COLUMN: Profile Status, Services Stealth Control, Share & DELETE USER -->
                 <div class="bg-white rounded-2xl p-5 shadow-card border border-slate-200 space-y-4 flex flex-col justify-between">
                     <div class="space-y-4">
                         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -272,21 +272,34 @@
                             </div>
                         </div>
 
-                        <!-- PER-USER DOB 18+ STEALTH SWITCH -->
-                        <div class="p-4 rounded-2xl bg-amber-50/80 border-2 border-amber-200 flex items-center justify-between gap-3">
-                            <div class="flex items-start gap-3">
-                                <div class="w-9 h-9 rounded-xl bg-amber-400/20 border border-amber-400 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
-                                    <i class="fa-solid fa-cake-candles text-sm"></i>
-                                </div>
-                                <div>
-                                    <div class="text-xs md:text-sm font-black text-amber-950">DOB 18+ Section Visibility</div>
-                                    <p class="text-[11px] text-amber-800 font-semibold leading-snug mt-0.5">बंद (OFF) करने पर इस यूज़र को पता भी नहीं चलेगा कि पोर्टल में DOB 18+ का ऑप्शन है।</p>
-                                </div>
+                        <!-- PER-USER SERVICE STEALTH SWITCHES -->
+                        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                            <div class="flex items-center gap-2 mb-1 border-b border-slate-200 pb-2">
+                                <i class="fa-solid fa-eye text-royal-500"></i>
+                                <div class="text-xs font-black text-dark-900">Service Visibility (Per User Stealth)</div>
                             </div>
-                            <label class="relative inline-flex items-center cursor-pointer shrink-0">
-                                <input type="checkbox" id="userDobToggle" onchange="window.toggleUserDobAccess(this.checked)" class="sr-only peer" checked>
-                                <div class="w-12 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                            </label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <!-- Domicile -->
+                                <label class="flex items-center justify-between cursor-pointer bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+                                    <span class="text-[10px] font-bold text-slate-700">Domicile (मूल निवास)</span>
+                                    <input type="checkbox" id="userDomicileToggle" onchange="window.toggleUserAccess('allowDomicile', this.checked)" class="accent-green-600 w-4 h-4" checked>
+                                </label>
+                                <!-- Caste -->
+                                <label class="flex items-center justify-between cursor-pointer bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+                                    <span class="text-[10px] font-bold text-slate-700">Caste (जाति)</span>
+                                    <input type="checkbox" id="userCasteToggle" onchange="window.toggleUserAccess('allowCaste', this.checked)" class="accent-green-600 w-4 h-4" checked>
+                                </label>
+                                <!-- DOB 18+ -->
+                                <label class="flex items-center justify-between cursor-pointer bg-amber-50 p-2 rounded-xl border border-amber-200 shadow-sm">
+                                    <span class="text-[10px] font-bold text-amber-900">DOB 18+ (VIP)</span>
+                                    <input type="checkbox" id="userDobToggle" onchange="window.toggleUserAccess('allowDob18', this.checked)" class="accent-green-600 w-4 h-4" checked>
+                                </label>
+                                <!-- DOB Minor -->
+                                <label class="flex items-center justify-between cursor-pointer bg-amber-50 p-2 rounded-xl border border-amber-200 shadow-sm">
+                                    <span class="text-[10px] font-bold text-amber-900">DOB Minor (VIP)</span>
+                                    <input type="checkbox" id="userDobMinorToggle" onchange="window.toggleUserAccess('allowDobMinor', this.checked)" class="accent-green-600 w-4 h-4" checked>
+                                </label>
+                            </div>
                         </div>
 
                         <!-- WhatsApp Phone & 1-Click Credentials Share -->
@@ -640,15 +653,26 @@
                             </div>
                             <input type="checkbox" id="chkShowDob18" onchange="window.savePortalSettings()" class="w-5 h-5 accent-green-600 rounded cursor-pointer">
                         </label>
+
+                        <label class="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer hover:border-royal-400 transition">
+                            <div class="flex items-center gap-2.5">
+                                <i class="fa-solid fa-baby text-royal-500"></i>
+                                <div>
+                                    <div class="text-xs font-black text-dark-900">DOB Minor (VIP Global)</div>
+                                    <div class="text-[10px] text-slate-400 font-bold">सभी VIP यूज़र्स के लिए ऑन/ऑफ</div>
+                                </div>
+                            </div>
+                            <input type="checkbox" id="chkShowDobMinor" onchange="window.savePortalSettings()" class="w-5 h-5 accent-green-600 rounded cursor-pointer">
+                        </label>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-2 pt-2">
                     <button type="button" onclick="window.quickToggleAllCerts(false)" class="bg-red-600 hover:bg-red-700 text-white font-black py-2.5 px-3 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5">
-                        <i class="fa-solid fa-eye-slash"></i> तीनों छुपाएं
+                        <i class="fa-solid fa-eye-slash"></i> सभी छुपाएं
                     </button>
                     <button type="button" onclick="window.quickToggleAllCerts(true)" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 px-3 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5">
-                        <i class="fa-solid fa-eye"></i> तीनों दिखाएं
+                        <i class="fa-solid fa-eye"></i> सभी दिखाएं
                     </button>
                 </div>
             </div>
