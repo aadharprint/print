@@ -1,6 +1,6 @@
 // ============================================================================
 // FILE 3: js/portal-wallet-chat.js (UPDATED COMPLETE)
-// (Auth, Wallet, Chat, User Preview, Adv Password Reset, History & Global Stealth Fix)
+// (Auth, Wallet, Chat, User Preview, Adv Password Reset, History, Global Stealth & TAB PERSISTENCE)
 // ============================================================================
 
 import "./config-templates.js";
@@ -42,7 +42,7 @@ window.canCurrentUserSeeService = function(srv) {
     if (srv === 'domicile') return cfg.showDomicile !== false && u.allowDomicile !== false;
     if (srv === 'caste') return cfg.showCaste !== false && u.allowCaste !== false;
     if (srv === 'dob18') return cfg.showDob18 !== false && u.allowDob18 !== false;
-    if (srv === 'dob_minor') return cfg.showDobMinor !== false && u.allowDobMinor !== false; // <-- FIXED: Global check added
+    if (srv === 'dob_minor') return cfg.showDobMinor !== false && u.allowDobMinor !== false;
     
     return true; // For other services like annexures
 };
@@ -176,13 +176,22 @@ async function updateVipTimerAndAlerts() {
 }
 window.dismissCornerAlert = function() { window.cornerAlertDismissed = true; document.getElementById('vipCornerAlert').style.display = 'none'; };
 
+// === UPDATED: RESTORE ACTIVE TAB AFTER REFRESH ===
 function setupDashboard(userData) {
     document.getElementById('displayUser').innerText = userData.username.toUpperCase(); const adminLink = document.getElementById('adminPanelLink'); const creditDisplayBox = document.getElementById('creditDisplayBox'); const vipServicesBar = document.getElementById('vipServicesBar'); const normalUserVipPromo = document.getElementById('normalUserVipPromo'); const portalTitle = document.getElementById('portalHeaderTitle'); const portalIcon = document.getElementById('portalHeaderIcon'); const vipBadge = document.getElementById('vipStatusBadge'); const mainFormCard = document.getElementById('mainFormCard');
     adminLink.style.display = userData.isAdmin ? 'flex' : 'none';
     if (userData.hasFreeAccess) { creditDisplayBox.style.display = 'none'; } else { creditDisplayBox.style.display = 'flex'; document.getElementById('displayCredits').innerText = userData.credits; }
     if (userData.isVip) { document.body.classList.add('vip-body-bg'); portalTitle.innerHTML = `Ojas <span class="text-royal-400">VIP</span>`; portalIcon.innerHTML = `<img src="logo.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">`; portalIcon.className = "w-7 h-7 md:w-10 md:h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden p-1 border border-slate-200 shrink-0"; vipBadge.style.display = 'inline-flex'; vipServicesBar.style.display = 'block'; normalUserVipPromo.style.display = 'none'; mainFormCard.className = "bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-vip-glow border-2 border-royal-400 p-4 md:p-7"; } else { document.body.classList.remove('vip-body-bg'); portalTitle.innerHTML = `Ojas <span class="text-royal-400">Portal</span>`; portalIcon.innerHTML = `<img src="logo.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">`; portalIcon.className = "w-7 h-7 md:w-10 md:h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden p-1 border border-slate-200 shrink-0"; vipBadge.style.display = 'none'; vipServicesBar.style.display = 'none'; normalUserVipPromo.style.display = 'block'; mainFormCard.className = "bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-card border border-slate-100 p-4 md:p-7"; }
     document.getElementById('loginSection').style.display = 'none'; document.getElementById('dashboardSection').style.display = 'flex';
-    window.applyLivePortalControls(); window.switchService(window.getFirstAllowedTab());
+    window.applyLivePortalControls(); 
+    
+    // Tab Persistence Logic
+    const savedTab = sessionStorage.getItem('ojas_active_tab');
+    if (savedTab && window.canCurrentUserSeeService(savedTab)) {
+        window.switchService(savedTab);
+    } else {
+        window.switchService(window.getFirstAllowedTab());
+    }
 }
 window.handleLogout = async function() { await signOut(auth); window.location.reload(); };
 
@@ -203,7 +212,6 @@ window.togglePassVisibility = function(inputId, btnEl) {
     }
 };
 
-// === UPDATED USER PASSWORD CHANGE LOGIC (WITH CONFIRM PASS) ===
 window.changeUserPassword = async function(event) {
     event.preventDefault();
     const currPass = document.getElementById('currentPassInput').value;
@@ -214,7 +222,7 @@ window.changeUserPassword = async function(event) {
     
     if (newPass.length < 6) {
         msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-red-50 text-red-600 border-red-200 mt-4";
-        msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> नया पासवर्ड कम से কমপক্ষে 6 अक्षरों का होना चाहिए!";
+        msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> नया पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!";
         msgBox.style.display = 'block';
         return;
     }
@@ -235,13 +243,9 @@ window.changeUserPassword = async function(event) {
         const user = auth.currentUser;
         const credential = EmailAuthProvider.credential(user.email, currPass);
         
-        // Re-authenticate to confirm identity
         await reauthenticateWithCredential(user, credential);
-        
-        // Update Password in Auth System
         await updatePassword(user, newPass);
         
-        // Update Password in Database for Admin to manage if needed
         await updateDoc(doc(db, "users", user.uid), { 
             userPass: newPass, 
             passUpdatedAt: new Date() 
@@ -252,7 +256,6 @@ window.changeUserPassword = async function(event) {
         msgBox.style.display = 'block';
         event.target.reset();
         
-        // Re-hide passwords visually
         ['currentPassInput', 'newPassInput', 'confirmPassInput'].forEach(id => {
             const inp = document.getElementById(id);
             if (inp && inp.type === 'text') {
@@ -457,7 +460,7 @@ window.renderHistory = function(filterType) {
     });
 };
 
-// === UPDATED SERVICE SWITCH LOGIC (WITH NEW PASSWORD CHANGE SECTION & HISTORY FIX) ===
+// === UPDATED: SAVE & SWITCH TAB LOGIC ===
 window.switchService = async function(serviceName) {
     if (!serviceName) serviceName = window.getFirstAllowedTab();
 
@@ -470,6 +473,8 @@ window.switchService = async function(serviceName) {
     else if (serviceName === 'dob_minor' && !window.canCurrentUserSeeService('dob_minor')) serviceName = window.getFirstAllowedTab();
 
     window.currentActiveTab = serviceName;
+    sessionStorage.setItem('ojas_active_tab', serviceName); // <--- SAVE TAB PERSISTENCE
+
     document.querySelectorAll('.service-tab').forEach(btn => { btn.className = "service-tab bg-dark-900 text-royal-300 font-bold py-2.5 px-3 rounded-xl hover:bg-dark-800 transition shadow-sm border border-slate-700 text-xs md:text-sm flex-1 flex justify-center items-center gap-1.5"; });
     document.querySelectorAll('.vip-tab').forEach(btn => { btn.className = "vip-tab bg-dark-800 text-royal-300 border border-royal-500/30 font-bold py-2 px-2.5 rounded-xl hover:bg-dark-700 transition text-[11px] md:text-xs flex items-center justify-center gap-1 shadow-sm"; });
 
@@ -571,7 +576,6 @@ window.switchService = async function(serviceName) {
     if (serviceName === 'support_chat') { container.innerHTML = `<div class="max-w-2xl mx-auto flex flex-col h-[460px] md:h-[520px] border border-slate-200 rounded-2xl overflow-hidden bg-slate-50 shadow-inner"><div class="bg-dark-950 text-white px-4 py-3 flex justify-between items-center border-b border-royal-500"><div class="flex items-center gap-2.5"><div class="w-8 h-8 rounded-xl bg-green-500/20 border border-green-400 text-green-400 flex items-center justify-center"><i class="fa-solid fa-headset text-sm"></i></div><div><h3 class="text-xs md:text-sm font-black text-white flex items-center gap-1.5">Live Admin Support Chat <span class="w-2 h-2 rounded-full bg-green-400 animate-ping"></span></h3><p class="text-[10px] text-slate-400 font-semibold">User ID: <span class="text-royal-300 font-bold">${window.currentUserData?.email || ''}</span></p></div></div><span class="text-[10px] bg-dark-800 text-royal-300 border border-slate-700 px-2.5 py-1 rounded-lg font-bold">2-Way Live</span></div><div id="userLiveChatMessagesBox" class="flex-1 p-3.5 md:p-4 overflow-y-auto space-y-3 bg-slate-100/80"></div><form onsubmit="window.sendUserSupportMessage(event)" class="p-3 bg-white border-t border-slate-200 flex gap-2"><input type="text" id="userSupportChatInput" required placeholder="यहाँ अपनी समस्या या मैसेज लिखें..." class="flex-1 px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs md:text-sm font-semibold bg-slate-50 focus:bg-white focus:border-royal-500 outline-none"><button type="submit" id="btnSendUserChat" class="bg-dark-900 hover:bg-black text-royal-300 font-black px-5 py-2.5 rounded-xl text-xs md:text-sm shadow-glow transition flex items-center gap-1.5 shrink-0"><span>Send</span> <i class="fa-solid fa-paper-plane text-xs"></i></button></form></div>`; window.renderUserLiveChatMessages(); if (window.currentUserData && window.currentUserChatData?.unreadByUser === true) { try { await updateDoc(doc(db, "supportTickets", window.currentUserData.uid), { unreadByUser: false }); } catch (e) {} } const headerBadge = document.getElementById('headerSupportUnreadBadge'); const gearBadge = document.getElementById('gearSupportUnreadBadge'); if (headerBadge) headerBadge.style.display = 'none'; if (gearBadge) gearBadge.style.display = 'none'; return; }
     if (serviceName === 'payments_history') { container.innerHTML = `<div class="space-y-4"><div id="userValidityInfoBox"></div><div class="grid grid-cols-3 gap-2 md:gap-4"><div class="p-3 rounded-xl bg-slate-50 border border-slate-200"><p class="text-[10px] font-bold text-slate-400 uppercase">कुल ट्रांजैक्शन</p><p id="sumTotalTxns" class="text-lg md:text-2xl font-black text-dark-900">0</p></div><div class="p-3 rounded-xl bg-green-50 border border-green-200"><p class="text-[10px] font-bold text-green-700 uppercase">सफल (Approved)</p><p id="sumApprovedAmt" class="text-lg md:text-2xl font-black text-green-700">₹0</p></div><div class="p-3 rounded-xl bg-amber-50 border border-amber-200"><p class="text-[10px] font-bold text-amber-800 uppercase">पेंडिंग (Pending)</p><p id="sumPendingAmt" class="text-lg md:text-2xl font-black text-amber-700">₹0 (0)</p></div></div><div><div class="flex justify-between items-center mb-2"><h4 class="text-sm md:text-base font-black text-dark-900"><i class="fa-solid fa-receipt text-royal-500 mr-1.5"></i> पेमेंट और VIP हिस्ट्री</h4><button onclick="window.loadUserPayments()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold"><i class="fa-solid fa-rotate-right mr-1"></i> Refresh</button></div><div class="overflow-x-auto border border-slate-200 rounded-xl"><table class="w-full text-left border-collapse bg-white min-w-[520px]"><thead class="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase"><tr><th class="p-3">तारीख (Date)</th><th class="p-3">राशि</th><th class="p-3">क्रेडिट्स / VIP</th><th class="p-3">UTR / Mode</th><th class="p-3 text-right">स्टेटस</th></tr></thead><tbody id="userPaymentsTableBody" class="text-xs text-slate-700"></tbody></table></div></div></div>`; window.loadUserPayments(); return; }
     
-    // === HISTORY FIX: cfg VARIABLE ADDED HERE ===
     if (serviceName === 'history') { 
         const cfg = window.portalConfigState; 
         const isVipUser = window.currentUserData && window.currentUserData.isVip; 
