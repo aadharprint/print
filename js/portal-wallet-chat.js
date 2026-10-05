@@ -1,6 +1,6 @@
 // ============================================================================
 // FILE 3: js/portal-wallet-chat.js (UPDATED COMPLETE)
-// (Auth, Wallet, Chat, User Preview, Adv Password Reset & History Fix)
+// (Auth, Wallet, Chat, User Preview, Adv Password Reset, History & Global Stealth Fix)
 // ============================================================================
 
 import "./config-templates.js";
@@ -25,14 +25,14 @@ window.currentActiveOrderId = null;
 window.currentUserChatData = { messages: [], unreadByUser: false };
 
 window.portalConfigState = {
-    showDomicile: true, showCaste: true, showDob18: true,
+    showDomicile: true, showCaste: true, showDob18: true, showDobMinor: true,
     bannerEnabled: false, bannerBadge: "UPDATE", bannerTitle: "",
     bannerMessage: "", bannerBtnText: "", bannerBtnLink: ""
 };
 
 window.currentRechargeCredits = 0; window.currentTotalPayable = 0; window.currentWantsVip = false; window.currentVipDays = 0; window.currentVipPlanFee = 0;
 
-// === PER-USER VISIBILITY CHECKER ===
+// === PER-USER & GLOBAL VISIBILITY CHECKER ===
 window.canCurrentUserSeeService = function(srv) {
     const cfg = window.portalConfigState || {};
     const u = window.currentUserData;
@@ -42,7 +42,7 @@ window.canCurrentUserSeeService = function(srv) {
     if (srv === 'domicile') return cfg.showDomicile !== false && u.allowDomicile !== false;
     if (srv === 'caste') return cfg.showCaste !== false && u.allowCaste !== false;
     if (srv === 'dob18') return cfg.showDob18 !== false && u.allowDob18 !== false;
-    if (srv === 'dob_minor') return u.allowDobMinor !== false;
+    if (srv === 'dob_minor') return cfg.showDobMinor !== false && u.allowDobMinor !== false; // <-- FIXED: Global check added
     
     return true; // For other services like annexures
 };
@@ -89,7 +89,7 @@ function startUserProfileListener(uid) {
     }); 
 }
 
-function startPortalSettingsListener() { if (window.portalSettingsUnsubscribe) window.portalSettingsUnsubscribe(); window.portalSettingsUnsubscribe = onSnapshot(doc(db, "settings", "portalConfig"), (snap) => { if (snap.exists()) { const data = snap.data(); window.portalConfigState = { showDomicile: data.showDomicile !== false, showCaste: data.showCaste !== false, showDob18: data.showDob18 !== false, bannerEnabled: !!data.bannerEnabled, bannerBadge: data.bannerBadge || "UPDATE", bannerTitle: data.bannerTitle || "", bannerMessage: data.bannerMessage || "", bannerBtnText: data.bannerBtnText || "", bannerBtnLink: data.bannerBtnLink || "" }; } window.applyLivePortalControls(); }); }
+function startPortalSettingsListener() { if (window.portalSettingsUnsubscribe) window.portalSettingsUnsubscribe(); window.portalSettingsUnsubscribe = onSnapshot(doc(db, "settings", "portalConfig"), (snap) => { if (snap.exists()) { const data = snap.data(); window.portalConfigState = { showDomicile: data.showDomicile !== false, showCaste: data.showCaste !== false, showDob18: data.showDob18 !== false, showDobMinor: data.showDobMinor !== false, bannerEnabled: !!data.bannerEnabled, bannerBadge: data.bannerBadge || "UPDATE", bannerTitle: data.bannerTitle || "", bannerMessage: data.bannerMessage || "", bannerBtnText: data.bannerBtnText || "", bannerBtnLink: data.bannerBtnLink || "" }; } window.applyLivePortalControls(); }); }
 
 window.applyLivePortalControls = function() {
     const cfg = window.portalConfigState; 
@@ -140,7 +140,7 @@ onAuthStateChanged(auth, async (user) => {
     if (user) {
         try {
             const emailLower = user.email.trim().toLowerCase(); if (!window.isAllowedPortalEmail(emailLower)) { await signOut(auth); alert("अमान्य आईडी! पोर्टल पर केवल @print.com डोमेन वाली आईडी ही मान्य है।"); loadingScreen.style.display = 'none'; return; }
-            try { const cfgSnap = await getDoc(doc(db, "settings", "portalConfig")); if (cfgSnap.exists()) { const d = cfgSnap.data(); window.portalConfigState = { showDomicile: d.showDomicile !== false, showCaste: d.showCaste !== false, showDob18: d.showDob18 !== false, bannerEnabled: !!d.bannerEnabled, bannerBadge: d.bannerBadge || "UPDATE", bannerTitle: d.bannerTitle || "", bannerMessage: d.bannerMessage || "", bannerBtnText: d.bannerBtnText || "", bannerBtnLink: d.bannerBtnLink || "" }; } } catch (e) {}
+            try { const cfgSnap = await getDoc(doc(db, "settings", "portalConfig")); if (cfgSnap.exists()) { const d = cfgSnap.data(); window.portalConfigState = { showDomicile: d.showDomicile !== false, showCaste: d.showCaste !== false, showDob18: d.showDob18 !== false, showDobMinor: d.showDobMinor !== false, bannerEnabled: !!d.bannerEnabled, bannerBadge: d.bannerBadge || "UPDATE", bannerTitle: d.bannerTitle || "", bannerMessage: d.bannerMessage || "", bannerBtnText: d.bannerBtnText || "", bannerBtnLink: d.bannerBtnLink || "" }; } } catch (e) {}
             const userDocRef = doc(db, "users", user.uid); const userDoc = await getDoc(userDocRef); let userCredits = 0, isVip = false, vipExpiry = 0, allowDob18 = true, allowDomicile = true, allowCaste = true, allowDobMinor = true;
             if (userDoc.exists()) { const data = userDoc.data(); userCredits = data.credits || 0; isVip = data.isVip || false; vipExpiry = data.vipExpiry || 0; allowDob18 = data.allowDob18 !== false; allowDomicile = data.allowDomicile !== false; allowCaste = data.allowCaste !== false; allowDobMinor = data.allowDobMinor !== false; }
             const isAdmin = (emailLower === window.ADMIN_EMAIL); const isFreeVip = window.FREE_VIP_EMAILS.includes(emailLower); const hasFreeAccess = isAdmin || isFreeVip; const now = Date.now();
@@ -214,7 +214,7 @@ window.changeUserPassword = async function(event) {
     
     if (newPass.length < 6) {
         msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-red-50 text-red-600 border-red-200 mt-4";
-        msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> नया पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!";
+        msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> नया पासवर्ड कम से কমপক্ষে 6 अक्षरों का होना चाहिए!";
         msgBox.style.display = 'block';
         return;
     }
