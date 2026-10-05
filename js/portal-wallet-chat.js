@@ -1,6 +1,6 @@
 // ============================================================================
 // FILE 3: js/portal-wallet-chat.js (UPDATED COMPLETE)
-// (Auth, Wallet, Chat, User Preview, Password Reset Fix & Stealth Logic)
+// (Auth, Wallet, Chat, User Preview, Adv Password Reset & History Fix)
 // ============================================================================
 
 import "./config-templates.js";
@@ -186,16 +186,44 @@ function setupDashboard(userData) {
 }
 window.handleLogout = async function() { await signOut(auth); window.location.reload(); };
 
-// === UPDATED USER PASSWORD CHANGE LOGIC ===
+// === SHOW/HIDE PASSWORD TOGGLE LOGIC ===
+window.togglePassVisibility = function(inputId, btnEl) {
+    const inp = document.getElementById(inputId);
+    const icon = btnEl.querySelector('i');
+    if (inp.type === 'password') {
+        inp.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+        icon.classList.add('text-royal-600');
+    } else {
+        inp.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.remove('text-royal-600');
+        icon.classList.add('fa-eye');
+    }
+};
+
+// === UPDATED USER PASSWORD CHANGE LOGIC (WITH CONFIRM PASS) ===
 window.changeUserPassword = async function(event) {
     event.preventDefault();
     const currPass = document.getElementById('currentPassInput').value;
     const newPass = document.getElementById('newPassInput').value;
+    const confirmPass = document.getElementById('confirmPassInput').value;
     const msgBox = document.getElementById('passChangeMsg');
     const btn = document.getElementById('btnChangePass');
     
     if (newPass.length < 6) {
-        return alert("नया पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!");
+        msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-red-50 text-red-600 border-red-200 mt-4";
+        msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> नया पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!";
+        msgBox.style.display = 'block';
+        return;
+    }
+
+    if (newPass !== confirmPass) {
+        msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-red-50 text-red-600 border-red-200 mt-4";
+        msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> नया पासवर्ड और कन्फर्म पासवर्ड मैच नहीं हो रहे हैं!";
+        msgBox.style.display = 'block';
+        return;
     }
     
     const origHtml = btn.innerHTML;
@@ -223,6 +251,15 @@ window.changeUserPassword = async function(event) {
         msgBox.innerHTML = "<i class='fa-solid fa-check-circle mr-1 text-base'></i> पासवर्ड सफलतापूर्वक बदल दिया गया है!";
         msgBox.style.display = 'block';
         event.target.reset();
+        
+        // Re-hide passwords visually
+        ['currentPassInput', 'newPassInput', 'confirmPassInput'].forEach(id => {
+            const inp = document.getElementById(id);
+            if (inp && inp.type === 'text') {
+                inp.type = 'password';
+                inp.nextElementSibling.querySelector('i').className = 'fa-solid fa-eye text-base';
+            }
+        });
         
     } catch (error) {
         msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-red-50 text-red-600 border-red-200 mt-4";
@@ -420,7 +457,7 @@ window.renderHistory = function(filterType) {
     });
 };
 
-// === UPDATED SERVICE SWITCH LOGIC (WITH NEW PASSWORD CHANGE SECTION) ===
+// === UPDATED SERVICE SWITCH LOGIC (WITH NEW PASSWORD CHANGE SECTION & HISTORY FIX) ===
 window.switchService = async function(serviceName) {
     if (!serviceName) serviceName = window.getFirstAllowedTab();
 
@@ -443,7 +480,7 @@ window.switchService = async function(serviceName) {
     const submitBtnText = window.currentUserData && window.currentUserData.hasFreeAccess ? 'Generate Document (VIP Free) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' : 'Generate Document (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>';
     const statusTagHtml = window.currentUserData && window.currentUserData.hasFreeAccess ? '<span class="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-[10px] font-black border border-green-300 uppercase"><i class="fa-solid fa-crown mr-1"></i>Lifetime VIP Free</span>' : (window.currentUserData && window.currentUserData.isVip ? '<span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-md text-[10px] font-black border border-amber-300 uppercase"><i class="fa-solid fa-crown mr-1"></i>10 Credits</span>' : '<span class="bg-royal-100 text-royal-900 px-2.5 py-1 rounded-md text-[10px] font-black border border-royal-300 uppercase">10 Credits</span>');
 
-    // === ADDED: CHANGE PASSWORD UI ===
+    // === ADDED: CHANGE PASSWORD UI WITH EYE TOGGLE & CONFIRM FIELD ===
     if (serviceName === 'password') {
         container.innerHTML = `
         <div class="max-w-md mx-auto space-y-4 pt-2">
@@ -453,11 +490,24 @@ window.switchService = async function(serviceName) {
             <form onsubmit="window.changeUserPassword(event)" class="bg-slate-50 p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Current Password (पुराना पासवर्ड)</label>
-                    <input type="password" id="currentPassInput" required class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-royal-500 bg-white">
+                    <div class="relative">
+                        <input type="password" id="currentPassInput" required class="w-full p-3.5 pr-12 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-royal-500 bg-white">
+                        <button type="button" onclick="window.togglePassVisibility('currentPassInput', this)" class="absolute right-4 top-3.5 text-slate-400 hover:text-royal-600 transition"><i class="fa-solid fa-eye text-base"></i></button>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">New Password (नया पासवर्ड)</label>
-                    <input type="password" id="newPassInput" required minlength="6" placeholder="कम से कम 6 अक्षर का होना चाहिए" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-royal-500 bg-white">
+                    <div class="relative">
+                        <input type="password" id="newPassInput" required minlength="6" placeholder="कम से कम 6 अक्षर का होना चाहिए" class="w-full p-3.5 pr-12 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-royal-500 bg-white">
+                        <button type="button" onclick="window.togglePassVisibility('newPassInput', this)" class="absolute right-4 top-3.5 text-slate-400 hover:text-royal-600 transition"><i class="fa-solid fa-eye text-base"></i></button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Confirm New Password (कन्फर्म करें)</label>
+                    <div class="relative">
+                        <input type="password" id="confirmPassInput" required minlength="6" placeholder="नया पासवर्ड दोबारा लिखें" class="w-full p-3.5 pr-12 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-royal-500 bg-white">
+                        <button type="button" onclick="window.togglePassVisibility('confirmPassInput', this)" class="absolute right-4 top-3.5 text-slate-400 hover:text-royal-600 transition"><i class="fa-solid fa-eye text-base"></i></button>
+                    </div>
                 </div>
                 <div id="passChangeMsg" style="display:none;"></div>
                 <button type="submit" id="btnChangePass" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-glow transition">Update Password</button>
@@ -520,7 +570,21 @@ window.switchService = async function(serviceName) {
     
     if (serviceName === 'support_chat') { container.innerHTML = `<div class="max-w-2xl mx-auto flex flex-col h-[460px] md:h-[520px] border border-slate-200 rounded-2xl overflow-hidden bg-slate-50 shadow-inner"><div class="bg-dark-950 text-white px-4 py-3 flex justify-between items-center border-b border-royal-500"><div class="flex items-center gap-2.5"><div class="w-8 h-8 rounded-xl bg-green-500/20 border border-green-400 text-green-400 flex items-center justify-center"><i class="fa-solid fa-headset text-sm"></i></div><div><h3 class="text-xs md:text-sm font-black text-white flex items-center gap-1.5">Live Admin Support Chat <span class="w-2 h-2 rounded-full bg-green-400 animate-ping"></span></h3><p class="text-[10px] text-slate-400 font-semibold">User ID: <span class="text-royal-300 font-bold">${window.currentUserData?.email || ''}</span></p></div></div><span class="text-[10px] bg-dark-800 text-royal-300 border border-slate-700 px-2.5 py-1 rounded-lg font-bold">2-Way Live</span></div><div id="userLiveChatMessagesBox" class="flex-1 p-3.5 md:p-4 overflow-y-auto space-y-3 bg-slate-100/80"></div><form onsubmit="window.sendUserSupportMessage(event)" class="p-3 bg-white border-t border-slate-200 flex gap-2"><input type="text" id="userSupportChatInput" required placeholder="यहाँ अपनी समस्या या मैसेज लिखें..." class="flex-1 px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs md:text-sm font-semibold bg-slate-50 focus:bg-white focus:border-royal-500 outline-none"><button type="submit" id="btnSendUserChat" class="bg-dark-900 hover:bg-black text-royal-300 font-black px-5 py-2.5 rounded-xl text-xs md:text-sm shadow-glow transition flex items-center gap-1.5 shrink-0"><span>Send</span> <i class="fa-solid fa-paper-plane text-xs"></i></button></form></div>`; window.renderUserLiveChatMessages(); if (window.currentUserData && window.currentUserChatData?.unreadByUser === true) { try { await updateDoc(doc(db, "supportTickets", window.currentUserData.uid), { unreadByUser: false }); } catch (e) {} } const headerBadge = document.getElementById('headerSupportUnreadBadge'); const gearBadge = document.getElementById('gearSupportUnreadBadge'); if (headerBadge) headerBadge.style.display = 'none'; if (gearBadge) gearBadge.style.display = 'none'; return; }
     if (serviceName === 'payments_history') { container.innerHTML = `<div class="space-y-4"><div id="userValidityInfoBox"></div><div class="grid grid-cols-3 gap-2 md:gap-4"><div class="p-3 rounded-xl bg-slate-50 border border-slate-200"><p class="text-[10px] font-bold text-slate-400 uppercase">कुल ट्रांजैक्शन</p><p id="sumTotalTxns" class="text-lg md:text-2xl font-black text-dark-900">0</p></div><div class="p-3 rounded-xl bg-green-50 border border-green-200"><p class="text-[10px] font-bold text-green-700 uppercase">सफल (Approved)</p><p id="sumApprovedAmt" class="text-lg md:text-2xl font-black text-green-700">₹0</p></div><div class="p-3 rounded-xl bg-amber-50 border border-amber-200"><p class="text-[10px] font-bold text-amber-800 uppercase">पेंडिंग (Pending)</p><p id="sumPendingAmt" class="text-lg md:text-2xl font-black text-amber-700">₹0 (0)</p></div></div><div><div class="flex justify-between items-center mb-2"><h4 class="text-sm md:text-base font-black text-dark-900"><i class="fa-solid fa-receipt text-royal-500 mr-1.5"></i> पेमेंट और VIP हिस्ट्री</h4><button onclick="window.loadUserPayments()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold"><i class="fa-solid fa-rotate-right mr-1"></i> Refresh</button></div><div class="overflow-x-auto border border-slate-200 rounded-xl"><table class="w-full text-left border-collapse bg-white min-w-[520px]"><thead class="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase"><tr><th class="p-3">तारीख (Date)</th><th class="p-3">राशि</th><th class="p-3">क्रेडिट्स / VIP</th><th class="p-3">UTR / Mode</th><th class="p-3 text-right">स्टेटस</th></tr></thead><tbody id="userPaymentsTableBody" class="text-xs text-slate-700"></tbody></table></div></div></div>`; window.loadUserPayments(); return; }
-    if (serviceName === 'history') { const isVipUser = window.currentUserData && window.currentUserData.isVip; const canShowDob = window.canCurrentUserSeeService('dob18'); const domOpt = cfg.showDomicile ? `<option value="Domicile">मूल निवास</option>` : ''; const casOpt = cfg.showCaste ? `<option value="Caste">जाति प्रमाण पत्र</option>` : ''; const dobOpt = (isVipUser && canShowDob) ? `<option value="DOB 18+">DOB (18+)</option>` : ''; const vipFilterOptions = isVipUser ? `${dobOpt}<option value="Annexure 1">Annexure 1</option><option value="Annexure 1A">Annexure 1A</option><option value="Annexure 3">Annexure 3</option><option value="Annexure 3A">Annexure 3A</option><option value="Annexure B">Annexure B</option><option value="Annexure C">Annexure C</option><option value="Annexure D">Annexure D</option><option value="Annexure E">Annexure E</option><option value="Annexure F">Annexure F</option>` : ''; container.innerHTML = `<div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-100 pb-3 mb-4"><div><h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-folder-open text-royal-500 mr-1.5"></i> Document History</h3><p id="userHistoryCount" class="text-[11px] font-bold text-royal-600">Total Files: 0</p></div><div class="flex items-center gap-2"><select onchange="window.renderHistory(this.value)" class="p-2 border border-slate-200 rounded-xl text-xs bg-slate-50 font-semibold outline-none"><option value="ALL">All Documents</option>${domOpt}${casOpt}${vipFilterOptions}</select><button onclick="window.loadUserHistory()" class="bg-slate-100 text-slate-600 px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-200"><i class="fa-solid fa-rotate-right"></i></button></div></div><div class="overflow-x-auto border border-slate-200 rounded-xl"><table class="w-full text-left border-collapse bg-white min-w-[500px]"><thead class="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase"><tr><th class="p-3">File Name</th><th class="p-3">Type</th><th class="p-3">Date & Time</th><th class="p-3 text-right">Action</th></tr></thead><tbody id="historyTableBody" class="text-xs text-slate-700"></tbody></table></div>`; window.loadUserHistory(); }
+    
+    // === HISTORY FIX: cfg VARIABLE ADDED HERE ===
+    if (serviceName === 'history') { 
+        const cfg = window.portalConfigState; 
+        const isVipUser = window.currentUserData && window.currentUserData.isVip; 
+        const canShowDob = window.canCurrentUserSeeService('dob18'); 
+        const domOpt = cfg.showDomicile ? `<option value="Domicile">मूल निवास</option>` : ''; 
+        const casOpt = cfg.showCaste ? `<option value="Caste">जाति प्रमाण पत्र</option>` : ''; 
+        const dobOpt = (isVipUser && canShowDob) ? `<option value="DOB 18+">DOB (18+)</option>` : ''; 
+        const vipFilterOptions = isVipUser ? `${dobOpt}<option value="Annexure 1">Annexure 1</option><option value="Annexure 1A">Annexure 1A</option><option value="Annexure 3">Annexure 3</option><option value="Annexure 3A">Annexure 3A</option><option value="Annexure B">Annexure B</option><option value="Annexure C">Annexure C</option><option value="Annexure D">Annexure D</option><option value="Annexure E">Annexure E</option><option value="Annexure F">Annexure F</option>` : ''; 
+        
+        container.innerHTML = `<div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-100 pb-3 mb-4"><div><h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-folder-open text-royal-500 mr-1.5"></i> Document History</h3><p id="userHistoryCount" class="text-[11px] font-bold text-royal-600">Total Files: 0</p></div><div class="flex items-center gap-2"><select onchange="window.renderHistory(this.value)" class="p-2 border border-slate-200 rounded-xl text-xs bg-slate-50 font-semibold outline-none"><option value="ALL">All Documents</option>${domOpt}${casOpt}${vipFilterOptions}</select><button onclick="window.loadUserHistory()" class="bg-slate-100 text-slate-600 px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-200"><i class="fa-solid fa-rotate-right"></i></button></div></div><div class="overflow-x-auto border border-slate-200 rounded-xl"><table class="w-full text-left border-collapse bg-white min-w-[500px]"><thead class="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase"><tr><th class="p-3">File Name</th><th class="p-3">Type</th><th class="p-3">Date & Time</th><th class="p-3 text-right">Action</th></tr></thead><tbody id="historyTableBody" class="text-xs text-slate-700"></tbody></table></div>`; 
+        
+        window.loadUserHistory(); 
+    }
 };
 
 window.loadUserPayments = async function() {
