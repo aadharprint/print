@@ -1,6 +1,6 @@
 // ============================================================================
-// FILE 4: js/admin-logic.js (PART 1)
-// (Complete Admin Logic: Auth, Users, Support Chat, Settings, Date Format & Cert Caching)
+// FILE 4: js/admin-logic.js (UPDATED & COMPLETE)
+// (Complete Admin Logic: Auth, Users, Support Chat, Settings, Cert Caching & Per-User Stealth)
 // ============================================================================
 
 import "./config-templates.js";
@@ -136,15 +136,23 @@ window.saveSelectedUserPhone = async function() {
     try { await updateDoc(doc(db, "users", uid), { userPhone: phoneVal }); window.usersDataList[uid].userPhone = phoneVal; alert('यूज़र का WhatsApp नंबर सेव हो गया!'); } catch (err) { alert('Error: ' + err.message); }
 };
 
-window.toggleUserDobAccess = async function(allowed) {
+// === NEW GENERIC TOGGLE FOR PER-USER STEALTH CONTROL ===
+window.toggleUserAccess = async function(field, allowed) {
     const uid = document.getElementById('userSelectDropdown').value;
-    if (!uid || !window.usersDataList[uid]) { alert('कृपया पहले ड्रॉपडाउन से यूज़र सेलेक्ट करें!'); const chk = document.getElementById('userDobToggle'); if (chk) chk.checked = !allowed; return; }
-    const uData = window.usersDataList[uid]; const msg = document.getElementById('adminMsg');
+    if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले ड्रॉपडाउन से यूज़र सेलेक्ट करें!');
+    const uData = window.usersDataList[uid];
+    const msg = document.getElementById('adminMsg');
     try {
-        await updateDoc(doc(db, "users", uid), { allowDob18: allowed }); window.usersDataList[uid].allowDob18 = allowed;
+        const updateObj = {}; 
+        updateObj[field] = allowed;
+        await updateDoc(doc(db, "users", uid), updateObj); 
+        window.usersDataList[uid][field] = allowed;
+        
+        let serviceName = field.replace('allow', '');
         msg.className = "p-3.5 bg-amber-50 text-amber-950 rounded-2xl text-xs font-black border border-amber-300 text-center shadow-sm";
-        msg.innerHTML = `<i class="fa-solid ${allowed ? 'fa-eye text-green-600' : 'fa-eye-slash text-red-600'} mr-1"></i> <strong>${uData.email}</strong> के लिए DOB 18+ सेक्शन <strong>${allowed ? 'चालू (Visible)' : 'गायब (Hidden)'}</strong> कर दिया गया है!`;
-        msg.classList.remove('hidden'); setTimeout(() => msg.classList.add('hidden'), 3500);
+        msg.innerHTML = `<i class="fa-solid ${allowed ? 'fa-eye text-green-600' : 'fa-eye-slash text-red-600'} mr-1"></i> <strong>${uData.email}</strong> के लिए ${serviceName} सेक्शन <strong>${allowed ? 'चालू (Visible)' : 'गायब (Hidden)'}</strong> कर दिया गया है!`;
+        msg.classList.remove('hidden'); 
+        setTimeout(() => msg.classList.add('hidden'), 3500);
     } catch (err) { alert('Error: ' + err.message); }
 };
 
@@ -328,23 +336,29 @@ window.startNewChatWithSelectedUser = async function() {
 
 window.populateSupportUserDropdown = function() { const sel = document.getElementById('newChatUserSelect'); if (!sel) return; sel.innerHTML = '<option value="">-- किसी यूज़र के साथ नई चैट खोलें --</option>'; for (const [uid, data] of Object.entries(window.usersDataList)) { sel.innerHTML += `<option value="${uid}">${data.email}</option>`; } };
 
+// === UPDATED: GLOBAL SETTINGS INCLUDE DOB MINOR ===
 window.loadPortalSettingsForAdmin = async function() {
-    try { const snap = await getDoc(doc(db, "settings", "portalConfig")); let cfg = { showDomicile: true, showCaste: true, showDob18: true, bannerEnabled: false, bannerBadge: "NEW UPDATE", bannerTitle: "", bannerMessage: "", bannerBtnText: "", bannerBtnLink: "", supportWhatsapp: "919306437623" }; if (snap.exists()) { cfg = { ...cfg, ...snap.data() }; }
-        document.getElementById('chkShowDomicile').checked = cfg.showDomicile !== false; document.getElementById('chkShowCaste').checked = cfg.showCaste !== false; document.getElementById('chkShowDob18').checked = cfg.showDob18 !== false; document.getElementById('chkBannerEnabled').checked = !!cfg.bannerEnabled; document.getElementById('inpBannerBadge').value = cfg.bannerBadge || 'UPDATE'; document.getElementById('inpBannerTitle').value = cfg.bannerTitle || ''; document.getElementById('inpBannerMessage').value = cfg.bannerMessage || ''; document.getElementById('inpBannerBtnText').value = cfg.bannerBtnText || ''; document.getElementById('inpBannerBtnLink').value = cfg.bannerBtnLink || ''; const supWaEl = document.getElementById('inpSupportWhatsapp'); if (supWaEl) supWaEl.value = cfg.supportWhatsapp || '919306437623'; window.adminSupportWhatsapp = cfg.supportWhatsapp || '919306437623'; window.updateStealthStatusPill();
+    try { const snap = await getDoc(doc(db, "settings", "portalConfig")); let cfg = { showDomicile: true, showCaste: true, showDob18: true, showDobMinor: true, bannerEnabled: false, bannerBadge: "NEW UPDATE", bannerTitle: "", bannerMessage: "", bannerBtnText: "", bannerBtnLink: "", supportWhatsapp: "919306437623" }; if (snap.exists()) { cfg = { ...cfg, ...snap.data() }; }
+        document.getElementById('chkShowDomicile').checked = cfg.showDomicile !== false; 
+        document.getElementById('chkShowCaste').checked = cfg.showCaste !== false; 
+        document.getElementById('chkShowDob18').checked = cfg.showDob18 !== false; 
+        const dobMinorEl = document.getElementById('chkShowDobMinor'); if(dobMinorEl) dobMinorEl.checked = cfg.showDobMinor !== false;
+        
+        document.getElementById('chkBannerEnabled').checked = !!cfg.bannerEnabled; document.getElementById('inpBannerBadge').value = cfg.bannerBadge || 'UPDATE'; document.getElementById('inpBannerTitle').value = cfg.bannerTitle || ''; document.getElementById('inpBannerMessage').value = cfg.bannerMessage || ''; document.getElementById('inpBannerBtnText').value = cfg.bannerBtnText || ''; document.getElementById('inpBannerBtnLink').value = cfg.bannerBtnLink || ''; const supWaEl = document.getElementById('inpSupportWhatsapp'); if (supWaEl) supWaEl.value = cfg.supportWhatsapp || '919306437623'; window.adminSupportWhatsapp = cfg.supportWhatsapp || '919306437623'; window.updateStealthStatusPill();
     } catch (err) {}
 };
 
 window.updateStealthStatusPill = function() {
-    const d = document.getElementById('chkShowDomicile')?.checked; const c = document.getElementById('chkShowCaste')?.checked; const b = document.getElementById('chkShowDob18')?.checked; const pill = document.getElementById('stealthStatusBadge'); if (!pill) return;
-    if (!d && !c && !b) { pill.className = "bg-red-100 text-red-700 border border-red-300 px-2.5 py-1 rounded-full text-[10px] font-black uppercase"; pill.innerHTML = `<i class="fa-solid fa-eye-slash mr-1"></i>Stealth Active`; } else if (d && c && b) { pill.className = "bg-green-100 text-green-800 border border-green-300 px-2.5 py-1 rounded-full text-[10px] font-black uppercase"; pill.innerHTML = `<i class="fa-solid fa-eye mr-1"></i>All Visible`; } else { pill.className = "bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-1 rounded-full text-[10px] font-black uppercase"; pill.innerHTML = `<i class="fa-solid fa-sliders mr-1"></i>Custom Mode`; }
+    const d = document.getElementById('chkShowDomicile')?.checked; const c = document.getElementById('chkShowCaste')?.checked; const b = document.getElementById('chkShowDob18')?.checked; const m = document.getElementById('chkShowDobMinor')?.checked; const pill = document.getElementById('stealthStatusBadge'); if (!pill) return;
+    if (!d && !c && !b && !m) { pill.className = "bg-red-100 text-red-700 border border-red-300 px-2.5 py-1 rounded-full text-[10px] font-black uppercase"; pill.innerHTML = `<i class="fa-solid fa-eye-slash mr-1"></i>Stealth Active`; } else if (d && c && b && m) { pill.className = "bg-green-100 text-green-800 border border-green-300 px-2.5 py-1 rounded-full text-[10px] font-black uppercase"; pill.innerHTML = `<i class="fa-solid fa-eye mr-1"></i>All Visible`; } else { pill.className = "bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-1 rounded-full text-[10px] font-black uppercase"; pill.innerHTML = `<i class="fa-solid fa-sliders mr-1"></i>Custom Mode`; }
 };
 
-window.quickToggleAllCerts = async function(makeVisible) { document.getElementById('chkShowDomicile').checked = makeVisible; document.getElementById('chkShowCaste').checked = makeVisible; document.getElementById('chkShowDob18').checked = makeVisible; await window.savePortalSettings(); };
+window.quickToggleAllCerts = async function(makeVisible) { document.getElementById('chkShowDomicile').checked = makeVisible; document.getElementById('chkShowCaste').checked = makeVisible; document.getElementById('chkShowDob18').checked = makeVisible; const dobMinorEl = document.getElementById('chkShowDobMinor'); if(dobMinorEl) dobMinorEl.checked = makeVisible; await window.savePortalSettings(); };
 
 window.savePortalSettings = async function(event) {
     if (event) event.preventDefault(); const btn = document.getElementById('btnSavePortalConfig'); const msg = document.getElementById('portalConfigMsg'); const origText = btn ? btn.innerHTML : ''; if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...'; }
     const rawSupWa = document.getElementById('inpSupportWhatsapp')?.value.trim() || '919306437623'; const cleanSupWa = window.formatCleanPhone(rawSupWa) || '919306437623';
-    const payload = { showDomicile: document.getElementById('chkShowDomicile').checked, showCaste: document.getElementById('chkShowCaste').checked, showDob18: document.getElementById('chkShowDob18').checked, bannerEnabled: document.getElementById('chkBannerEnabled').checked, bannerBadge: document.getElementById('inpBannerBadge').value.trim() || 'UPDATE', bannerTitle: document.getElementById('inpBannerTitle').value.trim(), bannerMessage: document.getElementById('inpBannerMessage').value.trim(), bannerBtnText: document.getElementById('inpBannerBtnText').value.trim(), bannerBtnLink: document.getElementById('inpBannerBtnLink').value.trim(), supportWhatsapp: cleanSupWa, updatedAt: new Date() };
+    const payload = { showDomicile: document.getElementById('chkShowDomicile').checked, showCaste: document.getElementById('chkShowCaste').checked, showDob18: document.getElementById('chkShowDob18').checked, showDobMinor: document.getElementById('chkShowDobMinor') ? document.getElementById('chkShowDobMinor').checked : true, bannerEnabled: document.getElementById('chkBannerEnabled').checked, bannerBadge: document.getElementById('inpBannerBadge').value.trim() || 'UPDATE', bannerTitle: document.getElementById('inpBannerTitle').value.trim(), bannerMessage: document.getElementById('inpBannerMessage').value.trim(), bannerBtnText: document.getElementById('inpBannerBtnText').value.trim(), bannerBtnLink: document.getElementById('inpBannerBtnLink').value.trim(), supportWhatsapp: cleanSupWa, updatedAt: new Date() };
     try { await setDoc(doc(db, "settings", "portalConfig"), payload, { merge: true }); window.adminSupportWhatsapp = cleanSupWa; window.updateStealthStatusPill(); if (msg) { msg.className = "p-3 bg-green-50 text-green-800 border border-green-300 rounded-xl text-xs font-black text-center"; msg.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> पोर्टल सेटिंग्स और बैनर सफलतापूर्वक अपडेट हो गए हैं!`; msg.classList.remove('hidden'); setTimeout(() => msg.classList.add('hidden'), 4000); } } catch (err) { alert("Error saving portal settings: " + err.message); } finally { if (btn) { btn.disabled = false; btn.innerHTML = origText; } }
 };
 
@@ -407,7 +421,7 @@ window.approvePayment = async function(paymentDocId, userId, creditsToAdd, vipDa
 window.rejectPayment = async function(paymentDocId) { if (!confirm(`क्या आप इस पेमेंट को REJECT करना चाहते हैं?\n(यह आपकी Rejected History में सेव रहेगा)`)) return; try { await updateDoc(doc(db, "payments", paymentDocId), { status: "Rejected" }); window.loadAllPayments(); } catch (err) {} };
 window.deletePaymentRecord = async function(paymentDocId) { if (!confirm(`क्या आप इस पेमेंट हिस्ट्री रिकॉर्ड को हमेशा के लिए डिलीट करना चाहते हैं?`)) return; try { await deleteDoc(doc(db, "payments", paymentDocId)); window.loadAllPayments(); } catch (err) {} };
 
-// ================= HISTORY, STAMP & NEW CERTIFICATE CHECKBOX LOGIC (WITH CACHE & STRICT DD/MM/YYYY DATE FORMATTING) =================
+// ================= HISTORY, STAMP & NEW CERTIFICATE CHECKBOX LOGIC =================
 window.loadAdminHistory = async function() {
     const container = document.getElementById('adminHistoryListContainer');
     container.innerHTML = `<div class="p-10 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>रिकॉर्ड्स लोड हो रहे हैं...</div>`;
@@ -451,7 +465,6 @@ window.toggleRowStampCheckbox = async function(origIndex, isChecked) {
     window.renderAdminHistory();
 };
 
-// --- रिलेशन कोड (S/o -> SO) में बदलने वाला फंक्शन ---
 window.formatRelationCodeForScript = function(relStr = '') {
     const clean = String(relStr).trim().toUpperCase();
     if (clean.includes('S/') || clean === 'S/O') return 'SO';
@@ -460,7 +473,6 @@ window.formatRelationCodeForScript = function(relStr = '') {
     return 'SO';
 };
 
-// --- (NEW) STRICT DD/MM/YYYY FORMATTER ---
 window.formatDateForCertificate = function(fData) {
     const months = {
         "JAN": "01", "FEB": "02", "MAR": "03", "APR": "04", "MAY": "05", "JUN": "06",
@@ -503,13 +515,11 @@ window.formatDateForCertificate = function(fData) {
     return `${dd}/${mm}/${yyyy}`;
 };
 
-// --- सर्टिफिकेट चेकबॉक्स को हैंडल करने वाला फंक्शन ---
 window.toggleCertificateCheckbox = async function(origIndex, isChecked) {
     const record = window.adminAllHistoryData[origIndex]; if (!record) return;
     const checkboxEl = document.getElementById(`certChk-${origIndex}`); if (checkboxEl) checkboxEl.disabled = true;
 
     if (isChecked) {
-        // Caching Logic: Agar file pehle se mojud hai toh dobara generate mat karo
         if (record.certificateFileId) {
             window.certificateSelectionMap[origIndex] = { enabled: true, certificateFileId: record.certificateFileId };
             record.isCertificateAttached = true;
@@ -525,7 +535,7 @@ window.toggleCertificateCheckbox = async function(origIndex, isChecked) {
             const rawRel = fData.rel || 'S/o';
             const relationCode = window.formatRelationCodeForScript(rawRel);
             const fatherName = fData.relativeName || '';
-            const docDate = window.formatDateForCertificate(fData); // DD/MM/YYYY
+            const docDate = window.formatDateForCertificate(fData); 
 
             const payload = {
                 candidateName: candidateName,
@@ -558,7 +568,6 @@ window.toggleCertificateCheckbox = async function(origIndex, isChecked) {
             alert('सर्टिफिकेट जोड़ने में समस्या आई: ' + err.message); if (checkboxEl) checkboxEl.checked = false;
         }
     } else {
-        // Checkbox hatane par preveiw se hatao aur DB mein isCertificateAttached false karo (taki reload par wapas na dikhe)
         window.certificateSelectionMap[origIndex] = { enabled: false, certificateFileId: record.certificateFileId };
         record.isCertificateAttached = false;
         try { await updateDoc(doc(db, "history", record.id), { isCertificateAttached: false }); } catch(e){}
@@ -587,7 +596,6 @@ window.renderAdminHistory = function() {
         const isAnnexure = String(data.fileId || '').startsWith('LOCAL_HTML_');
         const stampState = window.stampSelectionMap[data._origIndex]; const isStampChecked = !!(stampState && stampState.enabled);
         
-        // Hide UI and Checkbox if disabled
         const certState = window.certificateSelectionMap[data._origIndex] || { enabled: false, certificateFileId: data.certificateFileId || '' }; 
         const isCertChecked = !!certState.enabled;
 
@@ -673,7 +681,6 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
         const existingState = window.stampSelectionMap ? window.stampSelectionMap[historyIndex] : null;
         initialWithStamp = !!(existingState && existingState.enabled); initialStampSrc = existingState?.stampSrc || ''; initialStampFile = existingState?.stampFile || '';
         
-        // Only load if explicitly enabled
         const existingCert = window.certificateSelectionMap ? window.certificateSelectionMap[historyIndex] : null;
         initialCertFileId = (existingCert && existingCert.enabled) ? existingCert.certificateFileId : '';
     }
@@ -735,11 +742,65 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
 };
 
 window.closePdfViewer = function() { const modal = document.getElementById('pdfViewerModal'); if (modal) { modal.style.display = 'none'; modal.classList.add('hidden'); } const iframe = document.getElementById('pdfIframe'); if (iframe) iframe.src = ''; const htmlContainer = document.getElementById('htmlDocPreviewContainer'); if (htmlContainer) htmlContainer.innerHTML = ''; document.body.style.overflow = 'auto'; };
-window.switchAdminMainTab = function(tabName) { const tabs = ['payments', 'users', 'create_user', 'support', 'history', 'controls']; tabs.forEach(t => { const btn = document.getElementById(`tab-${t}`); if (btn) btn.className = "bg-slate-50 text-slate-600 font-bold py-2.5 px-3 rounded-xl hover:bg-slate-100 transition border border-slate-200/80 text-xs flex justify-center items-center gap-1.5"; const section = document.getElementById(`section-${t}`); if (section) section.classList.add('hidden'); }); const activeBtn = document.getElementById(`tab-${tabName}`); if (activeBtn) activeBtn.className = "bg-dark-950 text-royal-300 font-black py-2.5 px-3 rounded-xl shadow-glow transition text-xs flex justify-center items-center gap-1.5 border border-royal-500/50"; const activeSection = document.getElementById(`section-${tabName}`); if (activeSection) { activeSection.removeAttribute('class'); if (tabName === 'payments') activeSection.className = 'space-y-4'; if (tabName === 'users') activeSection.className = 'space-y-4'; if (tabName === 'create_user') activeSection.className = 'block'; if (tabName === 'support') activeSection.className = 'space-y-4'; if (tabName === 'history') activeSection.className = 'space-y-4'; if (tabName === 'controls') activeSection.className = 'grid grid-cols-1 md:grid-cols-2 gap-4'; } if (tabName === 'payments') window.loadAllPayments(); if (tabName === 'support') { window.populateSupportUserDropdown(); window.renderSupportChatSidebar(); if (!window.selectedChatTicketId && window.allSupportTickets.length > 0) window.selectSupportChatThread(window.allSupportTickets[0].id); } if (tabName === 'history') window.loadAdminHistory(); if (tabName === 'controls') window.loadPortalSettingsForAdmin(); };
+
+// === UPDATED: ADMIN TAB SWITCH & USERS / SETTINGS DATA ===
+window.switchAdminMainTab = function(tabName) { 
+    const tabs = ['payments', 'users', 'create_user', 'support', 'history', 'controls']; 
+    tabs.forEach(t => { 
+        const btn = document.getElementById(`tab-${t}`); 
+        if (btn) btn.className = "bg-slate-50 text-slate-600 font-bold py-2.5 px-3 rounded-xl hover:bg-slate-100 transition border border-slate-200/80 text-xs flex justify-center items-center gap-1.5"; 
+        const section = document.getElementById(`section-${t}`); 
+        if (section) section.classList.add('hidden'); 
+    }); 
+    const activeBtn = document.getElementById(`tab-${tabName}`); 
+    if (activeBtn) activeBtn.className = "bg-dark-950 text-royal-300 font-black py-2.5 px-3 rounded-xl shadow-glow transition text-xs flex justify-center items-center gap-1.5 border border-royal-500/50"; 
+    const activeSection = document.getElementById(`section-${tabName}`); 
+    if (activeSection) { 
+        activeSection.removeAttribute('class'); 
+        if (tabName === 'payments') activeSection.className = 'space-y-4'; 
+        if (tabName === 'users') activeSection.className = 'space-y-4'; 
+        if (tabName === 'create_user') activeSection.className = 'block'; 
+        if (tabName === 'support') activeSection.className = 'space-y-4'; 
+        if (tabName === 'history') activeSection.className = 'space-y-4'; 
+        if (tabName === 'controls') activeSection.className = 'grid grid-cols-1 md:grid-cols-2 gap-4'; 
+    } 
+    if (tabName === 'payments') window.loadAllPayments(); 
+    if (tabName === 'support') { window.populateSupportUserDropdown(); window.renderSupportChatSidebar(); if (!window.selectedChatTicketId && window.allSupportTickets.length > 0) window.selectSupportChatThread(window.allSupportTickets[0].id); } 
+    if (tabName === 'history') window.loadAdminHistory(); 
+    if (tabName === 'controls') window.loadPortalSettingsForAdmin(); 
+};
 
 window.loadAllUsersForDropdown = async function() { try { const querySnapshot = await getDocs(collection(db, "users")); window.usersDataList = {}; window.allUsersMap = {}; const selectDropdown = document.getElementById('userSelectDropdown'); if (selectDropdown) { selectDropdown.innerHTML = '<option value="">-- किसी यूज़र को चुनें --</option>'; } querySnapshot.forEach((docSnap) => { const data = docSnap.data(); window.usersDataList[docSnap.id] = data; window.allUsersMap[docSnap.id] = data.email || 'Unknown User'; if (selectDropdown && (data.email || '').toLowerCase() !== ADMIN_EMAIL.toLowerCase()) { selectDropdown.innerHTML += `<option value="${docSnap.id}">${data.email} (${data.userPhone || 'No Phone'})</option>`; } }); if (typeof window.populateSupportUserDropdown === 'function') { window.populateSupportUserDropdown(); } } catch (err) {} };
-window.handleUserSelection = function() { const uid = document.getElementById('userSelectDropdown').value; if (!uid || !window.usersDataList[uid]) { document.getElementById('currentUserCreditsDisplay').innerText = '--'; document.getElementById('selectedUserVipBadge').innerText = '--'; if(document.getElementById('selectedUserPhoneInput')) document.getElementById('selectedUserPhoneInput').value = ''; if(document.getElementById('selectedUserSavedPass')) document.getElementById('selectedUserSavedPass').innerText = '--'; return; } const uData = window.usersDataList[uid]; document.getElementById('currentUserCreditsDisplay').innerText = uData.credits || 0; const now = Date.now(); let vipStatus = "Normal User"; if (uData.isVip) { if (uData.vipExpiry && uData.vipExpiry > now) { const days = Math.ceil((uData.vipExpiry - now) / MS_PER_DAY); vipStatus = `👑 VIP (${days} Days)`; } else if (!uData.vipExpiry) { vipStatus = "👑 VIP (Lifetime)"; } else { vipStatus = "Expired VIP"; } } document.getElementById('selectedUserVipBadge').innerText = vipStatus; if(document.getElementById('selectedUserPhoneInput')) document.getElementById('selectedUserPhoneInput').value = uData.userPhone || ''; if(document.getElementById('selectedUserSavedPass')) document.getElementById('selectedUserSavedPass').innerText = uData.userPass || 'Not Set'; if(document.getElementById('userDobToggle')) document.getElementById('userDobToggle').checked = uData.allowDob18 !== false; };
+
+// === UPDATED: SYNC ALL 4 TOGGLES ON USER SELECTION ===
+window.handleUserSelection = function() { 
+    const uid = document.getElementById('userSelectDropdown').value; 
+    if (!uid || !window.usersDataList[uid]) { 
+        document.getElementById('currentUserCreditsDisplay').innerText = '--'; 
+        document.getElementById('selectedUserVipBadge').innerText = '--'; 
+        if(document.getElementById('selectedUserPhoneInput')) document.getElementById('selectedUserPhoneInput').value = ''; 
+        if(document.getElementById('selectedUserSavedPass')) document.getElementById('selectedUserSavedPass').innerText = '--'; 
+        return; 
+    } 
+    const uData = window.usersDataList[uid]; 
+    document.getElementById('currentUserCreditsDisplay').innerText = uData.credits || 0; 
+    const now = Date.now(); let vipStatus = "Normal User"; 
+    if (uData.isVip) { 
+        if (uData.vipExpiry && uData.vipExpiry > now) { const days = Math.ceil((uData.vipExpiry - now) / MS_PER_DAY); vipStatus = `👑 VIP (${days} Days)`; } 
+        else if (!uData.vipExpiry) { vipStatus = "👑 VIP (Lifetime)"; } 
+        else { vipStatus = "Expired VIP"; } 
+    } 
+    document.getElementById('selectedUserVipBadge').innerText = vipStatus; 
+    if(document.getElementById('selectedUserPhoneInput')) document.getElementById('selectedUserPhoneInput').value = uData.userPhone || ''; 
+    if(document.getElementById('selectedUserSavedPass')) document.getElementById('selectedUserSavedPass').innerText = uData.userPass || 'Not Set'; 
+    
+    if(document.getElementById('userDomicileToggle')) document.getElementById('userDomicileToggle').checked = uData.allowDomicile !== false;
+    if(document.getElementById('userCasteToggle')) document.getElementById('userCasteToggle').checked = uData.allowCaste !== false;
+    if(document.getElementById('userDobToggle')) document.getElementById('userDobToggle').checked = uData.allowDob18 !== false; 
+    if(document.getElementById('userDobMinorToggle')) document.getElementById('userDobMinorToggle').checked = uData.allowDobMinor !== false;
+};
+
 window.adminSetNewUserPassword = async function() { const uid = document.getElementById('userSelectDropdown').value; if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले यूज़र चुनें!'); const newPass = document.getElementById('adminNewResetPass').value.trim(); if (newPass.length < 6) return alert('पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!'); const btn = document.getElementById('btnAdminSetPass'); const orig = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; btn.disabled = true; try { const uData = window.usersDataList[uid]; if (uData.userPass) { try { const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: uData.email, password: uData.userPass, returnSecureToken: true }) }); const signInData = await signInRes.json(); if (signInData.idToken) { await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${firebaseConfig.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: signInData.idToken, password: newPass, returnSecureToken: true }) }); } } catch (e) { } } await updateDoc(doc(db, "users", uid), { userPass: newPass, adminResetPass: newPass, passUpdatedAt: new Date() }); window.usersDataList[uid].userPass = newPass; document.getElementById('selectedUserSavedPass').innerText = newPass; document.getElementById('adminNewResetPass').value = ''; alert('पासवर्ड सफलतापूर्वक बदल दिया गया है!'); } catch (err) { alert('Error: ' + err.message); } finally { btn.innerHTML = orig; btn.disabled = false; } };
 window.adminUpdateVipDays = async function(daysToAdd) { const uid = document.getElementById('userSelectDropdown').value; if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले यूज़र चुनें!'); const uData = window.usersDataList[uid]; let newIsVip = false; let newExpiry = 0; const now = Date.now(); if (daysToAdd > 0) { newIsVip = true; const baseTime = (uData.vipExpiry && uData.vipExpiry > now) ? uData.vipExpiry : now; newExpiry = baseTime + (daysToAdd * MS_PER_DAY); } try { await updateDoc(doc(db, "users", uid), { isVip: newIsVip, vipExpiry: newExpiry }); window.usersDataList[uid].isVip = newIsVip; window.usersDataList[uid].vipExpiry = newExpiry; window.handleUserSelection(); alert(daysToAdd > 0 ? `VIP ${daysToAdd} दिन के लिए बढ़ा दिया गया है!` : `VIP हटा दिया गया है।`); } catch (err) { alert('Error: ' + err.message); } };
 window.adjustCredits = async function(action) { const uid = document.getElementById('userSelectDropdown').value; if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले यूज़र चुनें!'); const amtVal = parseInt(document.getElementById('creditAdjustmentAmount').value); if (isNaN(amtVal) || amtVal <= 0) return alert('कृपया सही क्रेडिट वैल्यू डालें!'); const uData = window.usersDataList[uid]; let currentCredits = uData.credits || 0; let newCredits = action === 'add' ? currentCredits + amtVal : currentCredits - amtVal; if (newCredits < 0) newCredits = 0; try { await updateDoc(doc(db, "users", uid), { credits: newCredits }); window.usersDataList[uid].credits = newCredits; window.handleUserSelection(); document.getElementById('creditAdjustmentAmount').value = ''; alert(`क्रेडिट्स सफलतापूर्वक ${action === 'add' ? 'जोड़' : 'घटा'} दिए गए हैं!`); } catch (err) { alert('Error: ' + err.message); } };
-window.createNewUserByAdmin = async function(e) { e.preventDefault(); const emailInp = document.getElementById('newAdminUserEmail').value.trim().toLowerCase(); const pass = document.getElementById('newAdminUserPass').value.trim(); const phone = document.getElementById('newAdminUserPhone').value.trim(); const credits = parseInt(document.getElementById('newAdminUserCredits').value) || 0; const vipDays = parseInt(document.getElementById('newAdminUserVipDays').value) || 0; const msg = document.getElementById('adminCreateMsg'); const email = emailInp.includes('@') ? emailInp : `${emailInp}@print.com`; if (pass.length < 6) return alert('पासवर्ड 6 अक्षरों का होना चाहिए!'); msg.className = "p-3 bg-blue-50 text-blue-800 rounded-xl text-xs font-bold text-center"; msg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating user account...'; msg.classList.remove('hidden'); try { const signUpRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email, password: pass, returnSecureToken: true }) }); const signUpData = await signUpRes.json(); if (signUpData.error) throw new Error(signUpData.error.message); const uid = signUpData.localId; const now = Date.now(); const isVip = vipDays > 0; const vipExpiry = isVip ? now + (vipDays * MS_PER_DAY) : 0; await setDoc(doc(db, "users", uid), { email: email, username: email.split('@')[0], credits: credits, isVip: isVip, vipExpiry: vipExpiry, allowDob18: true, userPass: pass, adminResetPass: pass, userPhone: phone, createdAt: new Date() }); await window.loadAllUsersForDropdown(); msg.className = "p-3.5 bg-green-50 text-green-900 border border-green-300 rounded-xl text-xs font-black text-center"; msg.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> यूज़र <strong>${email}</strong> सफलतापूर्वक बन गया है!`; e.target.reset(); setTimeout(() => msg.classList.add('hidden'), 5000); } catch (err) { msg.className = "p-3 bg-red-50 text-red-800 border border-red-300 rounded-xl text-xs font-bold text-center"; msg.innerText = "Error: " + err.message; } };
+window.createNewUserByAdmin = async function(e) { e.preventDefault(); const emailInp = document.getElementById('newAdminUserEmail').value.trim().toLowerCase(); const pass = document.getElementById('newAdminUserPass').value.trim(); const phone = document.getElementById('newAdminUserPhone').value.trim(); const credits = parseInt(document.getElementById('newAdminUserCredits').value) || 0; const vipDays = parseInt(document.getElementById('newAdminUserVipDays').value) || 0; const msg = document.getElementById('adminCreateMsg'); const email = emailInp.includes('@') ? emailInp : `${emailInp}@print.com`; if (pass.length < 6) return alert('पासवर्ड 6 अक्षरों का होना चाहिए!'); msg.className = "p-3 bg-blue-50 text-blue-800 rounded-xl text-xs font-bold text-center"; msg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating user account...'; msg.classList.remove('hidden'); try { const signUpRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email, password: pass, returnSecureToken: true }) }); const signUpData = await signUpRes.json(); if (signUpData.error) throw new Error(signUpData.error.message); const uid = signUpData.localId; const now = Date.now(); const isVip = vipDays > 0; const vipExpiry = isVip ? now + (vipDays * MS_PER_DAY) : 0; await setDoc(doc(db, "users", uid), { email: email, username: email.split('@')[0], credits: credits, isVip: isVip, vipExpiry: vipExpiry, allowDob18: true, allowDomicile: true, allowCaste: true, allowDobMinor: true, userPass: pass, adminResetPass: pass, userPhone: phone, createdAt: new Date() }); await window.loadAllUsersForDropdown(); msg.className = "p-3.5 bg-green-50 text-green-900 border border-green-300 rounded-xl text-xs font-black text-center"; msg.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> यूज़र <strong>${email}</strong> सफलतापूर्वक बन गया है!`; e.target.reset(); setTimeout(() => msg.classList.add('hidden'), 5000); } catch (err) { msg.className = "p-3 bg-red-50 text-red-800 border border-red-300 rounded-xl text-xs font-bold text-center"; msg.innerText = "Error: " + err.message; } };
