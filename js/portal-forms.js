@@ -975,6 +975,3 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
 
     return false;
 };
-```eof
-
-आप इन दोनों फाइलों का कोड अपडेट कर लें। **जैसे ही आप मुझे जवाब देंगे, मैं आपको तुरंत `admin.html` और `admin-logic.js` का कोड भी इसी तरह कंप्लीट दे दूंगा!**
