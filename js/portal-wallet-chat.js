@@ -1,6 +1,5 @@
 // ============================================================================
-// FILE 3: js/portal-wallet-chat.js (UPDATED COMPLETE WITH UPI FIX)
-// (Auth, Wallet, Chat, User Preview, Adv Password Reset, History, Global Stealth & TAB PERSISTENCE)
+// FILE 3: js/portal-wallet-chat.js (UPDATED COMPLETE WITH AUTO-APPROVE FIX)
 // ============================================================================
 
 import "./config-templates.js";
@@ -38,13 +37,12 @@ window.canCurrentUserSeeService = function(srv) {
     const u = window.currentUserData;
     if (!u) return false;
     
-    // Check Global Stealth + Per-User Stealth
     if (srv === 'domicile') return cfg.showDomicile !== false && u.allowDomicile !== false;
     if (srv === 'caste') return cfg.showCaste !== false && u.allowCaste !== false;
     if (srv === 'dob18') return cfg.showDob18 !== false && u.allowDob18 !== false;
     if (srv === 'dob_minor') return cfg.showDobMinor !== false && u.allowDobMinor !== false;
     
-    return true; // For other services like annexures
+    return true; 
 };
 
 window.getFirstAllowedTab = function() { 
@@ -67,7 +65,6 @@ function startUserSupportChatListener(uid) { if (window.userChatUnsubscribe) win
 window.renderUserLiveChatMessages = function() { const box = document.getElementById('userLiveChatMessagesBox'); if (!box) return; let msgs = Array.isArray(window.currentUserChatData?.messages) ? [...window.currentUserChatData.messages] : []; if (msgs.length === 0 && window.currentUserChatData?.message) msgs.push({ sender: 'user', text: window.currentUserChatData.message, time: Date.now() }); if (msgs.length === 0) { box.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400"><div class="w-12 h-12 rounded-full bg-royal-50 text-royal-500 flex items-center justify-center text-xl mb-2 border border-royal-200"><i class="fa-solid fa-comments"></i></div><p class="text-xs font-black text-slate-600">Ojas Live Support Chat</p><p class="text-[11px] text-slate-400 mt-0.5">कोई भी समस्या या सवाल नीचे लिखकर भेजें। एडमिन का रिप्लाई यहीं इसी चैट में लाइव दिखेगा।</p></div>`; return; } box.innerHTML = msgs.map(m => { const isMe = m.sender === 'user'; const tStr = m.time ? new Date(m.time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) : ''; const safeText = String(m.text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;'); if (isMe) { return `<div class="flex justify-end"><div class="max-w-[80%] bg-dark-900 text-white px-3.5 py-2.5 rounded-2xl rounded-br-none shadow-sm"><p class="text-xs font-semibold whitespace-pre-line leading-relaxed">${safeText}</p><span class="block text-[9px] text-royal-300 text-right mt-1 opacity-80">${tStr} • You</span></div></div>`; } else { return `<div class="flex justify-start"><div class="max-w-[80%] bg-amber-50 border border-amber-300 text-slate-900 px-3.5 py-2.5 rounded-2xl rounded-bl-none shadow-sm"><span class="text-[10px] font-black text-amber-800 uppercase block mb-0.5"><i class="fa-solid fa-crown text-amber-500 mr-1"></i>Admin Support</span><p class="text-xs font-bold whitespace-pre-line leading-relaxed">${safeText}</p><span class="block text-[9px] text-slate-400 text-right mt-1">${tStr}</span></div></div>`; } }).join(''); box.scrollTop = box.scrollHeight; };
 window.sendUserSupportMessage = async function(event) { event.preventDefault(); if (!window.currentUserData) return; const inp = document.getElementById('userSupportChatInput'); const btn = document.getElementById('btnSendUserChat'); const text = inp.value.trim(); if (!text) return; inp.value = ''; btn.disabled = true; const uid = window.currentUserData.uid; try { const existingMsgs = Array.isArray(window.currentUserChatData?.messages) ? [...window.currentUserChatData.messages] : []; existingMsgs.push({ sender: 'user', text: text, time: Date.now() }); await setDoc(doc(db, "supportTickets", uid), { type: 'USER_SUPPORT_CHAT', userId: uid, userIdentifier: window.currentUserData.email, username: window.currentUserData.username, message: text, status: 'Open', unreadByAdmin: true, unreadByUser: false, timestamp: new Date(), updatedAtMs: Date.now(), messages: existingMsgs }, { merge: true }); } catch (err) { alert("मैसेज भेजने में समस्या आई: " + err.message); } finally { btn.disabled = false; inp.focus(); } };
 
-// === SYNC ALL 4 PER-USER STEALTH VALUES ===
 function startUserProfileListener(uid) { 
     if (window.userProfileUnsubscribe) window.userProfileUnsubscribe(); 
     window.userProfileUnsubscribe = onSnapshot(doc(db, "users", uid), (snap) => { 
@@ -75,7 +72,6 @@ function startUserProfileListener(uid) {
         const data = snap.data(); 
         window.currentUserData.credits = data.credits || 0; 
         
-        // Sync stealth states
         window.currentUserData.allowDob18 = data.allowDob18 !== false;
         window.currentUserData.allowDomicile = data.allowDomicile !== false;
         window.currentUserData.allowCaste = data.allowCaste !== false;
@@ -93,8 +89,6 @@ function startPortalSettingsListener() { if (window.portalSettingsUnsubscribe) w
 
 window.applyLivePortalControls = function() {
     const cfg = window.portalConfigState; 
-    
-    // Check combined visibility
     const canDom = window.canCurrentUserSeeService('domicile');
     const canCas = window.canCurrentUserSeeService('caste');
     const canDob18 = window.canCurrentUserSeeService('dob18');
@@ -125,7 +119,6 @@ window.applyLivePortalControls = function() {
     if (promoDesc) promoDesc.innerHTML = canDob18 ? `VIP लें: <strong>18+ DOB & सारे 9 Official Annexures</strong> अनलॉक करें (सभी डॉक्यूमेंट 10 Cr)!` : `VIP लें: <strong>सारे 9 Official Annexures</strong> अनलॉक करें (सभी डॉक्यूमेंट 10 Cr)!`;
     if (vipHeaderLabel) vipHeaderLabel.innerHTML = canDob18 ? `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures)` : `<i class="fa-solid fa-crown text-royal-400"></i> VIP Services (All 9 Annexures)`;
     
-    // Auto-switch tab if current tab becomes hidden
     if ((window.currentActiveTab === 'domicile' && !canDom) || (window.currentActiveTab === 'caste' && !canCas) || (window.currentActiveTab === 'dob18' && !canDob18) || (window.currentActiveTab === 'dob_minor' && !canDobMinor)) { 
         window.switchService(window.getFirstAllowedTab()); 
     }
@@ -183,117 +176,45 @@ function setupDashboard(userData) {
     if (userData.isVip) { document.body.classList.add('vip-body-bg'); portalTitle.innerHTML = `Ojas <span class="text-royal-400">VIP</span>`; portalIcon.innerHTML = `<img src="logo.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">`; portalIcon.className = "w-7 h-7 md:w-10 md:h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden p-1 border border-slate-200 shrink-0"; vipBadge.style.display = 'inline-flex'; vipServicesBar.style.display = 'block'; normalUserVipPromo.style.display = 'none'; mainFormCard.className = "bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-vip-glow border-2 border-royal-400 p-4 md:p-7"; } else { document.body.classList.remove('vip-body-bg'); portalTitle.innerHTML = `Ojas <span class="text-royal-400">Portal</span>`; portalIcon.innerHTML = `<img src="logo.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">`; portalIcon.className = "w-7 h-7 md:w-10 md:h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden p-1 border border-slate-200 shrink-0"; vipBadge.style.display = 'none'; vipServicesBar.style.display = 'none'; normalUserVipPromo.style.display = 'block'; mainFormCard.className = "bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-card border border-slate-100 p-4 md:p-7"; }
     document.getElementById('loginSection').style.display = 'none'; document.getElementById('dashboardSection').style.display = 'flex';
     window.applyLivePortalControls(); 
-    
-    // Tab Persistence Logic
     const savedTab = sessionStorage.getItem('ojas_active_tab');
-    if (savedTab && window.canCurrentUserSeeService(savedTab)) {
-        window.switchService(savedTab);
-    } else {
-        window.switchService(window.getFirstAllowedTab());
-    }
+    if (savedTab && window.canCurrentUserSeeService(savedTab)) { window.switchService(savedTab); } else { window.switchService(window.getFirstAllowedTab()); }
 }
 window.handleLogout = async function() { await signOut(auth); window.location.reload(); };
 
-// === SHOW/HIDE PASSWORD TOGGLE LOGIC ===
 window.togglePassVisibility = function(inputId, btnEl) {
-    const inp = document.getElementById(inputId);
-    const icon = btnEl.querySelector('i');
-    if (inp.type === 'password') {
-        inp.type = 'text';
-        icon.classList.remove('fa-eye');
-        icon.classList.add('fa-eye-slash');
-        icon.classList.add('text-royal-600');
-    } else {
-        inp.type = 'password';
-        icon.classList.remove('fa-eye-slash');
-        icon.classList.remove('text-royal-600');
-        icon.classList.add('fa-eye');
-    }
+    const inp = document.getElementById(inputId); const icon = btnEl.querySelector('i');
+    if (inp.type === 'password') { inp.type = 'text'; icon.classList.remove('fa-eye'); icon.classList.add('fa-eye-slash'); icon.classList.add('text-royal-600'); } else { inp.type = 'password'; icon.classList.remove('fa-eye-slash'); icon.classList.remove('text-royal-600'); icon.classList.add('fa-eye'); }
 };
 
 window.changeUserPassword = async function(event) {
-    event.preventDefault();
-    const currPass = document.getElementById('currentPassInput').value;
-    const newPass = document.getElementById('newPassInput').value;
-    const confirmPass = document.getElementById('confirmPassInput').value;
-    const msgBox = document.getElementById('passChangeMsg');
-    const btn = document.getElementById('btnChangePass');
-    
-    if (newPass.length < 6) {
-        msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-red-50 text-red-600 border-red-200 mt-4";
-        msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> नया पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!";
-        msgBox.style.display = 'block';
-        return;
-    }
-
-    if (newPass !== confirmPass) {
-        msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-red-50 text-red-600 border-red-200 mt-4";
-        msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> नया पासवर्ड और कन्फर्म पासवर्ड मैच नहीं हो रहे हैं!";
-        msgBox.style.display = 'block';
-        return;
-    }
-    
-    const origHtml = btn.innerHTML;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Updating Password...';
-    btn.disabled = true;
-    msgBox.style.display = 'none';
-    
+    event.preventDefault(); const currPass = document.getElementById('currentPassInput').value; const newPass = document.getElementById('newPassInput').value; const confirmPass = document.getElementById('confirmPassInput').value; const msgBox = document.getElementById('passChangeMsg'); const btn = document.getElementById('btnChangePass');
+    if (newPass.length < 6) { msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-red-50 text-red-600 border-red-200 mt-4"; msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> नया पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!"; msgBox.style.display = 'block'; return; }
+    if (newPass !== confirmPass) { msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-red-50 text-red-600 border-red-200 mt-4"; msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> नया पासवर्ड और कन्फर्म पासवर्ड मैच नहीं हो रहे हैं!"; msgBox.style.display = 'block'; return; }
+    const origHtml = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Updating Password...'; btn.disabled = true; msgBox.style.display = 'none';
     try {
-        const user = auth.currentUser;
-        const credential = EmailAuthProvider.credential(user.email, currPass);
-        
-        await reauthenticateWithCredential(user, credential);
-        await updatePassword(user, newPass);
-        
-        await updateDoc(doc(db, "users", user.uid), { 
-            userPass: newPass, 
-            passUpdatedAt: new Date() 
-        });
-        
-        msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-green-50 text-green-700 border-green-200 mt-4";
-        msgBox.innerHTML = "<i class='fa-solid fa-check-circle mr-1 text-base'></i> पासवर्ड सफलतापूर्वक बदल दिया गया है!";
-        msgBox.style.display = 'block';
-        event.target.reset();
-        
-        ['currentPassInput', 'newPassInput', 'confirmPassInput'].forEach(id => {
-            const inp = document.getElementById(id);
-            if (inp && inp.type === 'text') {
-                inp.type = 'password';
-                inp.nextElementSibling.querySelector('i').className = 'fa-solid fa-eye text-base';
-            }
-        });
-        
+        const user = auth.currentUser; const credential = EmailAuthProvider.credential(user.email, currPass);
+        await reauthenticateWithCredential(user, credential); await updatePassword(user, newPass);
+        await updateDoc(doc(db, "users", user.uid), { userPass: newPass, passUpdatedAt: new Date() });
+        msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-green-50 text-green-700 border-green-200 mt-4"; msgBox.innerHTML = "<i class='fa-solid fa-check-circle mr-1 text-base'></i> पासवर्ड सफलतापूर्वक बदल दिया गया है!"; msgBox.style.display = 'block'; event.target.reset();
+        ['currentPassInput', 'newPassInput', 'confirmPassInput'].forEach(id => { const inp = document.getElementById(id); if (inp && inp.type === 'text') { inp.type = 'password'; inp.nextElementSibling.querySelector('i').className = 'fa-solid fa-eye text-base'; } });
     } catch (error) {
         msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-red-50 text-red-600 border-red-200 mt-4";
-        if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
-            msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> आपका पुराना पासवर्ड गलत है!";
-        } else {
-            msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> " + error.message;
-        }
+        if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') { msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> आपका पुराना पासवर्ड गलत है!"; } else { msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> " + error.message; }
         msgBox.style.display = 'block';
-    } finally {
-        btn.innerHTML = origHtml;
-        btn.disabled = false;
-    }
+    } finally { btn.innerHTML = origHtml; btn.disabled = false; }
 };
 
 window.calculateCredits = function() {
-    const creditAmt = parseFloat(document.getElementById('rupeeAmount')?.value) || 0;
-    const selectedPlanEl = document.querySelector('input[name="vipPlanOption"]:checked');
-    let vipDays = 0, vipFee = 0;
+    const creditAmt = parseFloat(document.getElementById('rupeeAmount')?.value) || 0; const selectedPlanEl = document.querySelector('input[name="vipPlanOption"]:checked'); let vipDays = 0, vipFee = 0;
     if (selectedPlanEl) { vipDays = parseInt(selectedPlanEl.value) || 0; vipFee = parseInt(selectedPlanEl.getAttribute('data-price')) || 0; }
-
-    window.currentRechargeCredits = creditAmt; window.currentWantsVip = vipDays > 0;
-    window.currentVipDays = vipDays; window.currentVipPlanFee = vipFee; window.currentTotalPayable = creditAmt + vipFee;
-
+    window.currentRechargeCredits = creditAmt; window.currentWantsVip = vipDays > 0; window.currentVipDays = vipDays; window.currentVipPlanFee = vipFee; window.currentTotalPayable = creditAmt + vipFee;
     const calcCreditsEl = document.getElementById('calculatedCredits'); if (calcCreditsEl) calcCreditsEl.innerText = `${creditAmt} Cr`;
-    const vipSummaryBadge = document.getElementById('vipSummaryBadge');
-    if (vipSummaryBadge) { if (vipDays > 0) { vipSummaryBadge.style.display = 'inline-block'; vipSummaryBadge.innerHTML = `👑 +${vipDays}d VIP`; } else { vipSummaryBadge.style.display = 'none'; } }
+    const vipSummaryBadge = document.getElementById('vipSummaryBadge'); if (vipSummaryBadge) { if (vipDays > 0) { vipSummaryBadge.style.display = 'inline-block'; vipSummaryBadge.innerHTML = `👑 +${vipDays}d VIP`; } else { vipSummaryBadge.style.display = 'none'; } }
     const totalPayableDisplay = document.getElementById('totalPayableDisplay'); if (totalPayableDisplay) totalPayableDisplay.innerText = `₹${window.currentTotalPayable}`;
 };
 
 // ==============================================================================
-// 🌟 MAJOR FIX: FRONTEND SANITIZER ADDED HERE
+// 🌟 ROBUST AUTO-VERIFICATION PAYMENT GENERATOR
 // ==============================================================================
 window.generateQR = async function() {
     if (window.currentUserData?.hasFreeAccess) return; window.calculateCredits();
@@ -304,45 +225,55 @@ window.generateQR = async function() {
     const btn = document.getElementById('btnGenerateQR'); const origBtnHtml = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> पेमेंट लिंक बन रहा है...'; }
 
-    // Fallback Link Generation (No Spaces, No Special Chars)
+    // Fallback Link (Paytm Business ID) - यह सिर्फ तब चलेगा जब गेटवे फेल हो जाए
     const tempTr = `OJS${Date.now()}`;
     const cleanNote = window.currentWantsVip ? `OjasVIP${window.currentVipDays}d` : `OjasCredits`;
-    const queryParams = `pa=8279650137@amazonpay&pn=OjasPrintService&tr=${tempTr}&am=${window.currentTotalPayable}&cu=INR&tn=${cleanNote}`;
-    let universalUpiUrl = `upi://pay?${queryParams}`; 
+    let universalUpiUrl = `upi://pay?pa=APNI_PAYTM_BUSINESS_ID_YAHA_DAALEIN&pn=OjasPrintService&tr=${tempTr}&am=${window.currentTotalPayable}&cu=INR&tn=${cleanNote}`; 
     let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; 
     window.currentActiveOrderId = null;
 
     try {
-        const res = await fetch('/api/create-order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: window.currentUserData.uid, email: window.currentUserData.email, username: window.currentUserData.username, totalPayable: window.currentTotalPayable, creditsRequested: window.currentRechargeCredits, wantsVip: window.currentWantsVip, vipDaysRequested: window.currentVipDays, vipPlanFee: window.currentVipPlanFee }) });
+        // यह रिक्वेस्ट आपकी create-order.js फाइल को जाती है
+        const res = await fetch('/api/create-order', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ 
+                userId: window.currentUserData.uid, email: window.currentUserData.email, 
+                username: window.currentUserData.username, totalPayable: window.currentTotalPayable, 
+                creditsRequested: window.currentRechargeCredits, wantsVip: window.currentWantsVip, 
+                vipDaysRequested: window.currentVipDays, vipPlanFee: window.currentVipPlanFee 
+            }) 
+        });
+        
         const orderData = await res.json();
         
         if (orderData.status && orderData.orderId) {
             window.currentActiveOrderId = orderData.orderId;
             
-            // FRONTEND SANITIZER: Vyapar Gateway के खराब लिंक को यहीं ठीक करें 
+            // अगर गेटवे ने लिंक दिया है, तो वह फॉलबैक को हटा देगा (तभी ऑटो-अप्रूव काम करेगा)
             if (orderData.upi_string) { 
                 try {
                     let rawUpi = orderData.upi_string;
                     let [baseUrl, qString] = rawUpi.split('?');
                     if (qString) {
                         let params = new URLSearchParams(qString);
-                        // स्पेस और प्लस को हटा दें
-                        if (params.has('pn')) params.set('pn', params.get('pn').replace(/\\s+/g, '').replace(/\\+/g, ''));
-                        if (params.has('tn')) params.set('tn', params.get('tn').replace(/\\s+/g, '').replace(/\\+/g, ''));
+                        // स्पेस हटाएं ताकि पेमेंट फेल न हो
+                        if (params.has('pn')) params.set('pn', params.get('pn').replace(/\s+/g, '').replace(/\+/g, ''));
+                        if (params.has('tn')) params.set('tn', params.get('tn').replace(/\s+/g, '').replace(/\+/g, ''));
                         if (!params.has('tr')) params.set('tr', tempTr);
                         universalUpiUrl = `${baseUrl}?${params.toString()}`;
                     } else {
-                        universalUpiUrl = rawUpi;
+                        universalUpiUrl = rawUpi.replace(/\s/g, '').replace(/\+/g, '');
                     }
                 } catch(e) {
-                    // अगर पार्सिंग फेल हो जाए तो डायरेक्ट स्पेस हटा दें
-                    universalUpiUrl = orderData.upi_string.replace(/\\s/g, '').replace(/\\+/g, ''); 
+                    universalUpiUrl = orderData.upi_string.replace(/\s/g, '').replace(/\+/g, ''); 
                 }
                 qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; 
             }
             
             if (orderData.qr_code && orderData.qr_code.startsWith('http')) qrUrl = orderData.qr_code;
 
+            // यह लिसनर 'Auto-Approved' स्टेटस का इंतज़ार करता है
             if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe();
             window.activePaymentUnsubscribe = onSnapshot(doc(db, "payments", orderData.orderId), async (snap) => {
                 if (snap.exists() && (snap.data().status === 'Auto-Approved' || snap.data().status === 'Approved')) {
@@ -352,8 +283,14 @@ window.generateQR = async function() {
                     document.getElementById('walletMainUI').innerHTML = `<div class="p-6 bg-green-50 rounded-2xl border-2 border-green-400 text-center space-y-2"><i class="fa-solid fa-circle-check text-5xl text-green-600 mb-2 animate-bounce"></i><h2 class="text-xl font-black text-green-900">पेमेंट सफल! (Auto-Verified)</h2><p class="text-xs font-bold text-green-700">आपका ₹${window.currentTotalPayable} का पेमेंट वेरीफाई हो गया है और आपके अकाउंट में तुरंत क्रेडिट्स/VIP जोड़ दिए गए हैं!</p><div class="pt-3"><button onclick="window.location.reload()" class="bg-green-600 hover:bg-green-700 text-white font-black py-2.5 px-6 rounded-xl text-xs shadow">डैशबोर्ड पर जाएँ</button></div></div>`;
                 }
             });
+        } else {
+            // अगर API ने एरर दिया, तो ऑटो-अप्रूव नहीं होगा, फॉलबैक (डायरेक्ट Paytm) इस्तेमाल होगा
+            const fallbackDoc = await addDoc(collection(db, "payments"), { userId: window.currentUserData.uid, email: window.currentUserData.email, amountPaid: window.currentTotalPayable, creditsRequested: window.currentRechargeCredits, wantsVip: window.currentWantsVip, vipDaysRequested: window.currentVipDays, vipPlanFee: window.currentVipPlanFee, utrNumber: "ONLINE_UPI", timestamp: new Date(), status: "Pending" }); 
+            window.currentActiveOrderId = fallbackDoc.id; 
+            console.error("Gateway API Failed, using Fallback.");
         }
     } catch (err) { 
+        // अगर Fetch फेल हो गया, तो भी फॉलबैक यूज़ होगा
         try { 
             const fallbackDoc = await addDoc(collection(db, "payments"), { userId: window.currentUserData.uid, email: window.currentUserData.email, amountPaid: window.currentTotalPayable, creditsRequested: window.currentRechargeCredits, wantsVip: window.currentWantsVip, vipDaysRequested: window.currentVipDays, vipPlanFee: window.currentVipPlanFee, utrNumber: "ONLINE_UPI", timestamp: new Date(), status: "Pending" }); 
             window.currentActiveOrderId = fallbackDoc.id; 
