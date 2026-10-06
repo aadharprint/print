@@ -1,5 +1,6 @@
 // ============================================================================
 // FILE 3: js/portal-wallet-chat.js (PERFECT MOBILE & DESKTOP PAYMENT UI)
+// (Auto-Cancel Pending Payments & Dedicated UPI App Intents Added)
 // ============================================================================
 
 import "./config-templates.js";
@@ -34,6 +35,25 @@ window.currentTotalPayable = 0;
 window.currentWantsVip = false; 
 window.currentVipDays = 0; 
 window.currentVipPlanFee = 0;
+
+// === BROWSER BACK BUTTON AUTO-CANCEL LOGIC ===
+window.addEventListener('popstate', async function() {
+    if (window.currentActiveOrderId) {
+        const orderIdToCancel = window.currentActiveOrderId;
+        window.currentActiveOrderId = null;
+        if (window.activePaymentUnsubscribe) { 
+            window.activePaymentUnsubscribe(); 
+            window.activePaymentUnsubscribe = null; 
+        }
+        try { 
+            await updateDoc(doc(db, "payments", orderIdToCancel), { 
+                status: "Cancelled", 
+                cancelledBy: "User (Browser Back Button)", 
+                cancelledAt: new Date() 
+            }); 
+        } catch(e) {}
+    }
+});
 
 // === PER-USER & GLOBAL VISIBILITY CHECKER ===
 window.canCurrentUserSeeService = function(srv) {
@@ -623,7 +643,7 @@ window.changeUserPassword = async function(event) {
         });
         
         msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-green-50 text-green-700 border-green-200 mt-4";
-        msgBox.innerHTML = "<i class='fa-solid fa-check-circle mr-1 text-base'></i> पासवर्ड सफलतापूर्वक बदल दिया गया है!";
+        msgBox.innerHTML = "<i class='fa-solid fa-check-circle mr-1 text-base'></i> पासवर्ड सफलतापूर्वक बदल दिया गया ক্রো!";
         msgBox.style.display = 'block';
         event.target.reset();
         
@@ -682,384 +702,27 @@ window.calculateCredits = function() {
 };
 
 // ============================================================================
-// PERFECT MOBILE & DESKTOP PAYMENT & AUTO-VERIFICATION UI (generateQR)
+// AUTO-CANCEL (ON TAB SWITCH) LOGIC ADDED HERE
 // ============================================================================
-window.generateQR = async function() {
-    if (window.currentUserData?.hasFreeAccess) return; 
-    window.calculateCredits();
-    
-    if (!window.currentWantsVip && window.currentRechargeCredits < 100) return alert('पोर्टल पर कम से कम ₹100 के क्रेडिट रिचार्ज करना अनिवार्य है!');
-    if (window.currentWantsVip && window.currentRechargeCredits > 0 && window.currentRechargeCredits < 100) return alert('क्रेडिट रिचार्ज की न्यूनतम वैल्यू ₹100 है!');
-    if (window.currentTotalPayable < 100) return alert('न्यूनतम पेमेंट राशि ₹100 होनी चाहिए!');
+window.switchService = async function(serviceName) {
+    if (!serviceName) serviceName = window.getFirstAllowedTab();
 
-    const btn = document.getElementById('btnGenerateQR'); 
-    const origBtnHtml = btn ? btn.innerHTML : '';
-    if (btn) { 
-        btn.disabled = true; 
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> पेमेंट लिंक तैयार हो रहा है...'; 
-    }
-
-    // Default Fallback UPI String
-    const queryParams = `pa=8279650137@amazonpay&pn=Ojas%20Print%20Service&am=${window.currentTotalPayable}&cu=INR&tn=${encodeURIComponent(window.currentWantsVip ? `Ojas VIP ${window.currentVipDays}d` : `Ojas Credits`)}`;
-    let universalUpiUrl = `upi://pay?${queryParams}`; 
-    let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(universalUpiUrl)}`; 
-    window.currentActiveOrderId = null;
-
-    try {
-        const res = await fetch('/api/create-order', { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify({ 
-                userId: window.currentUserData.uid, 
-                email: window.currentUserData.email, 
-                username: window.currentUserData.username, 
-                totalPayable: window.currentTotalPayable, 
-                creditsRequested: window.currentRechargeCredits, 
-                wantsVip: window.currentWantsVip, 
-                vipDaysRequested: window.currentVipDays, 
-                vipPlanFee: window.currentVipPlanFee 
-            }) 
-        });
-        
-        const orderData = await res.json();
-        if (orderData.status && orderData.orderId) {
-            window.currentActiveOrderId = orderData.orderId;
-            
-            if (orderData.upi_string) { 
-                universalUpiUrl = orderData.upi_string; 
-                qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(universalUpiUrl)}`; 
-            }
-            if (orderData.qr_code && orderData.qr_code.startsWith('http')) {
-                qrUrl = orderData.qr_code;
-            }
-
-            // Real-time listener for Auto-Verification
-            if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe();
-            window.activePaymentUnsubscribe = onSnapshot(doc(db, "payments", orderData.orderId), async (snap) => {
-                if (snap.exists() && (snap.data().status === 'Auto-Approved' || snap.data().status === 'Approved')) {
-                    if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe(); 
-                    window.currentActiveOrderId = null;
-                    
-                    const uSnap = await getDoc(doc(db, "users", window.currentUserData.uid));
-                    if (uSnap.exists()) { 
-                        const updatedUser = uSnap.data(); 
-                        window.currentUserData.credits = updatedUser.credits || 0; 
-                        window.currentUserData.isVip = updatedUser.isVip || window.currentUserData.hasFreeAccess; 
-                        window.currentUserData.vipExpiry = updatedUser.vipExpiry || 0; 
-                        const crEl = document.getElementById('displayCredits'); 
-                        if (crEl) crEl.innerText = window.currentUserData.credits; 
-                    }
-
-                    document.getElementById('walletMainUI').innerHTML = `
-                        <div class="p-8 bg-green-50 rounded-3xl border-2 border-green-400 text-center space-y-3">
-                            <i class="fa-solid fa-circle-check text-6xl text-green-600 mb-2 animate-bounce"></i>
-                            <h2 class="text-2xl font-black text-green-900">पेमेंट सफल! (Auto-Verified)</h2>
-                            <p class="text-sm font-bold text-green-700">आपका ₹${window.currentTotalPayable} का पेमेंट सफलतापूर्वक वेरीफाई हो गया है और आपके अकाउंट में क्रेडिट्स/VIP जोड़ दिए गए हैं!</p>
-                            <div class="pt-4">
-                                <button onclick="window.location.reload()" class="bg-green-600 hover:bg-green-700 text-white font-black py-3 px-8 rounded-xl text-sm shadow-glow transition">
-                                    डैशबोर्ड पर वापस जाएँ
-                                </button>
-                            </div>
-                        </div>`;
-                }
-            });
+    // AUTO CANCEL PENDING PAYMENT IF NAVIGATED AWAY
+    if (window.currentActiveOrderId && serviceName !== 'add_credit') {
+        const orderIdToCancel = window.currentActiveOrderId;
+        window.currentActiveOrderId = null;
+        if (window.activePaymentUnsubscribe) { 
+            window.activePaymentUnsubscribe(); 
+            window.activePaymentUnsubscribe = null; 
         }
-    } catch (err) { 
-        try { 
-            const fallbackDoc = await addDoc(collection(db, "payments"), { 
-                userId: window.currentUserData.uid, 
-                email: window.currentUserData.email, 
-                amountPaid: window.currentTotalPayable, 
-                creditsRequested: window.currentRechargeCredits, 
-                wantsVip: window.currentWantsVip, 
-                vipDaysRequested: window.currentVipDays, 
-                vipPlanFee: window.currentVipPlanFee, 
-                utrNumber: "ONLINE_UPI", 
-                timestamp: new Date(), 
-                status: "Pending" 
-            }); 
-            window.currentActiveOrderId = fallbackDoc.id; 
-        } catch (e) {} 
-    } finally { 
-        if (btn) { 
-            btn.disabled = false; 
-            btn.innerHTML = origBtnHtml; 
-        } 
-    }
-
-    // UI Updates for Desktop & Mobile view
-    document.getElementById('upiQRCode').src = qrUrl; 
-    document.getElementById('qrPayableAmountText').innerText = `कुल पेमेंट: ₹${window.currentTotalPayable}`;
-    
-    // Direct UPI Button for Mobile Users (PhonePe, GPay, Paytm)
-    const mainUpiBtn = document.getElementById('btnDirectUpiPay'); 
-    if (mainUpiBtn) { 
-        mainUpiBtn.href = universalUpiUrl; 
-    }
-
-    document.getElementById('paymentStep1').style.display = 'none'; 
-    document.getElementById('qrSection').style.display = 'flex';
-};
-
-window.cancelAndBackToPaymentStep1 = async function() {
-    if (window.activePaymentUnsubscribe) { 
-        window.activePaymentUnsubscribe(); 
-        window.activePaymentUnsubscribe = null; 
-    }
-    if (window.currentActiveOrderId) { 
-        const orderIdToCancel = window.currentActiveOrderId; 
-        window.currentActiveOrderId = null; 
         try { 
             await updateDoc(doc(db, "payments", orderIdToCancel), { 
                 status: "Cancelled", 
-                cancelledBy: "User (Back without Payment)", 
+                cancelledBy: "User (Switched Tab)", 
                 cancelledAt: new Date() 
             }); 
-        } catch (e) {} 
+        } catch(e) {}
     }
-    document.getElementById('qrSection').style.display = 'none'; 
-    document.getElementById('paymentStep1').style.display = 'block'; 
-    alert("पेमेंट प्रोसेस कैंसिल कर दिया गया है।");
-};
-
-window.togglePaymentTicketBox = function() { 
-    const box = document.getElementById('paymentIssueTicketBox'); 
-    if (!box) return; 
-    box.style.display = box.style.display === 'none' ? 'block' : 'none'; 
-};
-
-window.submitPaymentIssueTicket = async function() {
-    const rawUtr = document.getElementById('ticketUtrInput')?.value.trim() || ''; 
-    const utr = rawUtr.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    const resMsg = document.getElementById('paymentTicketResultMsg'); 
-    const btn = document.getElementById('btnRaisePaymentTicket'); 
-    
-    if (!utr || utr.length < 10) return alert("कृपया अपना 12-अंकों का सही UTR / Reference नंबर दर्ज करें!");
-    const origHtml = btn.innerHTML; 
-    btn.disabled = true; 
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> टिकट सबमिट हो रहा है...';
-
-    const ticketMsgText = `💳 [PAYMENT UTR TICKET]\nAmount: ₹${window.currentTotalPayable}\nCredits: +${window.currentRechargeCredits} Cr${window.currentVipDays > 0 ? ` | VIP: +${window.currentVipDays}d` : ''}\nUTR No: ${utr}\nOrder ID: ${window.currentActiveOrderId || 'N/A'}\nNote: ऑनलाइन पेमेंट ऑटो-वेरीफाई नहीं हुआ, कृपया चेक करके क्रेडिट जोड़ें।`;
-    
-    try {
-        if (window.currentActiveOrderId) { 
-            try { 
-                await updateDoc(doc(db, "payments", window.currentActiveOrderId), { 
-                    utrNumber: utr, 
-                    status: "Pending (Ticket Raised)", 
-                    ticketRaisedAt: new Date() 
-                }); 
-            } catch (e) {} 
-        }
-        
-        const uid = window.currentUserData.uid; 
-        const chatRef = doc(db, "supportTickets", uid); 
-        const existingMsgs = Array.isArray(window.currentUserChatData?.messages) ? [...window.currentUserChatData.messages] : []; 
-        existingMsgs.push({ sender: 'user', text: ticketMsgText, time: Date.now() });
-        
-        await setDoc(chatRef, { 
-            type: 'PAYMENT_ISSUE_TICKET', 
-            userId: uid, 
-            userIdentifier: window.currentUserData.email, 
-            username: window.currentUserData.username, 
-            message: `💳 Payment UTR Ticket: ₹${window.currentTotalPayable} (UTR: ${utr})`, 
-            status: 'Open', 
-            unreadByAdmin: true, 
-            unreadByUser: false, 
-            timestamp: new Date(), 
-            updatedAtMs: Date.now(), 
-            messages: existingMsgs 
-        }, { merge: true });
-        
-        notifyAdminSecurely({ type: "PAYMENT_UTR_TICKET", user: window.currentUserData.email, amount: window.currentTotalPayable, utr: utr });
-        
-        resMsg.className = "p-3.5 rounded-xl bg-green-50 border border-green-300 text-green-900 text-xs font-bold text-center space-y-1 mt-2"; 
-        resMsg.innerHTML = `<div><i class="fa-solid fa-circle-check text-green-600 text-base mr-1"></i> आपका पेमेंट टिकट सफलतापूर्वक रेज़ हो गया है!</div><p class="text-[11px] text-green-800">आपका UTR नंबर (<strong>${utr}</strong>) दर्ज कर लिया गया है।</p>`; 
-        resMsg.style.display = 'block'; 
-        document.getElementById('ticketUtrInput').value = '';
-    } catch (err) { 
-        alert("टिकट रेज़ करने में समस्या आई: " + err.message); 
-    } finally { 
-        btn.disabled = false; 
-        btn.innerHTML = origHtml; 
-    }
-};
-
-window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
-    document.getElementById('pdfViewerTitle').innerText = fileName;
-    const iframe = document.getElementById('pdfIframe'); 
-    const htmlPreviewContainer = document.getElementById('htmlDocPreviewContainer');
-    const spinner = document.getElementById('pdfLoadingSpinner'); 
-    const downloadBtn = document.getElementById('modalDownloadBtn');
-    const printBtn = document.getElementById('modalPrintBtn'); 
-    const modalStampLabel = document.getElementById('modalStampToggleLabel');
-    const modalStampCheckbox = document.getElementById('modalStampCheckbox'); 
-    const shareBtn = document.getElementById('modalShareBtn');
-
-    const isAnnexure = String(fileId).startsWith('LOCAL_HTML_');
-    let initialWithStamp = false, initialStampSrc = '', initialStampFile = '', initialCertFileId = '';
-
-    if (historyIndex >= 0) {
-        const record = (window.historyData && window.historyData[historyIndex]) || (window.adminAllHistoryData && window.adminAllHistoryData[historyIndex]);
-        if (record) {
-            initialWithStamp = !!record.withStamp;
-            initialStampFile = record.stampFile || 'stamp.png';
-            initialCertFileId = (record.certificateFileId && record.isCertificateAttached !== false) ? record.certificateFileId : ''; 
-        }
-    }
-
-    if (initialWithStamp && !initialStampSrc && typeof window.getTransparentStampDataUrl === 'function') {
-        initialStampSrc = await window.getTransparentStampDataUrl(initialStampFile);
-    }
-
-    window.currentModalContext = { fileId: fileId, fileName: fileName, historyIndex: historyIndex, withStamp: initialWithStamp, stampFile: initialStampFile, stampSrc: initialStampSrc, certificateFileId: initialCertFileId };
-    
-    const previewParent = iframe.parentElement;
-    previewParent.classList.add('flex', 'flex-col');
-    if (shareBtn) shareBtn.style.display = 'none';
-
-    if (isAnnexure && historyIndex >= 0) {
-        if (shareBtn) shareBtn.style.display = 'flex';
-        if (modalStampLabel) modalStampLabel.classList.remove('hidden');
-        if (modalStampCheckbox) modalStampCheckbox.checked = initialWithStamp;
-
-        const record = (window.historyData && window.historyData[historyIndex]) || (window.adminAllHistoryData && window.adminAllHistoryData[historyIndex]);
-        const fData = record?.formData || {};
-        spinner.style.display = 'none';
-        
-        if (initialCertFileId) {
-            iframe.style.display = 'block'; 
-            iframe.style.flex = '1'; 
-            iframe.style.minHeight = '350px'; 
-            iframe.style.borderBottom = '4px solid #cbd5e1';
-            iframe.src = `https://drive.google.com/file/d/${initialCertFileId}/preview`;
-            
-            htmlPreviewContainer.style.display = 'flex'; 
-            htmlPreviewContainer.style.flex = '1'; 
-            htmlPreviewContainer.style.minHeight = '350px';
-            htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true, initialWithStamp, initialStampSrc);
-        } else {
-            iframe.style.display = 'none';
-            htmlPreviewContainer.style.display = 'flex'; 
-            htmlPreviewContainer.style.flex = '1';
-            htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true, initialWithStamp, initialStampSrc);
-        }
-
-        if (downloadBtn) { 
-            downloadBtn.onclick = async function() { 
-                await window.downloadHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc, window.currentModalContext.certificateFileId); 
-            }; 
-        }
-        if (printBtn) { 
-            printBtn.onclick = function() { 
-                window.directPrintDocument(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc, window.currentModalContext.certificateFileId); 
-            }; 
-        }
-        if (shareBtn) { 
-            shareBtn.onclick = async function() { 
-                await window.shareHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc, window.currentModalContext.certificateFileId); 
-            }; 
-        }
-    } else {
-        if (modalStampLabel) modalStampLabel.classList.add('hidden');
-        if (shareBtn) shareBtn.style.display = 'none'; 
-        htmlPreviewContainer.style.display = 'none'; 
-        htmlPreviewContainer.innerHTML = '';
-        iframe.style.display = 'block'; 
-        iframe.style.flex = '1'; 
-        spinner.style.display = 'flex';
-        iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
-        
-        if (downloadBtn) { 
-            downloadBtn.onclick = function() { 
-                window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank'); 
-            }; 
-        }
-        if (printBtn) { 
-            printBtn.onclick = function() { 
-                window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank'); 
-            }; 
-        }
-    }
-    const modal = document.getElementById('pdfViewerModal'); 
-    if (modal) { 
-        modal.style.display = 'flex'; 
-        modal.classList.remove('hidden'); 
-    } 
-    document.body.style.overflow = 'hidden';
-};
-
-window.closePdfViewer = function() { 
-    const modal = document.getElementById('pdfViewerModal'); 
-    if (modal) { 
-        modal.style.display = 'none'; 
-        modal.classList.add('hidden'); 
-    } 
-    const iframe = document.getElementById('pdfIframe'); 
-    if (iframe) iframe.src = ''; 
-    const htmlContainer = document.getElementById('htmlDocPreviewContainer'); 
-    if (htmlContainer) htmlContainer.innerHTML = ''; 
-    document.body.style.overflow = 'auto'; 
-};
-
-window.loadUserHistory = async function() {
-    const historyContainer = document.getElementById('historyTableBody'); 
-    if (!historyContainer) return;
-    historyContainer.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-400 font-bold text-xs"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>Loading records...</td></tr>`;
-    try {
-        const q = query(collection(db, "history"), where("userId", "==", window.currentUserData.uid));
-        const querySnapshot = await getDocs(q); 
-        window.historyData = [];
-        querySnapshot.forEach((docSnap) => { 
-            window.historyData.push({ id: docSnap.id, ...docSnap.data() }); 
-        });
-        window.historyData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)); 
-        window.renderHistory('ALL');
-    } catch (err) { 
-        historyContainer.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-500 text-xs">Failed to load history.</td></tr>`; 
-    }
-};
-
-window.renderHistory = function(filterType) {
-    const historyContainer = document.getElementById('historyTableBody'); 
-    if (!historyContainer) return; 
-    historyContainer.innerHTML = '';
-    const indexedData = window.historyData.map((item, idx) => ({ ...item, _origIndex: idx }));
-    const filteredData = filterType === 'ALL' ? indexedData : indexedData.filter(item => item.serviceType === filterType);
-    document.getElementById('userHistoryCount').innerText = `Total Files: ${filteredData.length}`;
-
-    if (filteredData.length === 0) { 
-        historyContainer.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-400 text-xs"><i class="fa-regular fa-folder-open text-3xl mb-2 text-slate-300"></i><br>No records found.</td></tr>`; 
-        return; 
-    }
-
-    filteredData.forEach((data) => {
-        const sec = data.timestamp?.seconds || Math.floor(Date.now() / 1000); 
-        const dateObj = new Date(sec * 1000);
-        const dateStr = dateObj.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'}); 
-        const timeStr = dateObj.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
-        
-        let badgesHtml = '';
-        if (data.certificateFileId && data.isCertificateAttached !== false) { 
-            badgesHtml += `<span class="bg-indigo-100 text-indigo-800 border border-indigo-300 px-2 py-0.5 rounded-full text-[10px] font-black ml-1.5"><i class="fa-solid fa-certificate mr-0.5"></i>Cert</span>`; 
-        }
-        if (data.withStamp) { 
-            badgesHtml += `<span class="bg-green-100 text-green-800 border border-green-300 px-2 py-0.5 rounded-full text-[10px] font-black ml-1.5"><i class="fa-solid fa-stamp mr-0.5"></i>Stamped</span>`; 
-        }
-        
-        historyContainer.innerHTML += `
-            <tr class="border-b border-slate-100 text-xs hover:bg-slate-50 transition">
-                <td class="p-3 font-bold text-slate-800">${data.fileName}${badgesHtml}</td>
-                <td class="p-3"><span class="bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">${data.serviceType}</span></td>
-                <td class="p-3 text-slate-500 text-[11px] font-medium">${dateStr} <br> ${timeStr}</td>
-                <td class="p-3 text-right whitespace-nowrap"><button onclick="window.openPdfViewer('${data.fileId}', '${data.fileName}', ${data._origIndex})" class="inline-flex items-center gap-1 bg-royal-50 text-royal-700 border border-royal-200 hover:bg-royal-600 hover:text-white px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition shadow-sm"><i class="fa-solid fa-eye"></i> Preview / PDF</button></td>
-            </tr>
-        `;
-    });
-};
-
-window.switchService = async function(serviceName) {
-    if (!serviceName) serviceName = window.getFirstAllowedTab();
 
     if (window.currentUserData?.hasFreeAccess && (serviceName === 'add_credit' || serviceName === 'payments_history')) serviceName = window.getFirstAllowedTab();
     
@@ -1130,7 +793,6 @@ window.switchService = async function(serviceName) {
         return;
     }
 
-    // PERFECT MOBILE & DESKTOP PAYMENT INTERFACE (add_credit)
     if (serviceName === 'add_credit') {
         container.innerHTML = `
         <div id="walletMainUI" class="max-w-xl mx-auto space-y-4">
@@ -1138,7 +800,6 @@ window.switchService = async function(serviceName) {
                 <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-wallet text-royal-500 mr-1.5"></i> Add Credits & VIP</h3>
             </div>
             
-            <!-- STEP 1: Plan Selection -->
             <div id="paymentStep1" class="space-y-4">
                 <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200">
                     <label class="block text-xs font-black text-slate-700 uppercase mb-2">1. Enter Amount (₹)</label>
@@ -1174,17 +835,30 @@ window.switchService = async function(serviceName) {
                         <img id="upiQRCode" src="" class="w-52 h-52 object-contain mx-auto" alt="UPI QR Code">
                     </div>
 
-                    <!-- Direct UPI App Button for Mobile Users -->
-                    <div class="pt-2">
-                        <a id="btnDirectUpiPay" href="#" class="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-black py-3.5 px-4 rounded-xl text-xs md:text-sm shadow-md transition">
-                            <i class="fa-solid fa-bolt text-amber-300 text-base"></i> Open UPI App &amp; Pay Instantly
-                        </a>
-                        <p class="text-[10px] font-semibold text-slate-400 mt-1.5">मोबाइल यूजर सीधे इस बटन पर क्लिक करके PhonePe, GPay या Paytm से पेमेंट कर सकते हैं।</p>
+                    <!-- Direct UPI App Buttons for Mobile Users (REMOVED GENERIC INTENT) -->
+                    <div class="pt-3 space-y-2.5">
+                        <p class="text-[11px] font-bold text-slate-500 mb-1">मोबाइल यूजर सीधे अपनी पेमेंट ऐप चुनें:</p>
+                        <div class="grid grid-cols-2 gap-2">
+                            <a id="btnPhonePe" href="#" class="w-full flex items-center justify-center gap-1.5 bg-[#5f259f] hover:bg-[#4b1d7d] text-white font-black py-2.5 px-3 rounded-xl text-[11px] md:text-xs shadow-md transition">
+                                PhonePe
+                            </a>
+                            <a id="btnGPay" href="#" class="w-full flex items-center justify-center gap-1.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 font-black py-2.5 px-3 rounded-xl text-[11px] md:text-xs shadow-md transition">
+                                GPay
+                            </a>
+                            <a id="btnPaytm" href="#" class="w-full flex items-center justify-center gap-1.5 bg-[#002970] hover:bg-[#001e52] text-white font-black py-2.5 px-3 rounded-xl text-[11px] md:text-xs shadow-md transition">
+                                Paytm
+                            </a>
+                            <a id="btnGenericUpi" href="#" class="w-full flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 px-3 rounded-xl text-[11px] md:text-xs shadow-md transition">
+                                <i class="fa-solid fa-bolt text-amber-300"></i> Other UPI
+                            </a>
+                        </div>
                     </div>
 
-                    <button onclick="window.cancelAndBackToPaymentStep1()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-black py-2.5 rounded-xl transition text-xs">
-                        Cancel &amp; Go Back
-                    </button>
+                    <div class="pt-2">
+                        <button onclick="window.cancelAndBackToPaymentStep1()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-black py-2.5 rounded-xl transition text-xs">
+                            Cancel &amp; Go Back
+                        </button>
+                    </div>
                 </div>
 
                 <div class="text-center">
@@ -1308,4 +982,153 @@ window.loadUserPayments = async function() {
     } catch (err) { 
         tableBody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500 text-xs">Failed to load payment history.</td></tr>`; 
     }
+};
+
+// ============================================================================
+// PERFECT APP-SPECIFIC UPI INTENT DEEP-LINKS ADDED (generateQR)
+// ============================================================================
+window.generateQR = async function() {
+    if (window.currentUserData?.hasFreeAccess) return; 
+    window.calculateCredits();
+    
+    if (!window.currentWantsVip && window.currentRechargeCredits < 100) return alert('पोर्टल पर कम से कम ₹100 के क्रेडिट रिचार्ज करना अनिवार्य है!');
+    if (window.currentWantsVip && window.currentRechargeCredits > 0 && window.currentRechargeCredits < 100) return alert('क्रेडिट रिचार्ज की न्यूनतम वैल्यू ₹100 है!');
+    if (window.currentTotalPayable < 100) return alert('न्यूनतम पेमेंट राशि ₹100 होनी चाहिए!');
+
+    const btn = document.getElementById('btnGenerateQR'); 
+    const origBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) { 
+        btn.disabled = true; 
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> पेमेंट लिंक तैयार हो रहा है...'; 
+    }
+
+    const queryParams = `pa=8279650137@amazonpay&pn=Ojas%20Print%20Service&am=${window.currentTotalPayable}&cu=INR&tn=${encodeURIComponent(window.currentWantsVip ? `Ojas VIP ${window.currentVipDays}d` : `Ojas Credits`)}`;
+    let universalUpiUrl = `upi://pay?${queryParams}`; 
+    let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(universalUpiUrl)}`; 
+    window.currentActiveOrderId = null;
+
+    try {
+        const res = await fetch('/api/create-order', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ 
+                userId: window.currentUserData.uid, 
+                email: window.currentUserData.email, 
+                username: window.currentUserData.username, 
+                totalPayable: window.currentTotalPayable, 
+                creditsRequested: window.currentRechargeCredits, 
+                wantsVip: window.currentWantsVip, 
+                vipDaysRequested: window.currentVipDays, 
+                vipPlanFee: window.currentVipPlanFee 
+            }) 
+        });
+        
+        const orderData = await res.json();
+        let extractedParams = queryParams;
+
+        if (orderData.status && orderData.orderId) {
+            window.currentActiveOrderId = orderData.orderId;
+            
+            if (orderData.upi_string) { 
+                universalUpiUrl = orderData.upi_string; 
+                extractedParams = orderData.upi_string;
+                if (extractedParams.startsWith('upi://pay?')) {
+                    extractedParams = extractedParams.substring(10);
+                }
+                qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(universalUpiUrl)}`; 
+            }
+            if (orderData.qr_code && orderData.qr_code.startsWith('http')) {
+                qrUrl = orderData.qr_code;
+            }
+
+            if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe();
+            window.activePaymentUnsubscribe = onSnapshot(doc(db, "payments", orderData.orderId), async (snap) => {
+                if (snap.exists() && (snap.data().status === 'Auto-Approved' || snap.data().status === 'Approved')) {
+                    if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe(); 
+                    window.currentActiveOrderId = null;
+                    
+                    const uSnap = await getDoc(doc(db, "users", window.currentUserData.uid));
+                    if (uSnap.exists()) { 
+                        const updatedUser = uSnap.data(); 
+                        window.currentUserData.credits = updatedUser.credits || 0; 
+                        window.currentUserData.isVip = updatedUser.isVip || window.currentUserData.hasFreeAccess; 
+                        window.currentUserData.vipExpiry = updatedUser.vipExpiry || 0; 
+                        const crEl = document.getElementById('displayCredits'); 
+                        if (crEl) crEl.innerText = window.currentUserData.credits; 
+                    }
+
+                    document.getElementById('walletMainUI').innerHTML = `
+                        <div class="p-8 bg-green-50 rounded-3xl border-2 border-green-400 text-center space-y-3">
+                            <i class="fa-solid fa-circle-check text-6xl text-green-600 mb-2 animate-bounce"></i>
+                            <h2 class="text-2xl font-black text-green-900">पेमेंट सफल! (Auto-Verified)</h2>
+                            <p class="text-sm font-bold text-green-700">आपका ₹${window.currentTotalPayable} का पेमेंट सफलतापूर्वक वेरीफाई हो गया है और आपके अकाउंट में क्रेडिट्स/VIP जोड़ दिए गए हैं!</p>
+                            <div class="pt-4">
+                                <button onclick="window.location.reload()" class="bg-green-600 hover:bg-green-700 text-white font-black py-3 px-8 rounded-xl text-sm shadow-glow transition">
+                                    डैशबोर्ड पर वापस जाएँ
+                                </button>
+                            </div>
+                        </div>`;
+                }
+            });
+        }
+
+        // BINDING EXTRACTED PARAMETERS TO DEDICATED APP INTENT BUTTONS
+        const btnPhonePe = document.getElementById('btnPhonePe');
+        const btnGPay = document.getElementById('btnGPay');
+        const btnPaytm = document.getElementById('btnPaytm');
+        const btnGenericUpi = document.getElementById('btnGenericUpi');
+
+        if (btnPhonePe) btnPhonePe.href = `phonepe://pay?${extractedParams}`;
+        if (btnGPay) btnGPay.href = `tez://upi/pay?${extractedParams}`;
+        if (btnPaytm) btnPaytm.href = `paytmmp://pay?${extractedParams}`;
+        if (btnGenericUpi) btnGenericUpi.href = `upi://pay?${extractedParams}`;
+
+    } catch (err) { 
+        try { 
+            const fallbackDoc = await addDoc(collection(db, "payments"), { 
+                userId: window.currentUserData.uid, 
+                email: window.currentUserData.email, 
+                amountPaid: window.currentTotalPayable, 
+                creditsRequested: window.currentRechargeCredits, 
+                wantsVip: window.currentWantsVip, 
+                vipDaysRequested: window.currentVipDays, 
+                vipPlanFee: window.currentVipPlanFee, 
+                utrNumber: "ONLINE_UPI", 
+                timestamp: new Date(), 
+                status: "Pending" 
+            }); 
+            window.currentActiveOrderId = fallbackDoc.id; 
+        } catch (e) {} 
+    } finally { 
+        if (btn) { 
+            btn.disabled = false; 
+            btn.innerHTML = origBtnHtml; 
+        } 
+    }
+
+    document.getElementById('upiQRCode').src = qrUrl; 
+    document.getElementById('qrPayableAmountText').innerText = `कुल पेमेंट: ₹${window.currentTotalPayable}`;
+
+    document.getElementById('paymentStep1').style.display = 'none'; 
+    document.getElementById('qrSection').style.display = 'flex';
+};
+
+window.cancelAndBackToPaymentStep1 = async function() {
+    if (window.activePaymentUnsubscribe) { 
+        window.activePaymentUnsubscribe(); 
+        window.activePaymentUnsubscribe = null; 
+    }
+    if (window.currentActiveOrderId) { 
+        const orderIdToCancel = window.currentActiveOrderId; 
+        window.currentActiveOrderId = null; 
+        try { 
+            await updateDoc(doc(db, "payments", orderIdToCancel), { 
+                status: "Cancelled", 
+                cancelledBy: "User (Back without Payment)", 
+                cancelledAt: new Date() 
+            }); 
+        } catch (e) {} 
+    }
+    document.getElementById('qrSection').style.display = 'none'; 
+    document.getElementById('paymentStep1').style.display = 'block'; 
 };
