@@ -1,5 +1,5 @@
 // ============================================================================
-// FILE 3: js/portal-wallet-chat.js (FINAL FIX FOR MOBILE BUTTON INTENT)
+// FILE 3: js/portal-wallet-chat.js (FINAL FIX - STRICTLY USING GATEWAY LINK)
 // ============================================================================
 
 import "./config-templates.js";
@@ -213,7 +213,7 @@ window.calculateCredits = function() {
 };
 
 // ==============================================================================
-// 🌟 THE FINAL FIX: CLEANING THE URL AND FORCING RAW INTENT FOR MOBILE
+// 🌟 100% GATEWAY LINK DEPENDENT - NO HARDCODED ID OVERRIDES
 // ==============================================================================
 window.generateQR = async function() {
     if (window.currentUserData?.hasFreeAccess) return; window.calculateCredits();
@@ -224,8 +224,9 @@ window.generateQR = async function() {
     const btn = document.getElementById('btnGenerateQR'); const origBtnHtml = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> पेमेंट लिंक बन रहा है...'; }
 
+    let universalUpiUrl = ''; 
     let qrUrl = '';
-    let universalUpiUrl = '';
+    window.currentActiveOrderId = null;
 
     try {
         const res = await fetch('/api/create-order', { 
@@ -245,17 +246,24 @@ window.generateQR = async function() {
             window.currentActiveOrderId = orderData.orderId;
             
             if (orderData.upi_string) { 
+                // 🌟 ONLY USE THE GATEWAY PROVIDED STRING
                 let rawUpi = orderData.upi_string;
                 
-                // यह व्यापार गेटवे के लिंक से स्पेस और प्लस को हटा देगा 
-                // ताकि मोबाइल का ब्राउज़र उसे खराब (Encode) न कर सके
-                universalUpiUrl = rawUpi.replace(/ /g, '').replace(/\+/g, '');
+                // Safely remove spaces that crash mobile apps, without touching the ID
+                rawUpi = rawUpi.replace(/ /g, '').replace(/\+/g, '').replace(/%20/g, '');
+
+                // Ensure merchant code is present (required by PhonePe/GPay for intents)
+                if (!rawUpi.includes('&mc=')) {
+                    rawUpi += '&mc=5499';
+                }
                 
+                universalUpiUrl = rawUpi;
                 qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; 
             }
             
             if (orderData.qr_code && orderData.qr_code.startsWith('http')) qrUrl = orderData.qr_code;
 
+            // Wait for Webhook to Auto-Approve
             if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe();
             window.activePaymentUnsubscribe = onSnapshot(doc(db, "payments", orderData.orderId), async (snap) => {
                 if (snap.exists() && (snap.data().status === 'Auto-Approved' || snap.data().status === 'Approved')) {
@@ -266,27 +274,31 @@ window.generateQR = async function() {
                 }
             });
         } else {
-            alert("Gateway error. Order not created.");
+            alert("Gateway Error. Could not process payment.");
+            if (btn) { btn.disabled = false; btn.innerHTML = origBtnHtml; }
+            return;
         }
     } catch (err) { 
-        console.error(err);
+        console.error("Order Creation Failed:", err);
+        alert("Network Error. Please try again.");
+        if (btn) { btn.disabled = false; btn.innerHTML = origBtnHtml; }
+        return;
     } finally { 
-        if (btn) { btn.disabled = false; btn.innerHTML = origBtnHtml; } 
+        if (btn && window.currentActiveOrderId) { btn.disabled = false; btn.innerHTML = origBtnHtml; } 
     }
 
-    if(universalUpiUrl) {
+    // Bind EXACT Gateway URL to the intent button
+    if (universalUpiUrl) {
         document.getElementById('upiQRCode').src = qrUrl; 
         document.getElementById('qrPayableAmountText').innerText = `कुल पेमेंट: ₹${window.currentTotalPayable}`;
         
         const mainUpiBtn = document.getElementById('btnDirectUpiPay'); 
         if (mainUpiBtn) { 
-            // बटन में href सेट करने के बजाय डायरेक्ट क्लिक इवेंट लगा रहे हैं
             mainUpiBtn.href = "#"; 
             mainUpiBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> Pay ₹${window.currentTotalPayable} Directly via UPI App`; 
-            
             mainUpiBtn.onclick = function(e) {
                 e.preventDefault();
-                // यह डायरेक्ट मोबाइल के OS को हिट करेगा
+                // 🌟 Directly hit the OS with the Gateway's exact string
                 window.location.href = universalUpiUrl; 
             };
         }
