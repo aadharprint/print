@@ -1,5 +1,5 @@
 // ============================================================================
-// FILE 3: js/portal-wallet-chat.js (UPDATED COMPLETE)
+// FILE 3: js/portal-wallet-chat.js (UPDATED COMPLETE WITH UPI FIX)
 // (Auth, Wallet, Chat, User Preview, Adv Password Reset, History, Global Stealth & TAB PERSISTENCE)
 // ============================================================================
 
@@ -176,7 +176,6 @@ async function updateVipTimerAndAlerts() {
 }
 window.dismissCornerAlert = function() { window.cornerAlertDismissed = true; document.getElementById('vipCornerAlert').style.display = 'none'; };
 
-// === UPDATED: RESTORE ACTIVE TAB AFTER REFRESH ===
 function setupDashboard(userData) {
     document.getElementById('displayUser').innerText = userData.username.toUpperCase(); const adminLink = document.getElementById('adminPanelLink'); const creditDisplayBox = document.getElementById('creditDisplayBox'); const vipServicesBar = document.getElementById('vipServicesBar'); const normalUserVipPromo = document.getElementById('normalUserVipPromo'); const portalTitle = document.getElementById('portalHeaderTitle'); const portalIcon = document.getElementById('portalHeaderIcon'); const vipBadge = document.getElementById('vipStatusBadge'); const mainFormCard = document.getElementById('mainFormCard');
     adminLink.style.display = userData.isAdmin ? 'flex' : 'none';
@@ -293,6 +292,9 @@ window.calculateCredits = function() {
     const totalPayableDisplay = document.getElementById('totalPayableDisplay'); if (totalPayableDisplay) totalPayableDisplay.innerText = `₹${window.currentTotalPayable}`;
 };
 
+// ==============================================================================
+// 🌟 MAJOR FIX: FRONTEND SANITIZER ADDED HERE
+// ==============================================================================
 window.generateQR = async function() {
     if (window.currentUserData?.hasFreeAccess) return; window.calculateCredits();
     if (!window.currentWantsVip && window.currentRechargeCredits < 100) return alert('पोर्टल पर कम से कम ₹100 के क्रेडिट रिचार्ज करना अनिवार्य है!');
@@ -302,19 +304,43 @@ window.generateQR = async function() {
     const btn = document.getElementById('btnGenerateQR'); const origBtnHtml = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> पेमेंट लिंक बन रहा है...'; }
 
-    // Unique Transaction ID जनरेट करें और स्पेस हटा दें
-const tempTr = `OJS${Date.now()}`;
-const cleanNote = window.currentWantsVip ? `OjasVIP${window.currentVipDays}` : `OjasCredits`;
-const queryParams = `pa=8279650137@amazonpay&pn=OjasPrintService&tr=${tempTr}&am=${window.currentTotalPayable}&cu=INR&tn=${cleanNote}`;
-let universalUpiUrl = `upi://pay?${queryParams}`; 
-let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; 
-window.currentActiveOrderId = null;
+    // Fallback Link Generation (No Spaces, No Special Chars)
+    const tempTr = `OJS${Date.now()}`;
+    const cleanNote = window.currentWantsVip ? `OjasVIP${window.currentVipDays}d` : `OjasCredits`;
+    const queryParams = `pa=8279650137@amazonpay&pn=OjasPrintService&tr=${tempTr}&am=${window.currentTotalPayable}&cu=INR&tn=${cleanNote}`;
+    let universalUpiUrl = `upi://pay?${queryParams}`; 
+    let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; 
+    window.currentActiveOrderId = null;
+
     try {
         const res = await fetch('/api/create-order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: window.currentUserData.uid, email: window.currentUserData.email, username: window.currentUserData.username, totalPayable: window.currentTotalPayable, creditsRequested: window.currentRechargeCredits, wantsVip: window.currentWantsVip, vipDaysRequested: window.currentVipDays, vipPlanFee: window.currentVipPlanFee }) });
         const orderData = await res.json();
+        
         if (orderData.status && orderData.orderId) {
             window.currentActiveOrderId = orderData.orderId;
-            if (orderData.upi_string) { universalUpiUrl = orderData.upi_string; qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; }
+            
+            // FRONTEND SANITIZER: Vyapar Gateway के खराब लिंक को यहीं ठीक करें 
+            if (orderData.upi_string) { 
+                try {
+                    let rawUpi = orderData.upi_string;
+                    let [baseUrl, qString] = rawUpi.split('?');
+                    if (qString) {
+                        let params = new URLSearchParams(qString);
+                        // स्पेस और प्लस को हटा दें
+                        if (params.has('pn')) params.set('pn', params.get('pn').replace(/\\s+/g, '').replace(/\\+/g, ''));
+                        if (params.has('tn')) params.set('tn', params.get('tn').replace(/\\s+/g, '').replace(/\\+/g, ''));
+                        if (!params.has('tr')) params.set('tr', tempTr);
+                        universalUpiUrl = `${baseUrl}?${params.toString()}`;
+                    } else {
+                        universalUpiUrl = rawUpi;
+                    }
+                } catch(e) {
+                    // अगर पार्सिंग फेल हो जाए तो डायरेक्ट स्पेस हटा दें
+                    universalUpiUrl = orderData.upi_string.replace(/\\s/g, '').replace(/\\+/g, ''); 
+                }
+                qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; 
+            }
+            
             if (orderData.qr_code && orderData.qr_code.startsWith('http')) qrUrl = orderData.qr_code;
 
             if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe();
@@ -327,7 +353,14 @@ window.currentActiveOrderId = null;
                 }
             });
         }
-    } catch (err) { try { const fallbackDoc = await addDoc(collection(db, "payments"), { userId: window.currentUserData.uid, email: window.currentUserData.email, amountPaid: window.currentTotalPayable, creditsRequested: window.currentRechargeCredits, wantsVip: window.currentWantsVip, vipDaysRequested: window.currentVipDays, vipPlanFee: window.currentVipPlanFee, utrNumber: "ONLINE_UPI", timestamp: new Date(), status: "Pending" }); window.currentActiveOrderId = fallbackDoc.id; } catch (e) {} } finally { if (btn) { btn.disabled = false; btn.innerHTML = origBtnHtml; } }
+    } catch (err) { 
+        try { 
+            const fallbackDoc = await addDoc(collection(db, "payments"), { userId: window.currentUserData.uid, email: window.currentUserData.email, amountPaid: window.currentTotalPayable, creditsRequested: window.currentRechargeCredits, wantsVip: window.currentWantsVip, vipDaysRequested: window.currentVipDays, vipPlanFee: window.currentVipPlanFee, utrNumber: "ONLINE_UPI", timestamp: new Date(), status: "Pending" }); 
+            window.currentActiveOrderId = fallbackDoc.id; 
+        } catch (e) {} 
+    } finally { 
+        if (btn) { btn.disabled = false; btn.innerHTML = origBtnHtml; } 
+    }
 
     document.getElementById('upiQRCode').src = qrUrl; document.getElementById('qrPayableAmountText').innerText = `कुल पेमेंट: ₹${window.currentTotalPayable}`;
     const mainUpiBtn = document.getElementById('btnDirectUpiPay'); if (mainUpiBtn) { mainUpiBtn.href = universalUpiUrl; mainUpiBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> Pay ₹${window.currentTotalPayable} Directly via UPI App`; }
@@ -464,7 +497,6 @@ window.renderHistory = function(filterType) {
     });
 };
 
-// === UPDATED: SAVE & SWITCH TAB LOGIC ===
 window.switchService = async function(serviceName) {
     if (!serviceName) serviceName = window.getFirstAllowedTab();
 
@@ -477,7 +509,7 @@ window.switchService = async function(serviceName) {
     else if (serviceName === 'dob_minor' && !window.canCurrentUserSeeService('dob_minor')) serviceName = window.getFirstAllowedTab();
 
     window.currentActiveTab = serviceName;
-    sessionStorage.setItem('ojas_active_tab', serviceName); // <--- SAVE TAB PERSISTENCE
+    sessionStorage.setItem('ojas_active_tab', serviceName);
 
     document.querySelectorAll('.service-tab').forEach(btn => { btn.className = "service-tab bg-dark-900 text-royal-300 font-bold py-2.5 px-3 rounded-xl hover:bg-dark-800 transition shadow-sm border border-slate-700 text-xs md:text-sm flex-1 flex justify-center items-center gap-1.5"; });
     document.querySelectorAll('.vip-tab').forEach(btn => { btn.className = "vip-tab bg-dark-800 text-royal-300 border border-royal-500/30 font-bold py-2 px-2.5 rounded-xl hover:bg-dark-700 transition text-[11px] md:text-xs flex items-center justify-center gap-1 shadow-sm"; });
@@ -489,7 +521,6 @@ window.switchService = async function(serviceName) {
     const submitBtnText = window.currentUserData && window.currentUserData.hasFreeAccess ? 'Generate Document (VIP Free) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' : 'Generate Document (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>';
     const statusTagHtml = window.currentUserData && window.currentUserData.hasFreeAccess ? '<span class="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-[10px] font-black border border-green-300 uppercase"><i class="fa-solid fa-crown mr-1"></i>Lifetime VIP Free</span>' : (window.currentUserData && window.currentUserData.isVip ? '<span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-md text-[10px] font-black border border-amber-300 uppercase"><i class="fa-solid fa-crown mr-1"></i>10 Credits</span>' : '<span class="bg-royal-100 text-royal-900 px-2.5 py-1 rounded-md text-[10px] font-black border border-royal-300 uppercase">10 Credits</span>');
 
-    // === ADDED: CHANGE PASSWORD UI WITH EYE TOGGLE & CONFIRM FIELD ===
     if (serviceName === 'password') {
         container.innerHTML = `
         <div class="max-w-md mx-auto space-y-4 pt-2">
@@ -525,7 +556,6 @@ window.switchService = async function(serviceName) {
         return;
     }
 
-    // Wallet UI
     if (serviceName === 'add_credit') {
         container.innerHTML = `
         <div id="walletMainUI" class="max-w-xl mx-auto space-y-4">
