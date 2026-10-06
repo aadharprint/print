@@ -229,7 +229,7 @@ window.generateQR = async function() {
     const cleanNote = window.currentWantsVip ? `OjasVIP${window.currentVipDays}d` : `OjasCredits`;
     
     // 🌟 Fallback Link with Merchant Code (mc=5499)
-    let universalUpiUrl = `upi://pay?pa=APNI_PAYTM_BUSINESS_ID_YAHA_DAALEIN&pn=OjasPrintService&mc=5499&tr=${tempTr}&am=${window.currentTotalPayable}&cu=INR&tn=${cleanNote}`; 
+    let universalUpiUrl = `upi://pay?pa=8279650137@ptyes&pn=OjasPrintService&mc=5499&tr=${tempTr}&am=${window.currentTotalPayable}&cu=INR&tn=${cleanNote}`; 
     let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; 
     window.currentActiveOrderId = null;
 
