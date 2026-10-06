@@ -1,6 +1,6 @@
 // ============================================================================
 // FILE 3: js/portal-wallet-chat.js (PERFECT MOBILE & DESKTOP PAYMENT UI)
-// (Auto-Cancel Pending Payments & Dedicated UPI App Intents Added)
+// (Auto-Cancel Pending Payments & Bulletproof UPI App Intents)
 // ============================================================================
 
 import "./config-templates.js";
@@ -643,7 +643,7 @@ window.changeUserPassword = async function(event) {
         });
         
         msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-green-50 text-green-700 border-green-200 mt-4";
-        msgBox.innerHTML = "<i class='fa-solid fa-check-circle mr-1 text-base'></i> पासवर्ड सफलतापूर्वक बदल दिया गया ক্রো!";
+        msgBox.innerHTML = "<i class='fa-solid fa-check-circle mr-1 text-base'></i> पासवर्ड सफलतापूर्वक बदल दिया गया है!";
         msgBox.style.display = 'block';
         event.target.reset();
         
@@ -702,7 +702,7 @@ window.calculateCredits = function() {
 };
 
 // ============================================================================
-// AUTO-CANCEL (ON TAB SWITCH) LOGIC ADDED HERE
+// AUTO CANCEL ON TAB SWITCH LOGIC
 // ============================================================================
 window.switchService = async function(serviceName) {
     if (!serviceName) serviceName = window.getFirstAllowedTab();
@@ -793,6 +793,9 @@ window.switchService = async function(serviceName) {
         return;
     }
 
+    // ============================================================================
+    // PERFECT APP-SPECIFIC UPI INTENT DEEP-LINKS & BULLETPROOF PARSER ADDED
+    // ============================================================================
     if (serviceName === 'add_credit') {
         container.innerHTML = `
         <div id="walletMainUI" class="max-w-xl mx-auto space-y-4">
@@ -824,18 +827,16 @@ window.switchService = async function(serviceName) {
                 </div>
             </div>
 
-            <!-- STEP 2: Mobile & Desktop QR / UPI App Buttons Section -->
             <div id="qrSection" style="display:none;" class="flex-col items-center justify-center space-y-4">
                 <div class="bg-white p-6 rounded-3xl shadow-xl border-2 border-slate-200 text-center w-full max-w-sm mx-auto space-y-3">
                     <h4 class="text-base font-black text-dark-900">Scan QR or Pay via App</h4>
                     <p id="qrPayableAmountText" class="text-xs font-bold text-slate-500">कुल पेमेंट: ₹0</p>
                     
-                    <!-- QR Code for Desktop Users -->
                     <div class="bg-slate-50 p-3 rounded-2xl inline-block border border-slate-200 shadow-inner">
                         <img id="upiQRCode" src="" class="w-52 h-52 object-contain mx-auto" alt="UPI QR Code">
                     </div>
 
-                    <!-- Direct UPI App Buttons for Mobile Users (REMOVED GENERIC INTENT) -->
+                    <!-- Direct UPI App Buttons for Mobile Users with Bulletproof Intents -->
                     <div class="pt-3 space-y-2.5">
                         <p class="text-[11px] font-bold text-slate-500 mb-1">मोबाइल यूजर सीधे अपनी पेमेंट ऐप चुनें:</p>
                         <div class="grid grid-cols-2 gap-2">
@@ -984,9 +985,6 @@ window.loadUserPayments = async function() {
     }
 };
 
-// ============================================================================
-// PERFECT APP-SPECIFIC UPI INTENT DEEP-LINKS ADDED (generateQR)
-// ============================================================================
 window.generateQR = async function() {
     if (window.currentUserData?.hasFreeAccess) return; 
     window.calculateCredits();
@@ -1002,10 +1000,13 @@ window.generateQR = async function() {
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> पेमेंट लिंक तैयार हो रहा है...'; 
     }
 
-    const queryParams = `pa=8279650137@amazonpay&pn=Ojas%20Print%20Service&am=${window.currentTotalPayable}&cu=INR&tn=${encodeURIComponent(window.currentWantsVip ? `Ojas VIP ${window.currentVipDays}d` : `Ojas Credits`)}`;
-    let universalUpiUrl = `upi://pay?${queryParams}`; 
-    let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(universalUpiUrl)}`; 
-    window.currentActiveOrderId = null;
+    // Default Fallback details
+    let pa = "8279650137@amazonpay";
+    let pn = "Ojas Print Service";
+    let am = window.currentTotalPayable;
+    let cu = "INR";
+    let tn = window.currentWantsVip ? `Ojas VIP ${window.currentVipDays}d` : `Ojas Credits`;
+    let tr = "";
 
     try {
         const res = await fetch('/api/create-order', { 
@@ -1024,21 +1025,25 @@ window.generateQR = async function() {
         });
         
         const orderData = await res.json();
-        let extractedParams = queryParams;
 
         if (orderData.status && orderData.orderId) {
             window.currentActiveOrderId = orderData.orderId;
-            
-            if (orderData.upi_string) { 
-                universalUpiUrl = orderData.upi_string; 
-                extractedParams = orderData.upi_string;
-                if (extractedParams.startsWith('upi://pay?')) {
-                    extractedParams = extractedParams.substring(10);
+            tr = orderData.orderId; 
+
+            // Safely parse Vyapar Gateway UPI string to extract raw components
+            if (orderData.upi_string && orderData.upi_string.includes('pa=')) {
+                try {
+                    let parseUrl = orderData.upi_string;
+                    if (!parseUrl.startsWith('http')) parseUrl = 'http://dummy.com/?' + parseUrl.split('?')[1];
+                    const urlParams = new URL(parseUrl).searchParams;
+                    
+                    if (urlParams.get('pa')) pa = urlParams.get('pa');
+                    if (urlParams.get('pn')) pn = urlParams.get('pn');
+                    if (urlParams.get('am')) am = urlParams.get('am');
+                    if (urlParams.get('tr')) tr = urlParams.get('tr');
+                } catch(e) { 
+                    console.error("UPI Parsing Error", e); 
                 }
-                qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(universalUpiUrl)}`; 
-            }
-            if (orderData.qr_code && orderData.qr_code.startsWith('http')) {
-                qrUrl = orderData.qr_code;
             }
 
             if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe();
@@ -1072,17 +1077,24 @@ window.generateQR = async function() {
             });
         }
 
-        // BINDING EXTRACTED PARAMETERS TO DEDICATED APP INTENT BUTTONS
+        // BUILD PERFECTLY SAFE & ENCODED PARAMETERS
+        const safeParams = `pa=${pa}&pn=${encodeURIComponent(pn)}&am=${am}&cu=${cu}&tn=${encodeURIComponent(tn)}&tr=${tr}`;
+
+        // BIND EXTRACTED PARAMETERS TO DEDICATED APP INTENT BUTTONS
         const btnPhonePe = document.getElementById('btnPhonePe');
         const btnGPay = document.getElementById('btnGPay');
         const btnPaytm = document.getElementById('btnPaytm');
         const btnGenericUpi = document.getElementById('btnGenericUpi');
 
-        if (btnPhonePe) btnPhonePe.href = `phonepe://pay?${extractedParams}`;
-        if (btnGPay) btnGPay.href = `tez://upi/pay?${extractedParams}`;
-        if (btnPaytm) btnPaytm.href = `paytmmp://pay?${extractedParams}`;
-        if (btnGenericUpi) btnGenericUpi.href = `upi://pay?${extractedParams}`;
+        if (btnPhonePe) btnPhonePe.href = `phonepe://pay?${safeParams}`;
+        if (btnGPay) btnGPay.href = `tez://upi/pay?${safeParams}`;
+        if (btnPaytm) btnPaytm.href = `paytmmp://pay?${safeParams}`;
+        if (btnGenericUpi) btnGenericUpi.href = `upi://pay?${safeParams}`;
 
+        // UPDATE QR CODE
+        const finalUpiLinkForQR = `upi://pay?${safeParams}`;
+        document.getElementById('upiQRCode').src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(finalUpiLinkForQR)}`; 
+        
     } catch (err) { 
         try { 
             const fallbackDoc = await addDoc(collection(db, "payments"), { 
@@ -1106,9 +1118,7 @@ window.generateQR = async function() {
         } 
     }
 
-    document.getElementById('upiQRCode').src = qrUrl; 
     document.getElementById('qrPayableAmountText').innerText = `कुल पेमेंट: ₹${window.currentTotalPayable}`;
-
     document.getElementById('paymentStep1').style.display = 'none'; 
     document.getElementById('qrSection').style.display = 'flex';
 };
@@ -1124,7 +1134,7 @@ window.cancelAndBackToPaymentStep1 = async function() {
         try { 
             await updateDoc(doc(db, "payments", orderIdToCancel), { 
                 status: "Cancelled", 
-                cancelledBy: "User (Back without Payment)", 
+                cancelledBy: "User (Back / Cancelled)", 
                 cancelledAt: new Date() 
             }); 
         } catch (e) {} 
