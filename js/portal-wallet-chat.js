@@ -302,9 +302,13 @@ window.generateQR = async function() {
     const btn = document.getElementById('btnGenerateQR'); const origBtnHtml = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> पेमेंट लिंक बन रहा है...'; }
 
-    const queryParams = `pa=8279650137@amazonpay&pn=Ojas%20Print%20Service&am=${window.currentTotalPayable}&cu=INR&tn=${encodeURIComponent(window.currentWantsVip ? `Ojas VIP ${window.currentVipDays}d` : `Ojas Credits`)}`;
-    let universalUpiUrl = `upi://pay?${queryParams}`; let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; window.currentActiveOrderId = null;
-
+    // Unique Transaction ID जनरेट करें और स्पेस हटा दें
+const tempTr = `OJS${Date.now()}`;
+const cleanNote = window.currentWantsVip ? `OjasVIP${window.currentVipDays}` : `OjasCredits`;
+const queryParams = `pa=8279650137@amazonpay&pn=OjasPrintService&tr=${tempTr}&am=${window.currentTotalPayable}&cu=INR&tn=${cleanNote}`;
+let universalUpiUrl = `upi://pay?${queryParams}`; 
+let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; 
+window.currentActiveOrderId = null;
     try {
         const res = await fetch('/api/create-order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: window.currentUserData.uid, email: window.currentUserData.email, username: window.currentUserData.username, totalPayable: window.currentTotalPayable, creditsRequested: window.currentRechargeCredits, wantsVip: window.currentWantsVip, vipDaysRequested: window.currentVipDays, vipPlanFee: window.currentVipPlanFee }) });
         const orderData = await res.json();
