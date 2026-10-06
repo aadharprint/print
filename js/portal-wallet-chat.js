@@ -1,5 +1,5 @@
 // ============================================================================
-// FILE 3: js/portal-wallet-chat.js (UPDATED COMPLETE WITH MOBILE INTENT FIX)
+// FILE 3: js/portal-wallet-chat.js (UPDATED COMPLETE WITH MOBILE INTENT & MC FIX)
 // ============================================================================
 
 import "./config-templates.js";
@@ -214,7 +214,7 @@ window.calculateCredits = function() {
 };
 
 // ==============================================================================
-// 🌟 INTENT LINK FIX: MOBILE ERROR RESOLVER
+// 🌟 INTENT LINK FIX: MOBILE ERROR RESOLVER & MERCHANT CODE INJECTION
 // ==============================================================================
 window.generateQR = async function() {
     if (window.currentUserData?.hasFreeAccess) return; window.calculateCredits();
@@ -228,8 +228,8 @@ window.generateQR = async function() {
     const tempTr = `OJS${Date.now()}`;
     const cleanNote = window.currentWantsVip ? `OjasVIP${window.currentVipDays}d` : `OjasCredits`;
     
-    // फॉलबैक लिंक (Fallback Link)
-    let universalUpiUrl = `upi://pay?pa=APNI_PAYTM_BUSINESS_ID_YAHA_DAALEIN&pn=OjasPrintService&tr=${tempTr}&am=${window.currentTotalPayable}&cu=INR&tn=${cleanNote}`; 
+    // 🌟 Fallback Link with Merchant Code (mc=5499)
+    let universalUpiUrl = `upi://pay?pa=APNI_PAYTM_BUSINESS_ID_YAHA_DAALEIN&pn=OjasPrintService&mc=5499&tr=${tempTr}&am=${window.currentTotalPayable}&cu=INR&tn=${cleanNote}`; 
     let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; 
     window.currentActiveOrderId = null;
 
@@ -251,25 +251,21 @@ window.generateQR = async function() {
             window.currentActiveOrderId = orderData.orderId;
             
             if (orderData.upi_string) { 
-                try {
-                    let rawUpi = orderData.upi_string;
-                    let [baseUrl, qString] = rawUpi.split('?');
-                    if (qString) {
-                        let params = new URLSearchParams(qString);
-                        if (params.has('pn')) params.set('pn', params.get('pn').replace(/\s+/g, '').replace(/\+/g, ''));
-                        if (params.has('tn')) params.set('tn', params.get('tn').replace(/\s+/g, '').replace(/\+/g, ''));
-                        if (!params.has('tr')) params.set('tr', tempTr);
-                        
-                        // .toString() '@' को '%40' बना देता है, जो मोबाइल लिंक में एरर देता है।
-                        // इसलिए हम उसे वापस '@' में बदल रहे हैं।
-                        let finalQuery = params.toString().replace(/%40/g, '@').replace(/%2B/g, '+');
-                        universalUpiUrl = `${baseUrl}?${finalQuery}`;
-                    } else {
-                        universalUpiUrl = rawUpi.replace(/\s/g, '').replace(/\+/g, '').replace(/%40/g, '@');
-                    }
-                } catch(e) {
-                    universalUpiUrl = orderData.upi_string.replace(/\s/g, '').replace(/\+/g, '').replace(/%40/g, '@'); 
+                // 🌟 Manual String Cleaning (No URLSearchParams to prevent % encoding on mobile)
+                let rawUpi = orderData.upi_string;
+                
+                // Remove spaces, pluses, and URL-encoded spaces completely
+                rawUpi = rawUpi.replace(/ /g, '')
+                               .replace(/\+/g, '')
+                               .replace(/%20/g, '')
+                               .replace(/%40/g, '@'); // Ensure @ is visible for UPI ID
+
+                // Inject Merchant Code if Vyapar Gateway didn't provide it
+                if (!rawUpi.includes('&mc=')) {
+                    rawUpi += '&mc=5499';
                 }
+                
+                universalUpiUrl = rawUpi;
                 qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; 
             }
             
