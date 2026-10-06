@@ -1,5 +1,5 @@
 // ============================================================================
-// FILE 3: js/portal-wallet-chat.js (FINAL STRICT GATEWAY INTENT - NO TAMPERING)
+// FILE 3: js/portal-wallet-chat.js (3-BUTTONS PAYTM, PHONEPE, GPAY & AUTO-VERIFY)
 // ============================================================================
 
 import "./config-templates.js";
@@ -188,7 +188,7 @@ window.togglePassVisibility = function(inputId, btnEl) {
 window.changeUserPassword = async function(event) {
     event.preventDefault(); const currPass = document.getElementById('currentPassInput').value; const newPass = document.getElementById('newPassInput').value; const confirmPass = document.getElementById('confirmPassInput').value; const msgBox = document.getElementById('passChangeMsg'); const btn = document.getElementById('btnChangePass');
     if (newPass.length < 6) { msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-red-50 text-red-600 border-red-200 mt-4"; msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> नया पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!"; msgBox.style.display = 'block'; return; }
-    if (newPass !== confirmPass) { msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-red-50 text-red-600 border-red-200 mt-4"; msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> नया पासवर्ड और कन्फर्म पासवर्ड मैच नहीं নাহो रहे हैं!"; msgBox.style.display = 'block'; return; }
+    if (newPass !== confirmPass) { msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-red-50 text-red-600 border-red-200 mt-4"; msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> नया पासवर्ड और कन्फर्म पासवर्ड मैच नहीं हो रहे हैं!"; msgBox.style.display = 'block'; return; }
     const origHtml = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Updating Password...'; btn.disabled = true; msgBox.style.display = 'none';
     try {
         const user = auth.currentUser; const credential = EmailAuthProvider.credential(user.email, currPass);
@@ -213,7 +213,7 @@ window.calculateCredits = function() {
 };
 
 // ==============================================================================
-// 🌟 FINAL FIX: STRICT GATEWAY LINK (NO MODIFICATIONS, DIRECT INTENT)
+// 🌟 3-BUTTONS PAYMENT GENERATOR (PAYTM, PHONEPE, GPAY) + AUTO VERIFY
 // ==============================================================================
 window.generateQR = async function() {
     if (window.currentUserData?.hasFreeAccess) return; window.calculateCredits();
@@ -245,7 +245,6 @@ window.generateQR = async function() {
         if (orderData.status && orderData.orderId) {
             window.currentActiveOrderId = orderData.orderId;
             
-            // 🌟 1. COMPLETELY UNTOUCHED LINK (Just passing exactly what the gateway gives)
             if (orderData.upi_string) { 
                 universalUpiUrl = orderData.upi_string;
                 qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; 
@@ -266,28 +265,56 @@ window.generateQR = async function() {
                 }
             });
         } else {
-            alert("Gateway Error. Could not process payment. Please check your Vyapar Gateway settings.");
+            alert("Gateway Error. Could not process payment.");
+            if (btn) { btn.disabled = false; btn.innerHTML = origBtnHtml; }
+            return;
         }
     } catch (err) { 
-        console.error("Order Creation Failed:", err);
+        console.error(err);
         alert("Network Error. Please try again.");
+        if (btn) { btn.disabled = false; btn.innerHTML = origBtnHtml; }
+        return;
     } finally { 
-        if (btn) { btn.disabled = false; btn.innerHTML = origBtnHtml; } 
+        if (btn && window.currentActiveOrderId) { btn.disabled = false; btn.innerHTML = origBtnHtml; } 
     }
 
-    // 🌟 2. Show UI and Bind UNTOUCHED URL directly to href
-    if(universalUpiUrl) {
+    if (universalUpiUrl) {
         document.getElementById('upiQRCode').src = qrUrl; 
         document.getElementById('qrPayableAmountText').innerText = `कुल पेमेंट: ₹${window.currentTotalPayable}`;
         
-        const mainUpiBtn = document.getElementById('btnDirectUpiPay'); 
-        if (mainUpiBtn) { 
-            // Setting the exact string to href so the OS picks it up natively
-            mainUpiBtn.href = universalUpiUrl; 
-            mainUpiBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> Pay ₹${window.currentTotalPayable} Directly via UPI App`; 
-            // No custom onclick preventing default; let the standard browser link handler take over.
-            mainUpiBtn.onclick = null;
+        // 🌟 3 अलग बटन (Paytm, PhonePe, Google Pay) UI बनाना
+        const qrSectionContainer = document.getElementById('qrSection');
+        const qrCardDiv = qrSectionContainer.querySelector('.bg-white');
+        
+        // पुराने सिंगल बटन को हटाकर 3 नए बटन्स जोड़ रहे हैं
+        let multiAppContainer = document.getElementById('multiAppUpiButtons');
+        if (!multiAppContainer) {
+            multiAppContainer = document.createElement('div');
+            multiAppContainer.id = 'multiAppUpiButtons';
+            multiAppContainer.className = 'space-y-2 mt-3';
+            qrCardDiv.insertBefore(multiAppContainer, qrCardDiv.querySelector('button[onclick*="cancelAndBack"]'));
         }
+        
+        // पुराना सिंगल "Pay Directly" बटन छिपा दें अगर है
+        const oldDirectBtn = document.getElementById('btnDirectUpiPay');
+        if (oldDirectBtn) oldDirectBtn.style.display = 'none';
+
+        // GPay, PhonePe, Paytm के लिए अलग स्कीम्स तैयार करना
+        const gpayUrl = universalUpiUrl.replace(/^upi:\/\//i, 'tez://upi/');
+        const phonepeUrl = universalUpiUrl.replace(/^upi:\/\//i, 'phonepe://pay/');
+        const paytmUrl = universalUpiUrl.replace(/^upi:\/\//i, 'paytmmp://pay?');
+
+        multiAppContainer.innerHTML = `
+            <a href="${phonepeUrl}" class="w-full flex items-center justify-center gap-2 bg-purple-700 hover:bg-purple-800 text-white font-black py-3 rounded-xl shadow-sm transition text-xs">
+                <i class="fa-solid fa-bolt text-amber-300"></i> Pay via PhonePe
+            </a>
+            <a href="${paytmUrl}" class="w-full flex items-center justify-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-black py-3 rounded-xl shadow-sm transition text-xs">
+                <i class="fa-solid fa-wallet text-yellow-300"></i> Pay via Paytm
+            </a>
+            <a href="${gpayUrl}" class="w-full flex items-center justify-center gap-2 bg-dark-900 hover:bg-black text-royal-300 border border-royal-400 font-black py-3 rounded-xl shadow-sm transition text-xs">
+                <i class="fa-solid fa-g text-white"></i> Pay via Google Pay
+            </a>
+        `;
         
         document.getElementById('paymentStep1').style.display = 'none'; 
         document.getElementById('qrSection').style.display = 'flex';
@@ -315,7 +342,7 @@ window.submitPaymentIssueTicket = async function() {
         await setDoc(chatRef, { type: 'PAYMENT_ISSUE_TICKET', userId: uid, userIdentifier: window.currentUserData.email, username: window.currentUserData.username, message: `💳 Payment UTR Ticket: ₹${window.currentTotalPayable} (UTR: ${utr})`, status: 'Open', unreadByAdmin: true, unreadByUser: false, timestamp: new Date(), updatedAtMs: Date.now(), messages: existingMsgs }, { merge: true });
         notifyAdminSecurely({ type: "PAYMENT_UTR_TICKET", user: window.currentUserData.email, amount: window.currentTotalPayable, utr: utr });
         resMsg.className = "p-3.5 rounded-xl bg-green-50 border border-green-300 text-green-900 text-xs font-bold text-center space-y-1 mt-2"; resMsg.innerHTML = `<div><i class="fa-solid fa-circle-check text-green-600 text-base mr-1"></i> आपका पेमेंट टिकट सफलतापूर्वक रेज़ हो गया है!</div><p class="text-[11px] text-green-800">आपका UTR नंबर (<strong>${utr}</strong>) दर्ज कर लिया गया है।</p>`; resMsg.style.display = 'block'; document.getElementById('ticketUtrInput').value = '';
-    } catch (err) { alert("टिकट रेज़ करने में समस्या आई: " + err.message); } finally { btn.disabled = false; btn.innerHTML = origHtml; }
+    } catch (err) { alert("टिकट भेजने में समस्या आई: " + err.message); } finally { btn.disabled = false; btn.innerHTML = origHtml; }
 };
 
 window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
@@ -381,7 +408,7 @@ window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
         if (downloadBtn) { downloadBtn.onclick = function() { window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank'); }; }
         if (printBtn) { printBtn.onclick = function() { window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank'); }; }
     }
-    const modal = document.getElementById('pdfViewerModal'); if (modal) { modal.style.display = 'flex'; modal.classList.remove('hidden'); } document.body.style.overflow = 'hidden';
+    const modal = document.getElementById('pdfViewerModal'); if (modal) { modal.style.display = 'flex'; modal.classList.add('hidden'); } document.body.style.overflow = 'hidden';
 };
 
 window.closePdfViewer = function() { const modal = document.getElementById('pdfViewerModal'); if (modal) { modal.style.display = 'none'; modal.classList.add('hidden'); } const iframe = document.getElementById('pdfIframe'); if (iframe) iframe.src = ''; const htmlContainer = document.getElementById('htmlDocPreviewContainer'); if (htmlContainer) htmlContainer.innerHTML = ''; document.body.style.overflow = 'auto'; };
@@ -516,7 +543,6 @@ window.switchService = async function(serviceName) {
                 <div class="bg-white p-6 rounded-3xl shadow-lg border-2 border-slate-200 text-center w-full max-w-sm mx-auto">
                     <h4 class="text-sm font-black text-dark-900 mb-1">Scan & Pay</h4><p id="qrPayableAmountText" class="text-xs font-bold text-slate-500 mb-4">कुल पेमेंट: ₹0</p>
                     <div class="bg-slate-50 p-2 rounded-2xl inline-block border border-slate-200 mb-4"><img id="upiQRCode" src="" class="w-48 h-48 object-contain"></div>
-                    <a id="btnDirectUpiPay" href="#" class="w-full block bg-green-600 hover:bg-green-700 text-white font-black py-3 rounded-xl mb-3 shadow-sm transition">Pay Directly via UPI App</a>
                     <button onclick="window.cancelAndBackToPaymentStep1()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-black py-3 rounded-xl transition text-xs">Cancel & Go Back</button>
                 </div>
                 <div class="text-center"><button onclick="window.togglePaymentTicketBox()" class="text-xs font-bold text-royal-600 hover:underline">पेमेंट कट गया पर क्रेडिट नहीं मिला? यहाँ क्लिक करें</button></div>
