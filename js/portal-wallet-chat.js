@@ -1,5 +1,5 @@
 // ============================================================================
-// FILE 3: js/portal-wallet-chat.js (UPDATED COMPLETE WITH MOBILE INTENT & MC FIX)
+// FILE 3: js/portal-wallet-chat.js (FINAL FIX FOR MOBILE BUTTON INTENT)
 // ============================================================================
 
 import "./config-templates.js";
@@ -31,7 +31,6 @@ window.portalConfigState = {
 
 window.currentRechargeCredits = 0; window.currentTotalPayable = 0; window.currentWantsVip = false; window.currentVipDays = 0; window.currentVipPlanFee = 0;
 
-// === PER-USER & GLOBAL VISIBILITY CHECKER ===
 window.canCurrentUserSeeService = function(srv) {
     const cfg = window.portalConfigState || {};
     const u = window.currentUserData;
@@ -214,7 +213,7 @@ window.calculateCredits = function() {
 };
 
 // ==============================================================================
-// 🌟 INTENT LINK FIX: MOBILE ERROR RESOLVER & MERCHANT CODE INJECTION
+// 🌟 THE FINAL FIX: CLEANING THE URL AND FORCING RAW INTENT FOR MOBILE
 // ==============================================================================
 window.generateQR = async function() {
     if (window.currentUserData?.hasFreeAccess) return; window.calculateCredits();
@@ -225,13 +224,8 @@ window.generateQR = async function() {
     const btn = document.getElementById('btnGenerateQR'); const origBtnHtml = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> पेमेंट लिंक बन रहा है...'; }
 
-    const tempTr = `OJS${Date.now()}`;
-    const cleanNote = window.currentWantsVip ? `OjasVIP${window.currentVipDays}d` : `OjasCredits`;
-    
-    // 🌟 Fallback Link with Merchant Code (mc=5499)
-    let universalUpiUrl = `upi://pay?pa=8279650137@ptyes&pn=OjasPrintService&mc=5499&tr=${tempTr}&am=${window.currentTotalPayable}&cu=INR&tn=${cleanNote}`; 
-    let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; 
-    window.currentActiveOrderId = null;
+    let qrUrl = '';
+    let universalUpiUrl = '';
 
     try {
         const res = await fetch('/api/create-order', { 
@@ -251,21 +245,12 @@ window.generateQR = async function() {
             window.currentActiveOrderId = orderData.orderId;
             
             if (orderData.upi_string) { 
-                // 🌟 Manual String Cleaning (No URLSearchParams to prevent % encoding on mobile)
                 let rawUpi = orderData.upi_string;
                 
-                // Remove spaces, pluses, and URL-encoded spaces completely
-                rawUpi = rawUpi.replace(/ /g, '')
-                               .replace(/\+/g, '')
-                               .replace(/%20/g, '')
-                               .replace(/%40/g, '@'); // Ensure @ is visible for UPI ID
-
-                // Inject Merchant Code if Vyapar Gateway didn't provide it
-                if (!rawUpi.includes('&mc=')) {
-                    rawUpi += '&mc=5499';
-                }
+                // यह व्यापार गेटवे के लिंक से स्पेस और प्लस को हटा देगा 
+                // ताकि मोबाइल का ब्राउज़र उसे खराब (Encode) न कर सके
+                universalUpiUrl = rawUpi.replace(/ /g, '').replace(/\+/g, '');
                 
-                universalUpiUrl = rawUpi;
                 qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; 
             }
             
@@ -281,21 +266,34 @@ window.generateQR = async function() {
                 }
             });
         } else {
-            const fallbackDoc = await addDoc(collection(db, "payments"), { userId: window.currentUserData.uid, email: window.currentUserData.email, amountPaid: window.currentTotalPayable, creditsRequested: window.currentRechargeCredits, wantsVip: window.currentWantsVip, vipDaysRequested: window.currentVipDays, vipPlanFee: window.currentVipPlanFee, utrNumber: "ONLINE_UPI", timestamp: new Date(), status: "Pending" }); 
-            window.currentActiveOrderId = fallbackDoc.id; 
+            alert("Gateway error. Order not created.");
         }
     } catch (err) { 
-        try { 
-            const fallbackDoc = await addDoc(collection(db, "payments"), { userId: window.currentUserData.uid, email: window.currentUserData.email, amountPaid: window.currentTotalPayable, creditsRequested: window.currentRechargeCredits, wantsVip: window.currentWantsVip, vipDaysRequested: window.currentVipDays, vipPlanFee: window.currentVipPlanFee, utrNumber: "ONLINE_UPI", timestamp: new Date(), status: "Pending" }); 
-            window.currentActiveOrderId = fallbackDoc.id; 
-        } catch (e) {} 
+        console.error(err);
     } finally { 
         if (btn) { btn.disabled = false; btn.innerHTML = origBtnHtml; } 
     }
 
-    document.getElementById('upiQRCode').src = qrUrl; document.getElementById('qrPayableAmountText').innerText = `कुल पेमेंट: ₹${window.currentTotalPayable}`;
-    const mainUpiBtn = document.getElementById('btnDirectUpiPay'); if (mainUpiBtn) { mainUpiBtn.href = universalUpiUrl; mainUpiBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> Pay ₹${window.currentTotalPayable} Directly via UPI App`; }
-    document.getElementById('paymentStep1').style.display = 'none'; document.getElementById('qrSection').style.display = 'flex';
+    if(universalUpiUrl) {
+        document.getElementById('upiQRCode').src = qrUrl; 
+        document.getElementById('qrPayableAmountText').innerText = `कुल पेमेंट: ₹${window.currentTotalPayable}`;
+        
+        const mainUpiBtn = document.getElementById('btnDirectUpiPay'); 
+        if (mainUpiBtn) { 
+            // बटन में href सेट करने के बजाय डायरेक्ट क्लिक इवेंट लगा रहे हैं
+            mainUpiBtn.href = "#"; 
+            mainUpiBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> Pay ₹${window.currentTotalPayable} Directly via UPI App`; 
+            
+            mainUpiBtn.onclick = function(e) {
+                e.preventDefault();
+                // यह डायरेक्ट मोबाइल के OS को हिट करेगा
+                window.location.href = universalUpiUrl; 
+            };
+        }
+        
+        document.getElementById('paymentStep1').style.display = 'none'; 
+        document.getElementById('qrSection').style.display = 'flex';
+    }
 };
 
 window.cancelAndBackToPaymentStep1 = async function() {
