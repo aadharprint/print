@@ -1,5 +1,5 @@
 // ============================================================================
-// FILE 3: js/portal-wallet-chat.js (UPDATED COMPLETE WITH AUTO-APPROVE FIX)
+// FILE 3: js/portal-wallet-chat.js (UPDATED COMPLETE WITH MOBILE INTENT FIX)
 // ============================================================================
 
 import "./config-templates.js";
@@ -214,7 +214,7 @@ window.calculateCredits = function() {
 };
 
 // ==============================================================================
-// 🌟 ROBUST AUTO-VERIFICATION PAYMENT GENERATOR
+// 🌟 INTENT LINK FIX: MOBILE ERROR RESOLVER
 // ==============================================================================
 window.generateQR = async function() {
     if (window.currentUserData?.hasFreeAccess) return; window.calculateCredits();
@@ -225,15 +225,15 @@ window.generateQR = async function() {
     const btn = document.getElementById('btnGenerateQR'); const origBtnHtml = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> पेमेंट लिंक बन रहा है...'; }
 
-    // Fallback Link (Paytm Business ID) - यह सिर्फ तब चलेगा जब गेटवे फेल हो जाए
     const tempTr = `OJS${Date.now()}`;
     const cleanNote = window.currentWantsVip ? `OjasVIP${window.currentVipDays}d` : `OjasCredits`;
+    
+    // फॉलबैक लिंक (Fallback Link)
     let universalUpiUrl = `upi://pay?pa=APNI_PAYTM_BUSINESS_ID_YAHA_DAALEIN&pn=OjasPrintService&tr=${tempTr}&am=${window.currentTotalPayable}&cu=INR&tn=${cleanNote}`; 
     let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; 
     window.currentActiveOrderId = null;
 
     try {
-        // यह रिक्वेस्ट आपकी create-order.js फाइल को जाती है
         const res = await fetch('/api/create-order', { 
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' }, 
@@ -250,30 +250,31 @@ window.generateQR = async function() {
         if (orderData.status && orderData.orderId) {
             window.currentActiveOrderId = orderData.orderId;
             
-            // अगर गेटवे ने लिंक दिया है, तो वह फॉलबैक को हटा देगा (तभी ऑटो-अप्रूव काम करेगा)
             if (orderData.upi_string) { 
                 try {
                     let rawUpi = orderData.upi_string;
                     let [baseUrl, qString] = rawUpi.split('?');
                     if (qString) {
                         let params = new URLSearchParams(qString);
-                        // स्पेस हटाएं ताकि पेमेंट फेल न हो
                         if (params.has('pn')) params.set('pn', params.get('pn').replace(/\s+/g, '').replace(/\+/g, ''));
                         if (params.has('tn')) params.set('tn', params.get('tn').replace(/\s+/g, '').replace(/\+/g, ''));
                         if (!params.has('tr')) params.set('tr', tempTr);
-                        universalUpiUrl = `${baseUrl}?${params.toString()}`;
+                        
+                        // .toString() '@' को '%40' बना देता है, जो मोबाइल लिंक में एरर देता है।
+                        // इसलिए हम उसे वापस '@' में बदल रहे हैं।
+                        let finalQuery = params.toString().replace(/%40/g, '@').replace(/%2B/g, '+');
+                        universalUpiUrl = `${baseUrl}?${finalQuery}`;
                     } else {
-                        universalUpiUrl = rawUpi.replace(/\s/g, '').replace(/\+/g, '');
+                        universalUpiUrl = rawUpi.replace(/\s/g, '').replace(/\+/g, '').replace(/%40/g, '@');
                     }
                 } catch(e) {
-                    universalUpiUrl = orderData.upi_string.replace(/\s/g, '').replace(/\+/g, ''); 
+                    universalUpiUrl = orderData.upi_string.replace(/\s/g, '').replace(/\+/g, '').replace(/%40/g, '@'); 
                 }
                 qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; 
             }
             
             if (orderData.qr_code && orderData.qr_code.startsWith('http')) qrUrl = orderData.qr_code;
 
-            // यह लिसनर 'Auto-Approved' स्टेटस का इंतज़ार करता है
             if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe();
             window.activePaymentUnsubscribe = onSnapshot(doc(db, "payments", orderData.orderId), async (snap) => {
                 if (snap.exists() && (snap.data().status === 'Auto-Approved' || snap.data().status === 'Approved')) {
@@ -284,13 +285,10 @@ window.generateQR = async function() {
                 }
             });
         } else {
-            // अगर API ने एरर दिया, तो ऑटो-अप्रूव नहीं होगा, फॉलबैक (डायरेक्ट Paytm) इस्तेमाल होगा
             const fallbackDoc = await addDoc(collection(db, "payments"), { userId: window.currentUserData.uid, email: window.currentUserData.email, amountPaid: window.currentTotalPayable, creditsRequested: window.currentRechargeCredits, wantsVip: window.currentWantsVip, vipDaysRequested: window.currentVipDays, vipPlanFee: window.currentVipPlanFee, utrNumber: "ONLINE_UPI", timestamp: new Date(), status: "Pending" }); 
             window.currentActiveOrderId = fallbackDoc.id; 
-            console.error("Gateway API Failed, using Fallback.");
         }
     } catch (err) { 
-        // अगर Fetch फेल हो गया, तो भी फॉलबैक यूज़ होगा
         try { 
             const fallbackDoc = await addDoc(collection(db, "payments"), { userId: window.currentUserData.uid, email: window.currentUserData.email, amountPaid: window.currentTotalPayable, creditsRequested: window.currentRechargeCredits, wantsVip: window.currentWantsVip, vipDaysRequested: window.currentVipDays, vipPlanFee: window.currentVipPlanFee, utrNumber: "ONLINE_UPI", timestamp: new Date(), status: "Pending" }); 
             window.currentActiveOrderId = fallbackDoc.id; 
