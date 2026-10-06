@@ -1,5 +1,5 @@
 // ============================================================================
-// FILE 3: js/portal-wallet-chat.js (FINAL FIX - STRICTLY USING GATEWAY LINK)
+// FILE 3: js/portal-wallet-chat.js (FINAL AUTO-VERIFY & GATEWAY INTENT FIX)
 // ============================================================================
 
 import "./config-templates.js";
@@ -163,7 +163,7 @@ async function updateVipTimerAndAlerts() {
     const now = Date.now(); const diff = userData.vipExpiry - now;
     if (diff <= 0) { clearInterval(window.vipCountdownInterval); userData.isVip = false; userData.vipExpiry = 0; try { await updateDoc(doc(db, "users", userData.uid), { isVip: false, vipExpiry: 0 }); } catch (e) {} if (cornerAlert) cornerAlert.style.display = 'none'; setupDashboard(userData); alert('आपकी VIP वैलिडिटी समाप्त हो गई है।'); return; }
     const totalDaysCeil = Math.ceil(diff / window.MS_PER_DAY); const days = Math.floor(diff / window.MS_PER_DAY); const hours = Math.floor((diff % window.MS_PER_DAY) / (1000 * 60 * 60));
-    if (gearVipDaysText) gearVipDaysText.innerText = `👑 VIP: ${totalDaysCeil} दिन बाकी (${days}d ${hours}h)`;
+    if (gearVipDaysText) gearVipDaysText.innerText = `👑 VIP: ${totalDaysCeil} दिन বাকি (${days}d ${hours}h)`;
     if (totalDaysCeil <= 5 && totalDaysCeil >= 1) { if (!window.cornerAlertDismissed) { cornerAlert.style.display = 'block'; cornerAlertDaysText.innerHTML = `VIP खत्म होने में सिर्फ <strong class="text-red-600 underline">${totalDaysCeil} दिन</strong> बचे हैं!`; } } else { cornerAlert.style.display = 'none'; }
 }
 window.dismissCornerAlert = function() { window.cornerAlertDismissed = true; document.getElementById('vipCornerAlert').style.display = 'none'; };
@@ -213,7 +213,7 @@ window.calculateCredits = function() {
 };
 
 // ==============================================================================
-// 🌟 100% GATEWAY LINK DEPENDENT - NO HARDCODED ID OVERRIDES
+// 🌟 THE FINAL FIX: 100% GATEWAY LINK + AUTO VERIFY + MOBILE BUTTON FIX
 // ==============================================================================
 window.generateQR = async function() {
     if (window.currentUserData?.hasFreeAccess) return; window.calculateCredits();
@@ -245,14 +245,14 @@ window.generateQR = async function() {
         if (orderData.status && orderData.orderId) {
             window.currentActiveOrderId = orderData.orderId;
             
+            // 🌟 ONLY USE THE GATEWAY PROVIDED STRING
             if (orderData.upi_string) { 
-                // 🌟 ONLY USE THE GATEWAY PROVIDED STRING
                 let rawUpi = orderData.upi_string;
                 
-                // Safely remove spaces that crash mobile apps, without touching the ID
-                rawUpi = rawUpi.replace(/ /g, '').replace(/\+/g, '').replace(/%20/g, '');
+                // Remove spaces that might break mobile apps without altering the actual data
+                rawUpi = rawUpi.replace(/\s+/g, '');
 
-                // Ensure merchant code is present (required by PhonePe/GPay for intents)
+                // Ensure Merchant Code is present (PhonePe/GPay require this for direct clicks)
                 if (!rawUpi.includes('&mc=')) {
                     rawUpi += '&mc=5499';
                 }
@@ -261,9 +261,11 @@ window.generateQR = async function() {
                 qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; 
             }
             
-            if (orderData.qr_code && orderData.qr_code.startsWith('http')) qrUrl = orderData.qr_code;
+            if (orderData.qr_code && orderData.qr_code.startsWith('http')) {
+                qrUrl = orderData.qr_code;
+            }
 
-            // Wait for Webhook to Auto-Approve
+            // Webhook Listener for Auto-Approve
             if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe();
             window.activePaymentUnsubscribe = onSnapshot(doc(db, "payments", orderData.orderId), async (snap) => {
                 if (snap.exists() && (snap.data().status === 'Auto-Approved' || snap.data().status === 'Approved')) {
@@ -274,31 +276,28 @@ window.generateQR = async function() {
                 }
             });
         } else {
-            alert("Gateway Error. Could not process payment.");
-            if (btn) { btn.disabled = false; btn.innerHTML = origBtnHtml; }
-            return;
+            alert("Gateway Error. Could not process payment. Please check your Vyapar Gateway settings.");
         }
     } catch (err) { 
         console.error("Order Creation Failed:", err);
         alert("Network Error. Please try again.");
-        if (btn) { btn.disabled = false; btn.innerHTML = origBtnHtml; }
-        return;
     } finally { 
-        if (btn && window.currentActiveOrderId) { btn.disabled = false; btn.innerHTML = origBtnHtml; } 
+        if (btn) { btn.disabled = false; btn.innerHTML = origBtnHtml; } 
     }
 
-    // Bind EXACT Gateway URL to the intent button
-    if (universalUpiUrl) {
+    // 🌟 Show UI and Bind URL cleanly
+    if(universalUpiUrl) {
         document.getElementById('upiQRCode').src = qrUrl; 
         document.getElementById('qrPayableAmountText').innerText = `कुल पेमेंट: ₹${window.currentTotalPayable}`;
         
         const mainUpiBtn = document.getElementById('btnDirectUpiPay'); 
         if (mainUpiBtn) { 
-            mainUpiBtn.href = "#"; 
+            mainUpiBtn.href = "#"; // Prevent HTML encoding by keeping href empty
             mainUpiBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> Pay ₹${window.currentTotalPayable} Directly via UPI App`; 
+            
             mainUpiBtn.onclick = function(e) {
                 e.preventDefault();
-                // 🌟 Directly hit the OS with the Gateway's exact string
+                // 🌟 Execute the clean URL directly via window location
                 window.location.href = universalUpiUrl; 
             };
         }
