@@ -1,5 +1,5 @@
 // ============================================================================
-// FILE 3: js/portal-wallet-chat.js (FINAL AUTO-VERIFY & GATEWAY INTENT FIX)
+// FILE 3: js/portal-wallet-chat.js (FINAL STRICT GATEWAY INTENT - NO TAMPERING)
 // ============================================================================
 
 import "./config-templates.js";
@@ -163,7 +163,7 @@ async function updateVipTimerAndAlerts() {
     const now = Date.now(); const diff = userData.vipExpiry - now;
     if (diff <= 0) { clearInterval(window.vipCountdownInterval); userData.isVip = false; userData.vipExpiry = 0; try { await updateDoc(doc(db, "users", userData.uid), { isVip: false, vipExpiry: 0 }); } catch (e) {} if (cornerAlert) cornerAlert.style.display = 'none'; setupDashboard(userData); alert('आपकी VIP वैलिडिटी समाप्त हो गई है।'); return; }
     const totalDaysCeil = Math.ceil(diff / window.MS_PER_DAY); const days = Math.floor(diff / window.MS_PER_DAY); const hours = Math.floor((diff % window.MS_PER_DAY) / (1000 * 60 * 60));
-    if (gearVipDaysText) gearVipDaysText.innerText = `👑 VIP: ${totalDaysCeil} दिन বাকি (${days}d ${hours}h)`;
+    if (gearVipDaysText) gearVipDaysText.innerText = `👑 VIP: ${totalDaysCeil} दिन बाकी (${days}d ${hours}h)`;
     if (totalDaysCeil <= 5 && totalDaysCeil >= 1) { if (!window.cornerAlertDismissed) { cornerAlert.style.display = 'block'; cornerAlertDaysText.innerHTML = `VIP खत्म होने में सिर्फ <strong class="text-red-600 underline">${totalDaysCeil} दिन</strong> बचे हैं!`; } } else { cornerAlert.style.display = 'none'; }
 }
 window.dismissCornerAlert = function() { window.cornerAlertDismissed = true; document.getElementById('vipCornerAlert').style.display = 'none'; };
@@ -188,7 +188,7 @@ window.togglePassVisibility = function(inputId, btnEl) {
 window.changeUserPassword = async function(event) {
     event.preventDefault(); const currPass = document.getElementById('currentPassInput').value; const newPass = document.getElementById('newPassInput').value; const confirmPass = document.getElementById('confirmPassInput').value; const msgBox = document.getElementById('passChangeMsg'); const btn = document.getElementById('btnChangePass');
     if (newPass.length < 6) { msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-red-50 text-red-600 border-red-200 mt-4"; msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> नया पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!"; msgBox.style.display = 'block'; return; }
-    if (newPass !== confirmPass) { msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-red-50 text-red-600 border-red-200 mt-4"; msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> नया पासवर्ड और कन्फर्म पासवर्ड मैच नहीं हो रहे हैं!"; msgBox.style.display = 'block'; return; }
+    if (newPass !== confirmPass) { msgBox.className = "text-xs font-bold p-3.5 rounded-xl border text-center bg-red-50 text-red-600 border-red-200 mt-4"; msgBox.innerHTML = "<i class='fa-solid fa-circle-exclamation mr-1'></i> नया पासवर्ड और कन्फर्म पासवर्ड मैच नहीं নাহो रहे हैं!"; msgBox.style.display = 'block'; return; }
     const origHtml = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Updating Password...'; btn.disabled = true; msgBox.style.display = 'none';
     try {
         const user = auth.currentUser; const credential = EmailAuthProvider.credential(user.email, currPass);
@@ -213,7 +213,7 @@ window.calculateCredits = function() {
 };
 
 // ==============================================================================
-// 🌟 THE FINAL FIX: 100% GATEWAY LINK + AUTO VERIFY + MOBILE BUTTON FIX
+// 🌟 FINAL FIX: STRICT GATEWAY LINK (NO MODIFICATIONS, DIRECT INTENT)
 // ==============================================================================
 window.generateQR = async function() {
     if (window.currentUserData?.hasFreeAccess) return; window.calculateCredits();
@@ -245,19 +245,9 @@ window.generateQR = async function() {
         if (orderData.status && orderData.orderId) {
             window.currentActiveOrderId = orderData.orderId;
             
-            // 🌟 ONLY USE THE GATEWAY PROVIDED STRING
+            // 🌟 1. COMPLETELY UNTOUCHED LINK (Just passing exactly what the gateway gives)
             if (orderData.upi_string) { 
-                let rawUpi = orderData.upi_string;
-                
-                // Remove spaces that might break mobile apps without altering the actual data
-                rawUpi = rawUpi.replace(/\s+/g, '');
-
-                // Ensure Merchant Code is present (PhonePe/GPay require this for direct clicks)
-                if (!rawUpi.includes('&mc=')) {
-                    rawUpi += '&mc=5499';
-                }
-                
-                universalUpiUrl = rawUpi;
+                universalUpiUrl = orderData.upi_string;
                 qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(universalUpiUrl)}`; 
             }
             
@@ -285,21 +275,18 @@ window.generateQR = async function() {
         if (btn) { btn.disabled = false; btn.innerHTML = origBtnHtml; } 
     }
 
-    // 🌟 Show UI and Bind URL cleanly
+    // 🌟 2. Show UI and Bind UNTOUCHED URL directly to href
     if(universalUpiUrl) {
         document.getElementById('upiQRCode').src = qrUrl; 
         document.getElementById('qrPayableAmountText').innerText = `कुल पेमेंट: ₹${window.currentTotalPayable}`;
         
         const mainUpiBtn = document.getElementById('btnDirectUpiPay'); 
         if (mainUpiBtn) { 
-            mainUpiBtn.href = "#"; // Prevent HTML encoding by keeping href empty
+            // Setting the exact string to href so the OS picks it up natively
+            mainUpiBtn.href = universalUpiUrl; 
             mainUpiBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> Pay ₹${window.currentTotalPayable} Directly via UPI App`; 
-            
-            mainUpiBtn.onclick = function(e) {
-                e.preventDefault();
-                // 🌟 Execute the clean URL directly via window location
-                window.location.href = universalUpiUrl; 
-            };
+            // No custom onclick preventing default; let the standard browser link handler take over.
+            mainUpiBtn.onclick = null;
         }
         
         document.getElementById('paymentStep1').style.display = 'none'; 
