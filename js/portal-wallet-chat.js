@@ -1,6 +1,6 @@
 // ============================================================================
 // FILE 3: js/portal-wallet-chat.js (PERFECT MOBILE & DESKTOP PAYMENT UI)
-// (Auto-Cancel Pending Payments & Bulletproof UPI App Intents)
+// (Auto-Cancel Pending Payments & Exact Vyapar Gateway Intent Preserved)
 // ============================================================================
 
 import "./config-templates.js";
@@ -794,7 +794,7 @@ window.switchService = async function(serviceName) {
     }
 
     // ============================================================================
-    // PERFECT APP-SPECIFIC UPI INTENT DEEP-LINKS & BULLETPROOF PARSER ADDED
+    // PERFECT APP-SPECIFIC UPI INTENT DEEP-LINKS & EXACT VYAPAR STRING PRESERVED
     // ============================================================================
     if (serviceName === 'add_credit') {
         container.innerHTML = `
@@ -836,7 +836,7 @@ window.switchService = async function(serviceName) {
                         <img id="upiQRCode" src="" class="w-52 h-52 object-contain mx-auto" alt="UPI QR Code">
                     </div>
 
-                    <!-- Direct UPI App Buttons for Mobile Users with Bulletproof Intents -->
+                    <!-- Direct UPI App Buttons for Mobile Users -->
                     <div class="pt-3 space-y-2.5">
                         <p class="text-[11px] font-bold text-slate-500 mb-1">मोबाइल यूजर सीधे अपनी पेमेंट ऐप चुनें:</p>
                         <div class="grid grid-cols-2 gap-2">
@@ -1000,13 +1000,10 @@ window.generateQR = async function() {
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> पेमेंट लिंक तैयार हो रहा है...'; 
     }
 
-    // Default Fallback details
-    let pa = "8279650137@amazonpay";
-    let pn = "Ojas Print Service";
-    let am = window.currentTotalPayable;
-    let cu = "INR";
-    let tn = window.currentWantsVip ? `Ojas VIP ${window.currentVipDays}d` : `Ojas Credits`;
-    let tr = "";
+    // Default Fallback
+    const fallbackQueryParams = `pa=8279650137@amazonpay&pn=Ojas%20Print%20Service&am=${window.currentTotalPayable}&cu=INR&tn=${encodeURIComponent(window.currentWantsVip ? `Ojas VIP ${window.currentVipDays}d` : `Ojas Credits`)}`;
+    let finalQueryString = fallbackQueryParams;
+    window.currentActiveOrderId = null;
 
     try {
         const res = await fetch('/api/create-order', { 
@@ -1028,21 +1025,14 @@ window.generateQR = async function() {
 
         if (orderData.status && orderData.orderId) {
             window.currentActiveOrderId = orderData.orderId;
-            tr = orderData.orderId; 
 
-            // Safely parse Vyapar Gateway UPI string to extract raw components
-            if (orderData.upi_string && orderData.upi_string.includes('pa=')) {
-                try {
-                    let parseUrl = orderData.upi_string;
-                    if (!parseUrl.startsWith('http')) parseUrl = 'http://dummy.com/?' + parseUrl.split('?')[1];
-                    const urlParams = new URL(parseUrl).searchParams;
-                    
-                    if (urlParams.get('pa')) pa = urlParams.get('pa');
-                    if (urlParams.get('pn')) pn = urlParams.get('pn');
-                    if (urlParams.get('am')) am = urlParams.get('am');
-                    if (urlParams.get('tr')) tr = urlParams.get('tr');
-                } catch(e) { 
-                    console.error("UPI Parsing Error", e); 
+            // USE EXACT VYAPAR GATEWAY STRING WITHOUT PARSING
+            if (orderData.upi_string) {
+                let vyaparUpiString = orderData.upi_string;
+                if (vyaparUpiString.includes('?')) {
+                    finalQueryString = vyaparUpiString.substring(vyaparUpiString.indexOf('?') + 1);
+                } else if (vyaparUpiString.startsWith('pa=')) {
+                    finalQueryString = vyaparUpiString;
                 }
             }
 
@@ -1077,23 +1067,22 @@ window.generateQR = async function() {
             });
         }
 
-        // BUILD PERFECTLY SAFE & ENCODED PARAMETERS
-        const safeParams = `pa=${pa}&pn=${encodeURIComponent(pn)}&am=${am}&cu=${cu}&tn=${encodeURIComponent(tn)}&tr=${tr}`;
-
-        // BIND EXTRACTED PARAMETERS TO DEDICATED APP INTENT BUTTONS
+        // BIND EXACT VYAPAR GATEWAY STRING TO BUTTONS
         const btnPhonePe = document.getElementById('btnPhonePe');
         const btnGPay = document.getElementById('btnGPay');
         const btnPaytm = document.getElementById('btnPaytm');
         const btnGenericUpi = document.getElementById('btnGenericUpi');
 
-        if (btnPhonePe) btnPhonePe.href = `phonepe://pay?${safeParams}`;
-        if (btnGPay) btnGPay.href = `tez://upi/pay?${safeParams}`;
-        if (btnPaytm) btnPaytm.href = `paytmmp://pay?${safeParams}`;
-        if (btnGenericUpi) btnGenericUpi.href = `upi://pay?${safeParams}`;
+        if (btnPhonePe) btnPhonePe.href = `phonepe://pay?${finalQueryString}`;
+        if (btnGPay) btnGPay.href = `tez://upi/pay?${finalQueryString}`;
+        if (btnPaytm) btnPaytm.href = `paytmmp://pay?${finalQueryString}`;
+        if (btnGenericUpi) btnGenericUpi.href = `upi://pay?${finalQueryString}`;
 
-        // UPDATE QR CODE
-        const finalUpiLinkForQR = `upi://pay?${safeParams}`;
-        document.getElementById('upiQRCode').src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(finalUpiLinkForQR)}`; 
+        // UPDATE QR CODE WITH EXACT STRING
+        document.getElementById('upiQRCode').src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`upi://pay?${finalQueryString}`)}`; 
+        if (orderData.qr_code && orderData.qr_code.startsWith('http')) {
+            document.getElementById('upiQRCode').src = orderData.qr_code;
+        }
         
     } catch (err) { 
         try { 
