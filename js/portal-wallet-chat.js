@@ -1,3 +1,33 @@
+// === THEME MANAGER (DARK / LIGHT MODE) ===
+window.initTheme = function() {
+    const saved = localStorage.getItem('ojas_theme');
+    const isDark = saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (isDark) {
+        document.documentElement.classList.add('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+    }
+    updateThemeToggleIcons(isDark);
+};
+window.toggleTheme = function() {
+    const isDark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('ojas_theme', isDark ? 'dark' : 'light');
+    updateThemeToggleIcons(isDark);
+};
+function updateThemeToggleIcons(isDark) {
+    document.querySelectorAll('.theme-toggle-btn').forEach(btn => {
+        btn.innerHTML = isDark 
+            ? '<i class="fa-solid fa-sun text-amber-400 text-sm md:text-base"></i>' 
+            : '<i class="fa-solid fa-moon text-royal-300 text-sm md:text-base"></i>';
+        btn.title = isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+    });
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', window.initTheme);
+} else {
+    window.initTheme();
+}
+
 // ============================================================================
 // FILE 3: js/portal-wallet-chat.js (UPDATED COMPLETE)
 // (Auth, Wallet, Chat, User Preview, Adv Password Reset, History, Global Stealth & TAB PERSISTENCE)
@@ -74,7 +104,7 @@ function startUserSupportChatListener(uid) { if (window.userChatUnsubscribe) win
 window.renderUserLiveChatMessages = function() { const box = document.getElementById('userLiveChatMessagesBox'); if (!box) return; let msgs = Array.isArray(window.currentUserChatData?.messages) ? [...window.currentUserChatData.messages] : []; if (msgs.length === 0 && window.currentUserChatData?.message) msgs.push({ sender: 'user', text: window.currentUserChatData.message, time: Date.now() }); if (msgs.length === 0) { box.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400"><div class="w-12 h-12 rounded-full bg-royal-50 text-royal-500 flex items-center justify-center text-xl mb-2 border border-royal-200"><i class="fa-solid fa-comments"></i></div><p class="text-xs font-black text-slate-600">Ojas Live Support Chat</p><p class="text-[11px] text-slate-400 mt-0.5">कोई भी समस्या या सवाल नीचे लिखकर भेजें। एडमिन का रिप्लाई यहीं इसी चैट में लाइव दिखेगा।</p></div>`; return; } box.innerHTML = msgs.map(m => { const isMe = m.sender === 'user'; const tStr = m.time ? new Date(m.time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) : ''; const safeText = String(m.text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;'); if (isMe) { return `<div class="flex justify-end"><div class="max-w-[80%] bg-dark-900 text-white px-3.5 py-2.5 rounded-2xl rounded-br-none shadow-sm"><p class="text-xs font-semibold whitespace-pre-line leading-relaxed">${safeText}</p><span class="block text-[9px] text-royal-300 text-right mt-1 opacity-80">${tStr} • You</span></div></div>`; } else { return `<div class="flex justify-start"><div class="max-w-[80%] bg-amber-50 border border-amber-300 text-slate-900 px-3.5 py-2.5 rounded-2xl rounded-bl-none shadow-sm"><span class="text-[10px] font-black text-amber-800 uppercase block mb-0.5"><i class="fa-solid fa-crown text-amber-500 mr-1"></i>Admin Support</span><p class="text-xs font-bold whitespace-pre-line leading-relaxed">${safeText}</p><span class="block text-[9px] text-slate-400 text-right mt-1">${tStr}</span></div></div>`; } }).join(''); box.scrollTop = box.scrollHeight; };
 window.sendUserSupportMessage = async function(event) { event.preventDefault(); if (!window.currentUserData) return; const inp = document.getElementById('userSupportChatInput'); const btn = document.getElementById('btnSendUserChat'); const text = inp.value.trim(); if (!text) return; inp.value = ''; btn.disabled = true; const uid = window.currentUserData.uid; try { const existingMsgs = Array.isArray(window.currentUserChatData?.messages) ? [...window.currentUserChatData.messages] : []; existingMsgs.push({ sender: 'user', text: text, time: Date.now() }); await setDoc(doc(db, "supportTickets", uid), { type: 'USER_SUPPORT_CHAT', userId: uid, userIdentifier: window.currentUserData.email, username: window.currentUserData.username, message: text, status: 'Open', unreadByAdmin: true, unreadByUser: false, timestamp: new Date(), updatedAtMs: Date.now(), messages: existingMsgs }, { merge: true }); } catch (err) { alert("मैसेज भेजने में समस्या आई: " + err.message); } finally { btn.disabled = false; inp.focus(); } };
 
-// === SYNC ALL PER-USER STEALTH VALUES ===
+// === SYNC ALL 4 PER-USER STEALTH VALUES ===
 function startUserProfileListener(uid) { 
     if (window.userProfileUnsubscribe) window.userProfileUnsubscribe(); 
     window.userProfileUnsubscribe = onSnapshot(doc(db, "users", uid), (snap) => { 
@@ -243,32 +273,32 @@ onAuthStateChanged(auth, async (user) => {
         try {
             const emailLower = user.email.trim().toLowerCase(); if (!window.isAllowedPortalEmail(emailLower)) { await signOut(auth); alert("अमान्य आईडी! पोर्टल पर केवल @print.com डोमेन वाली आईडी ही मान्य है।"); loadingScreen.style.display = 'none'; return; }
             try { 
-                const cfgSnap = await getDoc(doc(db, "settings", "portalConfig")); 
-                if (cfgSnap.exists()) { 
-                    const d = cfgSnap.data(); 
-                    window.portalConfigState = { 
-                        showDomicile: d.showDomicile !== false, 
-                        showCaste: d.showCaste !== false, 
-                        showDob18: d.showDob18 !== false, 
-                        showDobMinor: d.showDobMinor !== false, 
-                        showDobDelhi: d.showDobDelhi !== false,
-                        showPassport: d.showPassport !== false,
-                        showAnnexures: d.showAnnexures !== false,
-                        bannerEnabled: !!d.bannerEnabled, 
-                        bannerBadge: d.bannerBadge || "UPDATE", 
-                        bannerTitle: d.bannerTitle || "", 
-                        bannerMessage: d.bannerMessage || "", 
-                        bannerBtnText: d.bannerBtnText || "", 
-                        bannerBtnLink: d.bannerBtnLink || "",
-                        banner2Enabled: !!d.banner2Enabled, 
-                        banner2Badge: d.banner2Badge || "NOTICE", 
-                        banner2Title: d.banner2Title || "", 
-                        banner2Message: d.banner2Message || "", 
-                        banner2BtnText: d.banner2BtnText || "", 
-                        banner2BtnLink: d.banner2BtnLink || ""
-                    }; 
-                } 
-            } catch (e) {}
+    const cfgSnap = await getDoc(doc(db, "settings", "portalConfig")); 
+    if (cfgSnap.exists()) { 
+        const d = cfgSnap.data(); 
+        window.portalConfigState = { 
+            showDomicile: d.showDomicile !== false, 
+            showCaste: d.showCaste !== false, 
+            showDob18: d.showDob18 !== false, 
+            showDobMinor: d.showDobMinor !== false, 
+            showDobDelhi: d.showDobDelhi !== false,
+            showPassport: d.showPassport !== false,
+            showAnnexures: d.showAnnexures !== false,
+            bannerEnabled: !!d.bannerEnabled, 
+            bannerBadge: d.bannerBadge || "UPDATE", 
+            bannerTitle: d.bannerTitle || "", 
+            bannerMessage: d.bannerMessage || "", 
+            bannerBtnText: d.bannerBtnText || "", 
+            bannerBtnLink: d.bannerBtnLink || "",
+            banner2Enabled: !!d.banner2Enabled, 
+            banner2Badge: d.banner2Badge || "NOTICE", 
+            banner2Title: d.banner2Title || "", 
+            banner2Message: d.banner2Message || "", 
+            banner2BtnText: d.banner2BtnText || "", 
+            banner2BtnLink: d.banner2BtnLink || ""
+        }; 
+    } 
+} catch (e) {}
             const userDocRef = doc(db, "users", user.uid); const userDoc = await getDoc(userDocRef); let userCredits = 0, isVip = false, vipExpiry = 0, allowDob18 = true, allowDomicile = true, allowCaste = true, allowDobMinor = true;
             if (userDoc.exists()) { const data = userDoc.data(); userCredits = data.credits || 0; isVip = data.isVip || false; vipExpiry = data.vipExpiry || 0; allowDob18 = data.allowDob18 !== false; allowDomicile = data.allowDomicile !== false; allowCaste = data.allowCaste !== false; allowDobMinor = data.allowDobMinor !== false; }
             const isAdmin = (emailLower === window.ADMIN_EMAIL); const isFreeVip = window.FREE_VIP_EMAILS.includes(emailLower); const hasFreeAccess = isAdmin || isFreeVip; const now = Date.now();
@@ -304,11 +334,12 @@ async function updateVipTimerAndAlerts() {
 }
 window.dismissCornerAlert = function() { window.cornerAlertDismissed = true; document.getElementById('vipCornerAlert').style.display = 'none'; };
 
+// === UPDATED: RESTORE ACTIVE TAB AFTER REFRESH ===
 function setupDashboard(userData) {
     document.getElementById('displayUser').innerText = userData.username.toUpperCase(); const adminLink = document.getElementById('adminPanelLink'); const creditDisplayBox = document.getElementById('creditDisplayBox'); const vipServicesBar = document.getElementById('vipServicesBar'); const normalUserVipPromo = document.getElementById('normalUserVipPromo'); const portalTitle = document.getElementById('portalHeaderTitle'); const portalIcon = document.getElementById('portalHeaderIcon'); const vipBadge = document.getElementById('vipStatusBadge'); const mainFormCard = document.getElementById('mainFormCard');
     adminLink.style.display = userData.isAdmin ? 'flex' : 'none';
     if (userData.hasFreeAccess) { creditDisplayBox.style.display = 'none'; } else { creditDisplayBox.style.display = 'flex'; document.getElementById('displayCredits').innerText = userData.credits; }
-    if (userData.isVip) { document.body.classList.add('vip-body-bg'); portalTitle.innerHTML = `Ojas <span class="text-royal-400">VIP</span>`; portalIcon.innerHTML = `<img src="logo.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">`; portalIcon.className = "w-7 h-7 md:w-10 md:h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden p-1 border border-slate-200 shrink-0"; vipBadge.style.display = 'inline-flex'; vipServicesBar.style.display = 'block'; normalUserVipPromo.style.display = 'none'; } else { document.body.classList.remove('vip-body-bg'); portalTitle.innerHTML = `Ojas <span class="text-royal-400">Portal</span>`; portalIcon.innerHTML = `<img src="logo.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">`; portalIcon.className = "w-7 h-7 md:w-10 md:h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden p-1 border border-slate-200 shrink-0"; vipBadge.style.display = 'none'; vipServicesBar.style.display = 'none'; normalUserVipPromo.style.display = 'block'; }
+    if (userData.isVip) { document.body.classList.add('vip-body-bg'); portalTitle.innerHTML = `Ojas <span class="text-royal-400">VIP</span>`; portalIcon.innerHTML = `<img src="logo.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">`; portalIcon.className = "w-7 h-7 md:w-10 md:h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden p-1 border border-slate-200 shrink-0"; vipBadge.style.display = 'inline-flex'; vipServicesBar.style.display = 'block'; normalUserVipPromo.style.display = 'none'; mainFormCard.className = "bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-vip-glow border-2 border-royal-400 p-4 md:p-7"; } else { document.body.classList.remove('vip-body-bg'); portalTitle.innerHTML = `Ojas <span class="text-royal-400">Portal</span>`; portalIcon.innerHTML = `<img src="logo.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">`; portalIcon.className = "w-7 h-7 md:w-10 md:h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden p-1 border border-slate-200 shrink-0"; vipBadge.style.display = 'none'; vipServicesBar.style.display = 'none'; normalUserVipPromo.style.display = 'block'; mainFormCard.className = "bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-card border border-slate-100 p-4 md:p-7"; }
     document.getElementById('loginSection').style.display = 'none'; document.getElementById('dashboardSection').style.display = 'flex';
     window.applyLivePortalControls(); 
     
@@ -446,7 +477,7 @@ window.generateQR = async function() {
                     if (window.activePaymentUnsubscribe) window.activePaymentUnsubscribe(); window.currentActiveOrderId = null;
                     const uSnap = await getDoc(doc(db, "users", window.currentUserData.uid));
                     if (uSnap.exists()) { const updatedUser = uSnap.data(); window.currentUserData.credits = updatedUser.credits || 0; window.currentUserData.isVip = updatedUser.isVip || window.currentUserData.hasFreeAccess; window.currentUserData.vipExpiry = updatedUser.vipExpiry || 0; const crEl = document.getElementById('displayCredits'); if (crEl) crEl.innerText = window.currentUserData.credits; }
-                    document.getElementById('walletMainUI').innerHTML = `<div class="p-6 bg-green-50 dark:bg-slate-900 rounded-2xl border-2 border-green-400 text-center space-y-2"><i class="fa-solid fa-circle-check text-5xl text-green-600 mb-2 animate-bounce"></i><h2 class="text-xl font-black text-green-900 dark:text-green-300">पेमेंट सफल! (Auto-Verified)</h2><p class="text-xs font-bold text-green-700 dark:text-green-400">आपका ₹${window.currentTotalPayable} का पेमेंट वेरीफाई हो गया है और आपके अकाउंट में तुरंत क्रेडिट्स/VIP जोड़ दिए गए हैं!</p><div class="pt-3"><button onclick="window.location.reload()" class="bg-green-600 hover:bg-green-700 text-white font-black py-2.5 px-6 rounded-xl text-xs shadow">डैशबोर्ड पर जाएँ</button></div></div>`;
+                    document.getElementById('walletMainUI').innerHTML = `<div class="p-6 bg-green-50 rounded-2xl border-2 border-green-400 text-center space-y-2"><i class="fa-solid fa-circle-check text-5xl text-green-600 mb-2 animate-bounce"></i><h2 class="text-xl font-black text-green-900">पेमेंट सफल! (Auto-Verified)</h2><p class="text-xs font-bold text-green-700">आपका ₹${window.currentTotalPayable} का पेमेंट वेरीफाई हो गया है और आपके अकाउंट में तुरंत क्रेडिट्स/VIP जोड़ दिए गए हैं!</p><div class="pt-3"><button onclick="window.location.reload()" class="bg-green-600 hover:bg-green-700 text-white font-black py-2.5 px-6 rounded-xl text-xs shadow">डैशबोर्ड पर जाएँ</button></div></div>`;
                 }
             });
         }
@@ -455,29 +486,49 @@ window.generateQR = async function() {
     window.currentUniversalUpiUrl = universalUpiUrl;
     document.getElementById('upiQRCode').src = qrUrl; 
     document.getElementById('qrPayableAmountText').innerText = `कुल पेमेंट: ₹${window.currentTotalPayable}`;
+    const mainUpiBtn = document.getElementById('btnDirectUpiPay'); 
+    if (mainUpiBtn) { 
+        mainUpiBtn.href = universalUpiUrl; 
+        mainUpiBtn.innerHTML = `<i class="fa-solid fa-bolt mr-1"></i> Any Other UPI App`; 
+    }
     document.getElementById('paymentStep1').style.display = 'none'; 
     document.getElementById('qrSection').style.display = 'flex';
 };
 
+
+window.openUpiApp = function(app) {
+    let upiUrl = window.currentUniversalUpiUrl || `upi://pay?pa=8279650137@amazonpay&pn=Ojas%20Print%20Service&am=${window.currentTotalPayable}&cu=INR&tn=${encodeURIComponent(window.currentWantsVip ? `Ojas VIP ${window.currentVipDays}d` : `Ojas Credits`)}`;
+    const params = upiUrl.includes('?') ? upiUrl.substring(upiUrl.indexOf('?') + 1) : '';
+    const isAndroid = /android/i.test(navigator.userAgent);
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+    let target = upiUrl;
+    if (app === 'gpay') {
+        if (isAndroid) {
+            target = `intent://upi/pay?${params}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+        } else if (isIOS) {
+            target = `gpay://upi/pay?${params}`;
+        }
+    } else if (app === 'phonepe') {
+        if (isAndroid) {
+            target = `intent://upi/pay?${params}#Intent;scheme=upi;package=com.phonepe.app;end`;
+        } else if (isIOS) {
+            target = `phonepe://pay?${params}`;
+        }
+    } else if (app === 'paytm') {
+        if (isAndroid) {
+            target = `intent://upi/pay?${params}#Intent;scheme=upi;package=net.one97.paytm;end`;
+        } else if (isIOS) {
+            target = `paytmmp://pay?${params}`;
+        }
+    }
+    window.location.href = target;
+};
+
 window.cancelAndBackToPaymentStep1 = async function() {
-    if (window.activePaymentUnsubscribe) { 
-        window.activePaymentUnsubscribe(); 
-        window.activePaymentUnsubscribe = null; 
-    }
-    if (window.currentActiveOrderId) { 
-        const orderIdToCancel = window.currentActiveOrderId; 
-        window.currentActiveOrderId = null; 
-        try { 
-            await updateDoc(doc(db, "payments", orderIdToCancel), { 
-                status: "Cancelled", 
-                cancelledBy: "User (Cancel Button)", 
-                cancelledAt: new Date() 
-            }); 
-        } catch (e) {} 
-    }
-    document.getElementById('qrSection').style.display = 'none'; 
-    document.getElementById('paymentStep1').style.display = 'block'; 
-    alert("पेमेंट प्रोसेस कैंसिल कर दिया गया है।");
+    if (window.activePaymentUnsubscribe) { window.activePaymentUnsubscribe(); window.activePaymentUnsubscribe = null; }
+    if (window.currentActiveOrderId) { const orderIdToCancel = window.currentActiveOrderId; window.currentActiveOrderId = null; try { await updateDoc(doc(db, "payments", orderIdToCancel), { status: "Cancelled", cancelledBy: "User (Back without Payment)", cancelledAt: new Date() }); } catch (e) {} }
+    document.getElementById('qrSection').style.display = 'none'; document.getElementById('paymentStep1').style.display = 'block'; alert("पेमेंट प्रोसेस कैंसिल कर दिया गया है (Payment Cancelled)।");
 };
 
 window.togglePaymentTicketBox = function() { const box = document.getElementById('paymentIssueTicketBox'); if (!box) return; box.style.display = box.style.display === 'none' ? 'block' : 'none'; };
@@ -623,7 +674,7 @@ window.renderHistory = function(filterType = 'ALL', filterDate = '') {
     });
 };
 
-// === SAVE & SWITCH TAB LOGIC ===
+// === UPDATED: SAVE & SWITCH TAB LOGIC ===
 window.switchService = async function(serviceName) {
     if (!serviceName) serviceName = window.getFirstAllowedTab();
 
@@ -636,7 +687,7 @@ window.switchService = async function(serviceName) {
     else if (serviceName === 'dob_minor' && !window.canCurrentUserSeeService('dob_minor')) serviceName = window.getFirstAllowedTab();
 
     window.currentActiveTab = serviceName;
-    sessionStorage.setItem('ojas_active_tab', serviceName);
+    sessionStorage.setItem('ojas_active_tab', serviceName); // <--- SAVE TAB PERSISTENCE
 
     document.querySelectorAll('.service-tab').forEach(btn => { btn.className = "service-tab bg-dark-900 text-royal-300 font-bold py-2.5 px-3 rounded-xl hover:bg-dark-800 transition shadow-sm border border-slate-700 text-xs md:text-sm flex-1 flex justify-center items-center gap-1.5"; });
     document.querySelectorAll('.vip-tab').forEach(btn => { btn.className = "vip-tab bg-dark-800 text-royal-300 border border-royal-500/30 font-bold py-2 px-2.5 rounded-xl hover:bg-dark-700 transition text-[11px] md:text-xs flex items-center justify-center gap-1 shadow-sm"; });
@@ -648,6 +699,7 @@ window.switchService = async function(serviceName) {
     const submitBtnText = window.currentUserData && window.currentUserData.hasFreeAccess ? 'Generate Document (VIP Free) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>' : 'Generate Document (10 Credits) <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>';
     const statusTagHtml = window.currentUserData && window.currentUserData.hasFreeAccess ? '<span class="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-[10px] font-black border border-green-300 uppercase"><i class="fa-solid fa-crown mr-1"></i>Lifetime VIP Free</span>' : (window.currentUserData && window.currentUserData.isVip ? '<span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-md text-[10px] font-black border border-amber-300 uppercase"><i class="fa-solid fa-crown mr-1"></i>10 Credits</span>' : '<span class="bg-royal-100 text-royal-900 px-2.5 py-1 rounded-md text-[10px] font-black border border-royal-300 uppercase">10 Credits</span>');
 
+    // === ADDED: CHANGE PASSWORD UI WITH EYE TOGGLE & CONFIRM FIELD ===
     if (serviceName === 'password') {
         container.innerHTML = `
         <div class="max-w-md mx-auto space-y-4 pt-2">
@@ -683,7 +735,7 @@ window.switchService = async function(serviceName) {
         return;
     }
 
-    // Wallet UI (QR Code Only + Warning Banner)
+    // Wallet UI
     if (serviceName === 'add_credit') {
         container.innerHTML = `
         <div id="walletMainUI" class="max-w-xl mx-auto space-y-4">
@@ -769,50 +821,15 @@ window.switchService = async function(serviceName) {
     if (serviceName === 'payments_history') { container.innerHTML = `<div class="space-y-4"><div id="userValidityInfoBox"></div><div class="grid grid-cols-3 gap-2 md:gap-4"><div class="p-3 rounded-xl bg-slate-50 border border-slate-200"><p class="text-[10px] font-bold text-slate-400 uppercase">कुल ट्रांजैक्शन</p><p id="sumTotalTxns" class="text-lg md:text-2xl font-black text-dark-900">0</p></div><div class="p-3 rounded-xl bg-green-50 border border-green-200"><p class="text-[10px] font-bold text-green-700 uppercase">सफल (Approved)</p><p id="sumApprovedAmt" class="text-lg md:text-2xl font-black text-green-700">₹0</p></div><div class="p-3 rounded-xl bg-amber-50 border border-amber-200"><p class="text-[10px] font-bold text-amber-800 uppercase">पेंडिंग (Pending)</p><p id="sumPendingAmt" class="text-lg md:text-2xl font-black text-amber-700">₹0 (0)</p></div></div><div><div class="flex justify-between items-center mb-2"><h4 class="text-sm md:text-base font-black text-dark-900"><i class="fa-solid fa-receipt text-royal-500 mr-1.5"></i> पेमेंट और VIP हिस्ट्री</h4><button onclick="window.loadUserPayments()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold"><i class="fa-solid fa-rotate-right mr-1"></i> Refresh</button></div><div class="overflow-x-auto border border-slate-200 rounded-xl"><table class="w-full text-left border-collapse bg-white min-w-[520px]"><thead class="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase"><tr><th class="p-3">तारीख (Date)</th><th class="p-3">राशि</th><th class="p-3">क्रेडिट्स / VIP</th><th class="p-3">UTR / Mode</th><th class="p-3 text-right">स्टेटस</th></tr></thead><tbody id="userPaymentsTableBody" class="text-xs text-slate-700"></tbody></table></div></div></div>`; window.loadUserPayments(); return; }
     
     if (serviceName === 'history') { 
-        const cfg = window.portalConfigState || {}; 
+        const cfg = window.portalConfigState; 
         const isVipUser = window.currentUserData && window.currentUserData.isVip; 
-        const canShowDob18 = window.canCurrentUserSeeService('dob18'); 
-        const canShowDobDelhi = window.canCurrentUserSeeService('dob_delhi'); 
-        const canShowPassport = window.canCurrentUserSeeService('passport'); 
+        const canShowDob = window.canCurrentUserSeeService('dob18'); 
         const domOpt = cfg.showDomicile ? `<option value="Domicile">मूल निवास</option>` : ''; 
         const casOpt = cfg.showCaste ? `<option value="Caste">जाति प्रमाण पत्र</option>` : ''; 
-        const dobOpt = (isVipUser && canShowDob18) ? `<option value="DOB Meerut">DOB Meerut</option>` : ''; 
-        const dobDelhiOpt = (isVipUser && canShowDobDelhi) ? `<option value="DOB Delhi">DOB Delhi</option>` : ''; 
-        const passportOpt = (isVipUser && canShowPassport) ? `<option value="Passport">Passport</option>` : ''; 
-        const vipFilterOptions = isVipUser ? `${dobOpt}${dobDelhiOpt}${passportOpt}<option value="Annexure 1">Annexure 1</option><option value="Annexure 1A">Annexure 1A</option><option value="Annexure 3">Annexure 3</option><option value="Annexure 3A">Annexure 3A</option><option value="Annexure B">Annexure B</option><option value="Annexure C">Annexure C</option><option value="Annexure D">Annexure D</option><option value="Annexure E">Annexure E</option><option value="Annexure F">Annexure F</option>` : ''; 
+        const dobOpt = (isVipUser && canShowDob) ? `<option value="DOB 18+">DOB (18+)</option>` : ''; 
+        const vipFilterOptions = isVipUser ? `${dobOpt}<option value="Annexure 1">Annexure 1</option><option value="Annexure 1A">Annexure 1A</option><option value="Annexure 3">Annexure 3</option><option value="Annexure 3A">Annexure 3A</option><option value="Annexure B">Annexure B</option><option value="Annexure C">Annexure C</option><option value="Annexure D">Annexure D</option><option value="Annexure E">Annexure E</option><option value="Annexure F">Annexure F</option>` : ''; 
         
-        container.innerHTML = `
-            <div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-100 pb-3 mb-4">
-                <div>
-                    <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-folder-open text-royal-500 mr-1.5"></i> Document History</h3>
-                    <p id="userHistoryCount" class="text-[11px] font-bold text-royal-600">Total Files: 0</p>
-                </div>
-                <div class="flex items-center gap-2 flex-wrap">
-                    <select id="userHistoryTypeFilter" onchange="window.handleUserHistoryFilterChange()" class="p-2 border border-slate-200 rounded-xl text-xs bg-slate-50 font-semibold outline-none">
-                        <option value="ALL">All Documents</option>
-                        ${domOpt}${casOpt}${vipFilterOptions}
-                    </select>
-                    <div class="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1 text-xs">
-                        <i class="fa-regular fa-calendar text-slate-400"></i>
-                        <input type="date" id="userHistoryDateFilter" onchange="window.handleUserHistoryFilterChange()" class="bg-transparent border-0 text-xs font-semibold outline-none cursor-pointer">
-                        <button type="button" onclick="document.getElementById('userHistoryDateFilter').value=''; window.handleUserHistoryFilterChange();" class="text-slate-400 hover:text-red-500 px-1 text-xs" title="Clear Date Filter"><i class="fa-solid fa-xmark"></i></button>
-                    </div>
-                    <button onclick="window.loadUserHistory()" class="bg-slate-100 text-slate-600 px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-200"><i class="fa-solid fa-rotate-right"></i></button>
-                </div>
-            </div>
-            <div class="overflow-x-auto border border-slate-200 rounded-xl">
-                <table class="w-full text-left border-collapse bg-white min-w-[500px]">
-                    <thead class="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase">
-                        <tr>
-                            <th class="p-3">File Name</th>
-                            <th class="p-3">Type</th>
-                            <th class="p-3">Date & Time</th>
-                            <th class="p-3 text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="historyTableBody" class="text-xs text-slate-700"></tbody>
-                </table>
-            </div>`; 
+        container.innerHTML = `<div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-100 pb-3 mb-4"><div><h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-folder-open text-royal-500 mr-1.5"></i> Document History</h3><p id="userHistoryCount" class="text-[11px] font-bold text-royal-600">Total Files: 0</p></div><div class="flex items-center gap-2"><select onchange="window.renderHistory(this.value)" class="p-2 border border-slate-200 rounded-xl text-xs bg-slate-50 font-semibold outline-none"><option value="ALL">All Documents</option>${domOpt}${casOpt}${vipFilterOptions}</select><button onclick="window.loadUserHistory()" class="bg-slate-100 text-slate-600 px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-200"><i class="fa-solid fa-rotate-right"></i></button></div></div><div class="overflow-x-auto border border-slate-200 rounded-xl"><table class="w-full text-left border-collapse bg-white min-w-[500px]"><thead class="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase"><tr><th class="p-3">File Name</th><th class="p-3">Type</th><th class="p-3">Date & Time</th><th class="p-3 text-right">Action</th></tr></thead><tbody id="historyTableBody" class="text-xs text-slate-700"></tbody></table></div>`; 
         
         window.loadUserHistory(); 
     }

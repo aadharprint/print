@@ -475,7 +475,26 @@ window.savePortalSettings = async function(event) {
 
 window.loadAllPayments = async function() {
     const container = document.getElementById('adminPaymentsCardsContainer'); container.innerHTML = `<div class="col-span-1 md:col-span-2 p-10 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2 text-royal-500"></i><br>सभी पेमेंट और हिस्ट्री लोड हो रही हैं...</div>`;
-    try { const querySnapshot = await getDocs(collection(db, "payments")); window.allPaymentsData = []; querySnapshot.forEach((docSnap) => { window.allPaymentsData.push({ id: docSnap.id, ...docSnap.data() }); }); window.allPaymentsData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)); window.updatePaymentStatsAndBadges(); window.renderPaymentsByFilter(); } catch (err) { container.innerHTML = `<div class="col-span-1 md:col-span-2 p-6 text-center text-red-500 font-bold bg-white rounded-2xl">Error: ${err.message}</div>`; }
+    try { 
+        const querySnapshot = await getDocs(collection(db, "payments")); 
+        window.allPaymentsData = []; 
+        const now = Date.now();
+        const MS_72_HOURS = 72 * 60 * 60 * 1000;
+        
+        querySnapshot.forEach((docSnap) => { 
+            const item = { id: docSnap.id, ...docSnap.data() };
+            // Auto-cancel pending payments older than 72 hours
+            const sec = item.timestamp?.seconds || (item.timestamp ? Math.floor(new Date(item.timestamp).getTime() / 1000) : 0);
+            const itemTime = sec * 1000;
+            if (item.status === 'Pending' && itemTime > 0 && (now - itemTime > MS_72_HOURS)) {
+                item.status = 'Cancelled (Expired 72h)';
+                try {
+                    updateDoc(doc(db, "payments", item.id), { status: 'Cancelled (Expired 72h)', expiredAt: new Date() });
+                } catch(e) {}
+            }
+            window.allPaymentsData.push(item); 
+        }); 
+        window.allPaymentsData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)); window.updatePaymentStatsAndBadges(); window.renderPaymentsByFilter(); } catch (err) { container.innerHTML = `<div class="col-span-1 md:col-span-2 p-6 text-center text-red-500 font-bold bg-white rounded-2xl">Error: ${err.message}</div>`; }
 };
 
 window.updatePaymentStatsAndBadges = function() {
