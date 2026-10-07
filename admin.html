@@ -69,7 +69,101 @@
         ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    
+        /* Bulletproof Dark Mode CSS */
+        html.dark, html.dark body {
+            background-color: #020617 !important;
+            color: #f8fafc !important;
+        }
+        html.dark #mainFormCard {
+            background-color: #0f172a !important;
+            color: #f8fafc !important;
+            border-color: #334155 !important;
+        }
+        html.dark .bg-white:not(.affidavit-paper) {
+            background-color: #0f172a !important;
+            color: #f8fafc !important;
+            border-color: #334155 !important;
+        }
+        html.dark .bg-slate-50, html.dark .bg-slate-100 {
+            background-color: #1e293b !important;
+            color: #f1f5f9 !important;
+            border-color: #334155 !important;
+        }
+        html.dark .text-slate-800, html.dark .text-slate-700, html.dark .text-dark-900 {
+            color: #f8fafc !important;
+        }
+        html.dark .text-slate-600, html.dark .text-slate-500 {
+            color: #cbd5e1 !important;
+        }
+        html.dark input:not([type="checkbox"]):not([type="radio"]),
+        html.dark select,
+        html.dark textarea {
+            background-color: #1e293b !important;
+            color: #ffffff !important;
+            border-color: #475569 !important;
+        }
+        html.dark #gearDropdownMenu {
+            background-color: #0f172a !important;
+            color: #f8fafc !important;
+            border-color: #334155 !important;
+        }
+        html.dark #gearDropdownMenu button {
+            color: #f1f5f9 !important;
+        }
+        html.dark #gearDropdownMenu button:hover {
+            background-color: #1e293b !important;
+        }
+        html.dark table thead {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+        }
+        html.dark table tr {
+            border-color: #334155 !important;
+        }
+        html.dark table tr:hover {
+            background-color: #1e293b/60 !important;
+        }
+        html.dark #userLiveChatMessagesBox {
+            background-color: #020617 !important;
+        }
+        /* Ensure affidavit paper remains crisp white for printing and viewing */
+        .affidavit-paper, .affidavit-paper * {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+        }
+
     </style>
+
+        <!-- Instant Theme Manager -->
+    <script>
+        window.initTheme = function() {
+            var saved = localStorage.getItem('ojas_theme');
+            var isDark = saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            if (isDark) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+            window.updateThemeToggleIcons(isDark);
+        };
+        window.toggleTheme = function() {
+            var isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('ojas_theme', isDark ? 'dark' : 'light');
+            window.updateThemeToggleIcons(isDark);
+        };
+        window.updateThemeToggleIcons = function(isDark) {
+            var btns = document.querySelectorAll('.theme-toggle-btn');
+            btns.forEach(function(btn) {
+                btn.innerHTML = isDark 
+                    ? '<i class="fa-solid fa-sun text-amber-400 text-xs md:text-sm"></i>' 
+                    : '<i class="fa-solid fa-moon text-royal-300 text-xs md:text-sm"></i>';
+                btn.title = isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+            });
+        };
+        window.initTheme();
+        document.addEventListener('DOMContentLoaded', window.initTheme);
+    </script>
 
     <!-- Modular Admin Logic -->
     <script type="module" src="./js/admin-logic.js"></script>
