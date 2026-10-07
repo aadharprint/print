@@ -1,3 +1,33 @@
+// === THEME MANAGER (DARK / LIGHT MODE) ===
+window.initTheme = function() {
+    const saved = localStorage.getItem('ojas_theme');
+    const isDark = saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (isDark) {
+        document.documentElement.classList.add('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+    }
+    updateThemeToggleIcons(isDark);
+};
+window.toggleTheme = function() {
+    const isDark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('ojas_theme', isDark ? 'dark' : 'light');
+    updateThemeToggleIcons(isDark);
+};
+function updateThemeToggleIcons(isDark) {
+    document.querySelectorAll('.theme-toggle-btn').forEach(btn => {
+        btn.innerHTML = isDark 
+            ? '<i class="fa-solid fa-sun text-amber-400 text-xs md:text-sm"></i>' 
+            : '<i class="fa-solid fa-moon text-royal-300 text-xs md:text-sm"></i>';
+        btn.title = isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+    });
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', window.initTheme);
+} else {
+    window.initTheme();
+}
+
 // ============================================================================
 // FILE 4: js/admin-logic.js (UPDATED & COMPLETE)
 // (Complete Admin Logic: Auth, Users, Support Chat, Settings, Cert Caching & Per-User Stealth)
@@ -338,13 +368,44 @@ window.populateSupportUserDropdown = function() { const sel = document.getElemen
 
 // === UPDATED: GLOBAL SETTINGS INCLUDE DOB MINOR ===
 window.loadPortalSettingsForAdmin = async function() {
-    try { const snap = await getDoc(doc(db, "settings", "portalConfig")); let cfg = { showDomicile: true, showCaste: true, showDob18: true, showDobMinor: true, bannerEnabled: false, bannerBadge: "NEW UPDATE", bannerTitle: "", bannerMessage: "", bannerBtnText: "", bannerBtnLink: "", supportWhatsapp: "919306437623" }; if (snap.exists()) { cfg = { ...cfg, ...snap.data() }; }
+    try { 
+        const snap = await getDoc(doc(db, "settings", "portalConfig")); 
+        let cfg = { 
+            showDomicile: true, showCaste: true, showDob18: true, showDobMinor: true, 
+            showDobDelhi: true, showPassport: true, showAnnexures: true,
+            bannerEnabled: false, bannerBadge: "UPDATE", bannerTitle: "", bannerMessage: "", bannerBtnText: "", bannerBtnLink: "", 
+            banner2Enabled: false, banner2Badge: "NOTICE", banner2Title: "", banner2Message: "", banner2BtnText: "", banner2BtnLink: "",
+            supportWhatsapp: "919306437623" 
+        }; 
+        if (snap.exists()) { cfg = { ...cfg, ...snap.data() }; }
+        
         document.getElementById('chkShowDomicile').checked = cfg.showDomicile !== false; 
         document.getElementById('chkShowCaste').checked = cfg.showCaste !== false; 
         document.getElementById('chkShowDob18').checked = cfg.showDob18 !== false; 
         const dobMinorEl = document.getElementById('chkShowDobMinor'); if(dobMinorEl) dobMinorEl.checked = cfg.showDobMinor !== false;
+        const passEl = document.getElementById('chkShowPassport'); if(passEl) passEl.checked = cfg.showPassport !== false;
+        const annexEl = document.getElementById('chkShowAnnexures'); if(annexEl) annexEl.checked = cfg.showAnnexures !== false;
         
-        document.getElementById('chkBannerEnabled').checked = !!cfg.bannerEnabled; document.getElementById('inpBannerBadge').value = cfg.bannerBadge || 'UPDATE'; document.getElementById('inpBannerTitle').value = cfg.bannerTitle || ''; document.getElementById('inpBannerMessage').value = cfg.bannerMessage || ''; document.getElementById('inpBannerBtnText').value = cfg.bannerBtnText || ''; document.getElementById('inpBannerBtnLink').value = cfg.bannerBtnLink || ''; const supWaEl = document.getElementById('inpSupportWhatsapp'); if (supWaEl) supWaEl.value = cfg.supportWhatsapp || '919306437623'; window.adminSupportWhatsapp = cfg.supportWhatsapp || '919306437623'; window.updateStealthStatusPill();
+        // Banner 1
+        document.getElementById('chkBannerEnabled').checked = !!cfg.bannerEnabled; 
+        document.getElementById('inpBannerBadge').value = cfg.bannerBadge || 'UPDATE'; 
+        document.getElementById('inpBannerTitle').value = cfg.bannerTitle || ''; 
+        document.getElementById('inpBannerMessage').value = cfg.bannerMessage || ''; 
+        document.getElementById('inpBannerBtnText').value = cfg.bannerBtnText || ''; 
+        document.getElementById('inpBannerBtnLink').value = cfg.bannerBtnLink || ''; 
+        
+        // Banner 2
+        const b2Chk = document.getElementById('chkBanner2Enabled'); if(b2Chk) b2Chk.checked = !!cfg.banner2Enabled;
+        const b2Bdg = document.getElementById('inpBanner2Badge'); if(b2Bdg) b2Bdg.value = cfg.banner2Badge || 'NOTICE';
+        const b2Ttl = document.getElementById('inpBanner2Title'); if(b2Ttl) b2Ttl.value = cfg.banner2Title || '';
+        const b2Msg = document.getElementById('inpBanner2Message'); if(b2Msg) b2Msg.value = cfg.banner2Message || '';
+        const b2Btn = document.getElementById('inpBanner2BtnText'); if(b2Btn) b2Btn.value = cfg.banner2BtnText || '';
+        const b2Lnk = document.getElementById('inpBanner2BtnLink'); if(b2Lnk) b2Lnk.value = cfg.banner2BtnLink || '';
+
+        const supWaEl = document.getElementById('inpSupportWhatsapp'); 
+        if (supWaEl) supWaEl.value = cfg.supportWhatsapp || '919306437623'; 
+        window.adminSupportWhatsapp = cfg.supportWhatsapp || '919306437623'; 
+        window.updateStealthStatusPill();
     } catch (err) {}
 };
 
@@ -356,10 +417,58 @@ window.updateStealthStatusPill = function() {
 window.quickToggleAllCerts = async function(makeVisible) { document.getElementById('chkShowDomicile').checked = makeVisible; document.getElementById('chkShowCaste').checked = makeVisible; document.getElementById('chkShowDob18').checked = makeVisible; const dobMinorEl = document.getElementById('chkShowDobMinor'); if(dobMinorEl) dobMinorEl.checked = makeVisible; await window.savePortalSettings(); };
 
 window.savePortalSettings = async function(event) {
-    if (event) event.preventDefault(); const btn = document.getElementById('btnSavePortalConfig'); const msg = document.getElementById('portalConfigMsg'); const origText = btn ? btn.innerHTML : ''; if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...'; }
-    const rawSupWa = document.getElementById('inpSupportWhatsapp')?.value.trim() || '919306437623'; const cleanSupWa = window.formatCleanPhone(rawSupWa) || '919306437623';
-    const payload = { showDomicile: document.getElementById('chkShowDomicile').checked, showCaste: document.getElementById('chkShowCaste').checked, showDob18: document.getElementById('chkShowDob18').checked, showDobMinor: document.getElementById('chkShowDobMinor') ? document.getElementById('chkShowDobMinor').checked : true, bannerEnabled: document.getElementById('chkBannerEnabled').checked, bannerBadge: document.getElementById('inpBannerBadge').value.trim() || 'UPDATE', bannerTitle: document.getElementById('inpBannerTitle').value.trim(), bannerMessage: document.getElementById('inpBannerMessage').value.trim(), bannerBtnText: document.getElementById('inpBannerBtnText').value.trim(), bannerBtnLink: document.getElementById('inpBannerBtnLink').value.trim(), supportWhatsapp: cleanSupWa, updatedAt: new Date() };
-    try { await setDoc(doc(db, "settings", "portalConfig"), payload, { merge: true }); window.adminSupportWhatsapp = cleanSupWa; window.updateStealthStatusPill(); if (msg) { msg.className = "p-3 bg-green-50 text-green-800 border border-green-300 rounded-xl text-xs font-black text-center"; msg.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> पोर्टल सेटिंग्स और बैनर सफलतापूर्वक अपडेट हो गए हैं!`; msg.classList.remove('hidden'); setTimeout(() => msg.classList.add('hidden'), 4000); } } catch (err) { alert("Error saving portal settings: " + err.message); } finally { if (btn) { btn.disabled = false; btn.innerHTML = origText; } }
+    if (event) event.preventDefault(); 
+    const btn = document.getElementById('btnSavePortalConfig'); 
+    const msg = document.getElementById('portalConfigMsg'); 
+    const origText = btn ? btn.innerHTML : ''; 
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...'; }
+    
+    const rawSupWa = document.getElementById('inpSupportWhatsapp')?.value.trim() || '919306437623'; 
+    const cleanSupWa = window.formatCleanPhone(rawSupWa) || '919306437623';
+    
+    const payload = { 
+        showDomicile: document.getElementById('chkShowDomicile').checked, 
+        showCaste: document.getElementById('chkShowCaste').checked, 
+        showDob18: document.getElementById('chkShowDob18').checked, 
+        showDobMinor: document.getElementById('chkShowDobMinor') ? document.getElementById('chkShowDobMinor').checked : true, 
+        showDobDelhi: document.getElementById('chkShowDobMinor') ? document.getElementById('chkShowDobMinor').checked : true,
+        showPassport: document.getElementById('chkShowPassport') ? document.getElementById('chkShowPassport').checked : true,
+        showAnnexures: document.getElementById('chkShowAnnexures') ? document.getElementById('chkShowAnnexures').checked : true,
+        
+        // Banner 1
+        bannerEnabled: document.getElementById('chkBannerEnabled').checked, 
+        bannerBadge: document.getElementById('inpBannerBadge').value.trim() || 'UPDATE', 
+        bannerTitle: document.getElementById('inpBannerTitle').value.trim(), 
+        bannerMessage: document.getElementById('inpBannerMessage').value.trim(), 
+        bannerBtnText: document.getElementById('inpBannerBtnText').value.trim(), 
+        bannerBtnLink: document.getElementById('inpBannerBtnLink').value.trim(),
+        
+        // Banner 2
+        banner2Enabled: document.getElementById('chkBanner2Enabled') ? document.getElementById('chkBanner2Enabled').checked : false,
+        banner2Badge: document.getElementById('inpBanner2Badge') ? document.getElementById('inpBanner2Badge').value.trim() || 'NOTICE' : 'NOTICE',
+        banner2Title: document.getElementById('inpBanner2Title') ? document.getElementById('inpBanner2Title').value.trim() : '',
+        banner2Message: document.getElementById('inpBanner2Message') ? document.getElementById('inpBanner2Message').value.trim() : '',
+        banner2BtnText: document.getElementById('inpBanner2BtnText') ? document.getElementById('inpBanner2BtnText').value.trim() : '',
+        banner2BtnLink: document.getElementById('inpBanner2BtnLink') ? document.getElementById('inpBanner2BtnLink').value.trim() : '',
+
+        supportWhatsapp: cleanSupWa, 
+        updatedAt: new Date() 
+    };
+    try { 
+        await setDoc(doc(db, "settings", "portalConfig"), payload, { merge: true }); 
+        window.adminSupportWhatsapp = cleanSupWa; 
+        window.updateStealthStatusPill(); 
+        if (msg) { 
+            msg.className = "p-3 bg-green-50 text-green-800 border border-green-300 rounded-xl text-xs font-black text-center"; 
+            msg.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> पोर्टल सेटिंग्स और दोनों बैनर सफलतापूर्वक अपडेट हो गए हैं!`; 
+            msg.classList.remove('hidden'); 
+            setTimeout(() => msg.classList.add('hidden'), 4000); 
+        } 
+    } catch (err) { 
+        alert("Error saving portal settings: " + err.message); 
+    } finally { 
+        if (btn) { btn.disabled = false; btn.innerHTML = origText; } 
+    }
 };
 
 
@@ -578,11 +687,24 @@ window.toggleCertificateCheckbox = async function(origIndex, isChecked) {
 
 window.renderAdminHistory = function() {
     const container = document.getElementById('adminHistoryListContainer');
-    const fUser = document.getElementById('filterUser').value; const fType = document.getElementById('filterType').value;
+    const fUser = document.getElementById('filterUser')?.value || 'ALL'; 
+    const fType = document.getElementById('filterType')?.value || 'ALL';
+    const fDate = document.getElementById('filterDate')?.value || '';
     const indexedData = window.adminAllHistoryData.map((item, idx) => ({ ...item, _origIndex: idx }));
     let filteredData = indexedData;
     if (fUser !== 'ALL') filteredData = filteredData.filter(item => item.userId === fUser);
     if (fType !== 'ALL') filteredData = filteredData.filter(item => item.serviceType === fType);
+    if (fDate) {
+        filteredData = filteredData.filter(item => {
+            const sec = item.timestamp?.seconds || (item.timestamp ? Math.floor(new Date(item.timestamp).getTime() / 1000) : 0);
+            if (!sec) return false;
+            const d = new Date(sec * 1000);
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}` === fDate;
+        });
+    }
 
     document.getElementById('historyCount').innerText = `Total Files: ${filteredData.length}`; container.innerHTML = '';
     if (filteredData.length === 0) { container.innerHTML = `<div class="p-10 text-center text-slate-400 bg-white rounded-2xl border border-slate-100"><i class="fa-regular fa-folder-open text-4xl mb-2 text-slate-300"></i><br>कोई फाइल नहीं मिली।</div>`; return; }
@@ -797,10 +919,30 @@ window.handleUserSelection = function() {
     if(document.getElementById('userDomicileToggle')) document.getElementById('userDomicileToggle').checked = uData.allowDomicile !== false;
     if(document.getElementById('userCasteToggle')) document.getElementById('userCasteToggle').checked = uData.allowCaste !== false;
     if(document.getElementById('userDobToggle')) document.getElementById('userDobToggle').checked = uData.allowDob18 !== false; 
-    if(document.getElementById('userDobMinorToggle')) document.getElementById('userDobMinorToggle').checked = uData.allowDobMinor !== false;
+    if(document.getElementById('userDobDelhiToggle')) document.getElementById('userDobDelhiToggle').checked = (uData.allowDobDelhi !== false && uData.allowDobMinor !== false);
+    if(document.getElementById('userDobMinorToggle')) document.getElementById('userDobMinorToggle').checked = (uData.allowDobDelhi !== false && uData.allowDobMinor !== false);
+    if(document.getElementById('userPassportToggle')) document.getElementById('userPassportToggle').checked = uData.allowPassport !== false;
+    if(document.getElementById('userAnnexuresToggle')) document.getElementById('userAnnexuresToggle').checked = uData.allowAnnexures !== false;
 };
 
 window.adminSetNewUserPassword = async function() { const uid = document.getElementById('userSelectDropdown').value; if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले यूज़र चुनें!'); const newPass = document.getElementById('adminNewResetPass').value.trim(); if (newPass.length < 6) return alert('पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!'); const btn = document.getElementById('btnAdminSetPass'); const orig = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; btn.disabled = true; try { const uData = window.usersDataList[uid]; if (uData.userPass) { try { const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: uData.email, password: uData.userPass, returnSecureToken: true }) }); const signInData = await signInRes.json(); if (signInData.idToken) { await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${firebaseConfig.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: signInData.idToken, password: newPass, returnSecureToken: true }) }); } } catch (e) { } } await updateDoc(doc(db, "users", uid), { userPass: newPass, adminResetPass: newPass, passUpdatedAt: new Date() }); window.usersDataList[uid].userPass = newPass; document.getElementById('selectedUserSavedPass').innerText = newPass; document.getElementById('adminNewResetPass').value = ''; alert('पासवर्ड सफलतापूर्वक बदल दिया गया है!'); } catch (err) { alert('Error: ' + err.message); } finally { btn.innerHTML = orig; btn.disabled = false; } };
 window.adminUpdateVipDays = async function(daysToAdd) { const uid = document.getElementById('userSelectDropdown').value; if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले यूज़र चुनें!'); const uData = window.usersDataList[uid]; let newIsVip = false; let newExpiry = 0; const now = Date.now(); if (daysToAdd > 0) { newIsVip = true; const baseTime = (uData.vipExpiry && uData.vipExpiry > now) ? uData.vipExpiry : now; newExpiry = baseTime + (daysToAdd * MS_PER_DAY); } try { await updateDoc(doc(db, "users", uid), { isVip: newIsVip, vipExpiry: newExpiry }); window.usersDataList[uid].isVip = newIsVip; window.usersDataList[uid].vipExpiry = newExpiry; window.handleUserSelection(); alert(daysToAdd > 0 ? `VIP ${daysToAdd} दिन के लिए बढ़ा दिया गया है!` : `VIP हटा दिया गया है।`); } catch (err) { alert('Error: ' + err.message); } };
 window.adjustCredits = async function(action) { const uid = document.getElementById('userSelectDropdown').value; if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले यूज़र चुनें!'); const amtVal = parseInt(document.getElementById('creditAdjustmentAmount').value); if (isNaN(amtVal) || amtVal <= 0) return alert('कृपया सही क्रेडिट वैल्यू डालें!'); const uData = window.usersDataList[uid]; let currentCredits = uData.credits || 0; let newCredits = action === 'add' ? currentCredits + amtVal : currentCredits - amtVal; if (newCredits < 0) newCredits = 0; try { await updateDoc(doc(db, "users", uid), { credits: newCredits }); window.usersDataList[uid].credits = newCredits; window.handleUserSelection(); document.getElementById('creditAdjustmentAmount').value = ''; alert(`क्रेडिट्स सफलतापूर्वक ${action === 'add' ? 'जोड़' : 'घटा'} दिए गए हैं!`); } catch (err) { alert('Error: ' + err.message); } };
-window.createNewUserByAdmin = async function(e) { e.preventDefault(); const emailInp = document.getElementById('newAdminUserEmail').value.trim().toLowerCase(); const pass = document.getElementById('newAdminUserPass').value.trim(); const phone = document.getElementById('newAdminUserPhone').value.trim(); const credits = parseInt(document.getElementById('newAdminUserCredits').value) || 0; const vipDays = parseInt(document.getElementById('newAdminUserVipDays').value) || 0; const msg = document.getElementById('adminCreateMsg'); const email = emailInp.includes('@') ? emailInp : `${emailInp}@print.com`; if (pass.length < 6) return alert('पासवर्ड 6 अक्षरों का होना चाहिए!'); msg.className = "p-3 bg-blue-50 text-blue-800 rounded-xl text-xs font-bold text-center"; msg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating user account...'; msg.classList.remove('hidden'); try { const signUpRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email, password: pass, returnSecureToken: true }) }); const signUpData = await signUpRes.json(); if (signUpData.error) throw new Error(signUpData.error.message); const uid = signUpData.localId; const now = Date.now(); const isVip = vipDays > 0; const vipExpiry = isVip ? now + (vipDays * MS_PER_DAY) : 0; await setDoc(doc(db, "users", uid), { email: email, username: email.split('@')[0], credits: credits, isVip: isVip, vipExpiry: vipExpiry, allowDob18: true, allowDomicile: true, allowCaste: true, allowDobMinor: true, userPass: pass, adminResetPass: pass, userPhone: phone, createdAt: new Date() }); await window.loadAllUsersForDropdown(); msg.className = "p-3.5 bg-green-50 text-green-900 border border-green-300 rounded-xl text-xs font-black text-center"; msg.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> यूज़र <strong>${email}</strong> सफलतापूर्वक बन गया है!`; e.target.reset(); setTimeout(() => msg.classList.add('hidden'), 5000); } catch (err) { msg.className = "p-3 bg-red-50 text-red-800 border border-red-300 rounded-xl text-xs font-bold text-center"; msg.innerText = "Error: " + err.message; } };
+window.createNewUserByAdmin = async function(e) { e.preventDefault(); const emailInp = document.getElementById('newAdminUserEmail').value.trim().toLowerCase(); const pass = document.getElementById('newAdminUserPass').value.trim(); const phone = document.getElementById('newAdminUserPhone').value.trim(); const credits = parseInt(document.getElementById('newAdminUserCredits').value) || 0; const vipDays = parseInt(document.getElementById('newAdminUserVipDays').value) || 0; const msg = document.getElementById('adminCreateMsg'); const email = emailInp.includes('@') ? emailInp : `${emailInp}@print.com`; if (pass.length < 6) return alert('पासवर्ड 6 अक्षरों का होना चाहिए!'); msg.className = "p-3 bg-blue-50 text-blue-800 rounded-xl text-xs font-bold text-center"; msg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating user account...'; msg.classList.remove('hidden'); try { const signUpRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email, password: pass, returnSecureToken: true }) }); const signUpData = await signUpRes.json(); if (signUpData.error) throw new Error(signUpData.error.message); const uid = signUpData.localId; const now = Date.now(); const isVip = vipDays > 0; const vipExpiry = isVip ? now + (vipDays * MS_PER_DAY) : 0; await setDoc(doc(db, "users", uid), { 
+    email: email, 
+    username: email.split('@')[0], 
+    credits: credits, 
+    isVip: isVip, 
+    vipExpiry: vipExpiry, 
+    allowDob18: true, 
+    allowDobDelhi: true, 
+    allowDobMinor: true, 
+    allowDomicile: true, 
+    allowCaste: true, 
+    allowPassport: true, 
+    allowAnnexures: true, 
+    userPass: pass, 
+    adminResetPass: pass, 
+    userPhone: phone, 
+    createdAt: new Date() 
+}); await window.loadAllUsersForDropdown(); msg.className = "p-3.5 bg-green-50 text-green-900 border border-green-300 rounded-xl text-xs font-black text-center"; msg.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> यूज़र <strong>${email}</strong> सफलतापूर्वक बन गया है!`; e.target.reset(); setTimeout(() => msg.classList.add('hidden'), 5000); } catch (err) { msg.className = "p-3 bg-red-50 text-red-800 border border-red-300 rounded-xl text-xs font-bold text-center"; msg.innerText = "Error: " + err.message; } };
