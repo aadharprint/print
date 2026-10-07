@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="logo.png">
-    <title>Ojas Print Service</title>
+    <title>Ojas Print Service - Portal</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
@@ -98,10 +98,6 @@
             object-position: top center;
             mix-blend-mode: multiply;
             display: block;
-        }
-        .dark .affidavit-paper {
-            background: #ffffff !important;
-            color: #000000 !important;
         }
     </style>
 
@@ -228,7 +224,7 @@
                     <img src="logo.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">
                 </div>
                 <div class="flex items-center gap-1.5">
-                    <h2 id="portalHeaderTitle" class="text-sm md:text-lg font-black text-white">Ojas <span class="text-royal-400">Prints</span></h2>
+                    <h2 id="portalHeaderTitle" class="text-sm md:text-lg font-black text-white">Ojas <span class="text-royal-400">Portal</span></h2>
                     <span id="vipStatusBadge" style="display: none;" class="items-center gap-0.5 md:gap-1 bg-gradient-to-r from-yellow-300 to-amber-500 text-dark-950 text-[8px] md:text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase">
                         <i class="fa-solid fa-crown text-[7px] md:text-[8px]"></i> VIP
                     </span>
@@ -248,7 +244,6 @@
                     <span id="headerSupportUnreadBadge" style="display: none;" class="bg-red-600 text-white text-[9px] md:text-[10px] font-black px-1.5 py-0.2 rounded-full animate-bounce">0</span>
                 </button>
                 
-                <!-- Day / Night Mode Toggle -->
                 <button onclick="window.toggleTheme()" class="theme-toggle-btn w-7 h-7 md:w-9 md:h-9 rounded-lg md:rounded-xl bg-dark-800 hover:bg-dark-700 text-royal-300 border border-slate-700 flex items-center justify-center transition shadow-sm" title="Toggle Dark/Light Mode">
                     <i class="fa-solid fa-moon text-xs md:text-sm"></i>
                 </button>
@@ -256,32 +251,32 @@
                     <i class="fa-solid fa-gear text-xs md:text-sm"></i>
                 </button>
 
-                <div id="gearDropdownMenu" class="hidden absolute right-0 top-10 md:top-12 w-56 md:w-60 bg-white dark:bg-dark-900 text-slate-800 dark:text-slate-100 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 z-50">
-                    <div class="px-4 py-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-dark-950">
+                <div id="gearDropdownMenu" class="hidden absolute right-0 top-10 md:top-12 w-56 md:w-60 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200 py-2 z-50">
+                    <div class="px-4 py-2 border-b border-slate-100 bg-slate-50">
                         <p class="text-[10px] font-bold text-slate-400 uppercase">Logged in as</p>
-                        <p id="displayUser" class="text-xs font-black text-dark-900 dark:text-white truncate"></p>
+                        <p id="displayUser" class="text-xs font-black text-dark-900 truncate"></p>
                         <p id="gearVipDaysText" class="text-[10px] font-bold text-amber-600 mt-0.5"></p>
                     </div>
                     <div class="py-1">
-                        <button id="gearBtnAddCredit" onclick="window.selectGearOption('add_credit')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-dark-800 flex items-center gap-2.5">
+                        <button id="gearBtnAddCredit" onclick="window.selectGearOption('add_credit')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-amber-700 hover:bg-amber-50 flex items-center gap-2.5">
                             <i class="fa-solid fa-plus-circle text-amber-500 w-4"></i> Add Credit / Buy VIP
                         </button>
-                        <button onclick="window.selectGearOption('history')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-dark-800 flex items-center gap-2.5">
+                        <button onclick="window.selectGearOption('history')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5">
                             <i class="fa-solid fa-folder-open text-royal-500 w-4"></i> Document History
                         </button>
-                        <button id="gearBtnPaymentHistory" onclick="window.selectGearOption('payments_history')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-dark-800 flex items-center gap-2.5">
+                        <button id="gearBtnPaymentHistory" onclick="window.selectGearOption('payments_history')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5">
                             <i class="fa-solid fa-receipt text-green-600 w-4"></i> Payment History & Status
                         </button>
-                        <button onclick="window.selectGearOption('password')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-dark-800 flex items-center gap-2.5">
+                        <button onclick="window.selectGearOption('password')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5">
                             <i class="fa-solid fa-key text-indigo-500 w-4"></i> Change Password
                         </button>
-                        <button onclick="window.selectGearOption('support_chat')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-dark-800 flex items-center justify-between">
+                        <button onclick="window.selectGearOption('support_chat')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-green-700 hover:bg-green-50 flex items-center justify-between">
                             <span class="flex items-center gap-2.5"><i class="fa-solid fa-comments text-green-600 w-4"></i> Live Support Chat</span>
                             <span id="gearSupportUnreadBadge" style="display: none;" class="bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">New</span>
                         </button>
                     </div>
-                    <div class="border-t border-slate-100 dark:border-slate-800 pt-1">
-                        <button onclick="window.handleLogout()" class="w-full px-4 py-2 text-left text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-dark-800 flex items-center gap-2.5">
+                    <div class="border-t border-slate-100 pt-1">
+                        <button onclick="window.handleLogout()" class="w-full px-4 py-2 text-left text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-2.5">
                             <i class="fa-solid fa-power-off w-4"></i> Logout
                         </button>
                     </div>
@@ -291,7 +286,6 @@
 
         <!-- WIDE DESKTOP CONTAINER (max-w-7xl) -->
         <main class="max-w-7xl mx-auto w-full p-2.5 md:p-6 flex-grow">
-            <!-- Dual Banners Render Container -->
             <div id="liveUpdateBannerContainer" style="display: none;" class="mb-3.5"></div>
 
             <div id="normalUserVipPromo" style="display: none;" class="mb-4 rounded-2xl vip-promo-shine border border-royal-400 p-3 text-white shadow-md">
@@ -299,7 +293,7 @@
                     <div class="flex items-center gap-2">
                         <span class="bg-amber-400 text-dark-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase shrink-0"><i class="fa-solid fa-crown"></i> VIP ACCESS</span>
                         <p id="normalPromoTextDesc" class="text-xs font-bold text-royal-100">
-                            VIP लें: <strong>DOB (मेरठ/दिल्ली), पासपोर्ट & सारे Official Annexures</strong> अनलॉक करें (सभी डॉक्यूमेंट 10 Cr)!
+                            VIP लें: <strong>18+ DOB & सारे 9 Official Annexures</strong> अनलॉक करें (सभी डॉक्यूमेंट 10 Cr)!
                         </p>
                     </div>
                     <div class="flex items-center gap-1.5 w-full sm:w-auto justify-end">
@@ -310,17 +304,15 @@
                 </div>
             </div>
 
-            <!-- Standard Services -->
             <div id="standardServicesGrid" class="grid grid-cols-2 gap-2.5 mb-3">
                 <button onclick="window.switchService('domicile')" id="btn-domicile" class="service-tab"><i class="fa-solid fa-house-chimney"></i> Domicile (मूल निवास)</button>
                 <button onclick="window.switchService('caste')" id="btn-caste" class="service-tab"><i class="fa-solid fa-users"></i> Caste (जाति प्रमाण पत्र)</button>
             </div>
 
-            <!-- VIP Services (DOB Meerut, DOB Delhi, Passport, All Annexures) -->
             <div id="vipServicesBar" style="display: none;" class="mb-4 p-3 md:p-4 rounded-2xl bg-dark-950/90 border border-royal-400 shadow-vip-glow">
                 <div class="flex items-center justify-between mb-2.5 pb-1.5 border-b border-slate-800">
                     <span id="vipBarTitleLabel" class="text-[11px] font-black uppercase tracking-wider text-royal-300 flex items-center gap-1.5">
-                        <i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB, Passport &amp; All Annexures)
+                        <i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures)
                     </span>
                     <button onclick="window.selectGearOption('history')" class="text-[10px] text-slate-300 hover:text-royal-300 font-bold">
                         <i class="fa-solid fa-folder-open mr-1"></i> Saved Files
