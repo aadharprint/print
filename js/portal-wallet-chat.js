@@ -551,68 +551,156 @@ window.submitPaymentIssueTicket = async function() {
 
 window.openPdfViewer = async function(fileId, fileName, historyIndex = -1) {
     document.getElementById('pdfViewerTitle').innerText = fileName;
-    const iframe = document.getElementById('pdfIframe'); const htmlPreviewContainer = document.getElementById('htmlDocPreviewContainer');
-    const spinner = document.getElementById('pdfLoadingSpinner'); const downloadBtn = document.getElementById('modalDownloadBtn');
-    const printBtn = document.getElementById('modalPrintBtn'); const modalStampLabel = document.getElementById('modalStampToggleLabel');
-    const modalStampCheckbox = document.getElementById('modalStampCheckbox'); const shareBtn = document.getElementById('modalShareBtn');
+    const iframe = document.getElementById('pdfIframe'); 
+    const htmlPreviewContainer = document.getElementById('htmlDocPreviewContainer');
+    const spinner = document.getElementById('pdfLoadingSpinner'); 
+    const downloadBtn = document.getElementById('modalDownloadBtn');
+    const printBtn = document.getElementById('modalPrintBtn'); 
+    const modalStampLabel = document.getElementById('modalStampToggleLabel');
+    const modalStampCheckbox = document.getElementById('modalStampCheckbox'); 
+    const shareBtn = document.getElementById('modalShareBtn');
 
     const isAnnexure = String(fileId).startsWith('LOCAL_HTML_');
-    let initialWithStamp = false, initialStampSrc = '', initialStampFile = '', initialCertFileId = '';
+    let initialWithStamp = false, initialStampSrc = '', initialStampFile = '', initialCertFileId = '', initialCertBase64 = '';
 
-    if (historyIndex >= 0) {
-        const record = (window.historyData && window.historyData[historyIndex]) || (window.adminAllHistoryData && window.adminAllHistoryData[historyIndex]);
-        if (record) {
-            initialWithStamp = !!record.withStamp;
-            initialStampFile = record.stampFile || 'stamp.png';
-            initialCertFileId = (record.certificateFileId && record.isCertificateAttached !== false) ? record.certificateFileId : ''; 
+    const record = (window.historyData && window.historyData[historyIndex]);
+
+    if (historyIndex >= 0 && record) {
+        const existingState = window.stampSelectionMap ? window.stampSelectionMap[historyIndex] : null;
+        initialWithStamp = !!(existingState ? existingState.enabled : record.withStamp); 
+        initialStampSrc = existingState?.stampSrc || ''; 
+        initialStampFile = existingState?.stampFile || record.stampFile || '';
+        
+        initialCertFileId = (record?.certificateFileId && record?.isCertificateAttached !== false) ? record.certificateFileId : '';
+        initialCertBase64 = record?.certificateBase64 || '';
+    }
+
+    if (initialWithStamp && !initialStampSrc && typeof window.preloadAllAvailableStamps === 'function') {
+        if (window.availableStampsList && window.availableStampsList.length === 0) await window.preloadAllAvailableStamps();
+        if (window.pickRandomAvailableStampObj) { 
+            const chosenObj = window.pickRandomAvailableStampObj(); 
+            initialStampSrc = chosenObj.dataUrl; 
+            initialStampFile = chosenObj.name; 
         }
     }
 
-    if (initialWithStamp && !initialStampSrc && typeof window.getTransparentStampDataUrl === 'function') {
-        initialStampSrc = await window.getTransparentStampDataUrl(initialStampFile);
-    }
+    window.currentModalContext = { 
+        fileId: fileId, fileName: fileName, historyIndex: historyIndex, 
+        withStamp: initialWithStamp, stampFile: initialStampFile, stampSrc: initialStampSrc, 
+        certificateFileId: initialCertFileId, certificateBase64: initialCertBase64 
+    };
+    window.currentMergedPdfBlob = null;
 
-    window.currentModalContext = { fileId: fileId, fileName: fileName, historyIndex: historyIndex, withStamp: initialWithStamp, stampFile: initialStampFile, stampSrc: initialStampSrc, certificateFileId: initialCertFileId };
-    
-    const previewParent = iframe.parentElement;
-    previewParent.classList.add('flex', 'flex-col');
-    if (shareBtn) shareBtn.style.display = 'none';
+    const modal = document.getElementById('pdfViewerModal'); 
+    if (modal) { modal.style.display = 'flex'; modal.classList.remove('hidden'); } 
+    document.body.style.overflow = 'hidden';
 
     if (isAnnexure && historyIndex >= 0) {
         if (shareBtn) shareBtn.style.display = 'flex';
         if (modalStampLabel) modalStampLabel.classList.remove('hidden');
         if (modalStampCheckbox) modalStampCheckbox.checked = initialWithStamp;
 
-        const record = (window.historyData && window.historyData[historyIndex]) || (window.adminAllHistoryData && window.adminAllHistoryData[historyIndex]);
         const fData = record?.formData || {};
-        spinner.style.display = 'none';
-        
+
+        // If certificate is attached: Combine Page 1 (Annexure) + Page 2 (Certificate) into single 2-Page PDF
         if (initialCertFileId) {
-            iframe.style.display = 'block'; iframe.style.flex = '1'; iframe.style.minHeight = '350px'; iframe.style.borderBottom = '4px solid #cbd5e1';
-            iframe.src = `https://drive.google.com/file/d/${initialCertFileId}/preview`;
-            
-            htmlPreviewContainer.style.display = 'flex'; htmlPreviewContainer.style.flex = '1'; htmlPreviewContainer.style.minHeight = '350px';
-            htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true, initialWithStamp, initialStampSrc);
-        } else {
+            spinner.style.display = 'flex';
+            spinner.querySelector('p').innerText = 'Generating 2-Page Combined Document...';
             iframe.style.display = 'none';
-            htmlPreviewContainer.style.display = 'flex'; htmlPreviewContainer.style.flex = '1';
-            htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true, initialWithStamp, initialStampSrc);
+            htmlPreviewContainer.style.display = 'none';
+
+            try {
+                // 1. Generate Page 1 (Annexure PDF)
+                const annexureBlob = await window.generateAnnexureBlob(fileId, fData, initialWithStamp, initialStampSrc);
+
+                // 2. Fetch Certificate Base64 if not already cached
+                let certB64 = initialCertBase64;
+                if (!certB64 && typeof window.fetchCertificateBase64 === 'function') {
+                    certB64 = await window.fetchCertificateBase64(initialCertFileId);
+                    if (certB64 && record) {
+                        record.certificateBase64 = certB64;
+                    }
+                }
+
+                // 3. Merge Page 1 (Annexure) & Page 2 (Certificate)
+                const finalPdfBlob = await window.mergeAnnexureAndCertificate(annexureBlob, certB64);
+                window.currentMergedPdfBlob = finalPdfBlob;
+
+                const blobUrl = URL.createObjectURL(finalPdfBlob);
+                iframe.src = blobUrl;
+                iframe.style.display = 'block';
+                iframe.style.flex = '1';
+                iframe.style.borderBottom = 'none';
+                spinner.style.display = 'none';
+
+                // Unified 2-Page Download
+                if (downloadBtn) {
+                    downloadBtn.onclick = function() {
+                        const a = document.createElement('a');
+                        a.href = URL.createObjectURL(window.currentMergedPdfBlob);
+                        const finalName = initialWithStamp ? fileName.replace('.pdf', ' (With Stamp & Certificate).pdf') : fileName.replace('.pdf', ' (With Certificate).pdf');
+                        a.download = finalName;
+                        a.click();
+                    };
+                }
+
+                // Unified 2-Page Direct Print
+                if (printBtn) {
+                    printBtn.onclick = function() {
+                        try {
+                            iframe.contentWindow.focus();
+                            iframe.contentWindow.print();
+                        } catch(e) {
+                            window.open(blobUrl, '_blank');
+                        }
+                    };
+                }
+
+                // Unified 2-Page Share
+                if (shareBtn) {
+                    shareBtn.onclick = async function() {
+                        const finalName = fileName.replace('.pdf', ' (2-Page).pdf');
+                        const file = new File([window.currentMergedPdfBlob], finalName, { type: 'application/pdf' });
+                        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                            await navigator.share({ files: [file], title: finalName, text: 'Here is your 2-page document.' });
+                        } else {
+                            alert('Browser does not support direct sharing. Please download PDF.');
+                        }
+                    };
+                }
+
+                return;
+            } catch(err) {
+                console.error("2-Page PDF Generation Error:", err);
+                spinner.style.display = 'none';
+            }
         }
 
-        if (downloadBtn) { downloadBtn.onclick = async function() { await window.downloadHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc, window.currentModalContext.certificateFileId); }; }
-        if (printBtn) { printBtn.onclick = function() { window.directPrintDocument(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc, window.currentModalContext.certificateFileId); }; }
-        if (shareBtn) { shareBtn.onclick = async function() { await window.shareHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc, window.currentModalContext.certificateFileId); }; }
+        // Normal 1-Page Annexure (No Certificate Attached)
+        spinner.style.display = 'none';
+        iframe.style.display = 'none';
+        htmlPreviewContainer.style.display = 'flex';
+        htmlPreviewContainer.style.flex = '1';
+        htmlPreviewContainer.innerHTML = window.buildLocalAffidavitHtml(fileId, fData, true, initialWithStamp, initialStampSrc);
+
+        if (downloadBtn) { downloadBtn.onclick = async function() { await window.downloadHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc, ''); }; }
+        if (printBtn) { printBtn.onclick = function() { window.directPrintDocument(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc, ''); }; }
+        if (shareBtn) { shareBtn.onclick = async function() { await window.shareHtmlDocAsPdf(fileId, fData, fileName, window.currentModalContext.withStamp, window.currentModalContext.stampSrc, ''); }; }
+
     } else {
+        // Drive Hosted PDF files (Domicile, Caste, DOB, Passport)
         if (modalStampLabel) modalStampLabel.classList.add('hidden');
         if (shareBtn) shareBtn.style.display = 'none'; 
-        htmlPreviewContainer.style.display = 'none'; htmlPreviewContainer.innerHTML = '';
-        iframe.style.display = 'block'; iframe.style.flex = '1'; spinner.style.display = 'flex';
+        htmlPreviewContainer.style.display = 'none'; 
+        htmlPreviewContainer.innerHTML = '';
+        iframe.style.display = 'block'; 
+        iframe.style.flex = '1'; 
+        spinner.style.display = 'flex';
         iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
         
         if (downloadBtn) { downloadBtn.onclick = function() { window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank'); }; }
         if (printBtn) { printBtn.onclick = function() { window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank'); }; }
     }
-    const modal = document.getElementById('pdfViewerModal'); if (modal) { modal.style.display = 'flex'; modal.classList.remove('hidden'); } document.body.style.overflow = 'hidden';
 };
 
 window.closePdfViewer = function() { const modal = document.getElementById('pdfViewerModal'); if (modal) { modal.style.display = 'none'; modal.classList.add('hidden'); } const iframe = document.getElementById('pdfIframe'); if (iframe) iframe.src = ''; const htmlContainer = document.getElementById('htmlDocPreviewContainer'); if (htmlContainer) htmlContainer.innerHTML = ''; document.body.style.overflow = 'auto'; };

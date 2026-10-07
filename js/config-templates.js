@@ -509,6 +509,82 @@ window.buildLocalAffidavitHtml = function(fileId, d = {}, withShadow = true, wit
 };
 
 // ================= SHARED PDF DOWNLOAD, DIRECT PRINT & SHARE =================
+
+// ================= 2-PAGE PDF MERGING HELPERS (ANNEXURE + CERTIFICATE) =================
+window.generateAnnexureBlob = async function(fileId, formDataObj, withStamp = false, stampSrc = '') {
+    if (withStamp && typeof window.preloadAllAvailableStamps === 'function' && window.availableStampsList?.length === 0) {
+        await window.preloadAllAvailableStamps();
+    }
+    const finalStampSrc = withStamp ? (stampSrc || (typeof window.pickRandomAvailableStamp === 'function' ? window.pickRandomAvailableStamp() : 'stamp.png')) : '';
+    const tempWrapper = document.createElement('div');
+    tempWrapper.style.cssText = 'position:fixed;top:0;left:0;width:794px;height:1122px;margin:0;padding:0;z-index:99999;background:#ffffff;overflow:hidden;';
+    tempWrapper.innerHTML = window.buildLocalAffidavitHtml(fileId, formDataObj, false, withStamp, finalStampSrc);
+    document.body.appendChild(tempWrapper);
+    const targetEl = tempWrapper.querySelector('.affidavit-paper');
+
+    try {
+        const opt = {
+            margin: 0,
+            image: { type: 'jpeg', quality: 1.0 },
+            html2canvas: { scale: 2, useCORS: true, x: 0, y: 0, scrollX: 0, scrollY: 0, width: 794, height: 1122, windowWidth: 794, windowHeight: 1122 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        const pdfBlob = await html2pdf().set(opt).from(targetEl).output('blob');
+        return pdfBlob;
+    } finally {
+        document.body.removeChild(tempWrapper);
+    }
+};
+
+window.mergeAnnexureAndCertificate = async function(annexureBlob, certBase64) {
+    if (!window.PDFLib || !certBase64) return annexureBlob;
+    try {
+        const { PDFDocument } = window.PDFLib;
+        const mergedDoc = await PDFDocument.create();
+        
+        // Page 1: Annexure
+        const annexureBytes = await annexureBlob.arrayBuffer();
+        const doc1 = await PDFDocument.load(annexureBytes);
+        const pages1 = await mergedDoc.copyPages(doc1, doc1.getPageIndices());
+        pages1.forEach(p => mergedDoc.addPage(p));
+        
+        // Page 2: Certificate
+        const cleanBase64 = certBase64.replace(/^data:application\/pdf;base64,/, '').trim();
+        const binaryStr = atob(cleanBase64);
+        const certBytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) {
+            certBytes[i] = binaryStr.charCodeAt(i);
+        }
+        const doc2 = await PDFDocument.load(certBytes);
+        const pages2 = await mergedDoc.copyPages(doc2, doc2.getPageIndices());
+        pages2.forEach(p => mergedDoc.addPage(p));
+        
+        const mergedBytes = await mergedDoc.save();
+        return new Blob([mergedBytes], { type: 'application/pdf' });
+    } catch (e) {
+        console.error("PDF Merge Error:", e);
+        return annexureBlob;
+    }
+};
+
+window.fetchCertificateBase64 = async function(fileId) {
+    if (!fileId) return null;
+    const targetUrl = window.API_URLS["certificate"];
+    if (!targetUrl) return null;
+    try {
+        const res = await fetch(targetUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: "GET_BASE64", fileId: fileId })
+        });
+        const data = await res.json();
+        if (data.success && data.pdfBase64) {
+            return data.pdfBase64;
+        }
+    } catch (e) {}
+    return null;
+};
+
 window.downloadHtmlDocAsPdf = async function(fileId, formDataObj, fileName, withStamp = false, stampSrc = '', certificateFileId = '') {
     const btn = document.getElementById('modalDownloadBtn');
     const origHtml = btn ? btn.innerHTML : '';
