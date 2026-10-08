@@ -525,7 +525,7 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
             <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3 mb-4 relative z-20">
                 <div>
                     <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-cake-candles text-royal-500 mr-1.5"></i> Date of Birth Certificate (DOB Delhi VIP)</h3>
-                    <p class="text-[11px] font-bold text-slate-500">(COMING SOON)</p>
+                    <p class="text-[11px] font-bold text-slate-500">VIP एक्सक्लूसिव सर्विस (दिल्ली)</p>
                 </div>
                 ${statusTagHtml}
             </div>
@@ -541,7 +541,7 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
                         <div><label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Pin Code</label><input type="text" name="PIN" required class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none uppercase relative z-10"></div>
                         <div class="md:col-span-2 relative z-10">
                             <div class="flex justify-between items-center mb-1">
-                                <label class="text-[11px] font-bold text-slate-500 uppercase">ADDRESS </label>
+                                <label class="text-[11px] font-bold text-slate-500 uppercase">ADDRESS ( 'Delhi' लिखने की आवश्यकता नहीं है)</label>
                                 <span id="dobDelhiAddressCharCount" class="text-[10px] font-bold text-slate-400">7 / 38 Characters</span>
                             </div>
                             <input type="text" id="dobDelhiAddressInput" name="ADDRESS" value="VILL - " oninput="window.handleDob18AddressInput(this)" onblur="this.value = window.cleanDob18AddressString(this.value); window.handleDob18AddressInput(this);" required class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-slate-50 focus:bg-white outline-none uppercase">
@@ -564,7 +564,7 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
             <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3 mb-4 relative z-20">
                 <div>
                     <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-passport text-sky-500 mr-1.5"></i> Passport Services (VIP Exclusive)</h3>
-                    <p class="text-[11px] font-bold text-slate-500">(COMING SOON)</p>
+                    <p class="text-[11px] font-bold text-slate-500">VIP एक्सक्लूसिव पासपोर्ट सर्विस</p>
                 </div>
                 ${statusTagHtml}
             </div>
