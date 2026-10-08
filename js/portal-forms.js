@@ -525,7 +525,7 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
             <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3 mb-4 relative z-20">
                 <div>
                     <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-cake-candles text-royal-500 mr-1.5"></i> Date of Birth Certificate (DOB Delhi VIP)</h3>
-                    <p class="text-[11px] font-bold text-slate-500">VIP एक्सक्लूसिव सर्विस (दिल्ली)</p>
+                    <p class="text-[11px] font-bold text-slate-500">(COMING SOON)</p>
                 </div>
                 ${statusTagHtml}
             </div>
@@ -564,7 +564,7 @@ window.renderServiceFormHtml = function(serviceName, container, submitBtnText, s
             <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3 mb-4 relative z-20">
                 <div>
                     <h3 class="text-base md:text-lg font-black text-dark-900"><i class="fa-solid fa-passport text-sky-500 mr-1.5"></i> Passport Services (VIP Exclusive)</h3>
-                    <p class="text-[11px] font-bold text-slate-500">VIP एक्सक्लूसिव पासपोर्ट सर्विस</p>
+                    <p class="text-[11px] font-bold text-slate-500">(COMING SOON)</p>
                 </div>
                 ${statusTagHtml}
             </div>
