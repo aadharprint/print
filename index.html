@@ -157,16 +157,17 @@
         html.dark #userLiveChatMessagesBox {
             background-color: #020617 !important;
         }
-     /* Ensure affidavit paper remains crisp white for printing and viewing */
-        .affidavit-paper, .affidavit-paper * {
+ /* 1. सिर्फ मेन पेपर को सफ़ेद रखें, अंदर के हर एलिमेंट पर ज़बरदस्ती बैकग्राउंड न थोपें (इससे टेक्स्ट गायब नहीं होगा) */
+        .affidavit-paper {
             background-color: #ffffff !important;
             color: #000000 !important;
         }
 
-        /* FIX: सिर्फ स्टैम्प वाले हिस्से को ट्रांसपेरेंट करने के लिए */
-        .affidavit-paper .stamp-overlay-layer, 
-        .affidavit-paper .stamp-overlay-layer img {
+        /* 2. स्टैम्प लेयर को ट्रांसपेरेंट रखें और लेआउट खिसकने से रोकने के लिए blend-mode normal करें */
+        .stamp-overlay-layer, 
+        .stamp-overlay-layer img {
             background-color: transparent !important;
+            mix-blend-mode: normal !important; 
         }
 
     </style>
