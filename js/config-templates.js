@@ -10,7 +10,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { 
     getFirestore, doc, getDoc, setDoc, updateDoc, collection, 
-    addDoc, getDocs, query, where, onSnapshot, deleteDoc 
+    addDoc, getDocs, query, where, onSnapshot, deleteDoc,
+    orderBy, limit, startAfter
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 export const firebaseConfig = {
@@ -31,7 +32,7 @@ window.fb = {
     firebaseConfig, app, auth, db,
     signInWithEmailAndPassword, signOut, onAuthStateChanged,
     updatePassword, EmailAuthProvider, reauthenticateWithCredential,
-    doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, query, where, onSnapshot, deleteDoc
+    doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, query, where, onSnapshot, deleteDoc, orderBy, limit, startAfter
 };
 
 window.alert = function(message) {

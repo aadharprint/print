@@ -37,7 +37,8 @@ import "./config-templates.js";
 
 const {
     firebaseConfig, auth, db, onAuthStateChanged, signOut,
-    doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, onSnapshot
+    doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, onSnapshot,
+    query, where, orderBy, limit, startAfter
 } = window.fb;
 
 const ADMIN_EMAIL = window.ADMIN_EMAIL;
@@ -568,32 +569,145 @@ window.rejectPayment = async function(paymentDocId) { if (!confirm(`क्या
 window.deletePaymentRecord = async function(paymentDocId) { if (!confirm(`क्या आप इस पेमेंट हिस्ट्री रिकॉर्ड को हमेशा के लिए डिलीट करना चाहते हैं?`)) return; try { await deleteDoc(doc(db, "payments", paymentDocId)); window.loadAllPayments(); } catch (err) {} };
 
 // ================= HISTORY, STAMP & NEW CERTIFICATE CHECKBOX LOGIC =================
-window.loadAdminHistory = async function() {
+window.adminHistoryLastVisibleDoc = null;
+window.adminHistoryHasMore = true;
+window.adminHistoryIsLoading = false;
+window.adminHistoryBatchSize = 20;
+window.adminHistoryObserver = null;
+
+window.loadAdminHistory = async function(isReset = true) {
     const container = document.getElementById('adminHistoryListContainer');
-    container.innerHTML = `<div class="p-10 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>रिकॉर्ड्स लोड हो रहे हैं...</div>`;
+    const btn = document.getElementById('btnLoadMoreHistory');
+
+    if (isReset) {
+        window.adminAllHistoryData = [];
+        window.adminHistoryLastVisibleDoc = null;
+        window.adminHistoryHasMore = true;
+        if (container) {
+            container.innerHTML = `<div class="p-10 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>ताज़ा 20 रिकॉर्ड्स लोड हो रहे हैं...</div>`;
+        }
+    }
+
+    if (window.adminHistoryIsLoading || !window.adminHistoryHasMore) return;
+    window.adminHistoryIsLoading = true;
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> लोड हो रहा है...';
+    }
+
     await window.preloadAllAvailableStamps();
 
     try {
-        const filterUserDropdown = document.getElementById('filterUser'); const currUserFilter = filterUserDropdown.value; filterUserDropdown.innerHTML = '<option value="ALL">All Users</option>'; filterUserDropdown.innerHTML += `<option value="${window.currentUserData.uid}">👑 Harish Kumar (Admin)</option>`;
-        for (const [uid, data] of Object.entries(window.usersDataList)) { window.allUsersMap[uid] = data.email; if (uid !== window.currentUserData.uid) filterUserDropdown.innerHTML += `<option value="${uid}">${data.email}</option>`; }
-        filterUserDropdown.value = currUserFilter || 'ALL';
+        const filterUserDropdown = document.getElementById('filterUser');
+        if (filterUserDropdown && filterUserDropdown.options.length <= 1) {
+            const currUserFilter = filterUserDropdown.value;
+            filterUserDropdown.innerHTML = '<option value="ALL">All Users</option>';
+            filterUserDropdown.innerHTML += `<option value="${window.currentUserData.uid}">👑 Harish Kumar (Admin)</option>`;
+            for (const [uid, data] of Object.entries(window.usersDataList)) {
+                window.allUsersMap[uid] = data.email;
+                if (uid !== window.currentUserData.uid) filterUserDropdown.innerHTML += `<option value="${uid}">${data.email}</option>`;
+            }
+            filterUserDropdown.value = currUserFilter || 'ALL';
+        }
 
-        const historySnap = await getDocs(collection(db, "history")); window.adminAllHistoryData = [];
-        historySnap.forEach(docSnap => { window.adminAllHistoryData.push({ id: docSnap.id, ...docSnap.data() }); });
-        window.adminAllHistoryData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+        const historyCol = collection(db, "history");
+        let historyQuery;
 
-        window.stampSelectionMap = {};
-        window.certificateSelectionMap = {};
+        if (window.adminHistoryLastVisibleDoc) {
+            historyQuery = query(
+                historyCol,
+                orderBy("timestamp", "desc"),
+                startAfter(window.adminHistoryLastVisibleDoc),
+                limit(window.adminHistoryBatchSize)
+            );
+        } else {
+            historyQuery = query(
+                historyCol,
+                orderBy("timestamp", "desc"),
+                limit(window.adminHistoryBatchSize)
+            );
+        }
+
+        let snap;
+        try {
+            snap = await getDocs(historyQuery);
+        } catch (queryErr) {
+            console.warn('Index fallback on query:', queryErr);
+            historyQuery = query(historyCol, limit(window.adminHistoryBatchSize));
+            snap = await getDocs(historyQuery);
+        }
+
+        if (snap.empty || snap.docs.length < window.adminHistoryBatchSize) {
+            window.adminHistoryHasMore = false;
+        }
+
+        if (!snap.empty) {
+            window.adminHistoryLastVisibleDoc = snap.docs[snap.docs.length - 1];
+            snap.forEach(docSnap => {
+                window.adminAllHistoryData.push({ id: docSnap.id, ...docSnap.data() });
+            });
+        }
+
+        window.stampSelectionMap = window.stampSelectionMap || {};
+        window.certificateSelectionMap = window.certificateSelectionMap || {};
 
         window.adminAllHistoryData.forEach((rec, idx) => {
-            if (rec.withStamp) { window.stampSelectionMap[idx] = { enabled: true, stampFile: rec.stampFile || 'stamp.png', stampSrc: window.getStampDataUrlByName(rec.stampFile || 'stamp.png') }; }
-            
-            // Check for persistent attachment status
+            if (rec.withStamp && !window.stampSelectionMap[idx]) {
+                window.stampSelectionMap[idx] = { 
+                    enabled: true, 
+                    stampFile: rec.stampFile || 'stamp.png', 
+                    stampSrc: window.getStampDataUrlByName(rec.stampFile || 'stamp.png') 
+                };
+            }
             let certEnabled = rec.certificateFileId ? (rec.isCertificateAttached !== false) : false;
-            if (rec.certificateFileId) { window.certificateSelectionMap[idx] = { enabled: certEnabled, certificateFileId: rec.certificateFileId }; }
+            if (rec.certificateFileId && !window.certificateSelectionMap[idx]) {
+                window.certificateSelectionMap[idx] = { enabled: certEnabled, certificateFileId: rec.certificateFileId };
+            }
         });
+
         window.renderAdminHistory();
-    } catch (err) {}
+        window.setupAdminHistoryInfiniteScroll();
+
+    } catch (err) {
+        console.error('History load error:', err);
+        if (container && isReset) {
+            container.innerHTML = `<div class="p-6 text-center text-red-500 font-bold bg-white rounded-2xl">एरर: ${err.message}</div>`;
+        }
+    } finally {
+        window.adminHistoryIsLoading = false;
+        if (btn) {
+            btn.disabled = !window.adminHistoryHasMore;
+            btn.innerHTML = window.adminHistoryHasMore 
+                ? '<i class="fa-solid fa-angles-down mr-1"></i> और 20 रिकॉर्ड्स लोड करें (Load More)' 
+                : '✅ सभी रिकॉर्ड्स लोड हो चुके हैं';
+            btn.className = window.adminHistoryHasMore 
+                ? "bg-dark-900 hover:bg-black text-royal-300 font-black px-6 py-2.5 rounded-xl text-xs shadow-sm transition flex items-center gap-2 mx-auto" 
+                : "bg-slate-200 text-slate-500 font-bold px-6 py-2.5 rounded-xl text-xs transition cursor-default mx-auto";
+        }
+    }
+};
+
+window.loadNextAdminHistoryBatch = async function() {
+    if (window.adminHistoryIsLoading || !window.adminHistoryHasMore) return;
+    await window.loadAdminHistory(false);
+};
+
+window.setupAdminHistoryInfiniteScroll = function() {
+    const sentinel = document.getElementById('adminHistoryScrollSentinel');
+    if (!sentinel) return;
+
+    if (window.adminHistoryObserver) {
+        window.adminHistoryObserver.disconnect();
+    }
+
+    window.adminHistoryObserver = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && window.adminHistoryHasMore && !window.adminHistoryIsLoading) {
+            window.loadNextAdminHistoryBatch();
+        }
+    }, { rootMargin: '200px' });
+
+    window.adminHistoryObserver.observe(sentinel);
 };
 
 window.toggleRowStampCheckbox = async function(origIndex, isChecked) {
@@ -743,7 +857,7 @@ window.renderAdminHistory = function() {
         });
     }
 
-    document.getElementById('historyCount').innerText = `Total Files: ${filteredData.length}`; container.innerHTML = '';
+    document.getElementById('historyCount').innerText = `दिख रहे हैं: ${filteredData.length} फाइल्स ${window.adminHistoryHasMore ? '(नीचे स्क्रॉल करके और देखें)' : '(सभी लोडेड)'}`; container.innerHTML = '';
     if (filteredData.length === 0) { container.innerHTML = `<div class="p-10 text-center text-slate-400 bg-white rounded-2xl border border-slate-100"><i class="fa-regular fa-folder-open text-4xl mb-2 text-slate-300"></i><br>कोई फाइल नहीं मिली।</div>`; return; }
 
     filteredData.forEach(data => {
