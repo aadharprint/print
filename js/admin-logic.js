@@ -942,6 +942,154 @@ window.handleUserSelection = function() {
     if(document.getElementById('userDobMinorToggle')) document.getElementById('userDobMinorToggle').checked = (uData.allowDobDelhi !== false && uData.allowDobMinor !== false);
     if(document.getElementById('userPassportToggle')) document.getElementById('userPassportToggle').checked = uData.allowPassport !== false;
     if(document.getElementById('userAnnexuresToggle')) document.getElementById('userAnnexuresToggle').checked = uData.allowAnnexures !== false;
+
+    // Load Personal Banner Config for Selected User
+    const bannerChk = document.getElementById('chkUserBannerEnabled');
+    if (bannerChk) bannerChk.checked = !!uData.personalBannerEnabled;
+    if (document.getElementById('inpUserBannerBadge')) document.getElementById('inpUserBannerBadge').value = uData.personalBannerBadge || 'NOTICE';
+    if (document.getElementById('inpUserBannerTitle')) document.getElementById('inpUserBannerTitle').value = uData.personalBannerTitle || '';
+    if (document.getElementById('inpUserBannerMessage')) document.getElementById('inpUserBannerMessage').value = uData.personalBannerMessage || '';
+    if (document.getElementById('inpUserBannerBtnText')) document.getElementById('inpUserBannerBtnText').value = uData.personalBannerBtnText || '';
+    if (document.getElementById('inpUserBannerBtnLink')) document.getElementById('inpUserBannerBtnLink').value = uData.personalBannerBtnLink || '';
+    if (typeof window.updateUserBannerPreview === 'function') window.updateUserBannerPreview();
+};
+
+window.updateUserBannerPreview = function() {
+    const uid = document.getElementById('userSelectDropdown')?.value;
+    const previewBox = document.getElementById('userBannerPreviewBox');
+    if (!previewBox) return;
+    if (!uid || !window.usersDataList[uid]) {
+        previewBox.innerHTML = '<span class="text-xs text-slate-400 font-bold"><i class="fa-solid fa-arrow-up mr-1"></i> कृपया पहले ऊपर ड्रॉपडाउन से कोई यूज़र चुनें</span>';
+        return;
+    }
+    const uData = window.usersDataList[uid];
+    const isEnabled = document.getElementById('chkUserBannerEnabled')?.checked;
+    const badge = document.getElementById('inpUserBannerBadge')?.value.trim() || 'NOTICE';
+    const title = document.getElementById('inpUserBannerTitle')?.value.trim();
+    const msg = document.getElementById('inpUserBannerMessage')?.value.trim();
+    const btnText = document.getElementById('inpUserBannerBtnText')?.value.trim();
+    const name = typeof window.extractUserDisplayName === 'function' 
+        ? window.extractUserDisplayName(uData.email, uData.username) 
+        : (uData.username || uData.email.split('@')[0]);
+
+    if (!isEnabled) {
+        previewBox.innerHTML = `
+            <div class="p-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 text-xs font-bold text-center">
+                <i class="fa-solid fa-eye-slash mr-1 text-slate-400"></i> इस यूज़र (${uData.email}) के लिए पर्सनल बैनर वर्तमान में <strong>बंद (OFF)</strong> है।
+            </div>`;
+        return;
+    }
+
+    const displayMsg = msg || 'यहाँ जो भी संदेश लिखेंगे, वह यूज़र को इस बॉक्स में दिखेगा...';
+    const btnHtml = btnText ? `<span class="bg-amber-400 text-dark-950 font-black px-3 py-1 rounded-xl text-[10px] shrink-0 shadow-sm">${btnText}</span>` : '';
+
+    previewBox.innerHTML = `
+        <div class="p-3.5 md:p-4 rounded-2xl bg-gradient-to-r from-dark-950 via-slate-900 to-amber-950 text-white border-2 border-amber-400 shadow-lg relative overflow-hidden">
+            <div class="relative z-10 space-y-1.5">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <span class="bg-amber-400 text-dark-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shrink-0">
+                            <i class="fa-solid fa-user-tag mr-1"></i>${badge}
+                        </span>
+                        <h4 class="text-xs md:text-sm font-black text-amber-300 flex items-center gap-1.5">
+                            <span>डियर ${name}</span>
+                            ${title ? `<span class="text-slate-300 font-semibold">• ${title}</span>` : ''}
+                        </h4>
+                    </div>
+                    ${btnHtml}
+                </div>
+                <p class="text-xs md:text-sm font-bold text-slate-100 whitespace-pre-line leading-relaxed pl-0.5">
+                    ${displayMsg}
+                </p>
+            </div>
+        </div>`;
+};
+
+window.saveSelectedUserBanner = async function(event) {
+    if (event) event.preventDefault();
+    const uid = document.getElementById('userSelectDropdown')?.value;
+    if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले ड्रॉपडाउन से उस यूज़र को सेलेक्ट करें जिसके लिए बैनर सेट करना है!');
+    const uData = window.usersDataList[uid];
+    const btn = document.getElementById('btnSaveUserBanner');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...'; }
+
+    const isEnabled = document.getElementById('chkUserBannerEnabled').checked;
+    const badge = document.getElementById('inpUserBannerBadge').value.trim() || 'NOTICE';
+    const title = document.getElementById('inpUserBannerTitle').value.trim();
+    const message = document.getElementById('inpUserBannerMessage').value.trim();
+    const btnText = document.getElementById('inpUserBannerBtnText').value.trim();
+    const btnLink = document.getElementById('inpUserBannerBtnLink').value.trim();
+
+    if (isEnabled && !message) {
+        alert('कृपया यूज़र के लिए मैसेज भी लिखें, या फिर "Show to this User" टिक हटा दें!');
+        if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+        return;
+    }
+
+    try {
+        const payload = {
+            personalBannerEnabled: isEnabled,
+            personalBannerBadge: badge,
+            personalBannerTitle: title,
+            personalBannerMessage: message,
+            personalBannerBtnText: btnText,
+            personalBannerBtnLink: btnLink,
+            personalBannerUpdatedAt: new Date()
+        };
+        await updateDoc(doc(db, "users", uid), payload);
+        
+        Object.assign(window.usersDataList[uid], payload);
+        window.updateUserBannerPreview();
+
+        const name = typeof window.extractUserDisplayName === 'function' 
+            ? window.extractUserDisplayName(uData.email, uData.username) 
+            : (uData.username || uData.email.split('@')[0]);
+
+        const alertMsg = document.getElementById('adminMsg');
+        if (alertMsg) {
+            alertMsg.className = "p-3.5 bg-green-50 text-green-900 rounded-2xl text-xs font-black border border-green-300 text-center shadow-sm";
+            alertMsg.innerHTML = `<i class="fa-solid fa-circle-check text-green-600 mr-1"></i> यूज़र <strong>${uData.email} (डियर ${name})</strong> के लिए पर्सनल बैनर सफलतापूर्वक <strong>${isEnabled ? 'चालू (Saved & Active)' : 'बंद (Disabled)'}</strong> कर दिया गया है!`;
+            alertMsg.classList.remove('hidden');
+            setTimeout(() => alertMsg.classList.add('hidden'), 4000);
+        }
+        alert(`सफलतापूर्वक सेव हो गया!\n\nयह बैनर अब सिर्फ "डियर ${name}" (${uData.email}) के पोर्टल पर दिखेगा।`);
+    } catch (err) {
+        alert('Error saving personal banner: ' + err.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+    }
+};
+
+window.clearSelectedUserBanner = async function() {
+    const uid = document.getElementById('userSelectDropdown')?.value;
+    if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले किसी यूज़र को सेलेक्ट करें!');
+    const uData = window.usersDataList[uid];
+    if (!confirm(`क्या आप यूज़र "${uData.email}" का पर्सनल बैनर हटाना (Clear) चाहते हैं?`)) return;
+
+    try {
+        const payload = {
+            personalBannerEnabled: false,
+            personalBannerMessage: '',
+            personalBannerTitle: '',
+            personalBannerBtnText: '',
+            personalBannerBtnLink: '',
+            personalBannerUpdatedAt: new Date()
+        };
+        await updateDoc(doc(db, "users", uid), payload);
+        Object.assign(window.usersDataList[uid], payload);
+
+        document.getElementById('chkUserBannerEnabled').checked = false;
+        document.getElementById('inpUserBannerTitle').value = '';
+        document.getElementById('inpUserBannerMessage').value = '';
+        document.getElementById('inpUserBannerBtnText').value = '';
+        document.getElementById('inpUserBannerBtnLink').value = '';
+        window.updateUserBannerPreview();
+
+        alert('पर्सनल बैनर सफलतापूर्वक हटा दिया गया है!');
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
 };
 
 window.adminSetNewUserPassword = async function() { const uid = document.getElementById('userSelectDropdown').value; if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले यूज़र चुनें!'); const newPass = document.getElementById('adminNewResetPass').value.trim(); if (newPass.length < 6) return alert('पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!'); const btn = document.getElementById('btnAdminSetPass'); const orig = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; btn.disabled = true; try { const uData = window.usersDataList[uid]; if (uData.userPass) { try { const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: uData.email, password: uData.userPass, returnSecureToken: true }) }); const signInData = await signInRes.json(); if (signInData.idToken) { await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${firebaseConfig.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: signInData.idToken, password: newPass, returnSecureToken: true }) }); } } catch (e) { } } await updateDoc(doc(db, "users", uid), { userPass: newPass, adminResetPass: newPass, passUpdatedAt: new Date() }); window.usersDataList[uid].userPass = newPass; document.getElementById('selectedUserSavedPass').innerText = newPass; document.getElementById('adminNewResetPass').value = ''; alert('पासवर्ड सफलतापूर्वक बदल दिया गया है!'); } catch (err) { alert('Error: ' + err.message); } finally { btn.innerHTML = orig; btn.disabled = false; } };
