@@ -1,18 +1,48 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hi">
 <head>
+    <script>
+        if (window.history && window.history.replaceState) {
+            try { window.history.replaceState(null, document.title, '/'); } catch(e){}
+        }
+    </script>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <!-- Progressive Web App (PWA) Android Support -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#020617">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Ojas">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js').catch(function() {});
+            });
+        }
+    </script>
     <link rel="icon" type="image/png" href="logo.png">
-    <title>Ojas Print Service - Portal</title>
+    <title>Ojas Tools Studio - PDF, Passport Photo &amp; Image Suite</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- html2pdf.js for Single-Page A4 PDF Download -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     
-    <!-- Theme Config -->
+    <!-- High-Speed jsDelivr CDN + Fastly & cdnjs Fallbacks (100% Reliable in India) -->
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.9/dist/pdf-lib.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script>
+        if (!window.pdfjsLib) {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script>');
+        }
+        if (!window.PDFLib) {
+            document.write('<script src="https://fastly.jsdelivr.net/npm/pdf-lib@1.17.9/dist/pdf-lib.min.js"><\/script>');
+        }
+        if (!window.JSZip) {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"><\/script>');
+        }
+    </script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -23,112 +53,27 @@
                         dark: { 700: '#334155', 800: '#1e293b', 900: '#0f172a', 950: '#020617' }
                     },
                     boxShadow: {
-                        'glow': '0 0 15px rgba(245, 158, 11, 0.35)',
-                        'vip-glow': '0 0 25px rgba(251, 191, 36, 0.5)',
-                        'card': '0 8px 24px -4px rgba(0,0,0,0.08)'
+                        'glow': '0 0 20px rgba(245, 158, 11, 0.3)',
+                        'card': '0 10px 30px -5px rgba(15, 23, 42, 0.08)',
+                        'a4': '0 15px 35px -5px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
                     }
                 }
             }
-        }
+        };
     </script>
 
     <style>
-        .animate-spin-slow { animation: spin 4s linear infinite; }
-        .vip-body-bg {
-            background: radial-gradient(circle at top, #1e293b 0%, #0f172a 50%, #020617 100%);
-            color: #f8fafc;
-        }
-        @keyframes shimmer {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
-        }
-        .vip-promo-shine {
-            background: linear-gradient(90deg, #0f172a 0%, #1e293b 40%, #78350f 50%, #1e293b 60%, #0f172a 100%);
-            background-size: 200% 100%;
-            animation: shimmer 5s infinite linear;
-        }
-        @keyframes slideInRight {
-            from { transform: translateX(120%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        .corner-alert-anim {
-            animation: slideInRight 0.4s ease-out forwards;
-        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-      /* 1. Flexbox हटाया ताकि PDF में HTML2PDF का बग (Overlapping/Shift) ना आए */
-        .affidavit-paper {
-            position: relative !important;
-            display: block !important; 
-            font-family: 'Times New Roman', Times, serif;
-            width: 794px !important;
-            height: 1122px !important;
-            padding: 46px 62px !important;
-            background-color: #ffffff !important;
-            color: #000000 !important;
-            font-size: 15px;
-            line-height: 1.55;
-            box-sizing: border-box;
-            margin: 0 !important;
-            overflow: hidden;
-            flex-shrink: 0;
-        }
-
-        /* 2. सबसे नीचे वाले सिग्नेचर बॉक्स को फिक्स जगह पर रोकने के लिए */
-        .affidavit-paper > div:last-child {
-            position: absolute !important;
-            bottom: 46px !important;
-            left: 62px !important;
-            right: 62px !important;
-        }
-
-        /* 3. मेन टेक्स्ट को सुरक्षित रखने के लिए ताकि वह स्टैम्प के नीचे ना दबे */
-        .affidavit-paper > div:not(.stamp-overlay-layer):not(:last-child) {
-            position: relative !important;
-            z-index: 10 !important;
-            background-color: transparent !important;
-        }
-
-        .filled-val {
-            font-weight: bold !important;
-            color: #000000 !important;
-            text-decoration: underline !important;
-            text-underline-offset: 3px !important;
-        }
-
-        /* 4. स्टैम्प को पूरी तरह ट्रांसपेरेंट करने और mix-blend-mode का बग हटाने के लिए */
-        .stamp-overlay-layer {
-            position: absolute !important;
-            top: 0 !important; 
-            left: 0 !important; 
-            width: 100% !important; 
-            height: 100% !important;
-            pointer-events: none !important; 
-            z-index: 30 !important; 
-            background-color: transparent !important;
-            mix-blend-mode: normal !important;
-        }
-
-        .stamp-overlay-layer img {
-            width: 100% !important; 
-            height: 100% !important; 
-            object-fit: contain !important; 
-            object-position: top center !important; 
-            background-color: transparent !important;
-            mix-blend-mode: normal !important;
-            display: block !important;
-        }
-    
-        /* Bulletproof Dark Mode CSS */
         html.dark, html.dark body {
             background-color: #020617 !important;
             color: #f8fafc !important;
         }
-        html.dark #mainFormCard {
-            background-color: #0f172a !important;
-            color: #f8fafc !important;
-            border-color: #334155 !important;
-        }
-        html.dark .bg-white:not(.affidavit-paper) {
+        html.dark .bg-white {
             background-color: #0f172a !important;
             color: #f8fafc !important;
             border-color: #334155 !important;
@@ -151,49 +96,365 @@
             color: #ffffff !important;
             border-color: #475569 !important;
         }
+
+        .tool-card {
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .tool-card:hover {
+            transform: translateY(-4px);
+        }
+
+        .dropzone-box {
+            border: 2px dashed #cbd5e1;
+            transition: all 0.2s ease;
+        }
+        .dropzone-box:hover, .dropzone-box.dragover {
+            border-color: #f59e0b;
+            background-color: rgba(245, 158, 11, 0.05);
+        }
+
+        /* True A4 Paper Canvas Container */
+        .a4-desk-sheet {
+            width: 100%;
+            max-width: 794px;
+            /* Dynamic aspect-ratio controlled via JS */
+            background: #ffffff;
+            color: #000000;
+            box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.08);
+            position: relative;
+            margin: 0 auto;
+        }
+
+        /* Interactive Text Highlight for PDF Editor */
+        .pdf-text-highlight {
+            position: absolute;
+            background-color: rgba(245, 158, 11, 0.12);
+            border: 1px dashed rgba(245, 158, 11, 0.6);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-sizing: border-box;
+            border-radius: 2px;
+        }
+        .pdf-text-highlight:hover {
+            background-color: rgba(245, 158, 11, 0.35);
+            border-color: #d97706;
+            box-shadow: 0 0 5px rgba(245, 158, 11, 0.5);
+            z-index: 30;
+        }
+    
+        /* ==========================================================================
+           OJAS UNIVERSAL HIGH-CONTRAST THEME ENGINE (DARK & LIGHT MODE)
+           ========================================================================== */
+
+        /* --- 1. LIGHT MODE (DEFAULT) CONTRAST & VISIBILITY --- */
+        html:not(.dark), html:not(.dark) body {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+        }
+
+        html:not(.dark) .bg-white:not(.affidavit-paper):not(.a4-desk-sheet) {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            border-color: #e2e8f0 !important;
+        }
+
+        html:not(.dark) .bg-slate-50 {
+            background-color: #f8fafc !important;
+            color: #0f172a !important;
+            border-color: #e2e8f0 !important;
+        }
+
+        html:not(.dark) .bg-slate-100 {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+            border-color: #cbd5e1 !important;
+        }
+
+        /* Light mode text contrast */
+        html:not(.dark) .text-slate-800,
+        html:not(.dark) .text-slate-700,
+        html:not(.dark) .text-dark-900 {
+            color: #0f172a !important;
+        }
+
+        html:not(.dark) .text-slate-600,
+        html:not(.dark) .text-slate-500 {
+            color: #334155 !important;
+        }
+
+        html:not(.dark) .text-slate-400 {
+            color: #475569 !important;
+        }
+
+        /* Light mode colored card contrast */
+        html:not(.dark) .bg-amber-50, html:not(.dark) .bg-amber-100 {
+            background-color: #fffbeb !important;
+            color: #78350f !important;
+            border-color: #fcd34d !important;
+        }
+        html:not(.dark) .text-amber-950, html:not(.dark) .text-amber-900, html:not(.dark) .text-amber-800, html:not(.dark) .text-amber-700 {
+            color: #78350f !important;
+        }
+
+        html:not(.dark) .bg-green-50, html:not(.dark) .bg-green-100, html:not(.dark) .bg-emerald-50, html:not(.dark) .bg-emerald-100 {
+            background-color: #f0fdf4 !important;
+            color: #14532d !important;
+            border-color: #86efac !important;
+        }
+        html:not(.dark) .text-green-950, html:not(.dark) .text-green-900, html:not(.dark) .text-green-800, html:not(.dark) .text-green-700,
+        html:not(.dark) .text-emerald-950, html:not(.dark) .text-emerald-900, html:not(.dark) .text-emerald-800 {
+            color: #14532d !important;
+        }
+
+        html:not(.dark) .bg-red-50, html:not(.dark) .bg-red-100, html:not(.dark) .bg-rose-50, html:not(.dark) .bg-rose-100 {
+            background-color: #fef2f2 !important;
+            color: #7f1d1d !important;
+            border-color: #fca5a5 !important;
+        }
+        html:not(.dark) .text-red-950, html:not(.dark) .text-red-900, html:not(.dark) .text-red-800, html:not(.dark) .text-red-700, html:not(.dark) .text-red-600,
+        html:not(.dark) .text-rose-950, html:not(.dark) .text-rose-900, html:not(.dark) .text-rose-800 {
+            color: #991b1b !important;
+        }
+
+        html:not(.dark) .bg-indigo-50, html:not(.dark) .bg-indigo-100, html:not(.dark) .bg-sky-50, html:not(.dark) .bg-sky-100 {
+            background-color: #eff6ff !important;
+            color: #1e3a8a !important;
+            border-color: #93c5fd !important;
+        }
+        html:not(.dark) .text-indigo-950, html:not(.dark) .text-indigo-900, html:not(.dark) .text-indigo-800,
+        html:not(.dark) .text-sky-950, html:not(.dark) .text-sky-900, html:not(.dark) .text-sky-800 {
+            color: #1e3a8a !important;
+        }
+
+        /* Light mode form controls */
+        html:not(.dark) input:not([type="checkbox"]):not([type="radio"]),
+        html:not(.dark) select,
+        html:not(.dark) textarea {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            border-color: #cbd5e1 !important;
+        }
+        html:not(.dark) input::placeholder,
+        html:not(.dark) textarea::placeholder {
+            color: #94a3b8 !important;
+        }
+
+        /* --- 2. DARK MODE CONTRAST & VISIBILITY --- */
+        html.dark, html.dark body {
+            background-color: #020617 !important;
+            color: #f8fafc !important;
+        }
+
+        /* Dark mode main cards */
+        html.dark .bg-white:not(.affidavit-paper):not(.a4-desk-sheet),
+        html.dark #mainFormCard,
+        html.dark .shadow-card {
+            background-color: #0f172a !important;
+            color: #f8fafc !important;
+            border-color: #334155 !important;
+        }
+
+        /* Dark mode inner cards & sections */
+        html.dark .bg-slate-50,
+        html.dark .bg-slate-100 {
+            background-color: #1e293b !important;
+            color: #f1f5f9 !important;
+            border-color: #334155 !important;
+        }
+
+        html.dark .bg-slate-200 {
+            background-color: #334155 !important;
+            color: #f8fafc !important;
+            border-color: #475569 !important;
+        }
+
+        /* Dark mode text readability */
+        html.dark .text-slate-800,
+        html.dark .text-slate-700,
+        html.dark .text-dark-900 {
+            color: #f8fafc !important;
+        }
+
+        html.dark .text-slate-600,
+        html.dark .text-slate-500 {
+            color: #cbd5e1 !important;
+        }
+
+        html.dark .text-slate-400 {
+            color: #94a3b8 !important;
+        }
+
+        /* Dark mode colored boxes & alerts: high contrast backgrounds and glowing light text */
+        html.dark .bg-amber-50,
+        html.dark .bg-amber-100 {
+            background-color: #291804 !important;
+            color: #fef08a !important;
+            border-color: #78350f !important;
+        }
+        html.dark .text-amber-950,
+        html.dark .text-amber-900,
+        html.dark .text-amber-800,
+        html.dark .text-amber-700 {
+            color: #fde047 !important;
+        }
+
+        html.dark .bg-green-50,
+        html.dark .bg-green-100,
+        html.dark .bg-emerald-50,
+        html.dark .bg-emerald-100 {
+            background-color: #022c22 !important;
+            color: #a7f3d0 !important;
+            border-color: #065f46 !important;
+        }
+        html.dark .text-green-950,
+        html.dark .text-green-900,
+        html.dark .text-green-800,
+        html.dark .text-green-700,
+        html.dark .text-emerald-950,
+        html.dark .text-emerald-900,
+        html.dark .text-emerald-800 {
+            color: #6ee7b7 !important;
+        }
+
+        html.dark .bg-red-50,
+        html.dark .bg-red-100,
+        html.dark .bg-rose-50,
+        html.dark .bg-rose-100 {
+            background-color: #2e0814 !important;
+            color: #fecdd3 !important;
+            border-color: #881337 !important;
+        }
+        html.dark .text-red-950,
+        html.dark .text-red-900,
+        html.dark .text-red-800,
+        html.dark .text-red-700,
+        html.dark .text-red-600,
+        html.dark .text-rose-950,
+        html.dark .text-rose-900,
+        html.dark .text-rose-800 {
+            color: #fda4af !important;
+        }
+
+        html.dark .bg-indigo-50,
+        html.dark .bg-indigo-100,
+        html.dark .bg-sky-50,
+        html.dark .bg-sky-100 {
+            background-color: #0c1838 !important;
+            color: #bfdbfe !important;
+            border-color: #1e3a8a !important;
+        }
+        html.dark .text-indigo-950,
+        html.dark .text-indigo-900,
+        html.dark .text-indigo-800,
+        html.dark .text-sky-950,
+        html.dark .text-sky-900,
+        html.dark .text-sky-800 {
+            color: #93c5fd !important;
+        }
+
+        html.dark .bg-royal-50 {
+            background-color: #291804 !important;
+            color: #fde68a !important;
+            border-color: #78350f !important;
+        }
+        html.dark .text-royal-900,
+        html.dark .text-royal-800,
+        html.dark .text-royal-700 {
+            color: #fbbf24 !important;
+        }
+
+        /* Dark mode inputs, dropdowns & textareas */
+        html.dark input:not([type="checkbox"]):not([type="radio"]),
+        html.dark select,
+        html.dark textarea {
+            background-color: #1e293b !important;
+            color: #ffffff !important;
+            border-color: #475569 !important;
+        }
+        html.dark input:focus,
+        html.dark select:focus,
+        html.dark textarea:focus {
+            border-color: #f59e0b !important;
+            box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2) !important;
+        }
+        html.dark input::placeholder,
+        html.dark textarea::placeholder {
+            color: #64748b !important;
+        }
+
+        /* Dark mode menus & tables */
         html.dark #gearDropdownMenu {
             background-color: #0f172a !important;
             color: #f8fafc !important;
             border-color: #334155 !important;
         }
-        html.dark #gearDropdownMenu button {
+        html.dark #gearDropdownMenu button,
+        html.dark #gearDropdownMenu a {
             color: #f1f5f9 !important;
         }
-        html.dark #gearDropdownMenu button:hover {
+        html.dark #gearDropdownMenu button:hover,
+        html.dark #gearDropdownMenu a:hover {
             background-color: #1e293b !important;
         }
         html.dark table thead {
             background-color: #1e293b !important;
             border-color: #334155 !important;
         }
+        html.dark table th {
+            color: #94a3b8 !important;
+        }
+        html.dark table td {
+            color: #e2e8f0 !important;
+        }
         html.dark table tr {
             border-color: #334155 !important;
         }
         html.dark table tr:hover {
-            background-color: #1e293b/60 !important;
+            background-color: rgba(30, 41, 59, 0.7) !important;
         }
         html.dark #userLiveChatMessagesBox {
             background-color: #020617 !important;
         }
- /* 1. सिर्फ मेन पेपर को सफ़ेद रखें, अंदर के हर एलिमेंट पर ज़बरदस्ती बैकग्राउंड न थोपें (इससे टेक्स्ट गायब नहीं होगा) */
-        .affidavit-paper {
+
+        /* --- 3. HARDWARE-LOCKED PRINTABLE PAPER (NEVER INVERTED IN DARK MODE) --- */
+        .affidavit-paper, .a4-desk-sheet {
             background-color: #ffffff !important;
             color: #000000 !important;
         }
-
-        /* 2. स्टैम्प लेयर को ट्रांसपेरेंट रखें और लेआउट खिसकने से रोकने के लिए blend-mode normal करें */
-        .stamp-overlay-layer, 
-        .stamp-overlay-layer img {
-            background-color: transparent !important;
-            mix-blend-mode: normal !important; 
+        .affidavit-paper * {
+            color: inherit;
         }
-
-    
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .affidavit-paper .filled-val {
+            color: #000000 !important;
+            font-weight: bold !important;
+        }
     </style>
 
-        <!-- Instant Theme Manager -->
+        <!-- Auto-Routing: If user or admin is already logged in, automatically open Portal! -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyBSiDAvDYyBG8hkmez7s900JHhlbenG2nU",
+            authDomain: "oaps-d2cce.firebaseapp.com",
+            projectId: "oaps-d2cce",
+            storageBucket: "oaps-d2cce.firebasestorage.app",
+            messagingSenderId: "619616461386",
+            appId: "1:619616461386:web:c3b9b36815369c6f5d7cb3"
+        };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                sessionStorage.setItem('ojas_portal_access', 'allowed');
+                window.location.replace('/portal');
+            }
+        });
+    </script>
+
+    <!-- Theme Initializer -->
     <script>
         window.initTheme = function() {
             var saved = localStorage.getItem('ojas_theme');
@@ -222,255 +483,308 @@
         window.initTheme();
         document.addEventListener('DOMContentLoaded', window.initTheme);
     </script>
-
-    <!-- Modular JS Files -->
-    <script type="module" src="./js/portal-wallet-chat.js"></script>
 </head>
-<body class="bg-slate-50 dark:bg-dark-950 font-sans min-h-screen flex flex-col justify-between selection:bg-royal-300 selection:text-dark-900 transition-colors duration-300 dark:text-slate-100">
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col selection:bg-royal-300 selection:text-dark-900">
     
-    <!-- SECURITY LOADING SCREEN -->
-    <div id="loadingScreen" style="display: flex;" class="fixed inset-0 bg-dark-900 z-[200] flex-col items-center justify-center">
-        <img src="logo.png" alt="Ojas Logo" class="w-16 h-16 md:w-20 md:h-20 mb-4 object-contain animate-pulse" onerror="this.style.display='none'">
-        <h2 class="text-xl font-black text-white tracking-widest uppercase">Ojas Print Service</h2>
-        <p class="text-xs text-royal-300 mt-1 font-bold animate-pulse">Checking Security...</p>
-    </div>
-
-    <!-- COMPACT FLOATING CORNER ALERT WHEN 5 DAYS OR LESS REMAINING IN VIP -->
-    <div id="vipCornerAlert" style="display: none;" class="fixed bottom-3 right-3 z-[150] w-72 bg-amber-50 border-l-4 border-amber-500 rounded-xl p-3 shadow-xl text-slate-800 corner-alert-anim">
-        <div class="flex justify-between items-center mb-1">
-            <h4 class="text-xs font-black text-amber-900"><i class="fa-solid fa-triangle-exclamation text-amber-600 mr-1"></i> VIP एक्सपायरी अलर्ट</h4>
-            <button onclick="window.dismissCornerAlert()" class="text-slate-400 hover:text-red-500 text-xs"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        <p id="cornerAlertDaysText" class="text-[11px] font-semibold text-amber-800 mb-2"></p>
-        <button onclick="window.jumpToVipUpgrade(30)" class="w-full bg-dark-900 text-royal-300 font-black py-1.5 rounded-lg text-[11px]">अभी VIP वैलिडिटी बढ़ाएं</button>
-    </div>
-
-    <!-- FULL SCREEN PDF & HTML DOCUMENT VIEWER MODAL -->
-    <div id="pdfViewerModal" style="display: none;" class="fixed inset-0 z-[100] bg-dark-900/80 backdrop-blur-md items-center justify-center p-2 md:p-6 transition-opacity">
-        <div class="bg-white w-full max-w-6xl h-full flex flex-col rounded-2xl shadow-2xl overflow-hidden">
-            <div class="flex justify-between items-center p-2 md:p-4 border-b border-slate-200 bg-slate-50 gap-2">
-                <div class="flex items-center gap-2 overflow-hidden">
-                    <div class="w-7 h-7 bg-royal-100 text-royal-600 rounded-lg flex items-center justify-center shrink-0 text-xs"><i class="fa-solid fa-file-pdf"></i></div>
-                    <h3 id="pdfViewerTitle" class="font-bold text-slate-800 text-xs md:text-sm truncate">Document Preview</h3>
-                </div>
-                <div class="flex items-center gap-1.5 shrink-0">
-                    <button id="modalShareBtn" class="bg-emerald-500 hover:bg-emerald-600 text-white px-2.5 py-1.5 md:px-4 md:py-2 rounded-xl text-xs font-black transition shadow-sm gap-1.5" style="display: none;">
-                        <i class="fa-solid fa-share-nodes"></i> <span class="hidden md:inline">Share</span>
-                    </button>
-                    <button id="modalPrintBtn" class="bg-amber-500 hover:bg-amber-600 text-dark-950 px-2.5 py-1.5 md:px-4 md:py-2 rounded-xl text-xs font-black transition shadow-sm flex items-center gap-1.5">
-                        <i class="fa-solid fa-print"></i> <span class="hidden md:inline">Print</span>
-                    </button>
-                    <button id="modalDownloadBtn" class="bg-dark-900 hover:bg-black text-royal-300 px-2.5 py-1.5 md:px-4 md:py-2 rounded-xl text-xs font-bold transition shadow-glow flex items-center gap-1.5">
-                        <i class="fa-solid fa-download"></i> <span class="hidden md:inline">PDF</span>
-                    </button>
-                    <button onclick="window.closePdfViewer()" class="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-200 text-slate-600 hover:bg-red-500 hover:text-white transition"><i class="fa-solid fa-xmark"></i></button>
-                </div>
+    <!-- TOP HEADER -->
+    <header class="bg-dark-950 shadow-lg px-3 py-2.5 md:px-8 md:py-3.5 flex justify-between items-center sticky top-0 z-50 border-b border-royal-500/40">
+        <div class="flex items-center gap-2 md:gap-3">
+            <div class="w-8 h-8 md:w-10 md:h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden p-1 border border-slate-200 shrink-0">
+                <img src="logo.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">
             </div>
-            <div class="flex-grow bg-slate-300 relative overflow-y-auto">
-                <div id="pdfLoadingSpinner" class="absolute inset-0 flex flex-col items-center justify-center text-royal-600 bg-slate-100">
-                    <i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i>
-                    <p class="text-xs font-bold text-slate-600">Loading Preview...</p>
-                </div>
-                <iframe id="pdfIframe" class="w-full h-full relative z-10 border-none" onload="document.getElementById('pdfLoadingSpinner').style.display='none'" src=""></iframe>
-                <div id="htmlDocPreviewContainer" style="display: none;" class="w-full min-h-full p-2 md:p-6 justify-center items-start relative z-20 bg-slate-300 overflow-x-auto"></div>
+            <div>
+                <h1 class="text-sm md:text-lg font-black text-white leading-tight flex items-center gap-1.5">
+                    Ojas <span class="text-royal-400">Tools Studio</span>
+                    <span class="bg-amber-400 text-dark-950 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">HD Suite</span>
+                </h1>
+                <p class="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fast &amp; Private Browser Utilities (Max 50MB)</p>
             </div>
         </div>
-    </div>
 
-    <!-- CLEAN LOGIN SCREEN -->
-    <div id="loginSection" style="display: none;" class="items-center justify-center flex-grow p-4 min-h-screen bg-dark-900 relative overflow-hidden">
-        <div class="bg-white p-6 md:p-8 rounded-3xl shadow-2xl border-t-4 border-royal-500 w-full max-w-sm relative z-10 text-slate-800">
-            <div class="text-center mb-6">
-                <div class="w-16 h-16 md:w-20 md:h-20 bg-white border border-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-glow p-2 overflow-hidden">
-                    <img src="logo.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">
-                </div>
-                <h1 class="text-2xl font-black text-dark-900">Ojas Print Service</h1>
-                <p class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Secure Portal Login</p>
-            </div>
-            <form id="loginForm" onsubmit="window.handleLogin(event)" class="space-y-4">
-                <input type="text" id="loginUsername" placeholder="User ID (e.g. user@print.com)" required class="w-full px-4 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-royal-500 outline-none bg-slate-50 text-sm font-semibold">
-                <div class="space-y-1.5">
-                    <input type="password" id="loginPassword" placeholder="Password" required class="w-full px-4 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-royal-500 outline-none bg-slate-50 text-sm font-semibold">
-                    <div class="flex justify-end">
-                        <button type="button" onclick="window.openForgotPasswordModal()" class="text-[11px] font-bold text-royal-600 hover:text-royal-900 transition">
-                            <i class="fa-solid fa-key mr-1"></i>Forgot Password?
-                        </button>
-                    </div>
-                </div>
-                <button type="submit" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl shadow-glow transition text-sm">Secure Login <i class="fa-solid fa-arrow-right ml-1"></i></button>
-            </form>
-            <div id="loginError" style="display: none;" class="mt-4 text-center text-xs font-bold text-red-500 bg-red-50 p-2.5 rounded-xl border border-red-100"></div>
+        <div class="flex items-center gap-1.5 md:gap-2.5">
+            <button onclick="window.toggleTheme()" class="theme-toggle-btn w-8 h-8 md:w-9 md:h-9 rounded-xl bg-dark-900 hover:bg-dark-800 text-royal-300 border border-royal-500/30 flex items-center justify-center transition shadow-sm" title="Toggle Dark/Light Mode">
+                <i class="fa-solid fa-moon text-xs md:text-sm"></i>
+            </button>
+            <a href="/portal" onclick="sessionStorage.setItem('ojas_portal_access', 'allowed');" class="flex items-center gap-2 text-dark-950 hover:from-amber-400 hover:to-royal-400 transition font-black text-xs md:text-sm bg-gradient-to-r from-amber-400 via-royal-500 to-amber-500 px-3.5 py-2 md:px-4 md:py-2 rounded-xl shadow-glow">
+                <i class="fa-solid fa-right-to-bracket text-xs md:text-sm"></i> <span>VIP Portal Login</span>
+            </a>
         </div>
-    </div>
+    </header>
 
-    <!-- FORGOT PASSWORD TICKET MODAL -->
-    <div id="forgotPasswordModal" style="display: none;" class="fixed inset-0 z-[180] bg-dark-950/80 backdrop-blur-sm items-center justify-center p-4">
-        <div class="bg-white text-slate-800 w-full max-w-md rounded-3xl shadow-2xl border-t-4 border-royal-500 p-5 md:p-6 space-y-4">
-            <div class="flex justify-between items-start border-b border-slate-100 pb-3">
-                <div>
-                    <h3 class="text-base font-black text-dark-900"><i class="fa-solid fa-key text-royal-500 mr-1.5"></i> Forgot Password Ticket</h3>
-                    <p class="text-[11px] font-semibold text-slate-400 mt-0.5">अपनी User ID और नंबर लिखें, एडमिन को तुरंत सूचना भेजी जाएगी</p>
-                </div>
-                <button type="button" onclick="window.closeForgotPasswordModal()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-red-500 text-slate-500 hover:text-white flex items-center justify-center transition">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
+    <!-- MAIN APP CONTAINER -->
+    <main class="max-w-7xl mx-auto w-full p-3 md:p-6 flex-grow space-y-5">
 
-            <form onsubmit="window.submitForgotPasswordTicket(event)" class="space-y-3">
-                <div>
-                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आपकी User ID या Email</label>
-                    <input type="text" id="forgotUserIdInput" required placeholder="e.g. rahul@print.com" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
-                </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">आपका मोबाइल / WhatsApp नंबर</label>
-                    <input type="tel" id="forgotUserPhoneInput" required placeholder="Enter 10-Digit Mobile Number" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
-                </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">मैसेज (Optional)</label>
-                    <input type="text" id="forgotUserNoteInput" placeholder="मैं अपना पासवर्ड भूल गया हूँ, नया पासवर्ड भेजें" class="w-full p-3 border border-slate-200 rounded-xl text-xs font-semibold bg-slate-50 focus:bg-white outline-none">
-                </div>
-                <div id="forgotResultBox" style="display: none;"></div>
-                <button type="submit" id="btnSubmitForgotTicket" class="w-full bg-dark-900 hover:bg-black text-royal-300 font-black py-3.5 rounded-xl text-xs md:text-sm shadow-glow transition">
-                    <i class="fa-solid fa-paper-plane mr-1"></i> Raise Password Reset Ticket
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- DASHBOARD SCREEN -->
-    <div id="dashboardSection" style="display: none;" class="flex-grow flex-col">
-        <!-- COMPACT HEADER MOBILE, WIDE HEADER DESKTOP -->
-        <header class="bg-dark-950/95 backdrop-blur-md shadow-md px-2.5 sm:px-4 md:px-8 py-2 md:py-3.5 flex justify-between items-center sticky top-0 z-40 border-b border-royal-500/40 transition-all">
-            <!-- Left Brand Section -->
-            <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                <div id="portalHeaderIcon" class="w-8 h-8 md:w-10 md:h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden p-1 border border-royal-400/30 shrink-0 shadow-sm">
-                    <img src="logo.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">
-                </div>
-                <div class="flex items-center gap-1 sm:gap-1.5">
-                    <h2 id="portalHeaderTitle" class="text-xs sm:text-base md:text-lg font-black text-white tracking-tight leading-none whitespace-nowrap">Ojas <span class="text-royal-400">Portal</span></h2>
-                    <span id="vipStatusBadge" style="display: none;" class="items-center gap-0.5 bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 text-dark-950 text-[8px] sm:text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase shadow-sm tracking-wider shrink-0">
-                        <i class="fa-solid fa-crown text-[7px]"></i> VIP
-                    </span>
-                </div>
-            </div>
-
-            <!-- Right Action Controls -->
-            <div class="flex items-center gap-1 sm:gap-1.5 md:gap-2 relative shrink-0">
-                <a href="tools.html" class="h-8 md:h-9 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 text-royal-300 hover:text-white px-2.5 md:px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95" title="Free Tools Studio"><i class="fa-solid fa-toolbox text-xs"></i> <span class="hidden sm:inline">Tools</span></a>
-                <!-- Admin Panel Link (Shown only to Admin) -->
-                <a href="admin.html" id="adminPanelLink" style="display: none;" class="h-8 w-8 sm:w-auto sm:px-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 text-royal-300 hover:text-white flex items-center justify-center gap-1 text-xs font-bold transition shadow-sm active:scale-95" title="Admin Control Panel">
-                    <i class="fa-solid fa-shield-halved text-xs"></i>
-                    <span class="hidden sm:inline">Admin</span>
-                </a>
-                
-                <!-- Wallet Credit Box -->
-                <div id="creditDisplayBox" style="display: none;" class="h-8 px-2 sm:px-2.5 rounded-xl bg-gradient-to-r from-royal-500/20 to-amber-500/10 border border-royal-400/40 hover:border-royal-400 text-royal-300 flex items-center justify-center gap-1 cursor-pointer transition shadow-sm active:scale-95" onclick="window.selectGearOption('add_credit')" title="Wallet Balance / Add Credit">
-                    <i class="fa-solid fa-wallet text-royal-400 text-xs"></i>
-                    <span id="displayCredits" class="font-black text-white text-xs">0</span>
-                    <span class="hidden sm:inline text-[10px] text-royal-300/80 font-medium">Cr</span>
-                </div>
-
-                <!-- Support Chat Button -->
-                <button onclick="window.selectGearOption('support_chat')" class="relative h-8 w-8 sm:w-auto sm:px-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/40 flex items-center justify-center gap-1 transition text-xs font-bold shadow-sm active:scale-95" title="Live Support Chat">
-                    <i class="fa-solid fa-comments text-xs md:text-sm"></i>
-                    <span class="hidden sm:inline">Support</span>
-                    <span id="headerSupportUnreadBadge" style="display: none;" class="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] font-black h-4 min-w-[16px] px-1 rounded-full ring-2 ring-dark-950 flex items-center justify-center animate-pulse">0</span>
-                </button>
-                
-                <!-- Theme Toggle Button -->
-                <button onclick="window.toggleTheme()" class="theme-toggle-btn h-8 w-8 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-royal-300 border border-slate-700/60 flex items-center justify-center transition shadow-sm active:scale-95" title="Toggle Dark/Light Mode">
-                    <i class="fa-solid fa-moon text-xs md:text-sm"></i>
-                </button>
-
-                <!-- Settings / Gear Menu Button -->
-                <button id="gearMenuBtn" onclick="window.toggleGearMenu(event)" class="h-8 w-8 rounded-xl bg-slate-800/80 hover:bg-royal-500 hover:text-dark-950 text-royal-300 border border-slate-700/60 flex items-center justify-center transition shadow-sm active:scale-95" title="Settings & Options Menu">
-                    <i class="fa-solid fa-gear text-xs md:text-sm"></i>
-                </button>
-
-                <!-- Gear Dropdown Menu -->
-                <div id="gearDropdownMenu" class="hidden absolute right-0 top-10 sm:top-11 md:top-12 w-64 bg-white dark:bg-dark-900 text-slate-800 dark:text-slate-100 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 z-50 overflow-hidden">
-                    <div class="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-dark-950">
-                        <p class="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Logged in as</p>
-                        <p id="displayUser" class="text-xs font-black text-dark-900 dark:text-white truncate"></p>
-                        <p id="gearVipDaysText" class="text-[10px] font-bold text-amber-600 dark:text-amber-400 mt-0.5"></p>
-                    </div>
-                    <div class="py-1">
-                        <button id="gearBtnAddCredit" onclick="window.selectGearOption('add_credit')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-dark-800 flex items-center gap-2.5 transition">
-                            <i class="fa-solid fa-plus-circle text-amber-500 w-4"></i> Add Credit / Buy VIP
-                        </button>
-                        <button onclick="window.selectGearOption('history')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-800 flex items-center gap-2.5 transition">
-                            <i class="fa-solid fa-folder-open text-royal-500 w-4"></i> Document History
-                        </button>
-                        <button id="gearBtnPaymentHistory" onclick="window.selectGearOption('payments_history')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-800 flex items-center gap-2.5 transition">
-                            <i class="fa-solid fa-receipt text-green-600 w-4"></i> Payment History & Status
-                        </button>
-                        <button onclick="window.selectGearOption('password')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-dark-800 flex items-center gap-2.5 transition">
-                            <i class="fa-solid fa-key text-indigo-500 w-4"></i> Change Password
-                        </button>
-                        <button onclick="window.selectGearOption('support_chat')" class="w-full px-4 py-2.5 text-left text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-dark-800 flex items-center justify-between transition">
-                            <span class="flex items-center gap-2.5"><i class="fa-solid fa-comments text-emerald-500 w-4"></i> Live Support Chat</span>
-                            <span id="gearSupportUnreadBadge" style="display: none;" class="bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">New</span>
-                        </button>
-                    </div>
-                    <div class="border-t border-slate-100 dark:border-slate-800 pt-1">
-                        <button onclick="window.handleLogout()" class="w-full px-4 py-2 text-left text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-dark-800 flex items-center gap-2.5 transition">
-                            <i class="fa-solid fa-power-off w-4"></i> Logout
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </header>
-
-        <!-- WIDE DESKTOP CONTAINER (max-w-7xl) -->
-        <main class="max-w-7xl mx-auto w-full p-2.5 md:p-6 flex-grow">
-            <div id="liveUpdateBannerContainer" style="display: none;" class="mb-3.5"></div>
-
-            <div id="normalUserVipPromo" style="display: none;" class="mb-4 rounded-2xl vip-promo-shine border border-royal-400 p-3 text-white shadow-md">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                    <div class="flex items-center gap-2">
-                        <span class="bg-amber-400 text-dark-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase shrink-0"><i class="fa-solid fa-crown"></i> VIP ACCESS</span>
-                        <p id="normalPromoTextDesc" class="text-xs font-bold text-royal-100">
-                            VIP लें: <strong>18+ DOB & सारे 9 Official Annexures</strong> अनलॉक करें (सभी डॉक्यूमेंट 10 Cr)!
-                        </p>
-                    </div>
-                    <div class="flex items-center gap-1.5 w-full sm:w-auto justify-end">
-                        <button onclick="window.jumpToVipUpgrade(30)" class="flex-1 sm:flex-initial bg-dark-900 hover:bg-royal-400 hover:text-dark-950 text-royal-300 border border-royal-400 px-2.5 py-1 rounded-lg text-[11px] font-black transition">1M ₹149</button>
-                        <button onclick="window.jumpToVipUpgrade(60)" class="flex-1 sm:flex-initial bg-dark-900 hover:bg-royal-400 hover:text-dark-950 text-royal-300 border border-royal-400 px-2.5 py-1 rounded-lg text-[11px] font-black transition">2M ₹249</button>
-                        <button onclick="window.jumpToVipUpgrade(90)" class="flex-1 sm:flex-initial bg-amber-400 text-dark-950 px-2.5 py-1 rounded-lg text-[11px] font-black transition">3M ₹299</button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="standardServicesGrid" class="grid grid-cols-2 gap-2.5 mb-3">
-                <button onclick="window.switchService('domicile')" id="btn-domicile" class="service-tab"><i class="fa-solid fa-house-chimney"></i> Domicile (मूल निवास)</button>
-                <button onclick="window.switchService('caste')" id="btn-caste" class="service-tab"><i class="fa-solid fa-users"></i> Caste (जाति प्रमाण पत्र)</button>
-            </div>
-
-            <div id="vipServicesBar" style="display: none;" class="mb-4 p-3 md:p-4 rounded-2xl bg-dark-950/90 border border-royal-400 shadow-vip-glow">
-                <div class="flex items-center justify-between mb-2.5 pb-1.5 border-b border-slate-800">
-                    <span id="vipBarTitleLabel" class="text-[11px] font-black uppercase tracking-wider text-royal-300 flex items-center gap-1.5">
-                        <i class="fa-solid fa-crown text-royal-400"></i> VIP Services (DOB & All Annexures)
-                    </span>
-                    <button onclick="window.selectGearOption('history')" class="text-[10px] text-slate-300 hover:text-royal-300 font-bold">
-                        <i class="fa-solid fa-folder-open mr-1"></i> Saved Files
-                    </button>
-                </div>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <button onclick="window.switchService('dob18')" id="btn-dob18" class="vip-tab"><i class="fa-solid fa-cake-candles text-amber-400"></i> DOB MEERUT</button>
-                    <button onclick="window.switchService('dob_delhi')" id="btn-dob_delhi" class="vip-tab"><i class="fa-solid fa-cake-candles text-emerald-400"></i> DOB DELHI</button>
-                    <button onclick="window.switchService('passport')" id="btn-passport" class="vip-tab"><i class="fa-solid fa-passport text-sky-400"></i> PASSPORT</button>
-                    <button onclick="window.switchService('annexure1')" id="btn-annexures" class="vip-tab"><i class="fa-solid fa-file-signature text-amber-500"></i> All Annexures</button>
-                </div>
-            </div>
+        <!-- ================= VIEW 1: TOOLS GRID VIEW (CARDS) ================= -->
+        <div id="toolsGridView" class="space-y-6">
             
-            <div id="mainFormCard" class="relative overflow-hidden bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-card border border-slate-100 p-4 md:p-7">
-                <div id="formContainer"></div>
+            <!-- Hero Title & Category Filter -->
+            <div class="bg-gradient-to-r from-dark-950 via-slate-900 to-indigo-950 text-white rounded-3xl p-5 md:p-8 shadow-card border border-royal-500/30 relative overflow-hidden">
+                <div class="relative z-10 max-w-2xl space-y-2">
+                    <span class="inline-flex items-center gap-1.5 bg-royal-500/20 text-royal-300 border border-royal-400/40 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">
+                        <i class="fa-solid fa-bolt text-royal-400"></i> Instant 100% Client-Side Processing
+                    </span>
+                    <h2 class="text-xl md:text-3xl font-black text-white leading-tight">
+                        अल्ट्रा-फास्ट <span class="text-royal-400">PDF और फोटो टूल्स स्टूडियो</span>
+                    </h2>
+                    <p class="text-xs md:text-sm font-semibold text-slate-300 leading-relaxed">
+                        पासपोर्ट फोटो (वाइट बैकग्राउंड + 8-फोटो शीट), 800 DPI तक पीडीएफ से इमेज, A4 पीडीएफ टेक्स्ट एडिटर, बैकग्राउंड रिमूवर और सरकारी फॉर्म्स इमेज कंप्रेसर (Max 50MB)।
+                    </p>
+                </div>
+                <div class="absolute -right-8 -bottom-8 text-9xl text-royal-500/10 pointer-events-none select-none">
+                    <i class="fa-solid fa-toolbox"></i>
+                </div>
             </div>
-        </main>
-    </div>
-    
+
+            <!-- Category Filter Pills -->
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                    <button onclick="window.filterToolsCategory('all')" id="catBtn-all" class="px-3.5 py-1.5 rounded-xl text-xs font-black bg-dark-900 text-royal-300 shadow-sm border border-royal-500/40 transition">सभी 8 टूल्स</button>
+                    <button onclick="window.filterToolsCategory('photo')" id="catBtn-photo" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-600 hover:bg-slate-200 border border-slate-200 transition">फोटो &amp; इमेज टूल्स</button>
+                    <button onclick="window.filterToolsCategory('pdf')" id="catBtn-pdf" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-600 hover:bg-slate-200 border border-slate-200 transition">PDF टूल्स</button>
+                </div>
+                <div class="relative w-full sm:w-64">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+                    <input type="text" id="toolSearchInput" oninput="window.filterToolsBySearch(this.value)" placeholder="टूल खोजें..." class="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs font-bold bg-white focus:border-royal-400 outline-none">
+                </div>
+            </div>
+
+            <!-- 8 Feature Cards Grid -->
+            <div id="toolsCardsContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+                <!-- 1. PASSPORT PHOTO GENERATOR -->
+                <div onclick="window.openToolWorkspace('passport_photo')" data-category="photo" data-title="पासपोर्ट फोटो जनरेटर" class="tool-card cursor-pointer bg-white rounded-2xl p-5 shadow-card border border-slate-200 hover:border-amber-400 flex flex-col justify-between space-y-4">
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-start">
+                            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center text-xl font-black">
+                                <i class="fa-solid fa-id-badge"></i>
+                            </div>
+                            <span class="bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black px-2 py-0.5 rounded-md uppercase">White BG &amp; 8 Sheets</span>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-black text-dark-900">पासपोर्ट साइज फोटो मेकर</h3>
+                            <p class="text-xs font-semibold text-slate-500 mt-1 line-clamp-2">
+                                3.5×4.5cm साइज, ऑटोमेटिक वाइट बैकग्राउंड, और 4×6 शीट पर 8-फोटो प्रिंटेबल ग्रिड।
+                            </p>
+                        </div>
+                    </div>
+                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-black text-amber-600">
+                        <span>Open Studio</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </div>
+                </div>
+
+                <!-- 2. BACKGROUND REMOVER -->
+                <div onclick="window.openToolWorkspace('bg_remover')" data-category="photo" data-title="बैकग्राउंड रिमूवर" class="tool-card cursor-pointer bg-white rounded-2xl p-5 shadow-card border border-slate-200 hover:border-emerald-400 flex flex-col justify-between space-y-4">
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-start">
+                            <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center text-xl font-black">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            </div>
+                            <span class="bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-md uppercase">Pure White / Trans</span>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-black text-dark-900">बैकग्राउंड रिमूवर &amp; वाइट BG</h3>
+                            <p class="text-xs font-semibold text-slate-500 mt-1 line-clamp-2">
+                                फोटो का बैकग्राउंड हटाकर शुद्ध सफेद (#FFFFFF), पारदर्शी या स्काई-ब्लू रंग में बदलें।
+                            </p>
+                        </div>
+                    </div>
+                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-black text-emerald-600">
+                        <span>Open Studio</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </div>
+                </div>
+
+                <!-- 3. PDF TO HIGH-RES IMAGE -->
+                <div onclick="window.openToolWorkspace('pdf_to_img')" data-category="pdf" data-title="पीडीएफ से इमेज" class="tool-card cursor-pointer bg-white rounded-2xl p-5 shadow-card border border-slate-200 hover:border-indigo-400 flex flex-col justify-between space-y-4">
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-start">
+                            <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center text-xl font-black">
+                                <i class="fa-solid fa-file-image"></i>
+                            </div>
+                            <span class="bg-indigo-100 text-indigo-900 border border-indigo-300 text-[10px] font-black px-2 py-0.5 rounded-md uppercase">300 to 800 DPI</span>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-black text-dark-900">PDF to High-Res Image</h3>
+                            <p class="text-xs font-semibold text-slate-500 mt-1 line-clamp-2">
+                                पीडीएफ के हर पेज को 300 से 800 DPI तक अल्ट्रा-क्लियर हाई-रेज़ोल्यूशन PNG / JPG में बदलें।
+                            </p>
+                        </div>
+                    </div>
+                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-black text-indigo-600">
+                        <span>Open Studio</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </div>
+                </div>
+
+                <!-- 4. IMAGE TO PDF -->
+                <div onclick="window.openToolWorkspace('img_to_pdf')" data-category="pdf photo" data-title="इमेज से पीडीएफ" class="tool-card cursor-pointer bg-white rounded-2xl p-5 shadow-card border border-slate-200 hover:border-sky-400 flex flex-col justify-between space-y-4">
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-start">
+                            <div class="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 border border-sky-200 flex items-center justify-center text-xl font-black">
+                                <i class="fa-solid fa-file-pdf"></i>
+                            </div>
+                            <span class="bg-sky-100 text-sky-900 border border-sky-300 text-[10px] font-black px-2 py-0.5 rounded-md uppercase">Multi-Photo to A4</span>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-black text-dark-900">Image to PDF Converter</h3>
+                            <p class="text-xs font-semibold text-slate-500 mt-1 line-clamp-2">
+                                एक या अधिक फोटो को क्रमबद्ध तरीके से जोड़कर सिंगल A4 साइज पीडीएफ बनाएं।
+                            </p>
+                        </div>
+                    </div>
+                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-black text-sky-600">
+                        <span>Open Studio</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </div>
+                </div>
+
+                <!-- 5. PDF TEXT & STAMP EDITOR -->
+                <div onclick="window.openToolWorkspace('pdf_editor')" data-category="pdf" data-title="पीडीएफ एडिटर" class="tool-card cursor-pointer bg-white rounded-2xl p-5 shadow-card border border-slate-200 hover:border-rose-400 flex flex-col justify-between space-y-4">
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-start">
+                            <div class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center text-xl font-black">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </div>
+                            <span class="bg-rose-100 text-rose-900 border border-rose-300 text-[10px] font-black px-2 py-0.5 rounded-md uppercase">Click-to-Edit &amp; A4</span>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-black text-dark-900">PDF Text &amp; A4 Editor</h3>
+                            <p class="text-xs font-semibold text-slate-500 mt-1 line-clamp-2">
+                                पीडीएफ में किसी भी शब्द/लाइन पर क्लिक करके उसी जगह एडिट करें, व्हाइटआउट करें, साफ प्रिंट पाएं।
+                            </p>
+                        </div>
+                    </div>
+                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-black text-rose-600">
+                        <span>Open Studio</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </div>
+                </div>
+
+                <!-- 6. MERGE PDF -->
+                <div onclick="window.openToolWorkspace('pdf_merge')" data-category="pdf" data-title="पीडीएफ मर्ज" class="tool-card cursor-pointer bg-white rounded-2xl p-5 shadow-card border border-slate-200 hover:border-purple-400 flex flex-col justify-between space-y-4">
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-start">
+                            <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 border border-purple-200 flex items-center justify-center text-xl font-black">
+                                <i class="fa-solid fa-object-group"></i>
+                            </div>
+                            <span class="bg-purple-100 text-purple-900 border border-purple-300 text-[10px] font-black px-2 py-0.5 rounded-md uppercase">Combine PDFs</span>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-black text-dark-900">Merge PDF Files</h3>
+                            <p class="text-xs font-semibold text-slate-500 mt-1 line-clamp-2">
+                                कई सारी पीडीएफ फाइलों को अपनी इच्छानुसार क्रम में सजाकर एक सिंगल पीडीएफ में मर्ज करें।
+                            </p>
+                        </div>
+                    </div>
+                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-black text-purple-600">
+                        <span>Open Studio</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </div>
+                </div>
+
+                <!-- 7. UNLOCK PDF -->
+                <div onclick="window.openToolWorkspace('pdf_unlock')" data-category="pdf" data-title="पीडीएफ अनलॉक" class="tool-card cursor-pointer bg-white rounded-2xl p-5 shadow-card border border-slate-200 hover:border-teal-400 flex flex-col justify-between space-y-4">
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-start">
+                            <div class="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 border border-teal-200 flex items-center justify-center text-xl font-black">
+                                <i class="fa-solid fa-lock-open"></i>
+                            </div>
+                            <span class="bg-teal-100 text-teal-900 border border-teal-300 text-[10px] font-black px-2 py-0.5 rounded-md uppercase">Remove Password</span>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-black text-dark-900">PDF Password Unlocker</h3>
+                            <p class="text-xs font-semibold text-slate-500 mt-1 line-clamp-2">
+                                पासवर्ड-प्रोटेक्टेड पीडीएफ का पासवर्ड हटाकर हमेशा के लिए अनलॉक व पासवर्ड-फ्री बनाएं।
+                            </p>
+                        </div>
+                    </div>
+                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-black text-teal-600">
+                        <span>Open Studio</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </div>
+                </div>
+
+                <!-- 8. SMART IMAGE COMPRESSOR -->
+                <div onclick="window.openToolWorkspace('img_compress')" data-category="photo" data-title="इमेज कंप्रेसर" class="tool-card cursor-pointer bg-white rounded-2xl p-5 shadow-card border border-slate-200 hover:border-royal-500 flex flex-col justify-between space-y-4">
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-start">
+                            <div class="w-12 h-12 rounded-2xl bg-royal-50 text-royal-600 border border-royal-200 flex items-center justify-center text-xl font-black">
+                                <i class="fa-solid fa-file-zipper"></i>
+                            </div>
+                            <span class="bg-royal-100 text-royal-900 border border-royal-300 text-[10px] font-black px-2 py-0.5 rounded-md uppercase">Target 20KB / 50KB</span>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-black text-dark-900">Smart Image Compressor</h3>
+                            <p class="text-xs font-semibold text-slate-500 mt-1 line-clamp-2">
+                                सरकारी व साइबर कैफे फॉर्म्स के लिए 20KB, 50KB, 100KB में इमेज कंप्रेस करें बिना क्वालिटी खोए।
+                            </p>
+                        </div>
+                    </div>
+                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-black text-royal-600">
+                        <span>Open Studio</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ================= VIEW 2: ACTIVE TOOL WORKSPACE VIEW ================= -->
+        <div id="toolWorkspaceView" class="hidden space-y-4">
+            
+            <!-- Sticky Quick-Switcher Bar & Close Button (कट करने का बटन ❌) -->
+            <div class="bg-white rounded-2xl p-2.5 shadow-card border border-slate-200 flex items-center justify-between gap-2 sticky top-[62px] md:top-[74px] z-40">
+                <!-- Horizontal Quick-Switch Tabs -->
+                <div class="flex items-center gap-1.5 overflow-x-auto py-1 pr-2 flex-1 scrollbar-none">
+                    <button onclick="window.switchWorkspaceTool('passport_photo')" id="wsTab-passport_photo" class="ws-tab-btn px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition flex items-center gap-1.5 border border-slate-200">
+                        <i class="fa-solid fa-id-badge text-amber-500"></i> Passport Photo
+                    </button>
+                    <button onclick="window.switchWorkspaceTool('bg_remover')" id="wsTab-bg_remover" class="ws-tab-btn px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition flex items-center gap-1.5 border border-slate-200">
+                        <i class="fa-solid fa-wand-magic-sparkles text-emerald-500"></i> BG Remover
+                    </button>
+                    <button onclick="window.switchWorkspaceTool('pdf_to_img')" id="wsTab-pdf_to_img" class="ws-tab-btn px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition flex items-center gap-1.5 border border-slate-200">
+                        <i class="fa-solid fa-file-image text-indigo-500"></i> PDF to Image
+                    </button>
+                    <button onclick="window.switchWorkspaceTool('img_to_pdf')" id="wsTab-img_to_pdf" class="ws-tab-btn px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition flex items-center gap-1.5 border border-slate-200">
+                        <i class="fa-solid fa-file-pdf text-sky-500"></i> Image to PDF
+                    </button>
+                    <button onclick="window.switchWorkspaceTool('pdf_editor')" id="wsTab-pdf_editor" class="ws-tab-btn px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition flex items-center gap-1.5 border border-slate-200">
+                        <i class="fa-solid fa-pen-to-square text-rose-500"></i> PDF Editor (A4)
+                    </button>
+                    <button onclick="window.switchWorkspaceTool('pdf_merge')" id="wsTab-pdf_merge" class="ws-tab-btn px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition flex items-center gap-1.5 border border-slate-200">
+                        <i class="fa-solid fa-object-group text-purple-500"></i> Merge PDF
+                    </button>
+                    <button onclick="window.switchWorkspaceTool('pdf_unlock')" id="wsTab-pdf_unlock" class="ws-tab-btn px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition flex items-center gap-1.5 border border-slate-200">
+                        <i class="fa-solid fa-lock-open text-teal-500"></i> Unlock PDF
+                    </button>
+                    <button onclick="window.switchWorkspaceTool('img_compress')" id="wsTab-img_compress" class="ws-tab-btn px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition flex items-center gap-1.5 border border-slate-200">
+                        <i class="fa-solid fa-file-zipper text-royal-500"></i> Compressor
+                    </button>
+                </div>
+
+                <!-- CLOSE BUTTON: वापस सारे कार्ड्स में बदलने के लिए -->
+                <button onclick="window.closeToolWorkspace()" class="shrink-0 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 hover:border-red-600 px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center gap-1.5 shadow-sm" title="टूल बंद करें और कार्ड्स पर वापस जाएं">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                    <span class="hidden sm:inline">Close Tool</span>
+                </button>
+            </div>
+
+            <!-- DYNAMIC TOOL WORKSPACE CONTAINER -->
+            <div id="activeToolContainer" class="bg-white rounded-3xl p-4 md:p-7 shadow-card border border-slate-200 min-h-[500px]">
+                <!-- Loaded dynamically by js/tools-logic.js -->
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- FOOTER -->
     <footer class="bg-dark-950 border-t border-slate-800 text-center py-3.5 text-[10px] font-bold text-slate-400 mt-auto uppercase tracking-widest">
-        © 2026 Ojas Print Service | Secure Portal
+        © 2026 Ojas Tools Studio | Fast &amp; Secure Client Utilities
     </footer>
+
+    <!-- Modular Tools Logic -->
+    <script type="module" src="./js/tools-logic.js"></script>
 </body>
 </html>
