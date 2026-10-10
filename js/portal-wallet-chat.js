@@ -316,7 +316,7 @@ onAuthStateChanged(auth, async (user) => {
     if (shield) shield.remove();
     document.body.style.display = 'flex';
     if (window.history && window.history.replaceState) {
-        try { window.history.replaceState(null, document.title, '/'); } catch(e){}
+        try { window.history.replaceState(null, document.title, '/portal'); } catch(e){}
     }
     const loadingScreen = document.getElementById('loadingScreen'); const loginSection = document.getElementById('loginSection'); const dashboardSection = document.getElementById('dashboardSection');
     if (user) {
@@ -368,7 +368,21 @@ window.handleLogin = async function(event) {
     errorDiv.style.display = 'none'; const email = emailInput.includes('@') ? emailInput : `${emailInput}@print.com`;
     if (!window.isAllowedPortalEmail(email)) { errorDiv.innerHTML = '<i class="fa-solid fa-ban mr-1"></i> केवल <strong>@print.com</strong> डोमेन वाली User ID ही मान्य है!'; errorDiv.style.display = 'block'; return; }
     const originalBtnHtml = loginBtn.innerHTML; loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...'; loginBtn.disabled = true;
-    try { await signInWithEmailAndPassword(auth, email, passInput); } catch (error) { errorDiv.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i> Your ID or Password are incorrect!'; errorDiv.style.display = 'block'; document.getElementById('loginPassword').value = ''; loginBtn.innerHTML = originalBtnHtml; loginBtn.disabled = false; }
+    try { 
+        const userCred = await signInWithEmailAndPassword(auth, email, passInput); 
+        // If Admin logs in, direct straight to admin.html!
+        // Both User and Admin land on Portal! Admin gets full access and Admin button on Portal
+        sessionStorage.setItem('ojas_portal_access', 'allowed');
+        if (userCred.user && userCred.user.email && userCred.user.email.toLowerCase() === window.ADMIN_EMAIL.toLowerCase()) {
+            sessionStorage.setItem('ojas_admin_session', 'true');
+        }
+    } catch (error) { 
+        errorDiv.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i> Your ID or Password are incorrect!'; 
+        errorDiv.style.display = 'block'; 
+        document.getElementById('loginPassword').value = ''; 
+        loginBtn.innerHTML = originalBtnHtml; 
+        loginBtn.disabled = false; 
+    }
 };
 
 function startVipCountdownLoop() { if (window.vipCountdownInterval) clearInterval(window.vipCountdownInterval); updateVipTimerAndAlerts(); window.vipCountdownInterval = setInterval(updateVipTimerAndAlerts, 1000); }

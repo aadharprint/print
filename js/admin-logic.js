@@ -113,18 +113,30 @@ window.getStampDataUrlByName = function(fileName) {
 
 onAuthStateChanged(auth, async (user) => {
     if (!user || user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+        // Not authorized Super Admin: Immediately bounce to front page
         window.location.replace('/');
     } else {
+        // Authorized Super Admin! Remove shield and display admin panel
+        window.currentUserData = { uid: user.uid, email: user.email };
+        sessionStorage.setItem('ojas_admin_session', 'true');
+        sessionStorage.setItem('ojas_portal_access', 'allowed');
+
         const shield = document.getElementById('adminStealthShield');
         if (shield) shield.remove();
         document.body.style.display = 'flex';
+
         if (window.history && window.history.replaceState) {
-            try { window.history.replaceState(null, document.title, '/'); } catch(e){}
+            try { window.history.replaceState(null, document.title, '/admin'); } catch(e){}
         }
-        window.currentUserData = { uid: user.uid, email: user.email };
-        document.getElementById('adminPanelContent').classList.remove('hidden'); document.getElementById('loadingScreen').classList.add('hidden');
-        await window.preloadAllAvailableStamps(); await window.loadAllUsersForDropdown(); await window.loadPortalSettingsForAdmin();
-        window.startLiveSupportListener(); window.switchAdminMainTab('payments');
+
+        document.getElementById('adminPanelContent').classList.remove('hidden'); 
+        document.getElementById('loadingScreen').classList.add('hidden');
+        await window.preloadAllAvailableStamps(); 
+        await window.loadAllUsersForDropdown(); 
+        await window.loadPortalSettingsForAdmin();
+        window.startLiveSupportListener(); 
+        const savedTab = sessionStorage.getItem('ojas_admin_active_tab') || 'payments';
+        window.switchAdminMainTab(savedTab);
     }
 });
 
@@ -892,6 +904,8 @@ window.closePdfViewer = function() { const modal = document.getElementById('pdfV
 
 // === UPDATED: ADMIN TAB SWITCH & USERS / SETTINGS DATA ===
 window.switchAdminMainTab = function(tabName) { 
+    if (!tabName) tabName = "payments";
+    sessionStorage.setItem("ojas_admin_active_tab", tabName);
     const tabs = ['payments', 'users', 'create_user', 'support', 'history', 'controls']; 
     tabs.forEach(t => { 
         const btn = document.getElementById(`tab-${t}`); 
