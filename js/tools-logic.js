@@ -3,14 +3,14 @@
 // 100% Client-Side, Multi-CDN Robust Loaders, High-DPI & A4 PDF Editor
 // ============================================================================
 
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB strict limit
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB limit
 
-window.validateFileSize = function(file, customMaxMb = 10) {
+window.validateFileSize = function(file, customMaxMb = 50) {
     if (!file) return false;
     const maxBytes = customMaxMb * 1024 * 1024;
     if (file.size > maxBytes) {
         const fileMb = (file.size / (1024 * 1024)).toFixed(2);
-        alert(`⚠️ फाइल साइज बहुत बड़ा है!\n\nचुनी गई फाइल "${file.name}" का साइज ${fileMb} MB है।\nपोर्टल पर अधिकतम ${customMaxMb} MB तक की फाइल ही मान्य है।\n\nकृपया 10MB से छोटी फाइल चुनें।`);
+        alert(`⚠️ फाइल साइज बहुत बड़ा है!\n\nचुनी गई फाइल "${file.name}" का साइज ${fileMb} MB है।\nपोर्टल पर अधिकतम ${customMaxMb} MB तक की फाइल ही मान्य है।\n\nकृपया 50MB से छोटी फाइल चुनें।`);
         return false;
     }
     return true;
@@ -28,38 +28,57 @@ function dynamicallyLoadScript(url) {
 }
 
 window.ensurePdfLibrariesLoaded = async function() {
-    // 1. Load PDF.js if missing
+    // 1. Load PDF.js with multiple mirrors
     if (!window.pdfjsLib) {
-        try {
-            await dynamicallyLoadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
-        } catch (e) {
-            await dynamicallyLoadScript('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js');
+        const pdfjsSources = [
+            'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+            'https://fastly.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js'
+        ];
+        for (const src of pdfjsSources) {
+            try {
+                await dynamicallyLoadScript(src);
+                if (window.pdfjsLib) break;
+            } catch (err) {}
         }
     }
     if (window.pdfjsLib && !window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
     }
 
-    // 2. Load PDF-Lib if missing
+    // 2. Load PDF-Lib with reliable jsDelivr & Fastly mirrors
     if (!window.PDFLib) {
-        try {
-            await dynamicallyLoadScript('https://unpkg.com/pdf-lib@1.17.9/dist/pdf-lib.min.js');
-        } catch (e) {
-            await dynamicallyLoadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.9/pdf-lib.min.js');
+        const pdfLibSources = [
+            'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.9/dist/pdf-lib.min.js',
+            'https://fastly.jsdelivr.net/npm/pdf-lib@1.17.9/dist/pdf-lib.min.js',
+            'https://unpkg.com/pdf-lib@1.17.9/dist/pdf-lib.min.js'
+        ];
+        for (const src of pdfLibSources) {
+            try {
+                await dynamicallyLoadScript(src);
+                if (window.PDFLib) break;
+            } catch (err) {}
         }
     }
 
-    // 3. Load JSZip if missing
+    // 3. Load JSZip with multiple mirrors
     if (!window.JSZip) {
-        try {
-            await dynamicallyLoadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
-        } catch (e) {
-            await dynamicallyLoadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+        const jszipSources = [
+            'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
+            'https://fastly.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js'
+        ];
+        for (const src of jszipSources) {
+            try {
+                await dynamicallyLoadScript(src);
+                if (window.JSZip) break;
+            } catch (err) {}
         }
     }
 
-    if (!window.pdfjsLib) throw new Error('PDF.js लाइब्रेरी लोड नहीं हो पाई।');
-    if (!window.PDFLib) throw new Error('PDF-Lib लाइब्रेरी लोड नहीं हो पाई।');
+    if (!window.pdfjsLib) {
+        throw new Error('PDF व्यूअर लाइब्रेरी लोड नहीं हो सकी। कृपया इंटरनेट कनेक्शन चेक करें या पेज रिफ्रेश करें।');
+    }
     return true;
 };
 
@@ -206,7 +225,7 @@ window.setupPassportPhotoTool = function(container) {
                     <i class="fa-solid fa-camera"></i>
                 </div>
                 <h3 class="text-sm font-black text-slate-800">यहाँ अपनी फोटो अपलोड करें (क्लिक करें या ड्रैग करें)</h3>
-                <p class="text-xs font-semibold text-slate-400">JPG, PNG, WEBP (अधिकतम 10 MB)</p>
+                <p class="text-xs font-semibold text-slate-400">JPG, PNG, WEBP (अधिकतम 50 MB)</p>
             </div>
 
             <!-- Editor Section (Initially Hidden) -->
@@ -387,7 +406,7 @@ window.hexToRgb = function(hex) {
 
 window.handlePassportPhotoUpload = function(file) {
     if (!file) return;
-    if (!window.validateFileSize(file, 10)) return;
+    if (!window.validateFileSize(file, 50)) return;
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -770,7 +789,7 @@ window.setupBgRemoverTool = function(container) {
                 </div>
                 <div>
                     <h2 class="text-base md:text-lg font-black text-dark-900">स्मार्ट बैकग्राउंड रिमूवर &amp; वाइट BG कनवर्टर</h2>
-                    <p class="text-[11px] font-semibold text-slate-400">फोटो का बैकग्राउंड तुरंत शुद्ध सफेद (#FFFFFF), पारदर्शी या स्काई-ब्लू बनाएं (Max 10MB)</p>
+                    <p class="text-[11px] font-semibold text-slate-400">फोटो का बैकग्राउंड तुरंत शुद्ध सफेद (#FFFFFF), पारदर्शी या स्काई-ब्लू बनाएं (Max 50MB)</p>
                 </div>
             </div>
 
@@ -781,7 +800,7 @@ window.setupBgRemoverTool = function(container) {
                     <i class="fa-solid fa-image"></i>
                 </div>
                 <h3 class="text-sm font-black text-slate-800">यहाँ इमेज अपलोड करें (क्लिक करें या ड्रैग करें)</h3>
-                <p class="text-xs font-semibold text-slate-400">JPG, PNG, WEBP (अधिकतम 10MB)</p>
+                <p class="text-xs font-semibold text-slate-400">JPG, PNG, WEBP (अधिकतम 50MB)</p>
             </div>
 
             <!-- Result Workspace -->
@@ -835,7 +854,7 @@ window.bgRemoverState = {
 
 window.handleBgRemoverUpload = function(file) {
     if (!file) return;
-    if (!window.validateFileSize(file, 10)) return;
+    if (!window.validateFileSize(file, 50)) return;
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -931,7 +950,7 @@ window.setupPdfToImageTool = function(container) {
                 </div>
                 <div>
                     <h2 class="text-base md:text-lg font-black text-dark-900">PDF to High-Res Image Converter</h2>
-                    <p class="text-[11px] font-semibold text-slate-400">300+ से 800 DPI अल्ट्रा-क्लियर रेंडरिंग • PNG / JPG एक्सपोर्ट (Max 10MB)</p>
+                    <p class="text-[11px] font-semibold text-slate-400">300+ से 800 DPI अल्ट्रा-क्लियर रेंडरिंग • PNG / JPG एक्सपोर्ट (Max 50MB)</p>
                 </div>
             </div>
 
@@ -942,7 +961,7 @@ window.setupPdfToImageTool = function(container) {
                     <i class="fa-solid fa-file-pdf"></i>
                 </div>
                 <h3 class="text-sm font-black text-slate-800">यहाँ अपनी PDF फाइल अपलोड करें</h3>
-                <p class="text-xs font-semibold text-slate-400">केवल PDF फाइल (अधिकतम 10MB)</p>
+                <p class="text-xs font-semibold text-slate-400">केवल PDF फाइल (अधिकतम 50MB)</p>
             </div>
 
             <!-- Conversion Options & Output -->
@@ -993,7 +1012,7 @@ window.pdfToImgState = {
 
 window.handlePdfToImgUpload = async function(file) {
     if (!file) return;
-    if (!window.validateFileSize(file, 10)) return;
+    if (!window.validateFileSize(file, 50)) return;
 
     try {
         await window.ensurePdfLibrariesLoaded();
@@ -1106,7 +1125,7 @@ window.setupImageToPdfTool = function(container) {
                 </div>
                 <div>
                     <h2 class="text-base md:text-lg font-black text-dark-900">Image to PDF Converter</h2>
-                    <p class="text-[11px] font-semibold text-slate-400">एक या अधिक फोटो को क्रमबद्ध तरीके से A4 साइज प्रिंटेबल पीडीएफ में बदलें (Max 10MB)</p>
+                    <p class="text-[11px] font-semibold text-slate-400">एक या अधिक फोटो को क्रमबद्ध तरीके से A4 साइज प्रिंटेबल पीडीएफ में बदलें (Max 50MB)</p>
                 </div>
             </div>
 
@@ -1117,7 +1136,7 @@ window.setupImageToPdfTool = function(container) {
                     <i class="fa-solid fa-images"></i>
                 </div>
                 <h3 class="text-sm font-black text-slate-800">यहाँ फोटो चुनें (एक साथ कई फोटो चुन सकते हैं)</h3>
-                <p class="text-xs font-semibold text-slate-400">JPG, PNG (प्रत्येक फाइल अधिकतम 10MB)</p>
+                <p class="text-xs font-semibold text-slate-400">JPG, PNG (प्रत्येक फाइल अधिकतम 50MB)</p>
             </div>
 
             <!-- Image Reorder & Settings Workspace -->
@@ -1158,7 +1177,7 @@ window.handleImageToPdfUpload = function(fileList) {
     if (!fileList || fileList.length === 0) return;
     for (let i = 0; i < fileList.length; i++) {
         const file = fileList[i];
-        if (!window.validateFileSize(file, 10)) continue;
+        if (!window.validateFileSize(file, 50)) continue;
         const reader = new FileReader();
         reader.onload = (e) => {
             window.imgToPdfList.push({ name: file.name, dataUrl: e.target.result });
@@ -1285,7 +1304,7 @@ window.setupPdfEditorTool = function(container) {
                     </div>
                     <div>
                         <h2 class="text-base md:text-lg font-black text-dark-900">PDF Text &amp; A4 Editor (इन-प्लेस टेक्स्ट एडिटर)</h2>
-                        <p class="text-[11px] font-semibold text-slate-400">शब्द/लाइन पर क्लिक करके उसी जगह एडिट करें • बैकग्राउंड 100% सेम रहेगा, कोई ज़ूम या पिक्सल शिफ्ट नहीं (Max 10MB)</p>
+                        <p class="text-[11px] font-semibold text-slate-400">शब्द/लाइन पर क्लिक करके उसी जगह एडिट करें • बैकग्राउंड 100% सेम रहेगा, कोई ज़ूम या पिक्सल शिफ्ट नहीं (Max 50MB)</p>
                     </div>
                 </div>
             </div>
@@ -1297,7 +1316,7 @@ window.setupPdfEditorTool = function(container) {
                     <i class="fa-solid fa-file-pen"></i>
                 </div>
                 <h3 class="text-sm font-black text-slate-800">यहाँ PDF फाइल अपलोड करें</h3>
-                <p class="text-xs font-semibold text-slate-400">एडिट करने के लिए PDF चुनें (अधिकतम 10MB)</p>
+                <p class="text-xs font-semibold text-slate-400">एडिट करने के लिए PDF चुनें (अधिकतम 50MB)</p>
             </div>
 
             <!-- Full Workspace -->
@@ -1421,7 +1440,7 @@ window.sampleCanvasBackground = function(ctx, x, y, w, h) {
 
 window.handlePdfEditorUpload = async function(file) {
     if (!file) return;
-    if (!window.validateFileSize(file, 10)) return;
+    if (!window.validateFileSize(file, 50)) return;
 
     try {
         await window.ensurePdfLibrariesLoaded();
@@ -1767,7 +1786,7 @@ window.setupPdfMergeTool = function(container) {
                 </div>
                 <div>
                     <h2 class="text-base md:text-lg font-black text-dark-900">Merge PDF Files (पीडीएफ जोड़ें)</h2>
-                    <p class="text-[11px] font-semibold text-slate-400">कई PDF फाइलों को अपनी पसंद के क्रम में जोड़कर एक बनाएं (Max 10MB per file)</p>
+                    <p class="text-[11px] font-semibold text-slate-400">कई PDF फाइलों को अपनी पसंद के क्रम में जोड़कर एक बनाएं (Max 50MB per file)</p>
                 </div>
             </div>
 
@@ -1777,7 +1796,7 @@ window.setupPdfMergeTool = function(container) {
                     <i class="fa-solid fa-copy"></i>
                 </div>
                 <h3 class="text-sm font-black text-slate-800">यहाँ PDF फाइलें चुनें (एक साथ 2 या अधिक फाइलें चुनें)</h3>
-                <p class="text-xs font-semibold text-slate-400">प्रत्येक फाइल अधिकतम 10MB</p>
+                <p class="text-xs font-semibold text-slate-400">प्रत्येक फाइल अधिकतम 50MB</p>
             </div>
 
             <div id="pdfMergeWorkspace" class="hidden space-y-4">
@@ -1799,7 +1818,7 @@ window.handlePdfMergeUpload = async function(fileList) {
     if (!fileList || fileList.length === 0) return;
     for (let i = 0; i < fileList.length; i++) {
         const file = fileList[i];
-        if (!window.validateFileSize(file, 10)) continue;
+        if (!window.validateFileSize(file, 50)) continue;
         const arrayBuffer = await file.arrayBuffer();
         window.pdfMergeList.push({ name: file.name, size: file.size, bytes: arrayBuffer });
     }
@@ -1900,7 +1919,7 @@ window.setupPdfUnlockTool = function(container) {
                 </div>
                 <div>
                     <h2 class="text-base md:text-lg font-black text-dark-900">PDF Password Unlocker</h2>
-                    <p class="text-[11px] font-semibold text-slate-400">पासवर्ड हटाकर बिना लॉक वाली सामान्य PDF बनाएं (Max 10MB)</p>
+                    <p class="text-[11px] font-semibold text-slate-400">पासवर्ड हटाकर बिना लॉक वाली सामान्य PDF बनाएं (Max 50MB)</p>
                 </div>
             </div>
 
@@ -1910,7 +1929,7 @@ window.setupPdfUnlockTool = function(container) {
                     <i class="fa-solid fa-file-shield"></i>
                 </div>
                 <h3 class="text-sm font-black text-slate-800">लॉक PDF फाइल यहाँ चुनें</h3>
-                <p class="text-xs font-semibold text-slate-400">अधिकतम 10MB</p>
+                <p class="text-xs font-semibold text-slate-400">अधिकतम 50MB</p>
             </div>
 
             <div id="pdfUnlockFormSection" class="hidden bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-3">
@@ -1930,7 +1949,7 @@ window.pdfUnlockFileBytes = null;
 
 window.handlePdfUnlockUpload = async function(file) {
     if (!file) return;
-    if (!window.validateFileSize(file, 10)) return;
+    if (!window.validateFileSize(file, 50)) return;
 
     window.pdfUnlockFileBytes = await file.arrayBuffer();
     document.getElementById('pdfUnlockUploadBox').classList.add('hidden');
@@ -1977,7 +1996,7 @@ window.setupImageCompressorTool = function(container) {
                 </div>
                 <div>
                     <h2 class="text-base md:text-lg font-black text-dark-900">Smart Image Compressor (सरकारी फॉर्म्स के लिए)</h2>
-                    <p class="text-[11px] font-semibold text-slate-400">टारगेट 20KB, 50KB, 100KB में इमेज कंप्रेस करें बिना शार्पनेस खोए (Max 10MB)</p>
+                    <p class="text-[11px] font-semibold text-slate-400">टारगेट 20KB, 50KB, 100KB में इमेज कंप्रेस करें बिना शार्पनेस खोए (Max 50MB)</p>
                 </div>
             </div>
 
@@ -1987,7 +2006,7 @@ window.setupImageCompressorTool = function(container) {
                     <i class="fa-solid fa-compress"></i>
                 </div>
                 <h3 class="text-sm font-black text-slate-800">यहाँ इमेज अपलोड करें</h3>
-                <p class="text-xs font-semibold text-slate-400">JPG, PNG, WEBP (अधिकतम 10MB)</p>
+                <p class="text-xs font-semibold text-slate-400">JPG, PNG, WEBP (अधिकतम 50MB)</p>
             </div>
 
             <div id="compWorkspaceSection" class="hidden space-y-4">
@@ -2051,7 +2070,7 @@ window.compressorState = {
 
 window.handleCompressorUpload = function(file) {
     if (!file) return;
-    if (!window.validateFileSize(file, 10)) return;
+    if (!window.validateFileSize(file, 50)) return;
 
     window.compressorState.file = file;
     const origSizeKb = (file.size / 1024).toFixed(1);

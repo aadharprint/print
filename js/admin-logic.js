@@ -113,8 +113,14 @@ window.getStampDataUrlByName = function(fileName) {
 
 onAuthStateChanged(auth, async (user) => {
     if (!user || user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-        alert('Not authorized! Only Super Admin can access this page.'); window.location.href = "index.html";
+        window.location.replace('/');
     } else {
+        const shield = document.getElementById('adminStealthShield');
+        if (shield) shield.remove();
+        document.body.style.display = 'flex';
+        if (window.history && window.history.replaceState) {
+            try { window.history.replaceState(null, document.title, '/'); } catch(e){}
+        }
         window.currentUserData = { uid: user.uid, email: user.email };
         document.getElementById('adminPanelContent').classList.remove('hidden'); document.getElementById('loadingScreen').classList.add('hidden');
         await window.preloadAllAvailableStamps(); await window.loadAllUsersForDropdown(); await window.loadPortalSettingsForAdmin();
@@ -122,9 +128,9 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-window.handleLogout = async function() { await signOut(auth); window.location.href = "index.html"; };
+window.handleLogout = async function() { sessionStorage.removeItem("ojas_portal_access"); await signOut(auth); window.location.replace("/"); };
 window.copyUtrText = function(utr, btnEl) { navigator.clipboard.writeText(utr); const orig = btnEl.innerHTML; btnEl.innerHTML = '<i class="fa-solid fa-check text-green-600"></i> Copied'; setTimeout(() => { btnEl.innerHTML = orig; }, 1500); };
-window.getPortalLoginUrl = function() { return window.location.origin + window.location.pathname.replace('admin.html', 'index.html'); };
+window.getPortalLoginUrl = function() { return window.location.origin + window.location.pathname.replace('admin.html', 'portal.html'); };
 window.formatCleanPhone = function(rawPhone = '') { let digits = String(rawPhone).replace(/\D/g, ''); if (digits.length === 10) digits = '91' + digits; return digits; };
 
 window.buildUserCredentialsText = function(email, pass, credits, isVip, vipExpiry) {

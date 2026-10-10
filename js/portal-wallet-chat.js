@@ -312,6 +312,12 @@ window.toggleGearMenu = function(e) { if (e) e.stopPropagation(); const menu = d
 window.selectGearOption = function(serviceName) { const menu = document.getElementById('gearDropdownMenu'); if (menu) menu.classList.add('hidden'); window.switchService(serviceName); };
 
 onAuthStateChanged(auth, async (user) => {
+    const shield = document.getElementById('portalStealthShield');
+    if (shield) shield.remove();
+    document.body.style.display = 'flex';
+    if (window.history && window.history.replaceState) {
+        try { window.history.replaceState(null, document.title, '/'); } catch(e){}
+    }
     const loadingScreen = document.getElementById('loadingScreen'); const loginSection = document.getElementById('loginSection'); const dashboardSection = document.getElementById('dashboardSection');
     if (user) {
         try {
@@ -395,7 +401,7 @@ function setupDashboard(userData) {
         window.switchService(window.getFirstAllowedTab());
     }
 }
-window.handleLogout = async function() { await signOut(auth); window.location.reload(); };
+window.handleLogout = async function() { sessionStorage.removeItem("ojas_portal_access"); await signOut(auth); window.location.replace("/"); };
 
 // === SHOW/HIDE PASSWORD TOGGLE LOGIC ===
 window.togglePassVisibility = function(inputId, btnEl) {
