@@ -37,7 +37,8 @@ import "./config-templates.js";
 
 const {
     firebaseConfig, auth, db, onAuthStateChanged, signOut,
-    doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, onSnapshot
+    doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, onSnapshot,
+    query, where, orderBy, limit, startAfter
 } = window.fb;
 
 const ADMIN_EMAIL = window.ADMIN_EMAIL;
@@ -113,18 +114,36 @@ window.getStampDataUrlByName = function(fileName) {
 
 onAuthStateChanged(auth, async (user) => {
     if (!user || user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-        alert('Not authorized! Only Super Admin can access this page.'); window.location.href = "index.html";
+        // Not authorized Super Admin: Immediately bounce to front page
+        window.location.replace('/');
     } else {
+        // Authorized Super Admin! Remove shield and display admin panel
         window.currentUserData = { uid: user.uid, email: user.email };
-        document.getElementById('adminPanelContent').classList.remove('hidden'); document.getElementById('loadingScreen').classList.add('hidden');
-        await window.preloadAllAvailableStamps(); await window.loadAllUsersForDropdown(); await window.loadPortalSettingsForAdmin();
-        window.startLiveSupportListener(); window.switchAdminMainTab('payments');
+        sessionStorage.setItem('ojas_admin_session', 'true');
+        sessionStorage.setItem('ojas_portal_access', 'allowed');
+
+        const shield = document.getElementById('adminStealthShield');
+        if (shield) shield.remove();
+        document.body.style.display = 'flex';
+
+        if (window.history && window.history.replaceState) {
+            try { window.history.replaceState(null, document.title, '/admin'); } catch(e){}
+        }
+
+        document.getElementById('adminPanelContent').classList.remove('hidden'); 
+        document.getElementById('loadingScreen').classList.add('hidden');
+        await window.preloadAllAvailableStamps(); 
+        await window.loadAllUsersForDropdown(); 
+        await window.loadPortalSettingsForAdmin();
+        window.startLiveSupportListener(); 
+        const savedTab = sessionStorage.getItem('ojas_admin_active_tab') || 'payments';
+        window.switchAdminMainTab(savedTab);
     }
 });
 
-window.handleLogout = async function() { await signOut(auth); window.location.href = "index.html"; };
+window.handleLogout = async function() { sessionStorage.removeItem("ojas_portal_access"); await signOut(auth); window.location.replace("/"); };
 window.copyUtrText = function(utr, btnEl) { navigator.clipboard.writeText(utr); const orig = btnEl.innerHTML; btnEl.innerHTML = '<i class="fa-solid fa-check text-green-600"></i> Copied'; setTimeout(() => { btnEl.innerHTML = orig; }, 1500); };
-window.getPortalLoginUrl = function() { return window.location.origin + window.location.pathname.replace('admin.html', 'index.html'); };
+window.getPortalLoginUrl = function() { return window.location.origin + window.location.pathname.replace('admin.html', 'portal.html'); };
 window.formatCleanPhone = function(rawPhone = '') { let digits = String(rawPhone).replace(/\D/g, ''); if (digits.length === 10) digits = '91' + digits; return digits; };
 
 window.buildUserCredentialsText = function(email, pass, credits, isVip, vipExpiry) {
@@ -550,32 +569,145 @@ window.rejectPayment = async function(paymentDocId) { if (!confirm(`क्या
 window.deletePaymentRecord = async function(paymentDocId) { if (!confirm(`क्या आप इस पेमेंट हिस्ट्री रिकॉर्ड को हमेशा के लिए डिलीट करना चाहते हैं?`)) return; try { await deleteDoc(doc(db, "payments", paymentDocId)); window.loadAllPayments(); } catch (err) {} };
 
 // ================= HISTORY, STAMP & NEW CERTIFICATE CHECKBOX LOGIC =================
-window.loadAdminHistory = async function() {
+window.adminHistoryLastVisibleDoc = null;
+window.adminHistoryHasMore = true;
+window.adminHistoryIsLoading = false;
+window.adminHistoryBatchSize = 20;
+window.adminHistoryObserver = null;
+
+window.loadAdminHistory = async function(isReset = true) {
     const container = document.getElementById('adminHistoryListContainer');
-    container.innerHTML = `<div class="p-10 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>रिकॉर्ड्स लोड हो रहे हैं...</div>`;
+    const btn = document.getElementById('btnLoadMoreHistory');
+
+    if (isReset) {
+        window.adminAllHistoryData = [];
+        window.adminHistoryLastVisibleDoc = null;
+        window.adminHistoryHasMore = true;
+        if (container) {
+            container.innerHTML = `<div class="p-10 text-center text-slate-400 font-bold bg-white rounded-2xl border border-slate-100"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>ताज़ा 20 रिकॉर्ड्स लोड हो रहे हैं...</div>`;
+        }
+    }
+
+    if (window.adminHistoryIsLoading || !window.adminHistoryHasMore) return;
+    window.adminHistoryIsLoading = true;
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> लोड हो रहा है...';
+    }
+
     await window.preloadAllAvailableStamps();
 
     try {
-        const filterUserDropdown = document.getElementById('filterUser'); const currUserFilter = filterUserDropdown.value; filterUserDropdown.innerHTML = '<option value="ALL">All Users</option>'; filterUserDropdown.innerHTML += `<option value="${window.currentUserData.uid}">👑 Harish Kumar (Admin)</option>`;
-        for (const [uid, data] of Object.entries(window.usersDataList)) { window.allUsersMap[uid] = data.email; if (uid !== window.currentUserData.uid) filterUserDropdown.innerHTML += `<option value="${uid}">${data.email}</option>`; }
-        filterUserDropdown.value = currUserFilter || 'ALL';
+        const filterUserDropdown = document.getElementById('filterUser');
+        if (filterUserDropdown && filterUserDropdown.options.length <= 1) {
+            const currUserFilter = filterUserDropdown.value;
+            filterUserDropdown.innerHTML = '<option value="ALL">All Users</option>';
+            filterUserDropdown.innerHTML += `<option value="${window.currentUserData.uid}">👑 Harish Kumar (Admin)</option>`;
+            for (const [uid, data] of Object.entries(window.usersDataList)) {
+                window.allUsersMap[uid] = data.email;
+                if (uid !== window.currentUserData.uid) filterUserDropdown.innerHTML += `<option value="${uid}">${data.email}</option>`;
+            }
+            filterUserDropdown.value = currUserFilter || 'ALL';
+        }
 
-        const historySnap = await getDocs(collection(db, "history")); window.adminAllHistoryData = [];
-        historySnap.forEach(docSnap => { window.adminAllHistoryData.push({ id: docSnap.id, ...docSnap.data() }); });
-        window.adminAllHistoryData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+        const historyCol = collection(db, "history");
+        let historyQuery;
 
-        window.stampSelectionMap = {};
-        window.certificateSelectionMap = {};
+        if (window.adminHistoryLastVisibleDoc) {
+            historyQuery = query(
+                historyCol,
+                orderBy("timestamp", "desc"),
+                startAfter(window.adminHistoryLastVisibleDoc),
+                limit(window.adminHistoryBatchSize)
+            );
+        } else {
+            historyQuery = query(
+                historyCol,
+                orderBy("timestamp", "desc"),
+                limit(window.adminHistoryBatchSize)
+            );
+        }
+
+        let snap;
+        try {
+            snap = await getDocs(historyQuery);
+        } catch (queryErr) {
+            console.warn('Index fallback on query:', queryErr);
+            historyQuery = query(historyCol, limit(window.adminHistoryBatchSize));
+            snap = await getDocs(historyQuery);
+        }
+
+        if (snap.empty || snap.docs.length < window.adminHistoryBatchSize) {
+            window.adminHistoryHasMore = false;
+        }
+
+        if (!snap.empty) {
+            window.adminHistoryLastVisibleDoc = snap.docs[snap.docs.length - 1];
+            snap.forEach(docSnap => {
+                window.adminAllHistoryData.push({ id: docSnap.id, ...docSnap.data() });
+            });
+        }
+
+        window.stampSelectionMap = window.stampSelectionMap || {};
+        window.certificateSelectionMap = window.certificateSelectionMap || {};
 
         window.adminAllHistoryData.forEach((rec, idx) => {
-            if (rec.withStamp) { window.stampSelectionMap[idx] = { enabled: true, stampFile: rec.stampFile || 'stamp.png', stampSrc: window.getStampDataUrlByName(rec.stampFile || 'stamp.png') }; }
-            
-            // Check for persistent attachment status
+            if (rec.withStamp && !window.stampSelectionMap[idx]) {
+                window.stampSelectionMap[idx] = { 
+                    enabled: true, 
+                    stampFile: rec.stampFile || 'stamp.png', 
+                    stampSrc: window.getStampDataUrlByName(rec.stampFile || 'stamp.png') 
+                };
+            }
             let certEnabled = rec.certificateFileId ? (rec.isCertificateAttached !== false) : false;
-            if (rec.certificateFileId) { window.certificateSelectionMap[idx] = { enabled: certEnabled, certificateFileId: rec.certificateFileId }; }
+            if (rec.certificateFileId && !window.certificateSelectionMap[idx]) {
+                window.certificateSelectionMap[idx] = { enabled: certEnabled, certificateFileId: rec.certificateFileId };
+            }
         });
+
         window.renderAdminHistory();
-    } catch (err) {}
+        window.setupAdminHistoryInfiniteScroll();
+
+    } catch (err) {
+        console.error('History load error:', err);
+        if (container && isReset) {
+            container.innerHTML = `<div class="p-6 text-center text-red-500 font-bold bg-white rounded-2xl">एरर: ${err.message}</div>`;
+        }
+    } finally {
+        window.adminHistoryIsLoading = false;
+        if (btn) {
+            btn.disabled = !window.adminHistoryHasMore;
+            btn.innerHTML = window.adminHistoryHasMore 
+                ? '<i class="fa-solid fa-angles-down mr-1"></i> और 20 रिकॉर्ड्स लोड करें (Load More)' 
+                : '✅ सभी रिकॉर्ड्स लोड हो चुके हैं';
+            btn.className = window.adminHistoryHasMore 
+                ? "bg-dark-900 hover:bg-black text-royal-300 font-black px-6 py-2.5 rounded-xl text-xs shadow-sm transition flex items-center gap-2 mx-auto" 
+                : "bg-slate-200 text-slate-500 font-bold px-6 py-2.5 rounded-xl text-xs transition cursor-default mx-auto";
+        }
+    }
+};
+
+window.loadNextAdminHistoryBatch = async function() {
+    if (window.adminHistoryIsLoading || !window.adminHistoryHasMore) return;
+    await window.loadAdminHistory(false);
+};
+
+window.setupAdminHistoryInfiniteScroll = function() {
+    const sentinel = document.getElementById('adminHistoryScrollSentinel');
+    if (!sentinel) return;
+
+    if (window.adminHistoryObserver) {
+        window.adminHistoryObserver.disconnect();
+    }
+
+    window.adminHistoryObserver = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && window.adminHistoryHasMore && !window.adminHistoryIsLoading) {
+            window.loadNextAdminHistoryBatch();
+        }
+    }, { rootMargin: '200px' });
+
+    window.adminHistoryObserver.observe(sentinel);
 };
 
 window.toggleRowStampCheckbox = async function(origIndex, isChecked) {
@@ -725,7 +857,7 @@ window.renderAdminHistory = function() {
         });
     }
 
-    document.getElementById('historyCount').innerText = `Total Files: ${filteredData.length}`; container.innerHTML = '';
+    document.getElementById('historyCount').innerText = `दिख रहे हैं: ${filteredData.length} फाइल्स ${window.adminHistoryHasMore ? '(नीचे स्क्रॉल करके और देखें)' : '(सभी लोडेड)'}`; container.innerHTML = '';
     if (filteredData.length === 0) { container.innerHTML = `<div class="p-10 text-center text-slate-400 bg-white rounded-2xl border border-slate-100"><i class="fa-regular fa-folder-open text-4xl mb-2 text-slate-300"></i><br>कोई फाइल नहीं मिली।</div>`; return; }
 
     filteredData.forEach(data => {
@@ -886,15 +1018,17 @@ window.closePdfViewer = function() { const modal = document.getElementById('pdfV
 
 // === UPDATED: ADMIN TAB SWITCH & USERS / SETTINGS DATA ===
 window.switchAdminMainTab = function(tabName) { 
+    if (!tabName) tabName = "payments";
+    sessionStorage.setItem("ojas_admin_active_tab", tabName);
     const tabs = ['payments', 'users', 'create_user', 'support', 'history', 'controls']; 
     tabs.forEach(t => { 
         const btn = document.getElementById(`tab-${t}`); 
-        if (btn) btn.className = "bg-slate-50 text-slate-600 font-bold py-2.5 px-3 rounded-xl hover:bg-slate-100 transition border border-slate-200/80 text-xs flex justify-center items-center gap-1.5 whitespace-nowrap shrink-0 sm:shrink"; 
+        if (btn) btn.className = "bg-slate-50 text-slate-600 font-bold py-2.5 px-3 rounded-xl hover:bg-slate-100 transition border border-slate-200/80 text-xs flex justify-center items-center gap-1.5"; 
         const section = document.getElementById(`section-${t}`); 
         if (section) section.classList.add('hidden'); 
     }); 
     const activeBtn = document.getElementById(`tab-${tabName}`); 
-    if (activeBtn) activeBtn.className = "bg-dark-950 text-royal-300 font-black py-2.5 px-3 rounded-xl shadow-glow transition text-xs flex justify-center items-center gap-1.5 border border-royal-500/50 whitespace-nowrap shrink-0 sm:shrink"; 
+    if (activeBtn) activeBtn.className = "bg-dark-950 text-royal-300 font-black py-2.5 px-3 rounded-xl shadow-glow transition text-xs flex justify-center items-center gap-1.5 border border-royal-500/50"; 
     const activeSection = document.getElementById(`section-${tabName}`); 
     if (activeSection) { 
         activeSection.removeAttribute('class'); 
@@ -942,6 +1076,154 @@ window.handleUserSelection = function() {
     if(document.getElementById('userDobMinorToggle')) document.getElementById('userDobMinorToggle').checked = (uData.allowDobDelhi !== false && uData.allowDobMinor !== false);
     if(document.getElementById('userPassportToggle')) document.getElementById('userPassportToggle').checked = uData.allowPassport !== false;
     if(document.getElementById('userAnnexuresToggle')) document.getElementById('userAnnexuresToggle').checked = uData.allowAnnexures !== false;
+
+    // Load Personal Banner Config for Selected User
+    const bannerChk = document.getElementById('chkUserBannerEnabled');
+    if (bannerChk) bannerChk.checked = !!uData.personalBannerEnabled;
+    if (document.getElementById('inpUserBannerBadge')) document.getElementById('inpUserBannerBadge').value = uData.personalBannerBadge || 'NOTICE';
+    if (document.getElementById('inpUserBannerTitle')) document.getElementById('inpUserBannerTitle').value = uData.personalBannerTitle || '';
+    if (document.getElementById('inpUserBannerMessage')) document.getElementById('inpUserBannerMessage').value = uData.personalBannerMessage || '';
+    if (document.getElementById('inpUserBannerBtnText')) document.getElementById('inpUserBannerBtnText').value = uData.personalBannerBtnText || '';
+    if (document.getElementById('inpUserBannerBtnLink')) document.getElementById('inpUserBannerBtnLink').value = uData.personalBannerBtnLink || '';
+    if (typeof window.updateUserBannerPreview === 'function') window.updateUserBannerPreview();
+};
+
+window.updateUserBannerPreview = function() {
+    const uid = document.getElementById('userSelectDropdown')?.value;
+    const previewBox = document.getElementById('userBannerPreviewBox');
+    if (!previewBox) return;
+    if (!uid || !window.usersDataList[uid]) {
+        previewBox.innerHTML = '<span class="text-xs text-slate-400 font-bold"><i class="fa-solid fa-arrow-up mr-1"></i> कृपया पहले ऊपर ड्रॉपडाउन से कोई यूज़र चुनें</span>';
+        return;
+    }
+    const uData = window.usersDataList[uid];
+    const isEnabled = document.getElementById('chkUserBannerEnabled')?.checked;
+    const badge = document.getElementById('inpUserBannerBadge')?.value.trim() || 'NOTICE';
+    const title = document.getElementById('inpUserBannerTitle')?.value.trim();
+    const msg = document.getElementById('inpUserBannerMessage')?.value.trim();
+    const btnText = document.getElementById('inpUserBannerBtnText')?.value.trim();
+    const name = typeof window.extractUserDisplayName === 'function' 
+        ? window.extractUserDisplayName(uData.email, uData.username) 
+        : (uData.username || uData.email.split('@')[0]);
+
+    if (!isEnabled) {
+        previewBox.innerHTML = `
+            <div class="p-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 text-xs font-bold text-center">
+                <i class="fa-solid fa-eye-slash mr-1 text-slate-400"></i> इस यूज़र (${uData.email}) के लिए पर्सनल बैनर वर्तमान में <strong>बंद (OFF)</strong> है।
+            </div>`;
+        return;
+    }
+
+    const displayMsg = msg || 'यहाँ जो भी संदेश लिखेंगे, वह यूज़र को इस बॉक्स में दिखेगा...';
+    const btnHtml = btnText ? `<span class="bg-amber-400 text-dark-950 font-black px-3 py-1 rounded-xl text-[10px] shrink-0 shadow-sm">${btnText}</span>` : '';
+
+    previewBox.innerHTML = `
+        <div class="p-3.5 md:p-4 rounded-2xl bg-gradient-to-r from-dark-950 via-slate-900 to-amber-950 text-white border-2 border-amber-400 shadow-lg relative overflow-hidden">
+            <div class="relative z-10 space-y-1.5">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <span class="bg-amber-400 text-dark-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shrink-0">
+                            <i class="fa-solid fa-user-tag mr-1"></i>${badge}
+                        </span>
+                        <h4 class="text-xs md:text-sm font-black text-amber-300 flex items-center gap-1.5">
+                            <span>डियर ${name}</span>
+                            ${title ? `<span class="text-slate-300 font-semibold">• ${title}</span>` : ''}
+                        </h4>
+                    </div>
+                    ${btnHtml}
+                </div>
+                <p class="text-xs md:text-sm font-bold text-slate-100 whitespace-pre-line leading-relaxed pl-0.5">
+                    ${displayMsg}
+                </p>
+            </div>
+        </div>`;
+};
+
+window.saveSelectedUserBanner = async function(event) {
+    if (event) event.preventDefault();
+    const uid = document.getElementById('userSelectDropdown')?.value;
+    if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले ड्रॉपडाउन से उस यूज़र को सेलेक्ट करें जिसके लिए बैनर सेट करना है!');
+    const uData = window.usersDataList[uid];
+    const btn = document.getElementById('btnSaveUserBanner');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...'; }
+
+    const isEnabled = document.getElementById('chkUserBannerEnabled').checked;
+    const badge = document.getElementById('inpUserBannerBadge').value.trim() || 'NOTICE';
+    const title = document.getElementById('inpUserBannerTitle').value.trim();
+    const message = document.getElementById('inpUserBannerMessage').value.trim();
+    const btnText = document.getElementById('inpUserBannerBtnText').value.trim();
+    const btnLink = document.getElementById('inpUserBannerBtnLink').value.trim();
+
+    if (isEnabled && !message) {
+        alert('कृपया यूज़र के लिए मैसेज भी लिखें, या फिर "Show to this User" टिक हटा दें!');
+        if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+        return;
+    }
+
+    try {
+        const payload = {
+            personalBannerEnabled: isEnabled,
+            personalBannerBadge: badge,
+            personalBannerTitle: title,
+            personalBannerMessage: message,
+            personalBannerBtnText: btnText,
+            personalBannerBtnLink: btnLink,
+            personalBannerUpdatedAt: new Date()
+        };
+        await updateDoc(doc(db, "users", uid), payload);
+        
+        Object.assign(window.usersDataList[uid], payload);
+        window.updateUserBannerPreview();
+
+        const name = typeof window.extractUserDisplayName === 'function' 
+            ? window.extractUserDisplayName(uData.email, uData.username) 
+            : (uData.username || uData.email.split('@')[0]);
+
+        const alertMsg = document.getElementById('adminMsg');
+        if (alertMsg) {
+            alertMsg.className = "p-3.5 bg-green-50 text-green-900 rounded-2xl text-xs font-black border border-green-300 text-center shadow-sm";
+            alertMsg.innerHTML = `<i class="fa-solid fa-circle-check text-green-600 mr-1"></i> यूज़र <strong>${uData.email} (डियर ${name})</strong> के लिए पर्सनल बैनर सफलतापूर्वक <strong>${isEnabled ? 'चालू (Saved & Active)' : 'बंद (Disabled)'}</strong> कर दिया गया है!`;
+            alertMsg.classList.remove('hidden');
+            setTimeout(() => alertMsg.classList.add('hidden'), 4000);
+        }
+        alert(`सफलतापूर्वक सेव हो गया!\n\nयह बैनर अब सिर्फ "डियर ${name}" (${uData.email}) के पोर्टल पर दिखेगा।`);
+    } catch (err) {
+        alert('Error saving personal banner: ' + err.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+    }
+};
+
+window.clearSelectedUserBanner = async function() {
+    const uid = document.getElementById('userSelectDropdown')?.value;
+    if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले किसी यूज़र को सेलेक्ट करें!');
+    const uData = window.usersDataList[uid];
+    if (!confirm(`क्या आप यूज़र "${uData.email}" का पर्सनल बैनर हटाना (Clear) चाहते हैं?`)) return;
+
+    try {
+        const payload = {
+            personalBannerEnabled: false,
+            personalBannerMessage: '',
+            personalBannerTitle: '',
+            personalBannerBtnText: '',
+            personalBannerBtnLink: '',
+            personalBannerUpdatedAt: new Date()
+        };
+        await updateDoc(doc(db, "users", uid), payload);
+        Object.assign(window.usersDataList[uid], payload);
+
+        document.getElementById('chkUserBannerEnabled').checked = false;
+        document.getElementById('inpUserBannerTitle').value = '';
+        document.getElementById('inpUserBannerMessage').value = '';
+        document.getElementById('inpUserBannerBtnText').value = '';
+        document.getElementById('inpUserBannerBtnLink').value = '';
+        window.updateUserBannerPreview();
+
+        alert('पर्सनल बैनर सफलतापूर्वक हटा दिया गया है!');
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
 };
 
 window.adminSetNewUserPassword = async function() { const uid = document.getElementById('userSelectDropdown').value; if (!uid || !window.usersDataList[uid]) return alert('कृपया पहले यूज़र चुनें!'); const newPass = document.getElementById('adminNewResetPass').value.trim(); if (newPass.length < 6) return alert('पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!'); const btn = document.getElementById('btnAdminSetPass'); const orig = btn.innerHTML; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; btn.disabled = true; try { const uData = window.usersDataList[uid]; if (uData.userPass) { try { const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: uData.email, password: uData.userPass, returnSecureToken: true }) }); const signInData = await signInRes.json(); if (signInData.idToken) { await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${firebaseConfig.apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: signInData.idToken, password: newPass, returnSecureToken: true }) }); } } catch (e) { } } await updateDoc(doc(db, "users", uid), { userPass: newPass, adminResetPass: newPass, passUpdatedAt: new Date() }); window.usersDataList[uid].userPass = newPass; document.getElementById('selectedUserSavedPass').innerText = newPass; document.getElementById('adminNewResetPass').value = ''; alert('पासवर्ड सफलतापूर्वक बदल दिया गया है!'); } catch (err) { alert('Error: ' + err.message); } finally { btn.innerHTML = orig; btn.disabled = false; } };

@@ -10,7 +10,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { 
     getFirestore, doc, getDoc, setDoc, updateDoc, collection, 
-    addDoc, getDocs, query, where, onSnapshot, deleteDoc 
+    addDoc, getDocs, query, where, onSnapshot, deleteDoc,
+    orderBy, limit, startAfter
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 export const firebaseConfig = {
@@ -31,7 +32,7 @@ window.fb = {
     firebaseConfig, app, auth, db,
     signInWithEmailAndPassword, signOut, onAuthStateChanged,
     updatePassword, EmailAuthProvider, reauthenticateWithCredential,
-    doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, query, where, onSnapshot, deleteDoc
+    doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, query, where, onSnapshot, deleteDoc, orderBy, limit, startAfter
 };
 
 window.alert = function(message) {
@@ -71,6 +72,16 @@ window.alert = function(message) {
 window.ADMIN_EMAIL = "hkosiun1221@gmail.com";
 window.FREE_VIP_EMAILS = ["aadhaar@gmail.com", "danish@print.com"];
 window.MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+window.extractUserDisplayName = function(email, username) {
+    let name = username;
+    if (!name && email) {
+        name = email.split('@')[0];
+    }
+    if (!name) return 'User';
+    name = String(name).trim();
+    return name.charAt(0).toUpperCase() + name.slice(1);
+};
 
 window.isAllowedPortalEmail = function(email) {
     if (!email) return false;
