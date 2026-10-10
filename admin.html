@@ -533,6 +533,73 @@
 
                 </div>
             </div>
+
+            <!-- TARGETED PER-USER LIVE BANNER CARD -->
+            <div class="bg-white rounded-2xl p-5 shadow-card border border-slate-200 space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-lg border border-amber-200 font-black shrink-0">
+                            <i class="fa-solid fa-bullhorn"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-black text-dark-900">Targeted User Banner (इस यूज़र के लिए पर्सनल बैनर)</h3>
+                            <p class="text-[11px] font-semibold text-slate-400">यह बैनर सिर्फ चुने गए यूज़र के डैशबोर्ड पर "डियर [User]" नाम के साथ दिखेगा (बाकी यूज़र्स को नहीं दिखेगा)</p>
+                        </div>
+                    </div>
+                    <label class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 px-3 py-1.5 rounded-xl text-xs font-black cursor-pointer select-none transition shadow-sm">
+                        <input type="checkbox" id="chkUserBannerEnabled" onchange="window.updateUserBannerPreview()" class="w-4 h-4 accent-amber-600 rounded cursor-pointer">
+                        <span><i class="fa-solid fa-eye text-amber-600 mr-1"></i> Show to this User</span>
+                    </label>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Badge Tag (बैज नाम)</label>
+                        <input type="text" id="inpUserBannerBadge" value="NOTICE" oninput="window.updateUserBannerPreview()" placeholder="e.g. NOTICE, ALERT, OFFER" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-black uppercase bg-slate-50 focus:bg-white outline-none">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Heading / Title (वैकल्पिक शीर्षक)</label>
+                        <input type="text" id="inpUserBannerTitle" oninput="window.updateUserBannerPreview()" placeholder="e.g. आवश्यक सूचना / Important Notice" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">
+                        Personal Message for User (यूज़र के लिए खास संदेश)
+                    </label>
+                    <textarea id="inpUserBannerMessage" rows="2" oninput="window.updateUserBannerPreview()" placeholder="यहाँ संदेश लिखें..." class="w-full p-3 border border-slate-200 rounded-xl text-xs font-semibold bg-slate-50 focus:bg-white outline-none resize-none"></textarea>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Button Text (वैकल्पिक बटन टेक्स्ट)</label>
+                        <input type="text" id="inpUserBannerBtnText" oninput="window.updateUserBannerPreview()" placeholder="e.g. View Offer / Click Here" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Button Link (वैकल्पिक लिंक)</label>
+                        <input type="text" id="inpUserBannerBtnLink" oninput="window.updateUserBannerPreview()" placeholder="https://..." class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50 focus:bg-white outline-none">
+                    </div>
+                </div>
+
+                <!-- LIVE PREVIEW BOX -->
+                <div class="space-y-1.5 pt-1">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                        <i class="fa-solid fa-desktop mr-1"></i> Live Preview (यूज़र के स्क्रीन पर ऐसा दिखेगा)
+                    </label>
+                    <div id="userBannerPreviewBox" class="p-3 rounded-2xl bg-slate-50 border border-dashed border-slate-300">
+                        <span class="text-xs text-slate-400 font-bold">कृपया पहले कोई यूज़र चुनें</span>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" onclick="window.clearSelectedUserBanner()" class="bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 px-4 py-2.5 rounded-xl text-xs font-black transition">
+                        <i class="fa-solid fa-trash mr-1"></i> Remove Banner
+                    </button>
+                    <button type="button" id="btnSaveUserBanner" onclick="window.saveSelectedUserBanner(event)" class="bg-dark-900 hover:bg-black text-royal-300 px-6 py-2.5 rounded-xl text-xs font-black transition shadow-glow flex items-center gap-1.5">
+                        <i class="fa-solid fa-floppy-disk mr-1"></i> Save Personal Banner
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- ================= TAB 3: CREATE NEW USER (DEDICATED SEPARATE TAB) ================= -->
