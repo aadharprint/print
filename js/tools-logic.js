@@ -17,46 +17,71 @@ window.validateFileSize = function(file, customMaxMb = 50) {
 };
 
 // ================= ROBUST MULTI-CDN LIBRARY LOADER =================
-function dynamicallyLoadScript(url) {
+function dynamicallyLoadScript(url, timeoutMs = 4000) {
     return new Promise((resolve, reject) => {
         const s = document.createElement('script');
         s.src = url;
-        s.onload = () => resolve(true);
-        s.onerror = () => reject(new Error('Failed to load ' + url));
+        s.async = true;
+        let timer = setTimeout(() => {
+            s.onload = null;
+            s.onerror = null;
+            reject(new Error('Timeout loading ' + url));
+        }, timeoutMs);
+        s.onload = () => {
+            clearTimeout(timer);
+            resolve(true);
+        };
+        s.onerror = () => {
+            clearTimeout(timer);
+            reject(new Error('Failed to load ' + url));
+        };
         document.head.appendChild(s);
     });
 }
 
+// सुरक्षित PDFLib सेलेक्टर (Safe Getter)
+window.getPDFLib = function() {
+    if (window.PDFLib && window.PDFLib.PDFDocument) {
+        return window.PDFLib;
+    }
+    if (window.PDFDocument) {
+        return { PDFDocument: window.PDFDocument };
+    }
+    return null;
+};
+
 window.ensurePdfLibrariesLoaded = async function() {
-    // 1. Load PDF.js with multiple mirrors
+    // 1. Load PDF.js with multiple mirrors (Cloudflare cdnjs first)
     if (!window.pdfjsLib) {
         const pdfjsSources = [
-            'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
             'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+            'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
+            'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js',
             'https://fastly.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js'
         ];
         for (const src of pdfjsSources) {
             try {
-                await dynamicallyLoadScript(src);
+                await dynamicallyLoadScript(src, 3500);
                 if (window.pdfjsLib) break;
             } catch (err) {}
         }
     }
     if (window.pdfjsLib && !window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
 
-    // 2. Load PDF-Lib with reliable jsDelivr & Fastly mirrors
-    if (!window.PDFLib) {
+    // 2. Load PDF-Lib with reliable Cloudflare cdnjs & mirrors (100% Reliable in India)
+    if (!window.getPDFLib()) {
         const pdfLibSources = [
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.9/pdf-lib.min.js',
+            'https://unpkg.com/pdf-lib@1.17.9/dist/pdf-lib.min.js',
             'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.9/dist/pdf-lib.min.js',
-            'https://fastly.jsdelivr.net/npm/pdf-lib@1.17.9/dist/pdf-lib.min.js',
-            'https://unpkg.com/pdf-lib@1.17.9/dist/pdf-lib.min.js'
+            'https://fastly.jsdelivr.net/npm/pdf-lib@1.17.9/dist/pdf-lib.min.js'
         ];
         for (const src of pdfLibSources) {
             try {
-                await dynamicallyLoadScript(src);
-                if (window.PDFLib) break;
+                await dynamicallyLoadScript(src, 3500);
+                if (window.getPDFLib()) break;
             } catch (err) {}
         }
     }
@@ -64,20 +89,24 @@ window.ensurePdfLibrariesLoaded = async function() {
     // 3. Load JSZip with multiple mirrors
     if (!window.JSZip) {
         const jszipSources = [
-            'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',
             'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
+            'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',
+            'https://unpkg.com/jszip@3.10.1/dist/jszip.min.js',
             'https://fastly.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js'
         ];
         for (const src of jszipSources) {
             try {
-                await dynamicallyLoadScript(src);
+                await dynamicallyLoadScript(src, 3500);
                 if (window.JSZip) break;
             } catch (err) {}
         }
     }
 
     if (!window.pdfjsLib) {
-        throw new Error('PDF व्यूअर लाइब्रेरी लोड नहीं हो सकी। कृपया इंटरनेट कनेक्शन चेक करें या पेज रिफ्रेश करें।');
+        throw new Error('PDF व्यूअर लाइब्रेरी (PDF.js) लोड नहीं हो सकी। कृपया इंटरनेट कनेक्शन चेक करें या पेज रिफ्रेश करें।');
+    }
+    if (!window.getPDFLib()) {
+        throw new Error('PDF जनरेटर लाइब्रेरी (PDF-Lib) लोड नहीं हो सकी। कृपया इंटरनेट कनेक्शन या AdBlocker सेटिंग्स चेक करें।');
     }
     return true;
 };
@@ -85,7 +114,7 @@ window.ensurePdfLibrariesLoaded = async function() {
 // Auto-run verification on startup
 setTimeout(() => {
     window.ensurePdfLibrariesLoaded().catch(() => {});
-}, 200);
+}, 100);
 
 // ================= NAVIGATION & VIEW SWITCHER =================
 window.currentActiveTool = null;
@@ -278,7 +307,7 @@ window.setupPassportPhotoTool = function(container) {
                         <input type="range" id="ppBgTolerance" min="10" max="80" value="35" oninput="window.updatePassportTolerance(this.value)" class="w-full accent-amber-500 cursor-pointer">
                         
                         <div class="flex items-center gap-2 pt-1">
-                            <button type="button" onclick="window.togglePassportMagicWand()" id="btnPpMagicWand" class="flex-1 bg-amber-400 text-dark-950 border border-amber-500 py-1.5 px-2 rounded-lg text-[11px] font-black transition flex items-center justify-center gap-1 shadow-sm">
+                            <button type="button" onclick="window.togglePassportMagicWand()" id="btnPpMagicWand" class="flex-1 bg-amber-400 text-dark-950 border border-amber-500 py-1.5 px-2 rounded-lg text-[11px] font-black shadow-sm flex items-center justify-center gap-1">
                                 <i class="fa-solid fa-wand-magic-sparkles text-dark-950"></i> मैजिक वैंड (क्लिक करके रंग भरें)
                             </button>
                             <button type="button" onclick="window.togglePassportWhiteBrush()" id="btnPpWhiteBrush" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 py-1.5 px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1">
@@ -730,7 +759,11 @@ window.downloadPassportPdf = async function() {
 
     try {
         await window.ensurePdfLibrariesLoaded();
-        const { PDFDocument } = window.PDFLib;
+        const pdfLib = window.getPDFLib();
+        if (!pdfLib || !pdfLib.PDFDocument) {
+            throw new Error('PDF-Lib लाइब्रेरी उपलब्ध नहीं है। कृपया पेज रिफ्रेश करें।');
+        }
+        const { PDFDocument } = pdfLib;
         const pdfDoc = await PDFDocument.create();
 
         const imgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
@@ -778,6 +811,7 @@ window.printPassportCanvas = function() {
     win.document.close();
 };
 
+// ============================================================================
 // TOOL 2: BACKGROUND REMOVER & WHITE BG CONVERTER (bg_remover)
 // ============================================================================
 window.setupBgRemoverTool = function(container) {
@@ -1241,7 +1275,11 @@ window.generatePdfFromImages = async function() {
 
     try {
         await window.ensurePdfLibrariesLoaded();
-        const { PDFDocument } = window.PDFLib;
+        const pdfLib = window.getPDFLib();
+        if (!pdfLib || !pdfLib.PDFDocument) {
+            throw new Error('PDF-Lib लाइब्रेरी उपलब्ध नहीं है। कृपया पेज रिफ्रेश करें।');
+        }
+        const { PDFDocument } = pdfLib;
         const pdfDoc = await PDFDocument.create();
         const orientation = document.getElementById('imgPdfOrientation')?.value || 'portrait';
         const margin = parseFloat(document.getElementById('imgPdfMargin')?.value || 15);
@@ -1733,7 +1771,11 @@ window.saveAndDownloadEditedPdf = async function() {
 
     try {
         await window.ensurePdfLibrariesLoaded();
-        const { PDFDocument } = window.PDFLib;
+        const pdfLib = window.getPDFLib();
+        if (!pdfLib || !pdfLib.PDFDocument) {
+            throw new Error('PDF-Lib लाइब्रेरी उपलब्ध नहीं है। कृपया पेज रिफ्रेश करें।');
+        }
+        const { PDFDocument } = pdfLib;
 
         const origDoc = await PDFDocument.load(state.originalPdfBytes);
         const newDoc = await PDFDocument.create();
@@ -1775,6 +1817,7 @@ window.saveAndDownloadEditedPdf = async function() {
     }
 };
 
+// ============================================================================
 // TOOL 6: MERGE PDF (pdf_merge)
 // ============================================================================
 window.setupPdfMergeTool = function(container) {
@@ -1884,7 +1927,11 @@ window.executePdfMerge = async function() {
 
     try {
         await window.ensurePdfLibrariesLoaded();
-        const { PDFDocument } = window.PDFLib;
+        const pdfLib = window.getPDFLib();
+        if (!pdfLib || !pdfLib.PDFDocument) {
+            throw new Error('PDF-Lib लाइब्रेरी उपलब्ध नहीं है। कृपया पेज रिफ्रेश करें।');
+        }
+        const { PDFDocument } = pdfLib;
         const mergedDoc = await PDFDocument.create();
 
         for (const item of window.pdfMergeList) {
@@ -1966,7 +2013,11 @@ window.executePdfUnlock = async function() {
 
     try {
         await window.ensurePdfLibrariesLoaded();
-        const { PDFDocument } = window.PDFLib;
+        const pdfLib = window.getPDFLib();
+        if (!pdfLib || !pdfLib.PDFDocument) {
+            throw new Error('PDF-Lib लाइब्रेरी उपलब्ध नहीं है। कृपया पेज रिफ्रेश करें।');
+        }
+        const { PDFDocument } = pdfLib;
         const pdfDoc = await PDFDocument.load(window.pdfUnlockFileBytes, { password: pass });
         const cleanBytes = await pdfDoc.save();
 
