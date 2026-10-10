@@ -127,10 +127,18 @@
         html.dark #userLiveChatMessagesBox {
             background-color: #020617 !important;
         }
+        
         /* Ensure affidavit paper remains crisp white for printing and viewing */
-        .affidavit-paper, .affidavit-paper * {
+        .affidavit-paper {
             background-color: #ffffff !important;
             color: #000000 !important;
+        }
+        .affidavit-paper *:not(.stamp-overlay-layer):not(.stamp-overlay-layer img) {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+        }
+        .stamp-overlay-layer, .stamp-overlay-layer img {
+            background-color: transparent !important;
         }
 
     </style>
@@ -917,4 +925,4 @@
 
     </main>
 </body>
-</html>
+</html>s
