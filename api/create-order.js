@@ -68,7 +68,7 @@ export default async function handler(req, res) {
             customer_email: email || 'user@ovportal.com',
             customer_mobile: '9999999999',
             callback_url: 'https://ojasprints.vercel.app/api/webhook',
-            redirect_url: 'https://ojasprints.vercel.app/'
+            redirect_url: 'https://ojasprints.vercel.app/portal.html'
           })
         });
         gatewayData = await vgRes.json();
