@@ -157,10 +157,16 @@
         html.dark #userLiveChatMessagesBox {
             background-color: #020617 !important;
         }
-        /* Ensure affidavit paper remains crisp white for printing and viewing */
+     /* Ensure affidavit paper remains crisp white for printing and viewing */
         .affidavit-paper, .affidavit-paper * {
             background-color: #ffffff !important;
             color: #000000 !important;
+        }
+
+        /* FIX: सिर्फ स्टैम्प वाले हिस्से को ट्रांसपेरेंट करने के लिए */
+        .affidavit-paper .stamp-overlay-layer, 
+        .affidavit-paper .stamp-overlay-layer img {
+            background-color: transparent !important;
         }
 
     </style>
