@@ -31,38 +31,67 @@
     </script>
 
     <style>
-        /* Fixed Single-Page A4 Layout */
+       /* 1. Flexbox हटाया ताकि PDF में HTML2PDF का बग (Overlapping/Shift) ना आए */
         .affidavit-paper {
-            position: relative;
+            position: relative !important;
+            display: block !important; 
             font-family: 'Times New Roman', Times, serif;
-            width: 794px;
-            height: 1122px;
-            padding: 46px 62px;
-            background: #ffffff;
-            color: #000000;
+            width: 794px !important;
+            height: 1122px !important;
+            padding: 46px 62px !important;
+            background-color: #ffffff !important;
+            color: #000000 !important;
             font-size: 15px;
             line-height: 1.55;
             box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
             margin: 0 !important;
             overflow: hidden;
             flex-shrink: 0;
         }
+
+        /* 2. सबसे नीचे वाले सिग्नेचर बॉक्स को फिक्स जगह पर रोकने के लिए */
+        .affidavit-paper > div:last-child {
+            position: absolute !important;
+            bottom: 46px !important;
+            left: 62px !important;
+            right: 62px !important;
+        }
+
+        /* 3. मेन टेक्स्ट को सुरक्षित रखने के लिए ताकि वह स्टैम्प के नीचे ना दबे */
+        .affidavit-paper > div:not(.stamp-overlay-layer):not(:last-child) {
+            position: relative !important;
+            z-index: 10 !important;
+            background-color: transparent !important;
+        }
+
         .filled-val {
             font-weight: bold !important;
             color: #000000 !important;
             text-decoration: underline !important;
             text-underline-offset: 3px !important;
         }
+
+        /* 4. स्टैम्प को पूरी तरह ट्रांसपेरेंट करने और mix-blend-mode का बग हटाने के लिए */
         .stamp-overlay-layer {
-            position: absolute;
-            top: 0; left: 0; width: 794px; height: 1122px;
-            pointer-events: none; z-index: 30; mix-blend-mode: multiply; overflow: hidden;
+            position: absolute !important;
+            top: 0 !important; 
+            left: 0 !important; 
+            width: 100% !important; 
+            height: 100% !important;
+            pointer-events: none !important; 
+            z-index: 30 !important; 
+            background-color: transparent !important;
+            mix-blend-mode: normal !important;
         }
+
         .stamp-overlay-layer img {
-            width: 794px; height: 1122px; object-fit: contain; object-position: top center; mix-blend-mode: multiply; display: block;
+            width: 100% !important; 
+            height: 100% !important; 
+            object-fit: contain !important; 
+            object-position: top center !important; 
+            background-color: transparent !important;
+            mix-blend-mode: normal !important;
+            display: block !important;
         }
         /* Custom Scrollbar for Chat */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
