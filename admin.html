@@ -5,30 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="icon" type="image/png" href="logo.png">
         <title>Super Admin - Ojas Portal</title>
-    <!-- Stealth Shield & URL Masking: Silent bounce if stranger enters /admin.html -->
+    <!-- Stealth Shield & URL Masking -->
     <style id="adminStealthShield">
         body { display: none !important; }
     </style>
     <script>
         if (window.history && window.history.replaceState) {
-            try { window.history.replaceState(null, document.title, '/'); } catch(e){}
+            try { window.history.replaceState(null, document.title, '/admin'); } catch(e){}
         }
-        (function() {
-            var isAdminToken = false;
-            for (var k in localStorage) {
-                if (k.startsWith('firebase:authUser:')) {
-                    try {
-                        var u = JSON.parse(localStorage.getItem(k));
-                        if (u && u.email && u.email.toLowerCase() === 'hkosiun1221@gmail.com') {
-                            isAdminToken = true;
-                        }
-                    } catch(e){}
-                }
-            }
-            if (!isAdminToken) {
-                window.location.replace('/');
-            }
-        })();
     </script>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -124,32 +108,228 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     
-        /* Bulletproof Dark Mode CSS */
+                /* ==========================================================================
+           OJAS UNIVERSAL HIGH-CONTRAST THEME ENGINE (DARK & LIGHT MODE)
+           ========================================================================== */
+
+        /* --- 1. LIGHT MODE (DEFAULT) CONTRAST & VISIBILITY --- */
+        html:not(.dark), html:not(.dark) body {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+        }
+
+        html:not(.dark) .bg-white:not(.affidavit-paper):not(.a4-desk-sheet) {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            border-color: #e2e8f0 !important;
+        }
+
+        html:not(.dark) .bg-slate-50 {
+            background-color: #f8fafc !important;
+            color: #0f172a !important;
+            border-color: #e2e8f0 !important;
+        }
+
+        html:not(.dark) .bg-slate-100 {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+            border-color: #cbd5e1 !important;
+        }
+
+        /* Light mode text contrast */
+        html:not(.dark) .text-slate-800,
+        html:not(.dark) .text-slate-700,
+        html:not(.dark) .text-dark-900 {
+            color: #0f172a !important;
+        }
+
+        html:not(.dark) .text-slate-600,
+        html:not(.dark) .text-slate-500 {
+            color: #334155 !important;
+        }
+
+        html:not(.dark) .text-slate-400 {
+            color: #475569 !important;
+        }
+
+        /* Light mode colored card contrast */
+        html:not(.dark) .bg-amber-50, html:not(.dark) .bg-amber-100 {
+            background-color: #fffbeb !important;
+            color: #78350f !important;
+            border-color: #fcd34d !important;
+        }
+        html:not(.dark) .text-amber-950, html:not(.dark) .text-amber-900, html:not(.dark) .text-amber-800, html:not(.dark) .text-amber-700 {
+            color: #78350f !important;
+        }
+
+        html:not(.dark) .bg-green-50, html:not(.dark) .bg-green-100, html:not(.dark) .bg-emerald-50, html:not(.dark) .bg-emerald-100 {
+            background-color: #f0fdf4 !important;
+            color: #14532d !important;
+            border-color: #86efac !important;
+        }
+        html:not(.dark) .text-green-950, html:not(.dark) .text-green-900, html:not(.dark) .text-green-800, html:not(.dark) .text-green-700,
+        html:not(.dark) .text-emerald-950, html:not(.dark) .text-emerald-900, html:not(.dark) .text-emerald-800 {
+            color: #14532d !important;
+        }
+
+        html:not(.dark) .bg-red-50, html:not(.dark) .bg-red-100, html:not(.dark) .bg-rose-50, html:not(.dark) .bg-rose-100 {
+            background-color: #fef2f2 !important;
+            color: #7f1d1d !important;
+            border-color: #fca5a5 !important;
+        }
+        html:not(.dark) .text-red-950, html:not(.dark) .text-red-900, html:not(.dark) .text-red-800, html:not(.dark) .text-red-700, html:not(.dark) .text-red-600,
+        html:not(.dark) .text-rose-950, html:not(.dark) .text-rose-900, html:not(.dark) .text-rose-800 {
+            color: #991b1b !important;
+        }
+
+        html:not(.dark) .bg-indigo-50, html:not(.dark) .bg-indigo-100, html:not(.dark) .bg-sky-50, html:not(.dark) .bg-sky-100 {
+            background-color: #eff6ff !important;
+            color: #1e3a8a !important;
+            border-color: #93c5fd !important;
+        }
+        html:not(.dark) .text-indigo-950, html:not(.dark) .text-indigo-900, html:not(.dark) .text-indigo-800,
+        html:not(.dark) .text-sky-950, html:not(.dark) .text-sky-900, html:not(.dark) .text-sky-800 {
+            color: #1e3a8a !important;
+        }
+
+        /* Light mode form controls */
+        html:not(.dark) input:not([type="checkbox"]):not([type="radio"]),
+        html:not(.dark) select,
+        html:not(.dark) textarea {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            border-color: #cbd5e1 !important;
+        }
+        html:not(.dark) input::placeholder,
+        html:not(.dark) textarea::placeholder {
+            color: #94a3b8 !important;
+        }
+
+        /* --- 2. DARK MODE CONTRAST & VISIBILITY --- */
         html.dark, html.dark body {
             background-color: #020617 !important;
             color: #f8fafc !important;
         }
-        html.dark #mainFormCard {
+
+        /* Dark mode main cards */
+        html.dark .bg-white:not(.affidavit-paper):not(.a4-desk-sheet),
+        html.dark #mainFormCard,
+        html.dark .shadow-card {
             background-color: #0f172a !important;
             color: #f8fafc !important;
             border-color: #334155 !important;
         }
-        html.dark .bg-white:not(.affidavit-paper) {
-            background-color: #0f172a !important;
-            color: #f8fafc !important;
-            border-color: #334155 !important;
-        }
-        html.dark .bg-slate-50, html.dark .bg-slate-100 {
+
+        /* Dark mode inner cards & sections */
+        html.dark .bg-slate-50,
+        html.dark .bg-slate-100 {
             background-color: #1e293b !important;
             color: #f1f5f9 !important;
             border-color: #334155 !important;
         }
-        html.dark .text-slate-800, html.dark .text-slate-700, html.dark .text-dark-900 {
+
+        html.dark .bg-slate-200 {
+            background-color: #334155 !important;
+            color: #f8fafc !important;
+            border-color: #475569 !important;
+        }
+
+        /* Dark mode text readability */
+        html.dark .text-slate-800,
+        html.dark .text-slate-700,
+        html.dark .text-dark-900 {
             color: #f8fafc !important;
         }
-        html.dark .text-slate-600, html.dark .text-slate-500 {
+
+        html.dark .text-slate-600,
+        html.dark .text-slate-500 {
             color: #cbd5e1 !important;
         }
+
+        html.dark .text-slate-400 {
+            color: #94a3b8 !important;
+        }
+
+        /* Dark mode colored boxes & alerts: high contrast backgrounds and glowing light text */
+        html.dark .bg-amber-50,
+        html.dark .bg-amber-100 {
+            background-color: #291804 !important;
+            color: #fef08a !important;
+            border-color: #78350f !important;
+        }
+        html.dark .text-amber-950,
+        html.dark .text-amber-900,
+        html.dark .text-amber-800,
+        html.dark .text-amber-700 {
+            color: #fde047 !important;
+        }
+
+        html.dark .bg-green-50,
+        html.dark .bg-green-100,
+        html.dark .bg-emerald-50,
+        html.dark .bg-emerald-100 {
+            background-color: #022c22 !important;
+            color: #a7f3d0 !important;
+            border-color: #065f46 !important;
+        }
+        html.dark .text-green-950,
+        html.dark .text-green-900,
+        html.dark .text-green-800,
+        html.dark .text-green-700,
+        html.dark .text-emerald-950,
+        html.dark .text-emerald-900,
+        html.dark .text-emerald-800 {
+            color: #6ee7b7 !important;
+        }
+
+        html.dark .bg-red-50,
+        html.dark .bg-red-100,
+        html.dark .bg-rose-50,
+        html.dark .bg-rose-100 {
+            background-color: #2e0814 !important;
+            color: #fecdd3 !important;
+            border-color: #881337 !important;
+        }
+        html.dark .text-red-950,
+        html.dark .text-red-900,
+        html.dark .text-red-800,
+        html.dark .text-red-700,
+        html.dark .text-red-600,
+        html.dark .text-rose-950,
+        html.dark .text-rose-900,
+        html.dark .text-rose-800 {
+            color: #fda4af !important;
+        }
+
+        html.dark .bg-indigo-50,
+        html.dark .bg-indigo-100,
+        html.dark .bg-sky-50,
+        html.dark .bg-sky-100 {
+            background-color: #0c1838 !important;
+            color: #bfdbfe !important;
+            border-color: #1e3a8a !important;
+        }
+        html.dark .text-indigo-950,
+        html.dark .text-indigo-900,
+        html.dark .text-indigo-800,
+        html.dark .text-sky-950,
+        html.dark .text-sky-900,
+        html.dark .text-sky-800 {
+            color: #93c5fd !important;
+        }
+
+        html.dark .bg-royal-50 {
+            background-color: #291804 !important;
+            color: #fde68a !important;
+            border-color: #78350f !important;
+        }
+        html.dark .text-royal-900,
+        html.dark .text-royal-800,
+        html.dark .text-royal-700 {
+            color: #fbbf24 !important;
+        }
+
+        /* Dark mode inputs, dropdowns & textareas */
         html.dark input:not([type="checkbox"]):not([type="radio"]),
         html.dark select,
         html.dark textarea {
@@ -157,43 +337,63 @@
             color: #ffffff !important;
             border-color: #475569 !important;
         }
+        html.dark input:focus,
+        html.dark select:focus,
+        html.dark textarea:focus {
+            border-color: #f59e0b !important;
+            box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2) !important;
+        }
+        html.dark input::placeholder,
+        html.dark textarea::placeholder {
+            color: #64748b !important;
+        }
+
+        /* Dark mode menus & tables */
         html.dark #gearDropdownMenu {
             background-color: #0f172a !important;
             color: #f8fafc !important;
             border-color: #334155 !important;
         }
-        html.dark #gearDropdownMenu button {
+        html.dark #gearDropdownMenu button,
+        html.dark #gearDropdownMenu a {
             color: #f1f5f9 !important;
         }
-        html.dark #gearDropdownMenu button:hover {
+        html.dark #gearDropdownMenu button:hover,
+        html.dark #gearDropdownMenu a:hover {
             background-color: #1e293b !important;
         }
         html.dark table thead {
             background-color: #1e293b !important;
             border-color: #334155 !important;
         }
+        html.dark table th {
+            color: #94a3b8 !important;
+        }
+        html.dark table td {
+            color: #e2e8f0 !important;
+        }
         html.dark table tr {
             border-color: #334155 !important;
         }
         html.dark table tr:hover {
-            background-color: #1e293b/60 !important;
+            background-color: rgba(30, 41, 59, 0.7) !important;
         }
         html.dark #userLiveChatMessagesBox {
             background-color: #020617 !important;
         }
-     /* 1. सिर्फ मेन पेपर को सफ़ेद रखें, अंदर के हर एलिमेंट पर ज़बरदस्ती बैकग्राउंड न थोपें (इससे टेक्स्ट गायब नहीं होगा) */
-        .affidavit-paper {
+
+        /* --- 3. HARDWARE-LOCKED PRINTABLE PAPER (NEVER INVERTED IN DARK MODE) --- */
+        .affidavit-paper, .a4-desk-sheet {
             background-color: #ffffff !important;
             color: #000000 !important;
         }
-
-        /* 2. स्टैम्प लेयर को ट्रांसपेरेंट रखें और लेआउट खिसकने से रोकने के लिए blend-mode normal करें */
-        .stamp-overlay-layer, 
-        .stamp-overlay-layer img {
-            background-color: transparent !important;
-            mix-blend-mode: normal !important; 
+        .affidavit-paper * {
+            color: inherit;
         }
-
+        .affidavit-paper .filled-val {
+            color: #000000 !important;
+            font-weight: bold !important;
+        }
     </style>
 
         <!-- Instant Theme Manager -->
@@ -289,7 +489,7 @@
             <button onclick="window.toggleTheme()" class="theme-toggle-btn w-7 h-7 md:w-9 md:h-9 rounded-lg md:rounded-xl bg-dark-900 hover:bg-dark-800 text-royal-300 border border-royal-500/30 flex items-center justify-center transition shadow-sm" title="Toggle Dark/Light Mode">
                 <i class="fa-solid fa-moon text-xs md:text-sm"></i>
             </button>
-            <a href="portal.html" class="flex items-center gap-1.5 text-royal-300 hover:bg-royal-500 hover:text-dark-950 transition font-black text-[10px] md:text-xs bg-dark-900 border border-royal-500/30 px-2.5 py-1.5 md:px-3.5 md:py-2.5 rounded-lg md:rounded-xl shadow-sm">
+            <a href="/portal" class="flex items-center gap-1.5 text-royal-300 hover:bg-royal-500 hover:text-dark-950 transition font-black text-[10px] md:text-xs bg-dark-900 border border-royal-500/30 px-2.5 py-1.5 md:px-3.5 md:py-2.5 rounded-lg md:rounded-xl shadow-sm">
                 <i class="fa-solid fa-arrow-up-right-from-square"></i> <span class="hidden sm:inline">Open VIP Portal</span>
             </a>
             <button onclick="window.handleLogout()" class="bg-red-500/15 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 px-2.5 py-1.5 md:px-3.5 md:py-2.5 rounded-lg md:rounded-xl text-[10px] md:text-xs font-bold transition flex items-center gap-1.5">
