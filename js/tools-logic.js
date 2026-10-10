@@ -213,7 +213,6 @@ window.setupPassportPhotoTool = function(container) {
                     </div>
                     <div>
                         <h2 class="text-base md:text-lg font-black text-dark-900">पासपोर्ट साइज फोटो मेकर (Passport Photo Studio)</h2>
-                        <p class="text-[11px] font-semibold text-slate-400">3.5 × 4.5 cm स्टैंडर्ड साइज • वाइट, लाइट पिंक, लाइट रेड व कस्टम BG • A4 टॉप-रो 6 फोटो (पेज वेस्ट न हो)</p>
                     </div>
                 </div>
             </div>
