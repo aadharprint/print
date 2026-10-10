@@ -121,14 +121,6 @@ function startUserProfileListener(uid) {
         window.currentUserData.allowPassport = data.allowPassport !== false;
         window.currentUserData.allowAnnexures = data.allowAnnexures !== false;
 
-        // Sync Targeted Personal Banner State
-        window.currentUserData.personalBannerEnabled = !!data.personalBannerEnabled;
-        window.currentUserData.personalBannerBadge = data.personalBannerBadge || "NOTICE";
-        window.currentUserData.personalBannerTitle = data.personalBannerTitle || "";
-        window.currentUserData.personalBannerMessage = data.personalBannerMessage || "";
-        window.currentUserData.personalBannerBtnText = data.personalBannerBtnText || "";
-        window.currentUserData.personalBannerBtnLink = data.personalBannerBtnLink || "";
-
         const creditEl = document.getElementById('displayCredits'); if (creditEl) creditEl.innerText = window.currentUserData.credits; 
         const now = Date.now(); const isNowVip = window.currentUserData.hasFreeAccess || (data.isVip && (!data.vipExpiry || data.vipExpiry > now)); 
         const vipChanged = window.currentUserData.isVip !== isNowVip; 
@@ -179,46 +171,10 @@ window.applyLivePortalControls = function() {
     const canPassport = window.canCurrentUserSeeService('passport');
     const canAnnexures = window.canCurrentUserSeeService('annexures');
 
-    // Dual Banner & Targeted Personal User Banner Rendering
+    // Dual Banner Rendering
     const bannerBox = document.getElementById('liveUpdateBannerContainer');
     if (bannerBox) {
         let bannersHtml = '';
-
-        // 1. TARGETED PERSONAL BANNER (Only visible to this specific user!)
-        const u = window.currentUserData;
-        if (u && u.personalBannerEnabled && u.personalBannerMessage) {
-            const displayName = typeof window.extractUserDisplayName === 'function' 
-                ? window.extractUserDisplayName(u.email, u.username) 
-                : (u.username || u.email.split('@')[0]);
-
-            const pBtnHtml = (u.personalBannerBtnText && u.personalBannerBtnLink) 
-                ? `<a href="${u.personalBannerBtnLink}" target="_blank" class="bg-amber-400 hover:bg-amber-300 text-dark-950 font-black px-3.5 py-1.5 rounded-xl text-[11px] transition shrink-0 shadow-sm flex items-center gap-1">${u.personalBannerBtnText} <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i></a>` 
-                : '';
-
-            bannersHtml += `
-                <div class="p-3.5 md:p-4 rounded-2xl bg-gradient-to-r from-dark-950 via-slate-900 to-amber-950 text-white border-2 border-amber-400 shadow-xl mb-2.5 relative overflow-hidden">
-                    <div class="absolute -right-3 -bottom-3 text-7xl text-amber-500/10 pointer-events-none select-none">
-                        <i class="fa-solid fa-envelope-open-text"></i>
-                    </div>
-                    <div class="relative z-10 space-y-1.5">
-                        <div class="flex flex-wrap items-center justify-between gap-2">
-                            <div class="flex items-center gap-2">
-                                <span class="bg-amber-400 text-dark-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shrink-0">
-                                    <i class="fa-solid fa-user-tag mr-1"></i>${u.personalBannerBadge || 'PERSONAL NOTICE'}
-                                </span>
-                                <h4 class="text-xs md:text-sm font-black text-amber-300 flex items-center gap-1.5">
-                                    <span>डियर ${displayName}</span>
-                                    ${u.personalBannerTitle ? `<span class="text-slate-200 font-semibold">• ${u.personalBannerTitle}</span>` : ''}
-                                </h4>
-                            </div>
-                            ${pBtnHtml}
-                        </div>
-                        <p class="text-xs md:text-sm font-bold text-slate-100 whitespace-pre-line leading-relaxed pl-0.5">
-                            ${u.personalBannerMessage}
-                        </p>
-                    </div>
-                </div>`;
-        }
         if (cfg.bannerEnabled && (cfg.bannerTitle || cfg.bannerMessage)) {
             const btnHtml = (cfg.bannerBtnText && cfg.bannerBtnLink) 
                 ? `<a href="${cfg.bannerBtnLink}" target="_blank" class="bg-amber-400 hover:bg-amber-300 text-dark-950 font-black px-3.5 py-1.5 rounded-xl text-[11px] transition shrink-0 shadow-sm">${cfg.bannerBtnText} <i class="fa-solid fa-arrow-up-right-from-square ml-1 text-[9px]"></i></a>` 
@@ -312,12 +268,6 @@ window.toggleGearMenu = function(e) { if (e) e.stopPropagation(); const menu = d
 window.selectGearOption = function(serviceName) { const menu = document.getElementById('gearDropdownMenu'); if (menu) menu.classList.add('hidden'); window.switchService(serviceName); };
 
 onAuthStateChanged(auth, async (user) => {
-    const shield = document.getElementById('portalStealthShield');
-    if (shield) shield.remove();
-    document.body.style.display = 'flex';
-    if (window.history && window.history.replaceState) {
-        try { window.history.replaceState(null, document.title, '/portal'); } catch(e){}
-    }
     const loadingScreen = document.getElementById('loadingScreen'); const loginSection = document.getElementById('loginSection'); const dashboardSection = document.getElementById('dashboardSection');
     if (user) {
         try {
@@ -349,11 +299,11 @@ onAuthStateChanged(auth, async (user) => {
         }; 
     } 
 } catch (e) {}
-            const userDocRef = doc(db, "users", user.uid); const userDoc = await getDoc(userDocRef); let userCredits = 0, isVip = false, vipExpiry = 0, allowDob18 = true, allowDomicile = true, allowCaste = true, allowDobMinor = true, allowDobDelhi = true, allowPassport = true, allowAnnexures = true, personalBannerEnabled = false, personalBannerBadge = 'NOTICE', personalBannerTitle = '', personalBannerMessage = '', personalBannerBtnText = '', personalBannerBtnLink = '';
-            if (userDoc.exists()) { const data = userDoc.data(); userCredits = data.credits || 0; isVip = data.isVip || false; vipExpiry = data.vipExpiry || 0; allowDob18 = data.allowDob18 !== false; allowDomicile = data.allowDomicile !== false; allowCaste = data.allowCaste !== false; allowDobMinor = data.allowDobMinor !== false; allowDobDelhi = data.allowDobDelhi !== false; allowPassport = data.allowPassport !== false; allowAnnexures = data.allowAnnexures !== false; personalBannerEnabled = !!data.personalBannerEnabled; personalBannerBadge = data.personalBannerBadge || 'NOTICE'; personalBannerTitle = data.personalBannerTitle || ''; personalBannerMessage = data.personalBannerMessage || ''; personalBannerBtnText = data.personalBannerBtnText || ''; personalBannerBtnLink = data.personalBannerBtnLink || ''; }
+            const userDocRef = doc(db, "users", user.uid); const userDoc = await getDoc(userDocRef); let userCredits = 0, isVip = false, vipExpiry = 0, allowDob18 = true, allowDomicile = true, allowCaste = true, allowDobMinor = true;
+            if (userDoc.exists()) { const data = userDoc.data(); userCredits = data.credits || 0; isVip = data.isVip || false; vipExpiry = data.vipExpiry || 0; allowDob18 = data.allowDob18 !== false; allowDomicile = data.allowDomicile !== false; allowCaste = data.allowCaste !== false; allowDobMinor = data.allowDobMinor !== false; }
             const isAdmin = (emailLower === window.ADMIN_EMAIL); const isFreeVip = window.FREE_VIP_EMAILS.includes(emailLower); const hasFreeAccess = isAdmin || isFreeVip; const now = Date.now();
             if (!hasFreeAccess && isVip && vipExpiry > 0 && vipExpiry <= now) { isVip = false; vipExpiry = 0; await updateDoc(userDocRef, { isVip: false, vipExpiry: 0 }); }
-            window.currentUserData = { uid: user.uid, email: user.email, credits: userCredits, isVip: isVip || hasFreeAccess, vipExpiry: hasFreeAccess ? 0 : vipExpiry, allowDob18: allowDob18, allowDomicile: allowDomicile, allowCaste: allowCaste, allowDobMinor: allowDobMinor, allowDobDelhi: allowDobDelhi, allowPassport: allowPassport, allowAnnexures: allowAnnexures, personalBannerEnabled: personalBannerEnabled, personalBannerBadge: personalBannerBadge, personalBannerTitle: personalBannerTitle, personalBannerMessage: personalBannerMessage, personalBannerBtnText: personalBannerBtnText, personalBannerBtnLink: personalBannerBtnLink, isAdmin: isAdmin, isFreeVip: isFreeVip, hasFreeAccess: hasFreeAccess, username: user.email.split('@')[0] };
+            window.currentUserData = { uid: user.uid, email: user.email, credits: userCredits, isVip: isVip || hasFreeAccess, vipExpiry: hasFreeAccess ? 0 : vipExpiry, allowDob18: allowDob18, allowDomicile: allowDomicile, allowCaste: allowCaste, allowDobMinor: allowDobMinor, isAdmin: isAdmin, isFreeVip: isFreeVip, hasFreeAccess: hasFreeAccess, username: user.email.split('@')[0] };
             setupDashboard(window.currentUserData); startPortalSettingsListener(); startUserProfileListener(user.uid); startUserSupportChatListener(user.uid); startVipCountdownLoop(); loadingScreen.style.display = 'none'; 
         } catch (err) { await signOut(auth); }
     } else {
@@ -368,21 +318,7 @@ window.handleLogin = async function(event) {
     errorDiv.style.display = 'none'; const email = emailInput.includes('@') ? emailInput : `${emailInput}@print.com`;
     if (!window.isAllowedPortalEmail(email)) { errorDiv.innerHTML = '<i class="fa-solid fa-ban mr-1"></i> केवल <strong>@print.com</strong> डोमेन वाली User ID ही मान्य है!'; errorDiv.style.display = 'block'; return; }
     const originalBtnHtml = loginBtn.innerHTML; loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...'; loginBtn.disabled = true;
-    try { 
-        const userCred = await signInWithEmailAndPassword(auth, email, passInput); 
-        // If Admin logs in, direct straight to admin.html!
-        // Both User and Admin land on Portal! Admin gets full access and Admin button on Portal
-        sessionStorage.setItem('ojas_portal_access', 'allowed');
-        if (userCred.user && userCred.user.email && userCred.user.email.toLowerCase() === window.ADMIN_EMAIL.toLowerCase()) {
-            sessionStorage.setItem('ojas_admin_session', 'true');
-        }
-    } catch (error) { 
-        errorDiv.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i> Your ID or Password are incorrect!'; 
-        errorDiv.style.display = 'block'; 
-        document.getElementById('loginPassword').value = ''; 
-        loginBtn.innerHTML = originalBtnHtml; 
-        loginBtn.disabled = false; 
-    }
+    try { await signInWithEmailAndPassword(auth, email, passInput); } catch (error) { errorDiv.innerHTML = '<i class="fa-solid fa-circle-exclamation mr-1"></i> Your ID or Password are incorrect!'; errorDiv.style.display = 'block'; document.getElementById('loginPassword').value = ''; loginBtn.innerHTML = originalBtnHtml; loginBtn.disabled = false; }
 };
 
 function startVipCountdownLoop() { if (window.vipCountdownInterval) clearInterval(window.vipCountdownInterval); updateVipTimerAndAlerts(); window.vipCountdownInterval = setInterval(updateVipTimerAndAlerts, 1000); }
@@ -403,7 +339,7 @@ function setupDashboard(userData) {
     document.getElementById('displayUser').innerText = userData.username.toUpperCase(); const adminLink = document.getElementById('adminPanelLink'); const creditDisplayBox = document.getElementById('creditDisplayBox'); const vipServicesBar = document.getElementById('vipServicesBar'); const normalUserVipPromo = document.getElementById('normalUserVipPromo'); const portalTitle = document.getElementById('portalHeaderTitle'); const portalIcon = document.getElementById('portalHeaderIcon'); const vipBadge = document.getElementById('vipStatusBadge'); const mainFormCard = document.getElementById('mainFormCard');
     adminLink.style.display = userData.isAdmin ? 'flex' : 'none';
     if (userData.hasFreeAccess) { creditDisplayBox.style.display = 'none'; } else { creditDisplayBox.style.display = 'flex'; document.getElementById('displayCredits').innerText = userData.credits; }
-    if (userData.isVip) { document.body.classList.add('vip-body-bg'); portalTitle.innerHTML = `Ojas <span class="text-royal-400">VIP</span>`; portalIcon.innerHTML = `<img src="logo.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">`; portalIcon.className = "w-7 h-7 md:w-10 md:h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden p-1 border border-slate-200 shrink-0"; vipBadge.style.display = 'inline-flex'; vipServicesBar.style.display = 'block'; normalUserVipPromo.style.display = 'none'; mainFormCard.className = "bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-vip-glow border-2 border-royal-400 p-4 md:p-7"; } else { document.body.classList.remove('vip-body-bg'); portalTitle.innerHTML = `Ojas <span class="text-royal-400">Portal</span>`; portalIcon.innerHTML = `<img src="logo.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">`; portalIcon.className = "w-7 h-7 md:w-10 md:h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden p-1 border border-slate-200 shrink-0"; vipBadge.style.display = 'none'; vipServicesBar.style.display = 'none'; normalUserVipPromo.style.display = 'block'; mainFormCard.className = "bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-card border border-slate-100 p-4 md:p-7"; }
+    if (userData.isVip) { document.body.classList.add('vip-body-bg'); portalTitle.innerHTML = `Ojas <span class="text-royal-400">VIP</span>`; portalIcon.innerHTML = `<img src="logo.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">`; portalIcon.className = "w-8 h-8 md:w-10 md:h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden p-1 border border-slate-200/80 shrink-0 shadow-sm"; vipBadge.style.display = 'inline-flex'; vipServicesBar.style.display = 'block'; normalUserVipPromo.style.display = 'none'; mainFormCard.className = "bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-vip-glow border-2 border-royal-400 p-4 md:p-7"; } else { document.body.classList.remove('vip-body-bg'); portalTitle.innerHTML = `Ojas <span class="text-royal-400">Portal</span>`; portalIcon.innerHTML = `<img src="logo.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">`; portalIcon.className = "w-8 h-8 md:w-10 md:h-10 bg-white rounded-xl flex items-center justify-center overflow-hidden p-1 border border-slate-200/80 shrink-0 shadow-sm"; vipBadge.style.display = 'none'; vipServicesBar.style.display = 'none'; normalUserVipPromo.style.display = 'block'; mainFormCard.className = "bg-white text-slate-800 rounded-2xl md:rounded-3xl shadow-card border border-slate-100 p-4 md:p-7"; }
     document.getElementById('loginSection').style.display = 'none'; document.getElementById('dashboardSection').style.display = 'flex';
     window.applyLivePortalControls(); 
     
@@ -415,7 +351,7 @@ function setupDashboard(userData) {
         window.switchService(window.getFirstAllowedTab());
     }
 }
-window.handleLogout = async function() { sessionStorage.removeItem("ojas_portal_access"); await signOut(auth); window.location.replace("/"); };
+window.handleLogout = async function() { await signOut(auth); window.location.reload(); };
 
 // === SHOW/HIDE PASSWORD TOGGLE LOGIC ===
 window.togglePassVisibility = function(inputId, btnEl) {
