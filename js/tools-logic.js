@@ -1,12 +1,7 @@
 // ============================================================================
 // Ojas Tools Studio - Complete Logic Suite (tools-logic.js)
-// 100% Client-Side, Fast, Private, High-DPI (Max 10MB Validation)
+// 100% Client-Side, Multi-CDN Robust Loaders, High-DPI & A4 PDF Editor
 // ============================================================================
-
-// Initialize PDF.js worker
-if (window.pdfjsLib) {
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-}
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB strict limit
 
@@ -21,6 +16,58 @@ window.validateFileSize = function(file, customMaxMb = 10) {
     return true;
 };
 
+// ================= ROBUST MULTI-CDN LIBRARY LOADER =================
+function dynamicallyLoadScript(url) {
+    return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = url;
+        s.onload = () => resolve(true);
+        s.onerror = () => reject(new Error('Failed to load ' + url));
+        document.head.appendChild(s);
+    });
+}
+
+window.ensurePdfLibrariesLoaded = async function() {
+    // 1. Load PDF.js if missing
+    if (!window.pdfjsLib) {
+        try {
+            await dynamicallyLoadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+        } catch (e) {
+            await dynamicallyLoadScript('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js');
+        }
+    }
+    if (window.pdfjsLib && !window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    // 2. Load PDF-Lib if missing
+    if (!window.PDFLib) {
+        try {
+            await dynamicallyLoadScript('https://unpkg.com/pdf-lib@1.17.9/dist/pdf-lib.min.js');
+        } catch (e) {
+            await dynamicallyLoadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.9/pdf-lib.min.js');
+        }
+    }
+
+    // 3. Load JSZip if missing
+    if (!window.JSZip) {
+        try {
+            await dynamicallyLoadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+        } catch (e) {
+            await dynamicallyLoadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+        }
+    }
+
+    if (!window.pdfjsLib) throw new Error('PDF.js लाइब्रेरी लोड नहीं हो पाई।');
+    if (!window.PDFLib) throw new Error('PDF-Lib लाइब्रेरी लोड नहीं हो पाई।');
+    return true;
+};
+
+// Auto-run verification on startup
+setTimeout(() => {
+    window.ensurePdfLibrariesLoaded().catch(() => {});
+}, 200);
+
 // ================= NAVIGATION & VIEW SWITCHER =================
 window.currentActiveTool = null;
 
@@ -33,7 +80,6 @@ window.openToolWorkspace = function(toolId) {
     if (gridView) gridView.classList.add('hidden');
     if (wsView) wsView.classList.remove('hidden');
 
-    // Update active tab buttons styling
     document.querySelectorAll('.ws-tab-btn').forEach(btn => {
         btn.className = "ws-tab-btn px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 shrink-0 transition flex items-center gap-1.5 border border-slate-200";
     });
@@ -43,7 +89,6 @@ window.openToolWorkspace = function(toolId) {
         activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     }
 
-    // Render selected tool workspace
     if (container) {
         container.innerHTML = '<div class="p-10 text-center text-slate-400 font-bold"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>Workspace लोड हो रहा है...</div>';
         setTimeout(() => {
@@ -137,7 +182,7 @@ window.renderToolWorkspaceContent = function(toolId, container) {
 };
 
 // ============================================================================
-// TOOL 1: PASSPORT PHOTO GENERATOR (With White Background & 8-Photo Printable Sheet)
+// TOOL 1: PASSPORT PHOTO GENERATOR (Real Multi-Color BG & A4 Top-Aligned 6-Photo Sheet)
 // ============================================================================
 window.setupPassportPhotoTool = function(container) {
     container.innerHTML = `
@@ -149,7 +194,7 @@ window.setupPassportPhotoTool = function(container) {
                     </div>
                     <div>
                         <h2 class="text-base md:text-lg font-black text-dark-900">पासपोर्ट साइज फोटो मेकर (Passport Photo Studio)</h2>
-                        <p class="text-[11px] font-semibold text-slate-400">3.5 × 4.5 cm स्टैंडर्ड साइज • वाइट बैकग्राउंड • 4×6 इंच / A4 प्रिंटेबल शीट (Max 10MB)</p>
+                        <p class="text-[11px] font-semibold text-slate-400">3.5 × 4.5 cm स्टैंडर्ड साइज • वाइट, लाइट पिंक, लाइट रेड व कस्टम BG • A4 टॉप-रो 6 फोटो (पेज वेस्ट न हो)</p>
                     </div>
                 </div>
             </div>
@@ -161,108 +206,151 @@ window.setupPassportPhotoTool = function(container) {
                     <i class="fa-solid fa-camera"></i>
                 </div>
                 <h3 class="text-sm font-black text-slate-800">यहाँ अपनी फोटो अपलोड करें (क्लिक करें या ड्रैग करें)</h3>
-                <p class="text-xs font-semibold text-slate-400">JPG, PNG, WEBP (अधिकतम फाइल साइज: 10 MB)</p>
+                <p class="text-xs font-semibold text-slate-400">JPG, PNG, WEBP (अधिकतम 10 MB)</p>
             </div>
 
             <!-- Editor Section (Initially Hidden) -->
             <div id="ppEditorSection" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
                 
                 <!-- Left Controls Panel -->
-                <div class="lg:col-span-5 space-y-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                <div class="lg:col-span-5 space-y-3.5 bg-slate-50 p-4 rounded-2xl border border-slate-200">
                     
-                    <!-- 1. Background Color -->
+                    <!-- 1. Background Color Selection (White, Light Pink, Light Red, Sky Blue, Gray, Custom) -->
                     <div>
-                        <label class="block text-[11px] font-black text-slate-600 uppercase mb-1.5">1. बैकग्राउंड का रंग (Background)</label>
-                        <div class="grid grid-cols-3 gap-2">
-                            <button type="button" onclick="window.setPassportBgColor('#ffffff', this)" class="pp-bg-btn p-2 rounded-xl text-xs font-bold bg-white text-dark-900 border-2 border-amber-400 flex items-center justify-center gap-1 shadow-sm">
+                        <div class="flex justify-between items-center mb-1.5">
+                            <label class="text-[11px] font-black text-slate-700 uppercase">1. बैकग्राउंड का रंग (Background Color)</label>
+                            <span class="text-[10px] bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.2 rounded font-black">Color Applied</span>
+                        </div>
+                        <div class="grid grid-cols-4 gap-1.5">
+                            <button type="button" onclick="window.setPassportBgColor('#ffffff', this)" class="pp-bg-btn p-2 rounded-xl text-[11px] font-black bg-white text-dark-900 border-2 border-amber-400 flex items-center justify-center gap-1 shadow-sm" title="Pure White">
                                 <span class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-white"></span> White
                             </button>
-                            <button type="button" onclick="window.setPassportBgColor('#cce6ff', this)" class="pp-bg-btn p-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 flex items-center justify-center gap-1">
-                                <span class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-sky-200"></span> Sky Blue
+                            <button type="button" onclick="window.setPassportBgColor('#ffd1dc', this)" class="pp-bg-btn p-2 rounded-xl text-[11px] font-bold bg-white text-slate-700 border border-slate-200 flex items-center justify-center gap-1" title="Light Pink">
+                                <span class="w-3.5 h-3.5 rounded-full border border-pink-300 bg-[#ffd1dc]"></span> Lt. Pink
                             </button>
-                            <button type="button" onclick="window.setPassportBgColor('original', this)" class="pp-bg-btn p-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 flex items-center justify-center gap-1">
-                                <span class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-slate-400"></span> Original
+                            <button type="button" onclick="window.setPassportBgColor('#ffcccc', this)" class="pp-bg-btn p-2 rounded-xl text-[11px] font-bold bg-white text-slate-700 border border-slate-200 flex items-center justify-center gap-1" title="Light Red">
+                                <span class="w-3.5 h-3.5 rounded-full border border-red-300 bg-[#ffcccc]"></span> Lt. Red
                             </button>
+                            <button type="button" onclick="window.setPassportBgColor('#b9dcff', this)" class="pp-bg-btn p-2 rounded-xl text-[11px] font-bold bg-white text-slate-700 border border-slate-200 flex items-center justify-center gap-1" title="Sky Blue">
+                                <span class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-sky-200"></span> Blue
+                            </button>
+                            <button type="button" onclick="window.setPassportBgColor('#f3f4f6', this)" class="pp-bg-btn p-2 rounded-xl text-[11px] font-bold bg-white text-slate-700 border border-slate-200 flex items-center justify-center gap-1" title="Light Gray">
+                                <span class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-slate-200"></span> Gray
+                            </button>
+                            <button type="button" onclick="window.setPassportBgColor('#cc0000', this)" class="pp-bg-btn p-2 rounded-xl text-[11px] font-bold bg-white text-slate-700 border border-slate-200 flex items-center justify-center gap-1" title="Deep Red">
+                                <span class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-red-600"></span> Red
+                            </button>
+                            <button type="button" onclick="window.setPassportBgColor('original', this)" class="pp-bg-btn p-2 rounded-xl text-[11px] font-bold bg-white text-slate-700 border border-slate-200 flex items-center justify-center gap-1" title="Original Photo">
+                                <span class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-slate-400"></span> Orig
+                            </button>
+                            <label class="pp-bg-btn p-2 rounded-xl text-[11px] font-bold bg-white text-slate-700 border border-slate-200 flex items-center justify-center gap-1 cursor-pointer" title="Custom Color Picker">
+                                <input type="color" id="ppCustomColorPicker" value="#ffffff" onchange="window.setPassportBgColor(this.value, null)" class="w-3.5 h-3.5 p-0 border-0 rounded cursor-pointer">
+                                <span>Custom</span>
+                            </label>
                         </div>
                     </div>
 
-                    <!-- 2. Zoom & Position Controls -->
-                    <div class="space-y-3 p-3 bg-white rounded-xl border border-slate-200">
+                    <!-- 2. Background Sensitivity / Auto-Removal Slider & Touch-up -->
+                    <div class="p-3 bg-white rounded-xl border border-slate-200 space-y-2">
+                        <div class="flex justify-between items-center text-[11px] font-bold text-slate-600">
+                            <span>बैकग्राउंड सेंसिटिविटी (Sensitivity):</span>
+                            <span id="ppBgTolVal" class="text-amber-600 font-black">35</span>
+                        </div>
+                        <input type="range" id="ppBgTolerance" min="10" max="80" value="35" oninput="window.updatePassportTolerance(this.value)" class="w-full accent-amber-500 cursor-pointer">
+                        
+                        <div class="flex items-center gap-2 pt-1">
+                            <button type="button" onclick="window.togglePassportMagicWand()" id="btnPpMagicWand" class="flex-1 bg-amber-400 text-dark-950 border border-amber-500 py-1.5 px-2 rounded-lg text-[11px] font-black transition flex items-center justify-center gap-1 shadow-sm">
+                                <i class="fa-solid fa-wand-magic-sparkles text-dark-950"></i> मैजिक वैंड (क्लिक करके रंग भरें)
+                            </button>
+                            <button type="button" onclick="window.togglePassportWhiteBrush()" id="btnPpWhiteBrush" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 py-1.5 px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1">
+                                <i class="fa-solid fa-paintbrush text-royal-600"></i> टच-अप ब्रश
+                            </button>
+                        </div>
+                        <p id="ppToolModeStatus" class="text-[10px] font-semibold text-slate-400 text-center">💡 टिप्स: अगर कहीं बैकग्राउंड का कोई दाग रह जाए, तो फोटो पर उस जगह क्लिक करें।</p>
+                    </div>
+
+                    <!-- 3. Zoom & Pan Controls -->
+                    <div class="space-y-2.5 p-3 bg-white rounded-xl border border-slate-200">
                         <div>
-                            <div class="flex justify-between text-[11px] font-bold text-slate-600 mb-1">
-                                <span>Zoom (फोटो का आकार):</span>
+                            <div class="flex justify-between text-[11px] font-bold text-slate-600 mb-0.5">
+                                <span>Zoom (फोटो आकार):</span>
                                 <span id="ppZoomVal">1.0x</span>
                             </div>
-                            <input type="range" id="ppZoomSlider" min="0.5" max="3" step="0.05" value="1" oninput="window.updatePassportCanvas()" class="w-full accent-amber-500 cursor-pointer">
+                            <input type="range" id="ppZoomSlider" min="0.5" max="3" step="0.05" value="1" oninput="window.renderPassportStudio()" class="w-full accent-amber-500 cursor-pointer">
                         </div>
 
-                        <div>
-                            <div class="flex justify-between text-[11px] font-bold text-slate-600 mb-1">
-                                <span>Vertical Position (ऊपर / नीचे):</span>
-                                <span id="ppPanYVal">0</span>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Vertical (ऊपर/नीचे)</label>
+                                <input type="range" id="ppPanYSlider" min="-250" max="250" step="2" value="0" oninput="window.renderPassportStudio()" class="w-full accent-amber-500 cursor-pointer">
                             </div>
-                            <input type="range" id="ppPanYSlider" min="-200" max="200" step="2" value="0" oninput="window.updatePassportCanvas()" class="w-full accent-amber-500 cursor-pointer">
-                        </div>
-
-                        <div>
-                            <div class="flex justify-between text-[11px] font-bold text-slate-600 mb-1">
-                                <span>Horizontal Position (दाएँ / बाएँ):</span>
-                                <span id="ppPanXVal">0</span>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-500 mb-0.5">Horizontal (दाएँ/बाएँ)</label>
+                                <input type="range" id="ppPanXSlider" min="-250" max="250" step="2" value="0" oninput="window.renderPassportStudio()" class="w-full accent-amber-500 cursor-pointer">
                             </div>
-                            <input type="range" id="ppPanXSlider" min="-200" max="200" step="2" value="0" oninput="window.updatePassportCanvas()" class="w-full accent-amber-500 cursor-pointer">
                         </div>
                     </div>
 
-                    <!-- 3. Brightness & Contrast -->
+                    <!-- 4. Brightness & Contrast -->
                     <div class="grid grid-cols-2 gap-2 p-3 bg-white rounded-xl border border-slate-200">
                         <div>
-                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Brightness</label>
-                            <input type="range" id="ppBrightness" min="-40" max="40" value="5" oninput="window.updatePassportCanvas()" class="w-full accent-amber-500 cursor-pointer">
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Brightness</label>
+                            <input type="range" id="ppBrightness" min="-30" max="30" value="4" oninput="window.renderPassportStudio()" class="w-full accent-amber-500 cursor-pointer">
                         </div>
                         <div>
-                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Contrast</label>
-                            <input type="range" id="ppContrast" min="-40" max="40" value="10" oninput="window.updatePassportCanvas()" class="w-full accent-amber-500 cursor-pointer">
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Contrast</label>
+                            <input type="range" id="ppContrast" min="-30" max="30" value="6" oninput="window.renderPassportStudio()" class="w-full accent-amber-500 cursor-pointer">
                         </div>
                     </div>
 
-                    <!-- 4. Border & Cutting Line -->
-                    <label class="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-200 cursor-pointer">
-                        <span class="text-xs font-bold text-slate-700">काटने के लिए बॉर्डर (1mm Border)</span>
-                        <input type="checkbox" id="ppBorderToggle" checked onchange="window.updatePassportCanvas()" class="w-4 h-4 accent-amber-600 rounded">
-                    </label>
-
-                    <!-- Sheet Layout Options -->
-                    <div class="space-y-1.5">
-                        <label class="block text-[11px] font-black text-slate-600 uppercase">प्रिंट शीट लेआउट (Print Layout)</label>
-                        <select id="ppSheetLayout" onchange="window.updatePassportCanvas()" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold bg-white outline-none">
-                            <option value="single">Single Photo (3.5 × 4.5 cm)</option>
-                            <option value="sheet_4x6" selected>4 × 6 Inch Sheet (8 Photos in 2 Rows)</option>
-                            <option value="sheet_a4">A4 Full Sheet (16 Photos)</option>
-                        </select>
+                    <!-- 5. Sheet Layout (A4 6-Photo Top Row, 12, 18, 4x6, Single) -->
+                    <div class="p-3 bg-white rounded-xl border border-slate-200 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-bold text-slate-700">काटने के लिए 1mm बॉर्डर (Border)</span>
+                            <input type="checkbox" id="ppBorderToggle" checked onchange="window.renderPassportStudio()" class="w-4 h-4 accent-amber-600 rounded cursor-pointer">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-bold text-slate-700">चेहरे का गाइड ओवल (Face Guide)</span>
+                            <input type="checkbox" id="ppGuideToggle" checked onchange="window.renderPassportStudio()" class="w-4 h-4 accent-amber-600 rounded cursor-pointer">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">प्रिंट शीट लेआउट (Print Layout)</label>
+                            <select id="ppSheetLayout" onchange="window.renderPassportStudio()" class="w-full p-2.5 border-2 border-amber-300 rounded-xl text-xs font-black bg-amber-50/40 text-amber-950 outline-none cursor-pointer">
+                                <option value="sheet_a4_row1" selected>⭐ A4 टॉप 1 लाइन - 6 फोटो (पेज वेस्ट न हो, कटिंग स्ट्रिप)</option>
+                                <option value="sheet_a4_row2">A4 टॉप 2 लाइन - 12 फोटो</option>
+                                <option value="sheet_a4_row3">A4 टॉप 3 लाइन - 18 फोटो</option>
+                                <option value="sheet_a4_full">A4 फुल शीट - 30 फोटो (5 पंक्तियाँ)</option>
+                                <option value="sheet_4x6">4 × 6 Inch Sheet - 8 फोटो (2 Rows of 4)</option>
+                                <option value="single">Single Photo (3.5 × 4.5 cm / 300 DPI)</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <!-- Action Buttons -->
-                    <div class="grid grid-cols-2 gap-2 pt-2">
-                        <button type="button" onclick="window.downloadPassportOutput('jpg')" class="bg-dark-900 hover:bg-black text-royal-300 font-black py-3 rounded-xl text-xs transition shadow-glow flex items-center justify-center gap-1.5">
-                            <i class="fa-solid fa-download"></i> Download JPG
+                    <!-- Action Buttons: Download PDF, Download JPG, Direct Print -->
+                    <div class="grid grid-cols-3 gap-2 pt-1">
+                        <button type="button" onclick="window.downloadPassportPdf()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5" title="A4 शीट की प्रिंटेबल PDF डाउनलोड करें">
+                            <i class="fa-solid fa-file-pdf"></i> Download PDF
                         </button>
-                        <button type="button" onclick="window.printPassportCanvas()" class="bg-amber-500 hover:bg-amber-600 text-dark-950 font-black py-3 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5">
+                        <button type="button" onclick="window.downloadPassportOutput('jpg')" class="bg-dark-900 hover:bg-black text-royal-300 font-black py-3 rounded-xl text-xs transition shadow-glow flex items-center justify-center gap-1.5" title="इमेज फाइल डाउनलोड करें">
+                            <i class="fa-solid fa-download"></i> JPG Image
+                        </button>
+                        <button type="button" onclick="window.printPassportCanvas()" class="bg-amber-500 hover:bg-amber-600 text-dark-950 font-black py-3 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5" title="सीधे प्रिंटर पर भेजें">
                             <i class="fa-solid fa-print"></i> Direct Print
                         </button>
                     </div>
 
                     <button type="button" onclick="document.getElementById('ppFileInput').click()" class="w-full bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold py-2 rounded-xl text-xs transition">
-                        <i class="fa-solid fa-rotate-left mr-1"></i> दूसरी फोटो अपलोड करें
+                        <i class="fa-solid fa-rotate-left mr-1"></i> दूसरी फोटो बदलें
                     </button>
                 </div>
 
                 <!-- Right Canvas Preview -->
-                <div class="lg:col-span-7 bg-slate-200 p-4 rounded-2xl flex flex-col items-center justify-center min-h-[450px] overflow-auto">
-                    <div class="text-[11px] font-bold text-slate-500 mb-2 flex items-center gap-1.5">
-                        <i class="fa-solid fa-eye text-amber-600"></i>
-                        <span>Live High-DPI Print Preview</span>
+                <div class="lg:col-span-7 bg-slate-200 p-4 rounded-2xl flex flex-col items-center justify-center min-h-[500px] overflow-auto">
+                    <div class="text-[11px] font-bold text-slate-600 mb-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-print text-amber-600"></i>
+                        <span>Live High-DPI Print Preview (300 DPI Ultra Sharp)</span>
                     </div>
-                    <canvas id="ppMainCanvas" class="bg-white shadow-xl rounded-lg max-w-full h-auto border border-slate-300"></canvas>
+                    <canvas id="ppMainCanvas" class="bg-white shadow-xl rounded-lg max-w-full h-auto border border-slate-300 cursor-crosshair"></canvas>
                 </div>
 
             </div>
@@ -271,9 +359,30 @@ window.setupPassportPhotoTool = function(container) {
 };
 
 window.ppState = {
-    img: null,
+    originalImg: null,
+    processedImageCanvas: null,
     bgColor: '#ffffff',
-    targetRatio: 3.5 / 4.5
+    activeMode: 'wand',
+    brushSize: 20
+};
+
+// Helper: Hex Color to RGB
+window.hexToRgb = function(hex) {
+    if (!hex || hex === 'original') return { r: 255, g: 255, b: 255 };
+    const cleanHex = hex.replace('#', '');
+    if (cleanHex.length === 3) {
+        return {
+            r: parseInt(cleanHex[0] + cleanHex[0], 16),
+            g: parseInt(cleanHex[1] + cleanHex[1], 16),
+            b: parseInt(cleanHex[2] + cleanHex[2], 16)
+        };
+    }
+    const val = parseInt(cleanHex, 16);
+    return {
+        r: (val >> 16) & 255,
+        g: (val >> 8) & 255,
+        b: val & 255
+    };
 };
 
 window.handlePassportPhotoUpload = function(file) {
@@ -284,10 +393,11 @@ window.handlePassportPhotoUpload = function(file) {
     reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
-            window.ppState.img = img;
+            window.ppState.originalImg = img;
             document.getElementById('ppUploadSection').classList.add('hidden');
             document.getElementById('ppEditorSection').classList.remove('hidden');
-            window.updatePassportCanvas();
+
+            window.processPassportWhiteBackground();
         };
         img.src = e.target.result;
     };
@@ -297,53 +407,133 @@ window.handlePassportPhotoUpload = function(file) {
 window.setPassportBgColor = function(color, btnEl) {
     window.ppState.bgColor = color;
     document.querySelectorAll('.pp-bg-btn').forEach(b => {
-        b.className = "pp-bg-btn p-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 flex items-center justify-center gap-1";
+        b.className = "pp-bg-btn p-2 rounded-xl text-[11px] font-bold bg-white text-slate-700 border border-slate-200 flex items-center justify-center gap-1";
     });
-    if (btnEl) btnEl.className = "pp-bg-btn p-2 rounded-xl text-xs font-bold bg-white text-dark-900 border-2 border-amber-400 flex items-center justify-center gap-1 shadow-sm";
-    window.updatePassportCanvas();
+    if (btnEl) {
+        btnEl.className = "pp-bg-btn p-2 rounded-xl text-[11px] font-black bg-white text-dark-900 border-2 border-amber-400 flex items-center justify-center gap-1 shadow-sm";
+    }
+    const picker = document.getElementById('ppCustomColorPicker');
+    if (picker && color !== 'original') {
+        picker.value = color.startsWith('#') ? color : '#ffffff';
+    }
+    window.processPassportWhiteBackground();
 };
 
-window.updatePassportCanvas = function() {
-    const canvas = document.getElementById('ppMainCanvas');
-    if (!canvas || !window.ppState.img) return;
+window.updatePassportTolerance = function(val) {
+    const el = document.getElementById('ppBgTolVal');
+    if (el) el.innerText = val;
+    window.processPassportWhiteBackground();
+};
 
-    const img = window.ppState.img;
+window.togglePassportMagicWand = function() {
+    window.ppState.activeMode = 'wand';
+    document.getElementById('btnPpMagicWand').className = "flex-1 bg-amber-400 text-dark-950 border border-amber-500 py-1.5 px-2 rounded-lg text-[11px] font-black shadow-sm flex items-center justify-center gap-1";
+    document.getElementById('btnPpWhiteBrush').className = "flex-1 bg-slate-100 text-slate-700 border border-slate-300 py-1.5 px-2 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1";
+    document.getElementById('ppToolModeStatus').innerText = "✨ मैजिक वैंड एक्टिव: बैकग्राउंड पर जहाँ भी कोई दाग या शैडो हो, वहाँ क्लिक करें।";
+};
+
+window.togglePassportWhiteBrush = function() {
+    window.ppState.activeMode = 'brush';
+    document.getElementById('btnPpWhiteBrush').className = "flex-1 bg-amber-400 text-dark-950 border border-amber-500 py-1.5 px-2 rounded-lg text-[11px] font-black shadow-sm flex items-center justify-center gap-1";
+    document.getElementById('btnPpMagicWand').className = "flex-1 bg-slate-100 text-slate-700 border border-slate-300 py-1.5 px-2 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1";
+    document.getElementById('ppToolModeStatus').innerText = "🖌️ सफेद ब्रश एक्टिव: माउस से ड्रैग करके सफेद रंग का टच-अप करें।";
+};
+
+// Auto Background Replacement Algorithm (White, Pink, Red, Sky Blue, Gray, Custom)
+window.processPassportWhiteBackground = function() {
+    const img = window.ppState.originalImg;
+    if (!img) return;
+
+    const off = document.createElement('canvas');
+    off.width = img.width;
+    off.height = img.height;
+    const ctx = off.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+
+    if (window.ppState.bgColor === 'original') {
+        window.ppState.processedImageCanvas = off;
+        window.renderPassportStudio();
+        return;
+    }
+
+    const imgData = ctx.getImageData(0, 0, off.width, off.height);
+    const d = imgData.data;
+    const w = off.width;
+    const h = off.height;
+    const tol = parseInt(document.getElementById('ppBgTolerance')?.value || 35);
+    const tolSq = tol * tol * 3;
+
+    // Sample background from top and corner edges
+    let sampleR = 0, sampleG = 0, sampleB = 0, samplesCount = 0;
+    for (let x = 0; x < w; x += Math.max(1, Math.floor(w / 40))) {
+        for (let y = 0; y < Math.min(h * 0.15, 35); y += 3) {
+            const idx = (y * w + x) * 4;
+            sampleR += d[idx];
+            sampleG += d[idx + 1];
+            sampleB += d[idx + 2];
+            samplesCount++;
+        }
+    }
+    const bgR = Math.round(sampleR / samplesCount);
+    const bgG = Math.round(sampleG / samplesCount);
+    const bgB = Math.round(sampleB / samplesCount);
+
+    // Target fill color
+    const targetRgb = window.hexToRgb(window.ppState.bgColor || '#ffffff');
+    const fillR = targetRgb.r;
+    const fillG = targetRgb.g;
+    const fillB = targetRgb.b;
+
+    // Color replacement
+    for (let i = 0; i < d.length; i += 4) {
+        const r = d[i], g = d[i + 1], b = d[i + 2];
+        const dist = (r - bgR) * (r - bgR) + (g - bgG) * (g - bgG) + (b - bgB) * (b - bgB);
+        if (dist <= tolSq) {
+            d[i] = fillR;
+            d[i + 1] = fillG;
+            d[i + 2] = fillB;
+        }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    window.ppState.processedImageCanvas = off;
+    window.renderPassportStudio();
+};
+
+window.renderPassportStudio = function() {
+    const canvas = document.getElementById('ppMainCanvas');
+    if (!canvas || !window.ppState.processedImageCanvas) return;
+
+    const img = window.ppState.processedImageCanvas;
     const zoom = parseFloat(document.getElementById('ppZoomSlider')?.value || 1);
     const panX = parseFloat(document.getElementById('ppPanXSlider')?.value || 0);
     const panY = parseFloat(document.getElementById('ppPanYSlider')?.value || 0);
     const brightness = parseInt(document.getElementById('ppBrightness')?.value || 0);
     const contrast = parseInt(document.getElementById('ppContrast')?.value || 0);
     const hasBorder = document.getElementById('ppBorderToggle')?.checked ?? true;
-    const layout = document.getElementById('ppSheetLayout')?.value || 'sheet_4x6';
+    const showGuide = document.getElementById('ppGuideToggle')?.checked ?? true;
+    const layout = document.getElementById('ppSheetLayout')?.value || 'sheet_a4_row1';
 
     document.getElementById('ppZoomVal').innerText = zoom.toFixed(2) + 'x';
-    document.getElementById('ppPanXVal').innerText = panX;
-    document.getElementById('ppPanYVal').innerText = panY;
 
-    // Standard 300 DPI dimensions for 3.5cm x 4.5cm: 413 x 531 pixels
+    // Standard Passport photo dimensions for single view: 413 x 531 px
     const photoW = 413;
     const photoH = 531;
 
-    // 1. Offscreen single photo canvas
+    // 1. Single Photo Offscreen Canvas
     const singleCanvas = document.createElement('canvas');
     singleCanvas.width = photoW;
     singleCanvas.height = photoH;
     const sCtx = singleCanvas.getContext('2d');
 
-    // Fill background color
-    if (window.ppState.bgColor !== 'original') {
-        sCtx.fillStyle = window.ppState.bgColor;
-        sCtx.fillRect(0, 0, photoW, photoH);
-    } else {
-        sCtx.fillStyle = '#ffffff';
-        sCtx.fillRect(0, 0, photoW, photoH);
-    }
+    // Fill background
+    sCtx.fillStyle = window.ppState.bgColor === 'original' ? '#ffffff' : (window.ppState.bgColor || '#ffffff');
+    sCtx.fillRect(0, 0, photoW, photoH);
 
-    // Draw user image scaled and panned
+    // Draw scaled photo centered
     sCtx.save();
     sCtx.translate(photoW / 2 + panX, photoH / 2 + panY);
     sCtx.scale(zoom, zoom);
-    
     const imgAspect = img.width / img.height;
     let drawW = photoW;
     let drawH = photoW / imgAspect;
@@ -354,7 +544,7 @@ window.updatePassportCanvas = function() {
     sCtx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
     sCtx.restore();
 
-    // Apply brightness and contrast filters
+    // Filters (Brightness & Contrast)
     const imgData = sCtx.getImageData(0, 0, photoW, photoH);
     const d = imgData.data;
     const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
@@ -368,33 +558,40 @@ window.updatePassportCanvas = function() {
     }
     sCtx.putImageData(imgData, 0, 0);
 
-    // Fine cut border
+    // Cutting border
     if (hasBorder) {
         sCtx.strokeStyle = '#cccccc';
         sCtx.lineWidth = 3;
         sCtx.strokeRect(1, 1, photoW - 2, photoH - 2);
     }
 
-    // 2. Render onto Main Output Canvas based on layout
+    // 2. Output on Main Display Canvas
     const ctx = canvas.getContext('2d');
 
     if (layout === 'single') {
         canvas.width = photoW;
         canvas.height = photoH;
         ctx.drawImage(singleCanvas, 0, 0);
+
+        if (showGuide) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(245, 158, 11, 0.65)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 4]);
+            ctx.beginPath();
+            ctx.ellipse(photoW / 2, photoH * 0.45, photoW * 0.28, photoH * 0.32, 0, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        }
     } 
     else if (layout === 'sheet_4x6') {
-        // 4 x 6 inch at 300 DPI = 1800 x 1200 landscape (8 photos: 2 rows of 4)
+        // 4 x 6 inch at 300 DPI: 1800 x 1200 landscape (8 Photos)
         canvas.width = 1800;
         canvas.height = 1200;
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        const startX = 60;
-        const startY = 55;
-        const gapX = 18;
-        const gapY = 25;
-
+        const startX = 60, startY = 55, gapX = 18, gapY = 25;
         for (let row = 0; row < 2; row++) {
             for (let col = 0; col < 4; col++) {
                 const x = startX + col * (photoW + gapX);
@@ -407,26 +604,95 @@ window.updatePassportCanvas = function() {
             }
         }
     } 
-    else if (layout === 'sheet_a4') {
-        // A4 at 300 DPI = 2480 x 3508 px (16 photos: 4 rows of 4)
+    else {
+        // A4 Sheets at 300 DPI (2480 x 3508 px) - Aligned to TOP for minimal paper waste!
         canvas.width = 2480;
         canvas.height = 3508;
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        const startX = 140;
-        const startY = 160;
-        const gapX = 30;
-        const gapY = 40;
+        // 6 Photos in a row across A4 width (385 x 495 px per photo)
+        const a4PhotoW = 385;
+        const a4PhotoH = 495;
+        const gapX = 16;
+        const gapY = 24;
+        const startX = 45; // Horizontally centered: (2480 - (6*385 + 5*16)) / 2 = 45 px
+        const startY = 70; // Top margin: neat 6mm below edge
 
-        for (let row = 0; row < 4; row++) {
-            for (let col = 0; col < 4; col++) {
-                const x = startX + col * (photoW + gapX);
-                const y = startY + row * (photoH + gapY);
-                ctx.drawImage(singleCanvas, x, y);
+        let totalRows = 1;
+        if (layout === 'sheet_a4_row1') totalRows = 1;
+        else if (layout === 'sheet_a4_row2') totalRows = 2;
+        else if (layout === 'sheet_a4_row3') totalRows = 3;
+        else if (layout === 'sheet_a4_full') totalRows = 5;
+
+        for (let row = 0; row < totalRows; row++) {
+            for (let col = 0; col < 6; col++) {
+                const x = startX + col * (a4PhotoW + gapX);
+                const y = startY + row * (a4PhotoH + gapY);
+                ctx.drawImage(singleCanvas, x, y, a4PhotoW, a4PhotoH);
+
+                // Cutting guide border
+                ctx.strokeStyle = '#cccccc';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x - 1, y - 1, a4PhotoW + 2, a4PhotoH + 2);
+
+                // Corner tick marks for precision scissor cut
+                ctx.strokeStyle = '#999999';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(x - 4, y); ctx.lineTo(x, y); ctx.lineTo(x, y - 4);
+                ctx.moveTo(x + a4PhotoW + 4, y); ctx.lineTo(x + a4PhotoW, y); ctx.lineTo(x + a4PhotoW, y - 4);
+                ctx.moveTo(x - 4, y + a4PhotoH); ctx.lineTo(x, y + a4PhotoH); ctx.lineTo(x, y + a4PhotoH + 4);
+                ctx.moveTo(x + a4PhotoW + 4, y + a4PhotoH); ctx.lineTo(x + a4PhotoW, y + a4PhotoH); ctx.lineTo(x + a4PhotoW, y + a4PhotoH + 4);
+                ctx.stroke();
             }
         }
+
+        // Scissor cutting guide line right below the printed rows
+        const cutLineY = startY + totalRows * (a4PhotoH + gapY) + 15;
+        if (totalRows < 5 && cutLineY < 3400) {
+            ctx.save();
+            ctx.strokeStyle = '#aaaaaa';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([12, 8]);
+            ctx.beginPath();
+            ctx.moveTo(30, cutLineY);
+            ctx.lineTo(2450, cutLineY);
+            ctx.stroke();
+
+            ctx.fillStyle = '#777777';
+            ctx.font = 'bold 22px Arial, sans-serif';
+            ctx.fillText('✂ कटिंग लाइन (यहाँ से पेपर काटें और बाकी पेपर बचाएं)', 60, cutLineY - 8);
+            ctx.restore();
+        }
     }
+
+    // Attach click handler for Magic Wand in single view
+    canvas.onclick = (e) => {
+        if (layout !== 'single') return;
+        const rect = canvas.getBoundingClientRect();
+        const clickX = Math.round((e.clientX - rect.left) * (canvas.width / rect.width));
+        const clickY = Math.round((e.clientY - rect.top) * (canvas.height / rect.height));
+
+        const pCanvas = window.ppState.processedImageCanvas;
+        if (!pCanvas) return;
+        const pCtx = pCanvas.getContext('2d');
+        const imgD = pCtx.getImageData(0, 0, pCanvas.width, pCanvas.height);
+        const data = imgD.data;
+
+        const idx = (clickY * pCanvas.width + clickX) * 4;
+        const targetR = data[idx], targetG = data[idx + 1], targetB = data[idx + 2];
+        const fillRgb = window.hexToRgb(window.ppState.bgColor || '#ffffff');
+
+        for (let i = 0; i < data.length; i += 4) {
+            const dr = data[i] - targetR, dg = data[i + 1] - targetG, db = data[i + 2] - targetB;
+            if (dr * dr + dg * dg + db * db < 35 * 35 * 3) {
+                data[i] = fillRgb.r; data[i + 1] = fillRgb.g; data[i + 2] = fillRgb.b;
+            }
+        }
+        pCtx.putImageData(imgD, 0, 0);
+        window.renderPassportStudio();
+    };
 };
 
 window.downloadPassportOutput = function(format = 'jpg') {
@@ -438,6 +704,43 @@ window.downloadPassportOutput = function(format = 'jpg') {
     link.click();
 };
 
+window.downloadPassportPdf = async function() {
+    const canvas = document.getElementById('ppMainCanvas');
+    if (!canvas) return;
+    const layout = document.getElementById('ppSheetLayout')?.value || 'sheet_a4_row1';
+
+    try {
+        await window.ensurePdfLibrariesLoaded();
+        const { PDFDocument } = window.PDFLib;
+        const pdfDoc = await PDFDocument.create();
+
+        const imgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+        const embeddedImg = await pdfDoc.embedJpg(imgDataUrl);
+
+        if (layout === 'sheet_4x6') {
+            const page = pdfDoc.addPage([432, 288]); // 6 x 4 in pt
+            page.drawImage(embeddedImg, { x: 0, y: 0, width: 432, height: 288 });
+        } else if (layout === 'single') {
+            const page = pdfDoc.addPage([99.2, 127.5]); // 3.5 x 4.5 cm in pt
+            page.drawImage(embeddedImg, { x: 0, y: 0, width: 99.2, height: 127.5 });
+        } else {
+            // Standard A4 portrait in pt: 595.28 x 841.89
+            const page = pdfDoc.addPage([595.28, 841.89]);
+            page.drawImage(embeddedImg, { x: 0, y: 0, width: 595.28, height: 841.89 });
+        }
+
+        const pdfBytes = await pdfDoc.save();
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const link = document.createElement('a');
+        link.download = `Passport_Sheet_${layout}_${Date.now()}.pdf`;
+        link.href = URL.createObjectURL(blob);
+        link.click();
+        alert('सफलता! पासपोर्ट फोटो की प्रिंटेबल A4 PDF डाउनलोड हो गई है।');
+    } catch (e) {
+        alert('PDF बनाने में त्रुटि: ' + e.message);
+    }
+};
+
 window.printPassportCanvas = function() {
     const canvas = document.getElementById('ppMainCanvas');
     if (!canvas) return;
@@ -446,7 +749,7 @@ window.printPassportCanvas = function() {
     win.document.write(`
         <html>
         <head><title>Print Passport Photos</title>
-        <style>@page { size: auto; margin: 0; } body { margin: 0; display: flex; align-items: center; justify-content: center; }</style>
+        <style>@page { size: A4; margin: 0; } body { margin: 0; display: flex; align-items: flex-start; justify-content: center; }</style>
         </head>
         <body onload="window.print();window.close();">
             <img src="${dataUrl}" style="max-width:100%; height:auto;" />
@@ -456,7 +759,6 @@ window.printPassportCanvas = function() {
     win.document.close();
 };
 
-// ============================================================================
 // TOOL 2: BACKGROUND REMOVER & WHITE BG CONVERTER (bg_remover)
 // ============================================================================
 window.setupBgRemoverTool = function(container) {
@@ -468,7 +770,7 @@ window.setupBgRemoverTool = function(container) {
                 </div>
                 <div>
                     <h2 class="text-base md:text-lg font-black text-dark-900">स्मार्ट बैकग्राउंड रिमूवर &amp; वाइट BG कनवर्टर</h2>
-                    <p class="text-[11px] font-semibold text-slate-400">फोटो का बैकग्राउंड तुरंत वाइट (#FFFFFF), पारदर्शी या पसंदीदा रंग का बनाएं (Max 10MB)</p>
+                    <p class="text-[11px] font-semibold text-slate-400">फोटो का बैकग्राउंड तुरंत शुद्ध सफेद (#FFFFFF), पारदर्शी या स्काई-ब्लू बनाएं (Max 10MB)</p>
                 </div>
             </div>
 
@@ -499,9 +801,9 @@ window.setupBgRemoverTool = function(container) {
                     </div>
 
                     <div class="flex items-center gap-2">
-                        <label class="text-xs font-bold text-slate-600">सेंसिटिविटी (Tolerance):</label>
-                        <input type="range" id="bgTolerance" min="5" max="80" value="28" oninput="window.processBgRemoval()" class="w-28 accent-emerald-600 cursor-pointer">
-                        <span id="bgTolVal" class="text-xs font-bold text-slate-700">28</span>
+                        <label class="text-xs font-bold text-slate-600">टॉलरेंस (Sensitivity):</label>
+                        <input type="range" id="bgTolerance" min="5" max="80" value="32" oninput="window.processBgRemoval()" class="w-28 accent-emerald-600 cursor-pointer">
+                        <span id="bgTolVal" class="text-xs font-bold text-slate-700">32</span>
                     </div>
 
                     <button type="button" onclick="window.downloadBgResult()" class="bg-dark-900 hover:bg-black text-royal-300 font-black px-5 py-2.5 rounded-xl text-xs shadow-glow transition flex items-center gap-1.5">
@@ -515,7 +817,7 @@ window.setupBgRemoverTool = function(container) {
                         <img id="bgOriginalImg" class="max-h-96 mx-auto rounded-xl object-contain shadow-sm">
                     </div>
                     <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center">
-                        <h4 class="text-xs font-black text-emerald-600 uppercase mb-2">प्रोसेस्ड फोटो (Processed HD)</h4>
+                        <h4 class="text-xs font-black text-emerald-600 uppercase mb-2">प्रोसेस्ड फोटो (White/No BG)</h4>
                         <div class="bg-slate-200 p-2 rounded-xl inline-block">
                             <canvas id="bgResultCanvas" class="max-h-96 mx-auto rounded-lg shadow-sm"></canvas>
                         </div>
@@ -564,7 +866,7 @@ window.processBgRemoval = function() {
     const canvas = document.getElementById('bgResultCanvas');
     if (!img || !canvas) return;
 
-    const tol = parseInt(document.getElementById('bgTolerance')?.value || 28);
+    const tol = parseInt(document.getElementById('bgTolerance')?.value || 32);
     const tolValEl = document.getElementById('bgTolVal');
     if (tolValEl) tolValEl.innerText = tol;
 
@@ -578,48 +880,33 @@ window.processBgRemoval = function() {
     const w = canvas.width;
     const h = canvas.height;
 
-    // Sample corner pixels to detect background color
-    const corners = [
-        [0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]
-    ];
-    let avgR = 0, avgG = 0, avgB = 0;
-    corners.forEach(([x, y]) => {
-        const idx = (y * w + x) * 4;
-        avgR += d[idx];
-        avgG += d[idx + 1];
-        avgB += d[idx + 2];
-    });
-    avgR = Math.round(avgR / corners.length);
-    avgG = Math.round(avgG / corners.length);
-    avgB = Math.round(avgB / corners.length);
+    // Sample perimeter background
+    let avgR = 0, avgG = 0, avgB = 0, count = 0;
+    for (let x = 0; x < w; x += 10) {
+        const idx = x * 4;
+        avgR += d[idx]; avgG += d[idx + 1]; avgB += d[idx + 2];
+        count++;
+    }
+    avgR = Math.round(avgR / count);
+    avgG = Math.round(avgG / count);
+    avgB = Math.round(avgB / count);
 
     const isTrans = window.bgRemoverState.targetColor === 'transparent';
     let repR = 255, repG = 255, repB = 255;
-    if (window.bgRemoverState.targetColor === '#99ccff') {
-        repR = 153; repG = 204; repB = 255;
-    }
-
+    if (window.bgRemoverState.targetColor === '#99ccff') { repR = 153; repG = 204; repB = 255; }
     const tolSq = tol * tol * 3;
 
     for (let i = 0; i < d.length; i += 4) {
-        const r = d[i];
-        const g = d[i + 1];
-        const b = d[i + 2];
-
-        const distSq = (r - avgR) * (r - avgR) + (g - avgG) * (g - avgG) + (b - avgB) * (b - avgB);
-
-        if (distSq < tolSq) {
+        const r = d[i], g = d[i + 1], b = d[i + 2];
+        const dist = (r - avgR) * (r - avgR) + (g - avgG) * (g - avgG) + (b - avgB) * (b - avgB);
+        if (dist <= tolSq) {
             if (isTrans) {
                 d[i + 3] = 0;
             } else {
-                d[i] = repR;
-                d[i + 1] = repG;
-                d[i + 2] = repB;
-                d[i + 3] = 255;
+                d[i] = repR; d[i + 1] = repG; d[i + 2] = repB; d[i + 3] = 255;
             }
         }
     }
-
     ctx.putImageData(imgData, 0, 0);
 };
 
@@ -627,7 +914,7 @@ window.downloadBgResult = function() {
     const canvas = document.getElementById('bgResultCanvas');
     if (!canvas) return;
     const link = document.createElement('a');
-    link.download = `Photo_NoBG_${Date.now()}.png`;
+    link.download = `Clean_Photo_${Date.now()}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
 };
@@ -708,19 +995,17 @@ window.handlePdfToImgUpload = async function(file) {
     if (!file) return;
     if (!window.validateFileSize(file, 10)) return;
 
-    const statusEl = document.getElementById('pdfPagesStatusText');
-    document.getElementById('pdfImgUploadBox').classList.add('hidden');
-    document.getElementById('pdfImgWorkspaceSection').classList.remove('hidden');
-
     try {
+        await window.ensurePdfLibrariesLoaded();
         const arrayBuffer = await file.arrayBuffer();
-        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        const loadingTask = window.pdfjsLib.getDocument({ data: arrayBuffer });
         window.pdfToImgState.pdfDoc = await loadingTask.promise;
+
+        document.getElementById('pdfImgUploadBox').classList.add('hidden');
+        document.getElementById('pdfImgWorkspaceSection').classList.remove('hidden');
         window.renderPdfPagesToImages();
     } catch (err) {
         alert('PDF लोड करने में समस्या आई: ' + err.message);
-        document.getElementById('pdfImgUploadBox').classList.remove('hidden');
-        document.getElementById('pdfImgWorkspaceSection').classList.add('hidden');
     }
 };
 
@@ -787,7 +1072,8 @@ window.downloadAllPdfImagesZip = async function() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Zipping...';
 
     try {
-        const zip = new JSZip();
+        await window.ensurePdfLibrariesLoaded();
+        const zip = new window.JSZip();
         const fmt = document.getElementById('pdfImgFormat')?.value || 'png';
 
         list.forEach(item => {
@@ -820,7 +1106,7 @@ window.setupImageToPdfTool = function(container) {
                 </div>
                 <div>
                     <h2 class="text-base md:text-lg font-black text-dark-900">Image to PDF Converter</h2>
-                    <p class="text-[11px] font-semibold text-slate-400">एक या अधिक फोटो को क्रमबद्ध तरीके से A4 साइज प्रिंटेबल पीडीएफ में बदलें (Max 10MB per file)</p>
+                    <p class="text-[11px] font-semibold text-slate-400">एक या अधिक फोटो को क्रमबद्ध तरीके से A4 साइज प्रिंटेबल पीडीएफ में बदलें (Max 10MB)</p>
                 </div>
             </div>
 
@@ -904,9 +1190,9 @@ window.renderImgToPdfList = function() {
                     <span class="text-xs font-bold text-slate-800 truncate">${item.name}</span>
                 </div>
                 <div class="flex items-center gap-1.5 shrink-0">
-                    <button type="button" onclick="window.moveImgToPdfOrder(${index}, -1)" class="w-7 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs" title="Move Up"><i class="fa-solid fa-arrow-up"></i></button>
-                    <button type="button" onclick="window.moveImgToPdfOrder(${index}, 1)" class="w-7 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs" title="Move Down"><i class="fa-solid fa-arrow-down"></i></button>
-                    <button type="button" onclick="window.removeImgToPdfItem(${index})" class="w-7 h-7 bg-red-50 hover:bg-red-600 text-red-500 hover:text-white rounded-lg text-xs" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                    <button type="button" onclick="window.moveImgToPdfOrder(${index}, -1)" class="w-7 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs"><i class="fa-solid fa-arrow-up"></i></button>
+                    <button type="button" onclick="window.moveImgToPdfOrder(${index}, 1)" class="w-7 h-7 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs"><i class="fa-solid fa-arrow-down"></i></button>
+                    <button type="button" onclick="window.removeImgToPdfItem(${index})" class="w-7 h-7 bg-red-50 hover:bg-red-600 text-red-500 hover:text-white rounded-lg text-xs"><i class="fa-solid fa-trash"></i></button>
                 </div>
             </div>
         `;
@@ -935,7 +1221,8 @@ window.generatePdfFromImages = async function() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating PDF...';
 
     try {
-        const { PDFDocument } = PDFLib;
+        await window.ensurePdfLibrariesLoaded();
+        const { PDFDocument } = window.PDFLib;
         const pdfDoc = await PDFDocument.create();
         const orientation = document.getElementById('imgPdfOrientation')?.value || 'portrait';
         const margin = parseFloat(document.getElementById('imgPdfMargin')?.value || 15);
@@ -956,7 +1243,6 @@ window.generatePdfFromImages = async function() {
 
             const imgW = embeddedImage.width;
             const imgH = embeddedImage.height;
-
             const availW = a4Width - 2 * margin;
             const availH = a4Height - 2 * margin;
 
@@ -968,10 +1254,7 @@ window.generatePdfFromImages = async function() {
             const y = (a4Height - drawH) / 2;
 
             page.drawImage(embeddedImage, {
-                x: x,
-                y: y,
-                width: drawW,
-                height: drawH
+                x: x, y: y, width: drawW, height: drawH
             });
         }
 
@@ -990,83 +1273,100 @@ window.generatePdfFromImages = async function() {
 };
 
 // ============================================================================
-// TOOL 5: PDF TEXT & STAMP EDITOR (pdf_editor)
+// TOOL 5: TRUE A4 PDF TEXT & STAMP EDITOR (Precise In-Place Edit, Zero-Zoom Shift)
 // ============================================================================
 window.setupPdfEditorTool = function(container) {
     container.innerHTML = `
         <div class="space-y-4">
-            <div class="flex items-center gap-2.5 border-b border-slate-100 pb-3">
-                <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center text-lg font-black">
-                    <i class="fa-solid fa-pen-to-square"></i>
-                </div>
-                <div>
-                    <h2 class="text-base md:text-lg font-black text-dark-900">PDF Text &amp; Stamp Editor</h2>
-                    <p class="text-[11px] font-semibold text-slate-400">टेक्स्ट जोड़ें, हस्ताक्षर लगाएं, व्हाइटआउट (Erase) करें (Max 10MB)</p>
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center text-lg font-black">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-base md:text-lg font-black text-dark-900">PDF Text &amp; A4 Editor (इन-प्लेस टेक्स्ट एडिटर)</h2>
+                        <p class="text-[11px] font-semibold text-slate-400">शब्द/लाइन पर क्लिक करके उसी जगह एडिट करें • बैकग्राउंड 100% सेम रहेगा, कोई ज़ूम या पिक्सल शिफ्ट नहीं (Max 10MB)</p>
+                    </div>
                 </div>
             </div>
 
-            <!-- Upload Area -->
+            <!-- Upload Box -->
             <div id="pdfEditUploadBox" class="p-6 rounded-3xl dropzone-box text-center space-y-2 bg-slate-50 cursor-pointer" onclick="document.getElementById('pdfEditFileInput').click()">
                 <input type="file" id="pdfEditFileInput" accept="application/pdf" class="hidden" onchange="window.handlePdfEditorUpload(this.files[0])">
                 <div class="w-14 h-14 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-2 border border-rose-200">
-                    <i class="fa-solid fa-file-signature"></i>
+                    <i class="fa-solid fa-file-pen"></i>
                 </div>
                 <h3 class="text-sm font-black text-slate-800">यहाँ PDF फाइल अपलोड करें</h3>
                 <p class="text-xs font-semibold text-slate-400">एडिट करने के लिए PDF चुनें (अधिकतम 10MB)</p>
             </div>
 
-            <!-- Workspace Editor -->
+            <!-- Full Workspace -->
             <div id="pdfEditWorkspace" class="hidden space-y-4">
-                <!-- Toolbar -->
-                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
-                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
-                        <div class="flex items-center gap-2">
-                            <button type="button" onclick="window.navPdfEditPage(-1)" class="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold"><i class="fa-solid fa-chevron-left"></i> Prev</button>
-                            <span id="pdfEditPageIndicator" class="text-xs font-black text-slate-700">Page 1 / 1</span>
-                            <button type="button" onclick="window.navPdfEditPage(1)" class="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold">Next <i class="fa-solid fa-chevron-right"></i></button>
-                        </div>
-
-                        <div class="flex items-center gap-2">
-                            <button type="button" onclick="window.addDateStampToPdf()" class="bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1">
-                                <i class="fa-solid fa-calendar-day text-amber-500"></i> + Date Stamp
-                            </button>
-                            <button type="button" onclick="window.saveAndDownloadEditedPdf()" class="bg-rose-600 hover:bg-rose-700 text-white font-black px-4 py-1.5 rounded-xl text-xs transition shadow-sm flex items-center gap-1">
-                                <i class="fa-solid fa-download"></i> Save &amp; Download PDF
-                            </button>
-                        </div>
+                
+                <!-- Modern Top Toolbar -->
+                <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                    
+                    <!-- Page Navigation -->
+                    <div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm">
+                        <button type="button" onclick="window.navPdfEditPage(-1)" class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-700 text-xs font-bold"><i class="fa-solid fa-chevron-left"></i></button>
+                        <span id="pdfEditPageIndicator" class="text-xs font-black text-slate-800">Page 1 / 1</span>
+                        <button type="button" onclick="window.navPdfEditPage(1)" class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-700 text-xs font-bold"><i class="fa-solid fa-chevron-right"></i></button>
                     </div>
 
-                    <!-- Text & Whiteout Tools -->
-                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-2.5 items-center">
-                        <div class="sm:col-span-2">
-                            <input type="text" id="pdfEditTextInput" placeholder="यहाँ टेक्स्ट लिखें और नीचे PDF पर क्लिक करें..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold bg-white outline-none">
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <select id="pdfEditFontSize" class="p-2 border border-slate-200 rounded-xl text-xs font-bold bg-white outline-none">
-                                <option value="16">16 px</option>
-                                <option value="20" selected>20 px</option>
-                                <option value="26">26 px</option>
-                                <option value="32">32 px</option>
-                            </select>
-                            <select id="pdfEditColor" class="p-2 border border-slate-200 rounded-xl text-xs font-bold bg-white outline-none">
-                                <option value="#000000">Black</option>
-                                <option value="#0033cc">Blue</option>
-                                <option value="#cc0000">Red</option>
-                                <option value="#ffffff">Whiteout</option>
-                            </select>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <button type="button" onclick="window.enableWhiteoutMode()" id="btnWhiteout" class="flex-1 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 p-2 rounded-xl text-xs font-bold transition">
-                                <i class="fa-solid fa-eraser mr-1"></i> Erase Box
-                            </button>
+                    <!-- Editor Modes -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" onclick="window.setPdfEditorMode('click_edit')" id="btnEditModeClick" class="px-3 py-2 rounded-xl text-xs font-black bg-dark-900 text-royal-300 border border-royal-400 shadow-sm flex items-center gap-1.5">
+                            <i class="fa-solid fa-i-cursor"></i> शब्द पर क्लिक करके एडिट करें
+                        </button>
+                        <button type="button" onclick="window.setPdfEditorMode('box_replace')" id="btnEditModeBox" class="px-3 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 flex items-center gap-1.5">
+                            <i class="fa-solid fa-vector-square text-indigo-500"></i> लाइन/एरिया खींचकर बदलें
+                        </button>
+                        <button type="button" onclick="window.setPdfEditorMode('whiteout')" id="btnEditModeWhiteout" class="px-3 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 flex items-center gap-1.5">
+                            <i class="fa-solid fa-eraser text-rose-500"></i> इरेज़र (व्हाइटआउट)
+                        </button>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="btnSavePdfEditor" onclick="window.saveAndDownloadEditedPdf()" class="bg-rose-600 hover:bg-rose-700 text-white font-black px-4 py-2 rounded-xl text-xs shadow-sm transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-file-arrow-down"></i> Save Edited PDF
+                        </button>
+                    </div>
+                </div>
+
+                <div id="pdfEditGuideBanner" class="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold flex items-center gap-2">
+                    <i class="fa-solid fa-circle-info text-amber-600 text-sm"></i>
+                    <span>💡 <strong>क्लिक-टू-एडिट एक्टिव:</strong> पेज पर किसी भी नाम या शब्द पर क्लिक करें। उसी जगह बॉक्स खुलेगा, नया टेक्स्ट लिखें और <strong>Enter</strong> दबाएं — बैकग्राउंड बिल्कुल सेम रहेगा और पुराना टेक्स्ट साफ होकर नया छप जाएगा!</span>
+                </div>
+
+                <!-- True A4 Desk Canvas Workspace (Preserves natural page ratio & zero-zoom shift) -->
+                <div class="bg-slate-300/80 p-3 md:p-6 rounded-3xl flex justify-center items-start overflow-auto min-h-[650px]">
+                    <div id="a4DeskWrapper" class="a4-desk-sheet rounded-lg overflow-hidden relative shadow-a4 bg-white border border-slate-300">
+                        <!-- Main PDF Render Canvas -->
+                        <canvas id="pdfEditCanvas" class="block bg-white w-full h-auto"></canvas>
+                        <!-- Interactive Clickable Text Overlay Layer (Locked 1:1 with canvas) -->
+                        <div id="pdfTextOverlayLayer" class="absolute inset-0 z-20 pointer-events-auto"></div>
+                        <!-- In-Place Editable Input Popup (Dynamically Placed Over Clicked Word) -->
+                        <div id="inPlaceEditorPopup" class="hidden absolute z-40 bg-white p-2.5 rounded-xl shadow-2xl border-2 border-royal-500 space-y-2 max-w-sm">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-[10px] font-black uppercase text-royal-600">Edit Text In-Place</span>
+                                <button type="button" onclick="window.cancelInPlaceEdit()" class="text-slate-400 hover:text-red-500 text-xs"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+                            <input type="text" id="inPlaceTextInput" class="w-full p-2 border border-slate-300 rounded-lg text-xs font-bold outline-none focus:border-royal-500 bg-slate-50">
+                            <div class="flex items-center justify-between gap-2 pt-1">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-[10px] font-bold text-slate-500">Size:</span>
+                                    <input type="number" id="inPlaceFontSize" value="16" min="8" max="72" class="w-12 p-1 border border-slate-300 rounded text-xs font-bold text-center">
+                                    <input type="color" id="inPlaceTextColor" value="#000000" class="w-6 h-6 p-0 rounded border border-slate-300 cursor-pointer" title="Font Color">
+                                </div>
+                                <button type="button" onclick="window.applyInPlaceEdit()" class="bg-dark-900 hover:bg-black text-royal-300 px-3 py-1.5 rounded-lg text-xs font-black shadow transition">
+                                    ✓ Apply (Enter)
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Canvas Display -->
-                <div class="bg-slate-300 p-4 rounded-2xl flex justify-center overflow-auto max-h-[600px]">
-                    <canvas id="pdfEditCanvas" class="bg-white shadow-xl rounded cursor-crosshair border border-slate-400"></canvas>
-                </div>
             </div>
         </div>
     `;
@@ -1076,7 +1376,47 @@ window.pdfEditorState = {
     pdfDoc: null,
     currentPage: 1,
     scale: 2.0,
-    pageOverlays: {}
+    activeMode: 'click_edit',
+    currentActiveItem: null,
+    boxStartX: 0,
+    boxStartY: 0,
+    isDraggingBox: false,
+    pageCanvasMap: {}, // Cached modified canvas data URLs per page
+    pageDimsMap: {}    // Original page point dimensions [width, height]
+};
+
+// Color Sampler: Samples true backdrop color right next to text
+window.sampleCanvasBackground = function(ctx, x, y, w, h) {
+    try {
+        const canvasW = ctx.canvas.width;
+        const canvasH = ctx.canvas.height;
+        const checkPoints = [
+            [x, Math.max(0, y - 4)],
+            [x + w / 2, Math.max(0, y - 4)],
+            [Math.min(canvasW - 1, x + w), Math.max(0, y - 4)],
+            [Math.max(0, x - 4), y + h / 2],
+            [Math.min(canvasW - 1, x + w + 4), y + h / 2]
+        ];
+
+        let totR = 0, totG = 0, totB = 0, validSamples = 0;
+        checkPoints.forEach(([px, py]) => {
+            const cx = Math.max(0, Math.min(canvasW - 1, Math.round(px)));
+            const cy = Math.max(0, Math.min(canvasH - 1, Math.round(py)));
+            const pixel = ctx.getImageData(cx, cy, 1, 1).data;
+            // Ignore dark ink strokes
+            if (pixel[0] > 160 || pixel[1] > 160 || pixel[2] > 160) {
+                totR += pixel[0];
+                totG += pixel[1];
+                totB += pixel[2];
+                validSamples++;
+            }
+        });
+
+        if (validSamples > 0) {
+            return `rgb(${Math.round(totR / validSamples)}, ${Math.round(totG / validSamples)}, ${Math.round(totB / validSamples)})`;
+        }
+    } catch (e) {}
+    return '#ffffff';
 };
 
 window.handlePdfEditorUpload = async function(file) {
@@ -1084,107 +1424,338 @@ window.handlePdfEditorUpload = async function(file) {
     if (!window.validateFileSize(file, 10)) return;
 
     try {
+        await window.ensurePdfLibrariesLoaded();
         const arrayBuffer = await file.arrayBuffer();
-        window.pdfEditorState.pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        window.pdfEditorState.originalPdfBytes = arrayBuffer;
+        window.pdfEditorState.pdfDoc = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         window.pdfEditorState.currentPage = 1;
-        window.pdfEditorState.pageOverlays = {};
+        window.pdfEditorState.pageCanvasMap = {};
+        window.pdfEditorState.pageDimsMap = {};
 
         document.getElementById('pdfEditUploadBox').classList.add('hidden');
         document.getElementById('pdfEditWorkspace').classList.remove('hidden');
-        window.renderPdfEditorCurrentPage();
+        window.renderPdfEditorA4Page();
     } catch (e) {
         alert('PDF लोड नहीं हो पाई: ' + e.message);
     }
 };
 
-window.renderPdfEditorCurrentPage = async function() {
+window.setPdfEditorMode = function(mode) {
+    window.pdfEditorState.activeMode = mode;
+    const clickBtn = document.getElementById('btnEditModeClick');
+    const boxBtn = document.getElementById('btnEditModeBox');
+    const whiteoutBtn = document.getElementById('btnEditModeWhiteout');
+    const banner = document.getElementById('pdfEditGuideBanner');
+
+    const defaultClass = "px-3 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 flex items-center gap-1.5";
+    const activeClass = "px-3 py-2 rounded-xl text-xs font-black bg-dark-900 text-royal-300 border border-royal-400 shadow-sm flex items-center gap-1.5";
+
+    if (clickBtn) clickBtn.className = mode === 'click_edit' ? activeClass : defaultClass;
+    if (boxBtn) boxBtn.className = mode === 'box_replace' ? activeClass : defaultClass;
+    if (whiteoutBtn) whiteoutBtn.className = mode === 'whiteout' ? activeClass : defaultClass;
+
+    if (mode === 'click_edit') {
+        banner.innerHTML = `<i class="fa-solid fa-circle-info text-amber-600 text-sm"></i><span>💡 <strong>क्लिक-टू-एडिट एक्टिव:</strong> किसी भी शब्द पर क्लिक करके वहीं बदलें।</span>`;
+    } else if (mode === 'box_replace') {
+        banner.innerHTML = `<i class="fa-solid fa-vector-square text-indigo-600 text-sm"></i><span>📐 <strong>बॉक्स रिप्लेस एक्टिव:</strong> माउस से किसी भी लाइन या एरिया पर बॉक्स खींचें, नया टेक्स्ट लिखें।</span>`;
+    } else if (mode === 'whiteout') {
+        banner.innerHTML = `<i class="fa-solid fa-eraser text-rose-600 text-sm"></i><span>🧹 <strong>व्हाइटआउट (इरेज़र) एक्टिव:</strong> जिस भाग को मिटाना चाहते हैं, उसपर माउस से बॉक्स खींचें।</span>`;
+    }
+};
+
+window.renderPdfEditorA4Page = async function() {
     const pdfDoc = window.pdfEditorState.pdfDoc;
     const pageNum = window.pdfEditorState.currentPage;
     const canvas = document.getElementById('pdfEditCanvas');
-    if (!pdfDoc || !canvas) return;
+    const overlay = document.getElementById('pdfTextOverlayLayer');
+    const wrapper = document.getElementById('a4DeskWrapper');
+    if (!pdfDoc || !canvas || !overlay || !wrapper) return;
 
-    document.getElementById('pdfEditPageIndicator').innerText = `Page ${pageNum} / ${pdfDoc.numPages}`;
+    document.getElementById('pdfEditPageIndicator').innerText = `Page ${pageNum} of ${pdfDoc.numPages}`;
 
     const page = await pdfDoc.getPage(pageNum);
-    const viewport = page.getViewport({ scale: window.pdfEditorState.scale });
+    const scale = window.pdfEditorState.scale;
+    const viewport = page.getViewport({ scale: scale });
+    const naturalViewport = page.getViewport({ scale: 1.0 });
+
+    // Store natural point dimensions for 1:1 PDF export
+    window.pdfEditorState.pageDimsMap[pageNum] = [naturalViewport.width, naturalViewport.height];
+
+    // Lock wrapper aspect ratio to natural page ratio: ZERO ZOOM SHIFT!
+    wrapper.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
+    wrapper.style.maxWidth = Math.min(840, Math.round(viewport.width / (scale / 1.15))) + 'px';
 
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     const ctx = canvas.getContext('2d');
 
-    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+    // If this page was already modified, restore cached image to keep edits intact!
+    if (window.pdfEditorState.pageCanvasMap[pageNum]) {
+        const cachedImg = new Image();
+        cachedImg.onload = () => {
+            ctx.drawImage(cachedImg, 0, 0);
+            window.buildInteractiveTextOverlay(page, viewport, scale);
+        };
+        cachedImg.src = window.pdfEditorState.pageCanvasMap[pageNum];
+    } else {
+        // Otherwise render page freshly from PDF
+        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+        window.buildInteractiveTextOverlay(page, viewport, scale);
+    }
+};
 
-    canvas.onclick = (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-        const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+window.buildInteractiveTextOverlay = async function(page, viewport, scale) {
+    const overlay = document.getElementById('pdfTextOverlayLayer');
+    const canvas = document.getElementById('pdfEditCanvas');
+    if (!overlay || !canvas) return;
 
-        const text = document.getElementById('pdfEditTextInput')?.value.trim();
-        const fSize = parseInt(document.getElementById('pdfEditFontSize')?.value || 20);
-        const color = document.getElementById('pdfEditColor')?.value || '#000000';
+    overlay.innerHTML = '';
+    const textContent = await page.getTextContent();
+    const items = textContent.items;
 
-        if (text) {
-            ctx.fillStyle = color;
-            ctx.font = `bold ${fSize * window.pdfEditorState.scale}px Arial, sans-serif`;
-            ctx.fillText(text, x, y);
+    items.forEach((item) => {
+        if (!item.str || !item.str.trim()) return;
+
+        const tx = item.transform[4];
+        const ty = item.transform[5];
+        const [vx, vy] = viewport.convertToViewportPoint(tx, ty);
+
+        const fontSize = Math.sqrt(item.transform[0] * item.transform[0] + item.transform[1] * item.transform[1]);
+        const fontSizeCanvas = fontSize * scale;
+        const itemW = item.width * scale;
+        const itemH = fontSizeCanvas * 1.25;
+
+        // Bounding box: from baseline vy upward by fontSize
+        const boxLeftPercent = (vx / viewport.width) * 100;
+        const boxTopPercent = ((vy - fontSizeCanvas * 0.95) / viewport.height) * 100;
+        const boxWidthPercent = (itemW / viewport.width) * 100;
+        const boxHeightPercent = (itemH / viewport.height) * 100;
+
+        const div = document.createElement('div');
+        div.className = 'pdf-text-highlight';
+        div.style.left = boxLeftPercent + '%';
+        div.style.top = boxTopPercent + '%';
+        div.style.width = Math.max(boxWidthPercent, 0.5) + '%';
+        div.style.height = boxHeightPercent + '%';
+        div.title = `Click to edit: "${item.str}"`;
+
+        div.onclick = (e) => {
+            e.stopPropagation();
+            if (window.pdfEditorState.activeMode !== 'click_edit') return;
+            window.openInPlaceEditor(item, vx, vy, itemW, itemH, fontSize);
+        };
+
+        overlay.appendChild(div);
+    });
+
+    // Box Dragging Support
+    overlay.onmousedown = (e) => {
+        if (window.pdfEditorState.activeMode === 'click_edit') return;
+        const rect = overlay.getBoundingClientRect();
+        window.pdfEditorState.isDraggingBox = true;
+        window.pdfEditorState.boxStartX = (e.clientX - rect.left) * (canvas.width / rect.width);
+        window.pdfEditorState.boxStartY = (e.clientY - rect.top) * (canvas.height / rect.height);
+    };
+
+    overlay.onmouseup = (e) => {
+        if (!window.pdfEditorState.isDraggingBox) return;
+        window.pdfEditorState.isDraggingBox = false;
+        const rect = overlay.getBoundingClientRect();
+        const endX = (e.clientX - rect.left) * (canvas.width / rect.width);
+        const endY = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+        const startX = window.pdfEditorState.boxStartX;
+        const startY = window.pdfEditorState.boxStartY;
+        const boxX = Math.min(startX, endX);
+        const boxY = Math.min(startY, endY);
+        const boxW = Math.abs(endX - startX);
+        const boxH = Math.abs(endY - startY);
+
+        if (boxW < 8 || boxH < 8) return;
+        const ctx = canvas.getContext('2d');
+
+        if (window.pdfEditorState.activeMode === 'whiteout') {
+            const bgShade = window.sampleCanvasBackground(ctx, boxX, boxY, boxW, boxH);
+            ctx.fillStyle = bgShade;
+            ctx.fillRect(boxX, boxY, boxW, boxH);
+            // Cache page state
+            window.pdfEditorState.pageCanvasMap[window.pdfEditorState.currentPage] = canvas.toDataURL('image/jpeg', 0.98);
+        } else if (window.pdfEditorState.activeMode === 'box_replace') {
+            const newText = prompt('इस चुने हुए एरिया के लिए नया टेक्स्ट लिखें:', '');
+            if (newText !== null && newText.trim()) {
+                const bgShade = window.sampleCanvasBackground(ctx, boxX, boxY, boxW, boxH);
+                ctx.fillStyle = bgShade;
+                ctx.fillRect(boxX, boxY, boxW, boxH);
+
+                ctx.fillStyle = '#000000';
+                const fSize = Math.max(14, Math.round(boxH * 0.72));
+                ctx.font = `bold ${fSize}px Arial, sans-serif`;
+                ctx.textBaseline = 'middle';
+                ctx.fillText(newText.trim(), boxX + 4, boxY + boxH / 2);
+                window.pdfEditorState.pageCanvasMap[window.pdfEditorState.currentPage] = canvas.toDataURL('image/jpeg', 0.98);
+            }
         }
     };
 };
 
-window.navPdfEditPage = function(dir) {
-    const next = window.pdfEditorState.currentPage + dir;
-    if (next < 1 || next > window.pdfEditorState.pdfDoc.numPages) return;
-    window.pdfEditorState.currentPage = next;
-    window.renderPdfEditorCurrentPage();
-};
+window.openInPlaceEditor = function(item, vx, vy, itemW, itemH, fontSize) {
+    const popup = document.getElementById('inPlaceEditorPopup');
+    const input = document.getElementById('inPlaceTextInput');
+    const sizeInp = document.getElementById('inPlaceFontSize');
+    if (!popup || !input) return;
 
-window.addDateStampToPdf = function() {
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const inp = document.getElementById('pdfEditTextInput');
-    if (inp) inp.value = `DATE: ${dateStr}`;
-};
+    window.pdfEditorState.currentActiveItem = { item, vx, vy, itemW, itemH, fontSize };
 
-window.enableWhiteoutMode = function() {
+    input.value = item.str;
+    sizeInp.value = Math.round(fontSize * 1.05);
+
     const canvas = document.getElementById('pdfEditCanvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    alert('व्हाइटआउट मोड चालू है: अब PDF पर जहाँ भी क्लिक करेंगे वहाँ 120x30px का सफेद बॉक्स बन जाएगा।');
-    canvas.onclick = (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-        const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(x - 60, y - 15, 120, 30);
+    const leftPercent = (vx / canvas.width) * 100;
+    const topPercent = ((vy + 8) / canvas.height) * 100;
+
+    popup.style.left = Math.min(leftPercent, 65) + '%';
+    popup.style.top = Math.min(topPercent, 80) + '%';
+    popup.classList.remove('hidden');
+
+    input.focus();
+    input.select();
+
+    input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            window.applyInPlaceEdit();
+        } else if (e.key === 'Escape') {
+            window.cancelInPlaceEdit();
+        }
     };
 };
 
-window.saveAndDownloadEditedPdf = async function() {
-    const canvas = document.getElementById('pdfEditCanvas');
-    if (!canvas) return;
-    const imgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
-
-    const { PDFDocument } = PDFLib;
-    const pdfDoc = await PDFDocument.create();
-    const embeddedImg = await pdfDoc.embedJpg(imgDataUrl);
-
-    const page = pdfDoc.addPage([canvas.width / window.pdfEditorState.scale, canvas.height / window.pdfEditorState.scale]);
-    page.drawImage(embeddedImg, {
-        x: 0,
-        y: 0,
-        width: page.getWidth(),
-        height: page.getHeight()
-    });
-
-    const pdfBytes = await pdfDoc.save();
-    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-    const link = document.createElement('a');
-    link.download = `Edited_Document_${Date.now()}.pdf`;
-    link.href = URL.createObjectURL(blob);
-    link.click();
+window.cancelInPlaceEdit = function() {
+    const popup = document.getElementById('inPlaceEditorPopup');
+    if (popup) popup.classList.add('hidden');
+    window.pdfEditorState.currentActiveItem = null;
 };
 
-// ============================================================================
+// In-Place Text Replacement: Seamless background matching & exact baseline rendering
+window.applyInPlaceEdit = function() {
+    const state = window.pdfEditorState.currentActiveItem;
+    const input = document.getElementById('inPlaceTextInput');
+    const sizeInp = document.getElementById('inPlaceFontSize');
+    const colorInp = document.getElementById('inPlaceTextColor');
+    const canvas = document.getElementById('pdfEditCanvas');
+
+    if (!state || !input || !canvas) return;
+
+    const newStr = input.value.trim();
+    const fSize = parseInt(sizeInp.value) || 16;
+    const color = colorInp.value || '#000000';
+    const ctx = canvas.getContext('2d');
+    const scale = window.pdfEditorState.scale;
+
+    const { vx, vy, itemW } = state;
+    const fontSizeCanvas = fSize * scale;
+
+    // 1. Sample exact background color surrounding the text box
+    const eraseTop = Math.max(0, vy - fontSizeCanvas * 1.05);
+    const eraseHeight = fontSizeCanvas * 1.35;
+    const eraseLeft = Math.max(0, vx - 2);
+
+    ctx.font = `bold ${fontSizeCanvas}px Arial, sans-serif`;
+    const newMetrics = ctx.measureText(newStr);
+    const eraseWidth = Math.max(itemW + 6, newMetrics.width + 6);
+
+    const bgShade = window.sampleCanvasBackground(ctx, eraseLeft, eraseTop, eraseWidth, eraseHeight);
+
+    // 2. Cleanly erase original text with seamless backdrop color: NO GAPS, NO WHITE PATCHES!
+    ctx.fillStyle = bgShade;
+    ctx.fillRect(eraseLeft, eraseTop, eraseWidth, eraseHeight);
+
+    // 3. Draw newly edited text at exact original baseline
+    if (newStr) {
+        ctx.fillStyle = color;
+        ctx.font = `bold ${fontSizeCanvas}px Arial, sans-serif`;
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText(newStr, vx, vy);
+    }
+
+    // Cache page state so changes persist when paging
+    window.pdfEditorState.pageCanvasMap[window.pdfEditorState.currentPage] = canvas.toDataURL('image/jpeg', 0.98);
+
+    window.cancelInPlaceEdit();
+};
+
+window.navPdfEditPage = function(dir) {
+    const state = window.pdfEditorState;
+    const next = state.currentPage + dir;
+    if (next < 1 || next > state.pdfDoc.numPages) return;
+
+    // Cache current page before switching
+    const canvas = document.getElementById('pdfEditCanvas');
+    if (canvas) {
+        state.pageCanvasMap[state.currentPage] = canvas.toDataURL('image/jpeg', 0.98);
+    }
+
+    state.currentPage = next;
+    window.renderPdfEditorA4Page();
+};
+
+// Save & Download: Preserves exact original page dimensions and unedited pages!
+window.saveAndDownloadEditedPdf = async function() {
+    const state = window.pdfEditorState;
+    if (!state.pdfDoc) return;
+
+    const canvas = document.getElementById('pdfEditCanvas');
+    if (canvas) {
+        state.pageCanvasMap[state.currentPage] = canvas.toDataURL('image/jpeg', 0.98);
+    }
+
+    const btn = document.getElementById('btnSavePdfEditor');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
+
+    try {
+        await window.ensurePdfLibrariesLoaded();
+        const { PDFDocument } = window.PDFLib;
+
+        const origDoc = await PDFDocument.load(state.originalPdfBytes);
+        const newDoc = await PDFDocument.create();
+        const numPages = state.pdfDoc.numPages;
+
+        for (let p = 1; p <= numPages; p++) {
+            const origPage = origDoc.getPage(p - 1);
+            const origW = origPage.getWidth();
+            const origH = origPage.getHeight();
+
+            if (state.pageCanvasMap[p]) {
+                // Edited page: embed canvas at EXACT original width & height: ZERO ZOOM DISTORTION!
+                const embeddedImg = await newDoc.embedJpg(state.pageCanvasMap[p]);
+                const newPage = newDoc.addPage([origW, origH]);
+                newPage.drawImage(embeddedImg, {
+                    x: 0,
+                    y: 0,
+                    width: origW,
+                    height: origH
+                });
+            } else {
+                // Unedited page: copy directly from original with 100% vector sharpness!
+                const [copiedPage] = await newDoc.copyPages(origDoc, [p - 1]);
+                newDoc.addPage(copiedPage);
+            }
+        }
+
+        const pdfBytes = await newDoc.save();
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const link = document.createElement('a');
+        link.download = `Edited_Document_${Date.now()}.pdf`;
+        link.href = URL.createObjectURL(blob);
+        link.click();
+        alert('सफलता! आपकी एडिट की गई PDF फाइल डाउनलोड हो गई है। बैकग्राउंड और पेज का साइज बिल्कुल ओरिजिनल जैसा सुरक्षित रखा गया है।');
+    } catch (e) {
+        alert('PDF सेव करने में समस्या आई: ' + e.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+    }
+};
+
 // TOOL 6: MERGE PDF (pdf_merge)
 // ============================================================================
 window.setupPdfMergeTool = function(container) {
@@ -1200,7 +1771,6 @@ window.setupPdfMergeTool = function(container) {
                 </div>
             </div>
 
-            <!-- Upload Area -->
             <div class="p-6 rounded-3xl dropzone-box text-center space-y-2 bg-slate-50 cursor-pointer" onclick="document.getElementById('pdfMergeFileInput').click()">
                 <input type="file" id="pdfMergeFileInput" accept="application/pdf" multiple class="hidden" onchange="window.handlePdfMergeUpload(this.files)">
                 <div class="w-14 h-14 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-2 border border-purple-200">
@@ -1210,7 +1780,6 @@ window.setupPdfMergeTool = function(container) {
                 <p class="text-xs font-semibold text-slate-400">प्रत्येक फाइल अधिकतम 10MB</p>
             </div>
 
-            <!-- Merge List -->
             <div id="pdfMergeWorkspace" class="hidden space-y-4">
                 <div class="flex justify-between items-center bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
                     <span id="pdfMergeCountText" class="text-xs font-black text-purple-900">2 फाइलें चुनी गईं</span>
@@ -1218,7 +1787,6 @@ window.setupPdfMergeTool = function(container) {
                         <i class="fa-solid fa-object-group"></i> Merge &amp; Download PDF
                     </button>
                 </div>
-
                 <div id="pdfMergeFilesList" class="space-y-2"></div>
             </div>
         </div>
@@ -1296,7 +1864,8 @@ window.executePdfMerge = async function() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Merging...';
 
     try {
-        const { PDFDocument } = PDFLib;
+        await window.ensurePdfLibrariesLoaded();
+        const { PDFDocument } = window.PDFLib;
         const mergedDoc = await PDFDocument.create();
 
         for (const item of window.pdfMergeList) {
@@ -1335,7 +1904,6 @@ window.setupPdfUnlockTool = function(container) {
                 </div>
             </div>
 
-            <!-- Upload Area -->
             <div id="pdfUnlockUploadBox" class="p-6 rounded-3xl dropzone-box text-center space-y-2 bg-slate-50 cursor-pointer" onclick="document.getElementById('pdfUnlockFileInput').click()">
                 <input type="file" id="pdfUnlockFileInput" accept="application/pdf" class="hidden" onchange="window.handlePdfUnlockUpload(this.files[0])">
                 <div class="w-14 h-14 bg-teal-100 text-teal-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-2 border border-teal-200">
@@ -1345,7 +1913,6 @@ window.setupPdfUnlockTool = function(container) {
                 <p class="text-xs font-semibold text-slate-400">अधिकतम 10MB</p>
             </div>
 
-            <!-- Password Form -->
             <div id="pdfUnlockFormSection" class="hidden bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-3">
                 <div>
                     <label class="block text-xs font-bold text-slate-600 uppercase mb-1">PDF का पासवर्ड दर्ज करें</label>
@@ -1379,7 +1946,8 @@ window.executePdfUnlock = async function() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Unlocking...';
 
     try {
-        const { PDFDocument } = PDFLib;
+        await window.ensurePdfLibrariesLoaded();
+        const { PDFDocument } = window.PDFLib;
         const pdfDoc = await PDFDocument.load(window.pdfUnlockFileBytes, { password: pass });
         const cleanBytes = await pdfDoc.save();
 
@@ -1413,7 +1981,6 @@ window.setupImageCompressorTool = function(container) {
                 </div>
             </div>
 
-            <!-- Upload Area -->
             <div id="compUploadBox" class="p-6 rounded-3xl dropzone-box text-center space-y-2 bg-slate-50 cursor-pointer" onclick="document.getElementById('compFileInput').click()">
                 <input type="file" id="compFileInput" accept="image/*" class="hidden" onchange="window.handleCompressorUpload(this.files[0])">
                 <div class="w-14 h-14 bg-royal-100 text-royal-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-2 border border-royal-200">
@@ -1423,7 +1990,6 @@ window.setupImageCompressorTool = function(container) {
                 <p class="text-xs font-semibold text-slate-400">JPG, PNG, WEBP (अधिकतम 10MB)</p>
             </div>
 
-            <!-- Controls Workspace -->
             <div id="compWorkspaceSection" class="hidden space-y-4">
                 <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
                     <div class="flex flex-wrap items-center justify-between gap-3">
@@ -1462,7 +2028,6 @@ window.setupImageCompressorTool = function(container) {
                     </div>
                 </div>
 
-                <!-- Preview Grid -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center">
                         <span class="text-xs font-bold text-slate-400 block mb-2">Original Preview</span>
@@ -1526,7 +2091,6 @@ window.executeSmartCompression = async function() {
     let width = img.width;
     let height = img.height;
 
-    // Iterative resize & quality binary search
     let quality = 0.92;
     let resultBlob = null;
 
@@ -1543,7 +2107,6 @@ window.executeSmartCompression = async function() {
             break;
         }
 
-        // Adjust dimensions and quality
         if (quality > 0.4) {
             quality -= 0.15;
         } else {
