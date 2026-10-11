@@ -1049,7 +1049,7 @@ window.handlePdfToImgUpload = async function(file) {
         await window.ensurePdfViewerLoaded();
         const arrayBuffer = await file.arrayBuffer();
         const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
-        const loadingTask = pdfjs.getDocument({ data: arrayBuffer.slice(0) });
+        const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
         window.pdfToImgState.pdfDoc = await loadingTask.promise;
 
         document.getElementById('pdfImgUploadBox').classList.add('hidden');
@@ -1441,6 +1441,78 @@ window.pdfEditorState = {
 };
 
 // Color Sampler: Samples true backdrop color right next to text
+// Content-Aware Background Preservation & Inpainting (Photo & Texture Safe)
+window.inpaintCanvasBackground = function(ctx, startX, startY, width, height, onlyTextStrokes = true) {
+    const canvas = ctx.canvas;
+    const cw = canvas.width;
+    const ch = canvas.height;
+
+    const x0 = Math.max(0, Math.floor(startX));
+    const y0 = Math.max(0, Math.floor(startY));
+    const x1 = Math.min(cw, Math.ceil(startX + width));
+    const y1 = Math.min(ch, Math.ceil(startY + height));
+    const boxW = x1 - x0;
+    const boxH = y1 - y0;
+
+    if (boxW <= 0 || boxH <= 0) return;
+
+    // Sample clean background reference rows directly above and below the text box
+    const sampleYTop = Math.max(0, y0 - 2);
+    const sampleYBot = Math.min(ch - 1, y1 + 1);
+
+    const imgData = ctx.getImageData(x0, y0, boxW, boxH);
+    const d = imgData.data;
+
+    const topRowData = ctx.getImageData(x0, sampleYTop, boxW, 1).data;
+    const botRowData = ctx.getImageData(x0, sampleYBot, boxW, 1).data;
+
+    for (let bx = 0; bx < boxW; bx++) {
+        const topIdx = bx * 4;
+        const tR = topRowData[topIdx];
+        const tG = topRowData[topIdx + 1];
+        const tB = topRowData[topIdx + 2];
+
+        const bR = botRowData[topIdx];
+        const bG = botRowData[topIdx + 1];
+        const bB = botRowData[topIdx + 2];
+
+        for (let by = 0; by < boxH; by++) {
+            const idx = (by * boxW + bx) * 4;
+            const t = boxH > 1 ? (by / (boxH - 1)) : 0;
+
+            // Interpolate underlying background pixel vertically column-by-column
+            const bgR = Math.round((1 - t) * tR + t * bR);
+            const bgG = Math.round((1 - t) * tG + t * bG);
+            const bgB = Math.round((1 - t) * tB + t * bB);
+
+            if (!onlyTextStrokes) {
+                // Reconstruct full background seamlessly without solid white
+                d[idx] = bgR;
+                d[idx + 1] = bgG;
+                d[idx + 2] = bgB;
+            } else {
+                const curR = d[idx];
+                const curG = d[idx + 1];
+                const curB = d[idx + 2];
+
+                // Check difference between current pixel and underlying background
+                const diff = Math.abs(curR - bgR) + Math.abs(curG - bgG) + Math.abs(curB - bgB);
+
+                // If pixel is text stroke / dark ink, blend it smoothly into the background photo/color
+                if (diff > 22) {
+                    const alpha = Math.min(1.0, (diff - 18) / 24);
+                    d[idx] = Math.round((1 - alpha) * curR + alpha * bgR);
+                    d[idx + 1] = Math.round((1 - alpha) * curG + alpha * bgG);
+                    d[idx + 2] = Math.round((1 - alpha) * curB + alpha * bgB);
+                }
+                // If diff <= 22, it is already the natural photo/texture background! Kept 100% untouched!
+            }
+        }
+    }
+
+    ctx.putImageData(imgData, x0, y0);
+};
+
 window.sampleCanvasBackground = function(ctx, x, y, w, h) {
     try {
         const canvasW = ctx.canvas.width;
@@ -1632,17 +1704,13 @@ window.buildInteractiveTextOverlay = async function(page, viewport, scale) {
         const ctx = canvas.getContext('2d');
 
         if (window.pdfEditorState.activeMode === 'whiteout') {
-            const bgShade = window.sampleCanvasBackground(ctx, boxX, boxY, boxW, boxH);
-            ctx.fillStyle = bgShade;
-            ctx.fillRect(boxX, boxY, boxW, boxH);
+            window.inpaintCanvasBackground(ctx, boxX, boxY, boxW, boxH, false);
             // Cache page state
             window.pdfEditorState.pageCanvasMap[window.pdfEditorState.currentPage] = canvas.toDataURL('image/jpeg', 0.98);
         } else if (window.pdfEditorState.activeMode === 'box_replace') {
             const newText = prompt('इस चुने हुए एरिया के लिए नया टेक्स्ट लिखें:', '');
             if (newText !== null && newText.trim()) {
-                const bgShade = window.sampleCanvasBackground(ctx, boxX, boxY, boxW, boxH);
-                ctx.fillStyle = bgShade;
-                ctx.fillRect(boxX, boxY, boxW, boxH);
+                window.inpaintCanvasBackground(ctx, boxX, boxY, boxW, boxH, false);
 
                 ctx.fillStyle = '#000000';
                 const fSize = Math.max(14, Math.round(boxH * 0.72));
@@ -1720,11 +1788,8 @@ window.applyInPlaceEdit = function() {
     const newMetrics = ctx.measureText(newStr);
     const eraseWidth = Math.max(itemW + 6, newMetrics.width + 6);
 
-    const bgShade = window.sampleCanvasBackground(ctx, eraseLeft, eraseTop, eraseWidth, eraseHeight);
-
-    // 2. Cleanly erase original text with seamless backdrop color: NO GAPS, NO WHITE PATCHES!
-    ctx.fillStyle = bgShade;
-    ctx.fillRect(eraseLeft, eraseTop, eraseWidth, eraseHeight);
+    // 1. Content-Aware Background Preservation: Erase ONLY text strokes, keep photo/texture intact!
+    window.inpaintCanvasBackground(ctx, eraseLeft, eraseTop, eraseWidth, eraseHeight, true);
 
     // 3. Draw newly edited text at exact original baseline
     if (newStr) {
