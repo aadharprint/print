@@ -3,14 +3,50 @@
 // 100% Client-Side, Multi-CDN Robust Loaders, High-DPI & A4 PDF Editor
 // ============================================================================
 
-const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB limit
+const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB limit
 
-window.validateFileSize = function(file, customMaxMb = 50) {
+
+// ================= CUSTOM OJAS BRANDED ALERT MODAL =================
+window.alert = function(message) {
+    let alertModal = document.getElementById('customAlertModal');
+    if (!alertModal) {
+        alertModal = document.createElement('div');
+        alertModal.id = 'customAlertModal';
+        alertModal.className = 'fixed inset-0 z-[99999] flex items-center justify-center bg-dark-950/85 backdrop-blur-sm p-4 opacity-0 pointer-events-none transition-all duration-300';
+        alertModal.innerHTML = `
+            <div class="bg-white dark:bg-dark-900 rounded-3xl shadow-2xl border-t-4 border-royal-500 max-w-sm w-full p-6 text-center transform scale-95 transition-transform duration-300">
+                <div class="mx-auto w-16 h-16 mb-4 flex items-center justify-center rounded-2xl bg-white border border-slate-100 shadow-sm overflow-hidden p-2">
+                    <img src="logo.png" alt="Ojas Logo" class="w-full h-full object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1211/1211833.png'">
+                </div>
+                <h2 class="text-lg font-black text-dark-900 dark:text-white mb-2">Ojas Tools Studio</h2>
+                <p id="customAlertMessage" class="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-6 whitespace-pre-line leading-relaxed"></p>
+                <button onclick="window.closeCustomAlert()" class="bg-dark-900 hover:bg-black text-royal-300 font-black py-3 px-6 rounded-xl shadow-glow transition w-full text-sm">
+                    OK, Got it!
+                </button>
+            </div>
+        `;
+        document.body.appendChild(alertModal);
+        
+        window.closeCustomAlert = function() {
+            alertModal.classList.remove('opacity-100', 'pointer-events-auto');
+            alertModal.classList.add('opacity-0', 'pointer-events-none');
+            alertModal.querySelector('div').classList.remove('scale-100');
+            alertModal.querySelector('div').classList.add('scale-95');
+        };
+    }
+    document.getElementById('customAlertMessage').innerText = message;
+    alertModal.classList.remove('opacity-0', 'pointer-events-none');
+    alertModal.classList.add('opacity-100', 'pointer-events-auto');
+    alertModal.querySelector('div').classList.remove('scale-95');
+    alertModal.querySelector('div').classList.add('scale-100');
+};
+
+window.validateFileSize = function(file, customMaxMb = 100) {
     if (!file) return false;
     const maxBytes = customMaxMb * 1024 * 1024;
     if (file.size > maxBytes) {
         const fileMb = (file.size / (1024 * 1024)).toFixed(2);
-        alert(`⚠️ फाइल साइज बहुत बड़ा है!\n\nचुनी गई फाइल "${file.name}" का साइज ${fileMb} MB है।\nपोर्टल पर अधिकतम ${customMaxMb} MB तक की फाइल ही मान्य है।\n\nकृपया 50MB से छोटी फाइल चुनें।`);
+        alert(`⚠️ फाइल साइज बहुत बड़ा है!\n\nचुनी गई फाइल "${file.name}" का साइज ${fileMb} MB है।\nपोर्टल पर अधिकतम ${customMaxMb} MB तक की फाइल ही मान्य है।\n\nकृपया 100 MB से छोटी फाइल चुनें।`);
         return false;
     }
     return true;
@@ -251,7 +287,7 @@ window.setupPassportPhotoTool = function(container) {
                     <i class="fa-solid fa-camera"></i>
                 </div>
                 <h3 class="text-sm font-black text-slate-800">यहाँ अपनी फोटो अपलोड करें (क्लिक करें या ड्रैग करें)</h3>
-                <p class="text-xs font-semibold text-slate-400">JPG, PNG, WEBP (अधिकतम 50 MB)</p>
+                <p class="text-xs font-semibold text-slate-400">JPG, PNG, WEBP</p>
             </div>
 
             <!-- Editor Section (Initially Hidden) -->
@@ -321,7 +357,11 @@ window.setupPassportPhotoTool = function(container) {
                                 <span>Zoom (फोटो आकार):</span>
                                 <span id="ppZoomVal">1.0x</span>
                             </div>
-                            <input type="range" id="ppZoomSlider" min="0.5" max="3" step="0.05" value="1" oninput="window.renderPassportStudio()" class="w-full accent-amber-500 cursor-pointer">
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="document.getElementById('ppZoomSlider').stepDown(2); window.renderPassportStudio();" class="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs" title="Zoom Out"><i class="fa-solid fa-minus"></i></button>
+                                <input type="range" id="ppZoomSlider" min="0.5" max="3" step="0.05" value="1" oninput="window.renderPassportStudio()" class="flex-1 accent-amber-500 cursor-pointer">
+                                <button type="button" onclick="document.getElementById('ppZoomSlider').stepUp(2); window.renderPassportStudio();" class="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs" title="Zoom In"><i class="fa-solid fa-plus"></i></button>
+                            </div>
                         </div>
 
                         <div class="grid grid-cols-2 gap-2">
@@ -820,7 +860,7 @@ window.setupBgRemoverTool = function(container) {
                 </div>
                 <div>
                     <h2 class="text-base md:text-lg font-black text-dark-900">स्मार्ट बैकग्राउंड रिमूवर &amp; वाइट BG कनवर्टर</h2>
-                    <p class="text-[11px] font-semibold text-slate-400">फोटो का बैकग्राउंड तुरंत शुद्ध सफेद (#FFFFFF), पारदर्शी या स्काई-ब्लू बनाएं (Max 50MB)</p>
+                    <p class="text-[11px] font-semibold text-slate-400">फोटो का बैकग्राउंड तुरंत शुद्ध सफेद (#FFFFFF), पारदर्शी या स्काई-ब्लू बनाएं</p>
                 </div>
             </div>
 
@@ -831,14 +871,14 @@ window.setupBgRemoverTool = function(container) {
                     <i class="fa-solid fa-image"></i>
                 </div>
                 <h3 class="text-sm font-black text-slate-800">यहाँ इमेज अपलोड करें (क्लिक करें या ड्रैग करें)</h3>
-                <p class="text-xs font-semibold text-slate-400">JPG, PNG, WEBP (अधिकतम 50MB)</p>
+                <p class="text-xs font-semibold text-slate-400">JPG, PNG, WEBP</p>
             </div>
 
             <!-- Result Workspace -->
             <div id="bgWorkspaceSection" class="hidden space-y-4">
                 <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
                     <div class="flex flex-wrap items-center gap-2">
-                        <span class="text-xs font-bold text-slate-600 uppercase">नया बैकग्राउंड रंग:</span>
+                        <span class="text-xs font-bold text-slate-600 uppercase">नया बैकग्राउंड:</span>
                         <button type="button" onclick="window.applyBgColor('#ffffff', this)" class="bg-mode-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-dark-900 border-2 border-emerald-500 shadow-sm flex items-center gap-1.5">
                             <span class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-white"></span> Pure White
                         </button>
@@ -847,6 +887,20 @@ window.setupBgRemoverTool = function(container) {
                         </button>
                         <button type="button" onclick="window.applyBgColor('#99ccff', this)" class="bg-mode-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 flex items-center gap-1.5">
                             <span class="w-3.5 h-3.5 rounded-full border border-slate-300 bg-sky-300"></span> Sky Blue
+                        </button>
+
+                        <!-- Zoom Controls -->
+                        <div class="flex items-center gap-1 bg-white px-2 py-1 rounded-xl border border-slate-200 shadow-sm ml-1">
+                            <span class="text-[10px] font-bold text-slate-400 mr-0.5">Zoom:</span>
+                            <button type="button" onclick="window.zoomBgRemover(-0.25)" class="w-6 h-6 flex items-center justify-center font-bold text-xs text-slate-700 hover:bg-slate-100 rounded" title="Zoom Out"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                            <span id="bgZoomText" class="text-xs font-black text-slate-800 min-w-[34px] text-center">100%</span>
+                            <button type="button" onclick="window.zoomBgRemover(0.25)" class="w-6 h-6 flex items-center justify-center font-bold text-xs text-slate-700 hover:bg-slate-100 rounded" title="Zoom In"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                            <button type="button" onclick="window.resetBgZoom()" class="text-[10px] text-slate-400 hover:text-slate-700 ml-0.5">Reset</button>
+                        </div>
+
+                        <!-- Undo Button -->
+                        <button type="button" onclick="window.undoBgRemover()" class="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 flex items-center gap-1 shadow-sm" title="Undo">
+                            <i class="fa-solid fa-rotate-left text-amber-500"></i> Undo
                         </button>
                     </div>
 
@@ -903,6 +957,8 @@ window.handleBgRemoverUpload = function(file) {
 };
 
 window.applyBgColor = function(color, btnEl) {
+    if (!window.bgRemoverState.undoStack) window.bgRemoverState.undoStack = [];
+    window.bgRemoverState.undoStack.push(window.bgRemoverState.targetColor);
     window.bgRemoverState.targetColor = color;
     document.querySelectorAll('.bg-mode-btn').forEach(b => {
         b.className = "bg-mode-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 flex items-center gap-1.5";
@@ -981,7 +1037,7 @@ window.setupPdfToImageTool = function(container) {
                 </div>
                 <div>
                     <h2 class="text-base md:text-lg font-black text-dark-900">PDF to High-Res Image Converter</h2>
-                    <p class="text-[11px] font-semibold text-slate-400">300+ से 800 DPI अल्ट्रा-क्लियर रेंडरिंग • PNG / JPG एक्सपोर्ट (Max 50MB)</p>
+                    <p class="text-[11px] font-semibold text-slate-400">300+ से 800 DPI अल्ट्रा-क्लियर रेंडरिंग • PNG / JPG एक्सपोर्ट</p>
                 </div>
             </div>
 
@@ -992,7 +1048,7 @@ window.setupPdfToImageTool = function(container) {
                     <i class="fa-solid fa-file-pdf"></i>
                 </div>
                 <h3 class="text-sm font-black text-slate-800">यहाँ अपनी PDF फाइल अपलोड करें</h3>
-                <p class="text-xs font-semibold text-slate-400">केवल PDF फाइल (अधिकतम 50MB)</p>
+                <p class="text-xs font-semibold text-slate-400">केवल PDF फाइल</p>
             </div>
 
             <!-- Conversion Options & Output -->
@@ -1157,7 +1213,7 @@ window.setupImageToPdfTool = function(container) {
                 </div>
                 <div>
                     <h2 class="text-base md:text-lg font-black text-dark-900">Image to PDF Converter</h2>
-                    <p class="text-[11px] font-semibold text-slate-400">एक या अधिक फोटो को क्रमबद्ध तरीके से A4 साइज प्रिंटेबल पीडीएफ में बदलें (Max 50MB)</p>
+                    <p class="text-[11px] font-semibold text-slate-400">एक या अधिक फोटो को क्रमबद्ध तरीके से A4 साइज प्रिंटेबल पीडीएफ में बदलें</p>
                 </div>
             </div>
 
@@ -1168,7 +1224,7 @@ window.setupImageToPdfTool = function(container) {
                     <i class="fa-solid fa-images"></i>
                 </div>
                 <h3 class="text-sm font-black text-slate-800">यहाँ फोटो चुनें (एक साथ कई फोटो चुन सकते हैं)</h3>
-                <p class="text-xs font-semibold text-slate-400">JPG, PNG (प्रत्येक फाइल अधिकतम 50MB)</p>
+                <p class="text-xs font-semibold text-slate-400">JPG, PNG</p>
             </div>
 
             <!-- Image Reorder & Settings Workspace -->
@@ -1340,7 +1396,7 @@ window.setupPdfEditorTool = function(container) {
                     </div>
                     <div>
                         <h2 class="text-base md:text-lg font-black text-dark-900">PDF Text &amp; A4 Editor (इन-प्लेस टेक्स्ट एडिटर)</h2>
-                        <p class="text-[11px] font-semibold text-slate-400">शब्द/लाइन पर क्लिक करके उसी जगह एडिट करें • बैकग्राउंड 100% सेम रहेगा, कोई ज़ूम या पिक्सल शिफ्ट नहीं (Max 50MB)</p>
+                        <p class="text-[11px] font-semibold text-slate-400">शब्द/लाइन पर क्लिक करके उसी जगह एडिट करें • बैकग्राउंड 100% सेम रहेगा, कोई ज़ूम या पिक्सल शिफ्ट नहीं</p>
                     </div>
                 </div>
             </div>
@@ -1352,7 +1408,7 @@ window.setupPdfEditorTool = function(container) {
                     <i class="fa-solid fa-file-pen"></i>
                 </div>
                 <h3 class="text-sm font-black text-slate-800">यहाँ PDF फाइल अपलोड करें</h3>
-                <p class="text-xs font-semibold text-slate-400">एडिट करने के लिए PDF चुनें (अधिकतम 50MB)</p>
+                <p class="text-xs font-semibold text-slate-400">एडिट करने के लिए PDF चुनें</p>
             </div>
 
             <!-- Full Workspace -->
@@ -1362,11 +1418,24 @@ window.setupPdfEditorTool = function(container) {
                 <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-3">
                     
                     <!-- Page Navigation -->
-                    <div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm">
-                        <button type="button" onclick="window.navPdfEditPage(-1)" class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-700 text-xs font-bold"><i class="fa-solid fa-chevron-left"></i></button>
+                    <div class="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 shadow-sm">
+                        <button type="button" onclick="window.navPdfEditPage(-1)" class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-700 text-xs font-bold" title="पिछला पेज"><i class="fa-solid fa-chevron-left"></i></button>
                         <span id="pdfEditPageIndicator" class="text-xs font-black text-slate-800">Page 1 / 1</span>
-                        <button type="button" onclick="window.navPdfEditPage(1)" class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-700 text-xs font-bold"><i class="fa-solid fa-chevron-right"></i></button>
+                        <button type="button" onclick="window.navPdfEditPage(1)" class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-700 text-xs font-bold" title="अगला पेज"><i class="fa-solid fa-chevron-right"></i></button>
                     </div>
+
+                    <!-- Zoom Controls -->
+                    <div class="flex items-center gap-1 bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-sm">
+                        <button type="button" onclick="window.zoomPdfEditor(-0.2)" class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-700 text-xs font-black" title="Zoom Out (-)"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                        <span id="pdfEditZoomText" class="text-xs font-black text-slate-800 px-1 min-w-[40px] text-center">100%</span>
+                        <button type="button" onclick="window.zoomPdfEditor(0.2)" class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-700 text-xs font-black" title="Zoom In (+)"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                        <button type="button" onclick="window.resetPdfEditorZoom()" class="text-[10px] font-bold text-slate-400 hover:text-slate-800 px-1.5 py-1 rounded hover:bg-slate-100 ml-0.5">Reset</button>
+                    </div>
+
+                    <!-- Undo Button -->
+                    <button type="button" id="btnUndoPdfEdit" onclick="window.undoPdfEditorAction()" class="px-3 py-2 rounded-xl text-xs font-black bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 flex items-center gap-1.5 shadow-sm" title="Undo (पिछला बदलाव वापस लें)">
+                        <i class="fa-solid fa-rotate-left text-amber-500"></i> <span>Undo</span>
+                    </button>
 
                     <!-- Editor Modes -->
                     <div class="flex flex-wrap items-center gap-2">
@@ -1704,13 +1773,15 @@ window.buildInteractiveTextOverlay = async function(page, viewport, scale) {
         const ctx = canvas.getContext('2d');
 
         if (window.pdfEditorState.activeMode === 'whiteout') {
+            window.savePdfEditorUndoState();
             window.inpaintCanvasBackground(ctx, boxX, boxY, boxW, boxH, false);
             // Cache page state
             window.pdfEditorState.pageCanvasMap[window.pdfEditorState.currentPage] = canvas.toDataURL('image/jpeg', 0.98);
         } else if (window.pdfEditorState.activeMode === 'box_replace') {
             const newText = prompt('इस चुने हुए एरिया के लिए नया टेक्स्ट लिखें:', '');
             if (newText !== null && newText.trim()) {
-                window.inpaintCanvasBackground(ctx, boxX, boxY, boxW, boxH, false);
+                window.savePdfEditorUndoState();
+            window.inpaintCanvasBackground(ctx, boxX, boxY, boxW, boxH, false);
 
                 ctx.fillStyle = '#000000';
                 const fSize = Math.max(14, Math.round(boxH * 0.72));
@@ -1789,6 +1860,7 @@ window.applyInPlaceEdit = function() {
     const eraseWidth = Math.max(itemW + 6, newMetrics.width + 6);
 
     // 1. Content-Aware Background Preservation: Erase ONLY text strokes, keep photo/texture intact!
+    window.savePdfEditorUndoState();
     window.inpaintCanvasBackground(ctx, eraseLeft, eraseTop, eraseWidth, eraseHeight, true);
 
     // 3. Draw newly edited text at exact original baseline
@@ -1803,6 +1875,129 @@ window.applyInPlaceEdit = function() {
     window.pdfEditorState.pageCanvasMap[window.pdfEditorState.currentPage] = canvas.toDataURL('image/jpeg', 0.98);
 
     window.cancelInPlaceEdit();
+};
+
+
+// ================= ZOOM & UNDO CONTROLS ENGINE =================
+window.pdfEditorState.viewZoom = 1.0;
+window.pdfEditorState.undoStack = [];
+
+window.savePdfEditorUndoState = function() {
+    const canvas = document.getElementById('pdfEditCanvas');
+    if (!canvas) return;
+    if (!window.pdfEditorState.undoStack) window.pdfEditorState.undoStack = [];
+    if (window.pdfEditorState.undoStack.length >= 25) window.pdfEditorState.undoStack.shift();
+    window.pdfEditorState.undoStack.push({
+        page: window.pdfEditorState.currentPage,
+        dataUrl: canvas.toDataURL('image/jpeg', 0.98)
+    });
+};
+
+window.undoPdfEditorAction = function() {
+    const stack = window.pdfEditorState.undoStack;
+    if (!stack || stack.length === 0) {
+        return alert('वापस जाने के लिए कोई पिछला बदलाव (Undo Step) नहीं है।');
+    }
+    const lastState = stack.pop();
+    const canvas = document.getElementById('pdfEditCanvas');
+    if (!canvas) return;
+
+    const img = new Image();
+    img.onload = () => {
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        window.pdfEditorState.pageCanvasMap[window.pdfEditorState.currentPage] = lastState.dataUrl;
+    };
+    img.src = lastState.dataUrl;
+};
+
+window.zoomPdfEditor = function(delta) {
+    let z = (window.pdfEditorState.viewZoom || 1.0) + delta;
+    if (z < 0.4) z = 0.4;
+    if (z > 3.0) z = 3.0;
+    z = Math.round(z * 10) / 10;
+    window.pdfEditorState.viewZoom = z;
+    const wrapper = document.getElementById('a4DeskWrapper');
+    const zoomText = document.getElementById('pdfEditZoomText');
+    if (wrapper) {
+        wrapper.style.transform = `scale(${z})`;
+        wrapper.style.transformOrigin = 'top center';
+    }
+    if (zoomText) zoomText.innerText = Math.round(z * 100) + '%';
+};
+
+window.resetPdfEditorZoom = function() {
+    window.pdfEditorState.viewZoom = 1.0;
+    const wrapper = document.getElementById('a4DeskWrapper');
+    const zoomText = document.getElementById('pdfEditZoomText');
+    if (wrapper) {
+        wrapper.style.transform = 'scale(1)';
+        wrapper.style.transformOrigin = 'top center';
+    }
+    if (zoomText) zoomText.innerText = '100%';
+};
+
+// Background Remover Zoom & Undo
+window.bgRemoverState.viewZoom = 1.0;
+window.bgRemoverState.undoStack = [];
+
+window.zoomBgRemover = function(delta) {
+    let z = (window.bgRemoverState.viewZoom || 1.0) + delta;
+    if (z < 0.5) z = 0.5;
+    if (z > 3.0) z = 3.0;
+    z = Math.round(z * 10) / 10;
+    window.bgRemoverState.viewZoom = z;
+    const canvas = document.getElementById('bgResultCanvas');
+    const origImg = document.getElementById('bgOriginalImg');
+    const zoomText = document.getElementById('bgZoomText');
+    if (canvas) canvas.style.transform = `scale(${z})`;
+    if (origImg) origImg.style.transform = `scale(${z})`;
+    if (zoomText) zoomText.innerText = Math.round(z * 100) + '%';
+};
+
+window.resetBgZoom = function() {
+    window.bgRemoverState.viewZoom = 1.0;
+    const canvas = document.getElementById('bgResultCanvas');
+    const origImg = document.getElementById('bgOriginalImg');
+    const zoomText = document.getElementById('bgZoomText');
+    if (canvas) canvas.style.transform = 'scale(1)';
+    if (origImg) origImg.style.transform = 'scale(1)';
+    if (zoomText) zoomText.innerText = '100%';
+};
+
+window.undoBgRemover = function() {
+    const stack = window.bgRemoverState.undoStack;
+    if (!stack || stack.length === 0) return alert('कोई पिछला बदलाव नहीं है।');
+    const prev = stack.pop();
+    window.bgRemoverState.targetColor = prev;
+    window.processBgRemoval();
+};
+
+// Compressor Zoom
+window.compressorState.viewZoom = 1.0;
+
+window.zoomCompressor = function(delta) {
+    let z = (window.compressorState.viewZoom || 1.0) + delta;
+    if (z < 0.5) z = 0.5;
+    if (z > 3.0) z = 3.0;
+    z = Math.round(z * 10) / 10;
+    window.compressorState.viewZoom = z;
+    const orig = document.getElementById('compOriginalPreview');
+    const res = document.getElementById('compResultPreview');
+    const zoomText = document.getElementById('compZoomText');
+    if (orig) orig.style.transform = `scale(${z})`;
+    if (res) res.style.transform = `scale(${z})`;
+    if (zoomText) zoomText.innerText = Math.round(z * 100) + '%';
+};
+
+window.resetCompressorZoom = function() {
+    window.compressorState.viewZoom = 1.0;
+    const orig = document.getElementById('compOriginalPreview');
+    const res = document.getElementById('compResultPreview');
+    const zoomText = document.getElementById('compZoomText');
+    if (orig) orig.style.transform = 'scale(1)';
+    if (res) res.style.transform = 'scale(1)';
+    if (zoomText) zoomText.innerText = '100%';
 };
 
 window.navPdfEditPage = function(dir) {
@@ -1894,7 +2089,7 @@ window.setupPdfMergeTool = function(container) {
                 </div>
                 <div>
                     <h2 class="text-base md:text-lg font-black text-dark-900">Merge PDF Files (पीडीएफ जोड़ें)</h2>
-                    <p class="text-[11px] font-semibold text-slate-400">कई PDF फाइलों को अपनी पसंद के क्रम में जोड़कर एक बनाएं (Max 50MB per file)</p>
+                    <p class="text-[11px] font-semibold text-slate-400">कई PDF फाइलों को अपनी पसंद के क्रम में जोड़कर एक बनाएं</p>
                 </div>
             </div>
 
@@ -2031,7 +2226,7 @@ window.setupPdfUnlockTool = function(container) {
                 </div>
                 <div>
                     <h2 class="text-base md:text-lg font-black text-dark-900">PDF Password Unlocker</h2>
-                    <p class="text-[11px] font-semibold text-slate-400">पासवर्ड हटाकर बिना लॉक वाली सामान्य PDF बनाएं (Max 50MB)</p>
+                    <p class="text-[11px] font-semibold text-slate-400">पासवर्ड हटाकर बिना लॉक वाली सामान्य PDF बनाएं</p>
                 </div>
             </div>
 
@@ -2074,26 +2269,69 @@ window.executePdfUnlock = async function() {
     const btn = document.getElementById('btnUnlockPdf');
     const origHtml = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Unlocking...';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Unlocking PDF...';
 
     try {
+        await window.ensurePdfViewerLoaded();
         await window.ensurePdfLibLoaded();
+        const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
+
+        // 1. Decrypt using PDF.js engine with password support
+        let pdfDoc;
+        try {
+            const loadingTask = pdfjs.getDocument({
+                data: window.pdfUnlockFileBytes.slice(0),
+                password: pass
+            });
+            pdfDoc = await loadingTask.promise;
+        } catch (decryptErr) {
+            const msg = String(decryptErr?.message || decryptErr || '');
+            if (msg.toLowerCase().includes('password') || msg.toLowerCase().includes('incorrect') || msg.toLowerCase().includes('need')) {
+                throw new Error('दर्ज किया गया पासवर्ड गलत है!\n\nकृपया सही पासवर्ड दोबारा चेक करके डालें।');
+            }
+            throw new Error('PDF डिक्रिप्ट नहीं हो सकी: ' + msg);
+        }
+
+        // 2. Re-create clean unencrypted PDF via PDFLib
         const pdfLib = window.getPDFLib();
         if (!pdfLib || !pdfLib.PDFDocument) {
             throw new Error('PDF-Lib लाइब्रेरी उपलब्ध नहीं है। कृपया पेज रिफ्रेश करें।');
         }
         const { PDFDocument } = pdfLib;
-        const pdfDoc = await PDFDocument.load(window.pdfUnlockFileBytes.slice(0), { password: pass });
-        const cleanBytes = await pdfDoc.save();
+        const cleanDoc = await PDFDocument.create();
 
+        for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+            const page = await pdfDoc.getPage(pageNum);
+            const viewport = page.getViewport({ scale: 2.5 });
+            const naturalViewport = page.getViewport({ scale: 1.0 });
+
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            const ctx = canvas.getContext('2d');
+            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+            const imgData = canvas.toDataURL('image/jpeg', 0.98);
+            const embeddedImg = await cleanDoc.embedJpg(imgData);
+
+            const newPage = cleanDoc.addPage([naturalViewport.width, naturalViewport.height]);
+            newPage.drawImage(embeddedImg, {
+                x: 0,
+                y: 0,
+                width: naturalViewport.width,
+                height: naturalViewport.height
+            });
+        }
+
+        const cleanBytes = await cleanDoc.save();
         const blob = new Blob([cleanBytes], { type: 'application/pdf' });
         const link = document.createElement('a');
         link.download = `Unlocked_Document_${Date.now()}.pdf`;
         link.href = URL.createObjectURL(blob);
         link.click();
-        alert('सफलता! आपकी PDF हमेशा के लिए अनलॉक हो गई है।');
+        alert('🎉 सफलता! आपकी PDF का पासवर्ड हमेशा के लिए हटा दिया गया है और अनलॉक PDF डाउनलोड हो गई है।');
     } catch (e) {
-        alert('पासवर्ड गलत है या PDF अनलॉक नहीं हो पाई। त्रुटि: ' + e.message);
+        alert(e.message || 'PDF अनलॉक करने में समस्या आई।');
     } finally {
         btn.disabled = false;
         btn.innerHTML = origHtml;
@@ -2112,7 +2350,7 @@ window.setupImageCompressorTool = function(container) {
                 </div>
                 <div>
                     <h2 class="text-base md:text-lg font-black text-dark-900">Smart Image Compressor (सरकारी फॉर्म्स के लिए)</h2>
-                    <p class="text-[11px] font-semibold text-slate-400">टारगेट 20KB, 50KB, 100KB में इमेज कंप्रेस करें बिना शार्पनेस खोए (Max 50MB)</p>
+                    <p class="text-[11px] font-semibold text-slate-400">टारगेट 20KB, 50KB, 100KB में इमेज कंप्रेस करें बिना शार्पनेस खोए</p>
                 </div>
             </div>
 
@@ -2122,15 +2360,24 @@ window.setupImageCompressorTool = function(container) {
                     <i class="fa-solid fa-compress"></i>
                 </div>
                 <h3 class="text-sm font-black text-slate-800">यहाँ इमेज अपलोड करें</h3>
-                <p class="text-xs font-semibold text-slate-400">JPG, PNG, WEBP (अधिकतम 50MB)</p>
+                <p class="text-xs font-semibold text-slate-400">JPG, PNG, WEBP</p>
             </div>
 
             <div id="compWorkspaceSection" class="hidden space-y-4">
                 <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
                     <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <span class="text-xs font-bold text-slate-400 block uppercase">मूल साइज (Original Size):</span>
-                            <span id="compOrigSizeText" class="text-base font-black text-dark-900">0 KB</span>
+                        <div class="flex items-center gap-3">
+                            <div>
+                                <span class="text-xs font-bold text-slate-400 block uppercase">मूल साइज (Original):</span>
+                                <span id="compOrigSizeText" class="text-base font-black text-dark-900">0 KB</span>
+                            </div>
+                            <div class="flex items-center gap-1 bg-white px-2 py-1 rounded-xl border border-slate-200 shadow-sm ml-2">
+                                <span class="text-[10px] font-bold text-slate-400 mr-0.5">Zoom:</span>
+                                <button type="button" onclick="window.zoomCompressor(-0.25)" class="w-6 h-6 flex items-center justify-center font-bold text-xs text-slate-700 hover:bg-slate-100 rounded"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                                <span id="compZoomText" class="text-xs font-black text-slate-800 min-w-[34px] text-center">100%</span>
+                                <button type="button" onclick="window.zoomCompressor(0.25)" class="w-6 h-6 flex items-center justify-center font-bold text-xs text-slate-700 hover:bg-slate-100 rounded"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                                <button type="button" onclick="window.resetCompressorZoom()" class="text-[10px] text-slate-400 hover:text-slate-700 ml-0.5">Reset</button>
+                            </div>
                         </div>
                         <div class="flex flex-wrap items-center gap-1.5">
                             <span class="text-xs font-black text-slate-600 uppercase mr-1">क्विक प्रीसेट्स:</span>
