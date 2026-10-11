@@ -28,7 +28,7 @@
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
- <!-- High-Speed Cloudflare cdnjs + jsDelivr & unpkg Fallbacks (100% Reliable in India & Worldwide) -->
+    <!-- High-Speed Cloudflare cdnjs + jsDelivr & unpkg Fallbacks (100% Reliable in India & Worldwide) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -44,28 +44,6 @@
         }
         if (!window.JSZip) {
             document.write('<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"><\/script>');
-        }
-    </script>
-<script>
-    if (!window.pdfjsLib) {
-        document.write('<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"><\/script>');
-    }
-    if (!window.PDFLib) {
-        document.write('<script src="https://unpkg.com/pdf-lib@1.17.9/dist/pdf-lib.min.js"><\/script>');
-    }
-    if (!window.JSZip) {
-        document.write('<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"><\/script>');
-    }
-</script>
-    <script>
-        if (!window.pdfjsLib) {
-            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script>');
-        }
-        if (!window.PDFLib) {
-            document.write('<script src="https://fastly.jsdelivr.net/npm/pdf-lib@1.17.9/dist/pdf-lib.min.js"><\/script>');
-        }
-        if (!window.JSZip) {
-            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"><\/script>');
         }
     </script>
     <script>
@@ -472,9 +450,20 @@
         const auth = getAuth(app);
 
         onAuthStateChanged(auth, (user) => {
+            const portalBtn = document.getElementById('topPortalBtn');
             if (user) {
                 sessionStorage.setItem('ojas_portal_access', 'allowed');
-                window.location.replace('/portal');
+                // Logged-in user explicitly accessing tools: DO NOT redirect!
+                if (portalBtn) {
+                    portalBtn.href = '/portal';
+                    portalBtn.innerHTML = '<i class="fa-solid fa-house-user text-xs md:text-sm"></i> <span>Back to VIP Portal</span>';
+                    portalBtn.title = 'Back to VIP Portal';
+                }
+            } else {
+                if (portalBtn) {
+                    portalBtn.href = '/portal';
+                    portalBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket text-xs md:text-sm"></i> <span>VIP Portal Login</span>';
+                }
             }
         });
     </script>
@@ -520,8 +509,9 @@
             <div>
                 <h1 class="text-sm md:text-lg font-black text-white leading-tight flex items-center gap-1.5">
                     Ojas <span class="text-royal-400">Tools Studio</span>
+                    <span class="bg-amber-400 text-dark-950 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">HD Suite</span>
                 </h1>
-                <p class="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fast &amp; Private Browser Utilities</p>
+                <p class="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fast &amp; Private Browser Utilities (Max 50MB)</p>
             </div>
         </div>
 
@@ -529,7 +519,7 @@
             <button onclick="window.toggleTheme()" class="theme-toggle-btn w-8 h-8 md:w-9 md:h-9 rounded-xl bg-dark-900 hover:bg-dark-800 text-royal-300 border border-royal-500/30 flex items-center justify-center transition shadow-sm" title="Toggle Dark/Light Mode">
                 <i class="fa-solid fa-moon text-xs md:text-sm"></i>
             </button>
-            <a href="/portal" onclick="sessionStorage.setItem('ojas_portal_access', 'allowed');" class="flex items-center gap-2 text-dark-950 hover:from-amber-400 hover:to-royal-400 transition font-black text-xs md:text-sm bg-gradient-to-r from-amber-400 via-royal-500 to-amber-500 px-3.5 py-2 md:px-4 md:py-2 rounded-xl shadow-glow">
+            <a href="/portal" id="topPortalBtn" onclick="sessionStorage.setItem('ojas_portal_access', 'allowed');" class="flex items-center gap-2 text-dark-950 hover:from-amber-400 hover:to-royal-400 transition font-black text-xs md:text-sm bg-gradient-to-r from-amber-400 via-royal-500 to-amber-500 px-3.5 py-2 md:px-4 md:py-2 rounded-xl shadow-glow">
                 <i class="fa-solid fa-right-to-bracket text-xs md:text-sm"></i> <span>VIP Portal Login</span>
             </a>
         </div>
@@ -550,7 +540,9 @@
                     <h2 class="text-xl md:text-3xl font-black text-white leading-tight">
                         अल्ट्रा-फास्ट <span class="text-royal-400">PDF और फोटो टूल्स स्टूडियो</span>
                     </h2>
-                   
+                    <p class="text-xs md:text-sm font-semibold text-slate-300 leading-relaxed">
+                        पासपोर्ट फोटो (वाइट बैकग्राउंड + 8-फोटो शीट), 800 DPI तक पीडीएफ से इमेज, A4 पीडीएफ टेक्स्ट एडिटर, बैकग्राउंड रिमूवर और सरकारी फॉर्म्स इमेज कंप्रेसर (Max 50MB)।
+                    </p>
                 </div>
                 <div class="absolute -right-8 -bottom-8 text-9xl text-royal-500/10 pointer-events-none select-none">
                     <i class="fa-solid fa-toolbox"></i>
@@ -584,7 +576,9 @@
                         </div>
                         <div>
                             <h3 class="text-sm font-black text-dark-900">पासपोर्ट साइज फोटो मेकर</h3>
-                          
+                            <p class="text-xs font-semibold text-slate-500 mt-1 line-clamp-2">
+                                3.5×4.5cm साइज, ऑटोमेटिक वाइट बैकग्राउंड, और 4×6 शीट पर 8-फोटो प्रिंटेबल ग्रिड।
+                            </p>
                         </div>
                     </div>
                     <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-black text-amber-600">
@@ -604,7 +598,9 @@
                         </div>
                         <div>
                             <h3 class="text-sm font-black text-dark-900">बैकग्राउंड रिमूवर &amp; वाइट BG</h3>
-                         
+                            <p class="text-xs font-semibold text-slate-500 mt-1 line-clamp-2">
+                                फोटो का बैकग्राउंड हटाकर शुद्ध सफेद (#FFFFFF), पारदर्शी या स्काई-ब्लू रंग में बदलें।
+                            </p>
                         </div>
                     </div>
                     <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-black text-emerald-600">
@@ -624,7 +620,9 @@
                         </div>
                         <div>
                             <h3 class="text-sm font-black text-dark-900">PDF to High-Res Image</h3>
-                          
+                            <p class="text-xs font-semibold text-slate-500 mt-1 line-clamp-2">
+                                पीडीएफ के हर पेज को 300 से 800 DPI तक अल्ट्रा-क्लियर हाई-रेज़ोल्यूशन PNG / JPG में बदलें।
+                            </p>
                         </div>
                     </div>
                     <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-black text-indigo-600">
@@ -644,7 +642,9 @@
                         </div>
                         <div>
                             <h3 class="text-sm font-black text-dark-900">Image to PDF Converter</h3>
-                            
+                            <p class="text-xs font-semibold text-slate-500 mt-1 line-clamp-2">
+                                एक या अधिक फोटो को क्रमबद्ध तरीके से जोड़कर सिंगल A4 साइज पीडीएफ बनाएं।
+                            </p>
                         </div>
                     </div>
                     <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-black text-sky-600">
@@ -664,7 +664,9 @@
                         </div>
                         <div>
                             <h3 class="text-sm font-black text-dark-900">PDF Text &amp; A4 Editor</h3>
-                           
+                            <p class="text-xs font-semibold text-slate-500 mt-1 line-clamp-2">
+                                पीडीएफ में किसी भी शब्द/लाइन पर क्लिक करके उसी जगह एडिट करें, व्हाइटआउट करें, साफ प्रिंट पाएं।
+                            </p>
                         </div>
                     </div>
                     <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-black text-rose-600">
@@ -684,7 +686,9 @@
                         </div>
                         <div>
                             <h3 class="text-sm font-black text-dark-900">Merge PDF Files</h3>
-                           
+                            <p class="text-xs font-semibold text-slate-500 mt-1 line-clamp-2">
+                                कई सारी पीडीएफ फाइलों को अपनी इच्छानुसार क्रम में सजाकर एक सिंगल पीडीएफ में मर्ज करें।
+                            </p>
                         </div>
                     </div>
                     <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-black text-purple-600">
@@ -704,7 +708,9 @@
                         </div>
                         <div>
                             <h3 class="text-sm font-black text-dark-900">PDF Password Unlocker</h3>
-                            
+                            <p class="text-xs font-semibold text-slate-500 mt-1 line-clamp-2">
+                                पासवर्ड-प्रोटेक्टेड पीडीएफ का पासवर्ड हटाकर हमेशा के लिए अनलॉक व पासवर्ड-फ्री बनाएं।
+                            </p>
                         </div>
                     </div>
                     <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-black text-teal-600">
@@ -724,7 +730,9 @@
                         </div>
                         <div>
                             <h3 class="text-sm font-black text-dark-900">Smart Image Compressor</h3>
-                        
+                            <p class="text-xs font-semibold text-slate-500 mt-1 line-clamp-2">
+                                सरकारी व साइबर कैफे फॉर्म्स के लिए 20KB, 50KB, 100KB में इमेज कंप्रेस करें बिना क्वालिटी खोए।
+                            </p>
                         </div>
                     </div>
                     <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-black text-royal-600">
