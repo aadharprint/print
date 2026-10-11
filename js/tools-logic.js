@@ -1049,7 +1049,7 @@ window.handlePdfToImgUpload = async function(file) {
         await window.ensurePdfViewerLoaded();
         const arrayBuffer = await file.arrayBuffer();
         const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
-        const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
+        const loadingTask = pdfjs.getDocument({ data: arrayBuffer.slice(0) });
         window.pdfToImgState.pdfDoc = await loadingTask.promise;
 
         document.getElementById('pdfImgUploadBox').classList.add('hidden');
@@ -1481,9 +1481,10 @@ window.handlePdfEditorUpload = async function(file) {
     try {
         await window.ensurePdfViewerLoaded();
         const arrayBuffer = await file.arrayBuffer();
-        window.pdfEditorState.originalPdfBytes = arrayBuffer;
+        // Clone ArrayBuffer so PDF.js web worker transfer does not detach originalPdfBytes!
+        window.pdfEditorState.originalPdfBytes = arrayBuffer.slice(0);
         const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
-        window.pdfEditorState.pdfDoc = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+        window.pdfEditorState.pdfDoc = await pdfjs.getDocument({ data: arrayBuffer.slice(0) }).promise;
         window.pdfEditorState.currentPage = 1;
         window.pdfEditorState.pageCanvasMap = {};
         window.pdfEditorState.pageDimsMap = {};
@@ -1776,7 +1777,7 @@ window.saveAndDownloadEditedPdf = async function() {
         }
         const { PDFDocument } = pdfLib;
 
-        const origDoc = await PDFDocument.load(state.originalPdfBytes);
+        const origDoc = await PDFDocument.load(state.originalPdfBytes.slice(0));
         const newDoc = await PDFDocument.create();
         const numPages = state.pdfDoc.numPages;
 
@@ -1934,7 +1935,7 @@ window.executePdfMerge = async function() {
         const mergedDoc = await PDFDocument.create();
 
         for (const item of window.pdfMergeList) {
-            const docToMerge = await PDFDocument.load(item.bytes);
+            const docToMerge = await PDFDocument.load(item.bytes.slice(0));
             const copiedPages = await mergedDoc.copyPages(docToMerge, docToMerge.getPageIndices());
             copiedPages.forEach((page) => mergedDoc.addPage(page));
         }
@@ -2017,7 +2018,7 @@ window.executePdfUnlock = async function() {
             throw new Error('PDF-Lib लाइब्रेरी उपलब्ध नहीं है। कृपया पेज रिफ्रेश करें।');
         }
         const { PDFDocument } = pdfLib;
-        const pdfDoc = await PDFDocument.load(window.pdfUnlockFileBytes, { password: pass });
+        const pdfDoc = await PDFDocument.load(window.pdfUnlockFileBytes.slice(0), { password: pass });
         const cleanBytes = await pdfDoc.save();
 
         const blob = new Blob([cleanBytes], { type: 'application/pdf' });
