@@ -17,7 +17,7 @@ window.validateFileSize = function(file, customMaxMb = 50) {
 };
 
 // ================= ROBUST MULTI-CDN LIBRARY LOADER =================
-function dynamicallyLoadScript(url, timeoutMs = 4000) {
+function dynamicallyLoadScript(url, timeoutMs = 5000) {
     return new Promise((resolve, reject) => {
         const s = document.createElement('script');
         s.src = url;
@@ -50,60 +50,49 @@ window.getPDFLib = function() {
     return null;
 };
 
-window.ensurePdfLibrariesLoaded = async function() {
-    // 1. Load PDF.js with multiple mirrors (Cloudflare cdnjs first)
-    if (!window.pdfjsLib) {
+// 1. केवल PDF Viewer (PDF.js) लोड करने के लिए (अपलोड और देखने के लिए)
+window.ensurePdfViewerLoaded = async function() {
+    if (!window.pdfjsLib && !window['pdfjs-dist/build/pdf']) {
         const pdfjsSources = [
             'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
-            'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
             'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js',
+            'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
             'https://fastly.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js'
         ];
         for (const src of pdfjsSources) {
             try {
-                await dynamicallyLoadScript(src, 3500);
-                if (window.pdfjsLib) break;
+                await dynamicallyLoadScript(src, 4000);
+                if (window.pdfjsLib || window['pdfjs-dist/build/pdf']) break;
             } catch (err) {}
         }
+    }
+    if (!window.pdfjsLib && window['pdfjs-dist/build/pdf']) {
+        window.pdfjsLib = window['pdfjs-dist/build/pdf'];
     }
     if (window.pdfjsLib && !window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
+    if (!window.pdfjsLib) {
+        throw new Error('PDF व्यूअर लाइब्रेरी (PDF.js) लोड नहीं हो सकी। कृपया इंटरनेट कनेक्शन चेक करें।');
+    }
+    return true;
+};
 
-    // 2. Load PDF-Lib with reliable Cloudflare cdnjs & mirrors (100% Reliable in India)
+// 2. केवल PDF-Lib लोड करने के लिए (सेव, एडिट और जनरेट करने के लिए)
+window.ensurePdfLibLoaded = async function() {
     if (!window.getPDFLib()) {
         const pdfLibSources = [
-            'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.9/pdf-lib.min.js',
-            'https://unpkg.com/pdf-lib@1.17.9/dist/pdf-lib.min.js',
-            'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.9/dist/pdf-lib.min.js',
-            'https://fastly.jsdelivr.net/npm/pdf-lib@1.17.9/dist/pdf-lib.min.js'
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js',
+            'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js',
+            'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js',
+            'https://fastly.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js'
         ];
         for (const src of pdfLibSources) {
             try {
-                await dynamicallyLoadScript(src, 3500);
+                await dynamicallyLoadScript(src, 4000);
                 if (window.getPDFLib()) break;
             } catch (err) {}
         }
-    }
-
-    // 3. Load JSZip with multiple mirrors
-    if (!window.JSZip) {
-        const jszipSources = [
-            'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
-            'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',
-            'https://unpkg.com/jszip@3.10.1/dist/jszip.min.js',
-            'https://fastly.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js'
-        ];
-        for (const src of jszipSources) {
-            try {
-                await dynamicallyLoadScript(src, 3500);
-                if (window.JSZip) break;
-            } catch (err) {}
-        }
-    }
-
-    if (!window.pdfjsLib) {
-        throw new Error('PDF व्यूअर लाइब्रेरी (PDF.js) लोड नहीं हो सकी। कृपया इंटरनेट कनेक्शन चेक करें या पेज रिफ्रेश करें।');
     }
     if (!window.getPDFLib()) {
         throw new Error('PDF जनरेटर लाइब्रेरी (PDF-Lib) लोड नहीं हो सकी। कृपया इंटरनेट कनेक्शन या AdBlocker सेटिंग्स चेक करें।');
@@ -111,10 +100,18 @@ window.ensurePdfLibrariesLoaded = async function() {
     return true;
 };
 
-// Auto-run verification on startup
+// 3. दोनों एक साथ लोड करने के लिए
+window.ensurePdfLibrariesLoaded = async function() {
+    await window.ensurePdfViewerLoaded();
+    await window.ensurePdfLibLoaded();
+    return true;
+};
+
+// बैकग्राउंड में लाइब्रेरी प्री-लोड करने के लिए
 setTimeout(() => {
-    window.ensurePdfLibrariesLoaded().catch(() => {});
-}, 100);
+    window.ensurePdfViewerLoaded().catch(() => {});
+    window.ensurePdfLibLoaded().catch(() => {});
+}, 300);
 
 // ================= NAVIGATION & VIEW SWITCHER =================
 window.currentActiveTool = null;
@@ -758,7 +755,7 @@ window.downloadPassportPdf = async function() {
     const layout = document.getElementById('ppSheetLayout')?.value || 'sheet_a4_row1';
 
     try {
-        await window.ensurePdfLibrariesLoaded();
+        await window.ensurePdfLibLoaded();
         const pdfLib = window.getPDFLib();
         if (!pdfLib || !pdfLib.PDFDocument) {
             throw new Error('PDF-Lib लाइब्रेरी उपलब्ध नहीं है। कृपया पेज रिफ्रेश करें।');
@@ -1049,9 +1046,10 @@ window.handlePdfToImgUpload = async function(file) {
     if (!window.validateFileSize(file, 50)) return;
 
     try {
-        await window.ensurePdfLibrariesLoaded();
+        await window.ensurePdfViewerLoaded();
         const arrayBuffer = await file.arrayBuffer();
-        const loadingTask = window.pdfjsLib.getDocument({ data: arrayBuffer });
+        const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
+        const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
         window.pdfToImgState.pdfDoc = await loadingTask.promise;
 
         document.getElementById('pdfImgUploadBox').classList.add('hidden');
@@ -1274,7 +1272,7 @@ window.generatePdfFromImages = async function() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating PDF...';
 
     try {
-        await window.ensurePdfLibrariesLoaded();
+        await window.ensurePdfLibLoaded();
         const pdfLib = window.getPDFLib();
         if (!pdfLib || !pdfLib.PDFDocument) {
             throw new Error('PDF-Lib लाइब्रेरी उपलब्ध नहीं है। कृपया पेज रिफ्रेश करें।');
@@ -1481,10 +1479,11 @@ window.handlePdfEditorUpload = async function(file) {
     if (!window.validateFileSize(file, 50)) return;
 
     try {
-        await window.ensurePdfLibrariesLoaded();
+        await window.ensurePdfViewerLoaded();
         const arrayBuffer = await file.arrayBuffer();
         window.pdfEditorState.originalPdfBytes = arrayBuffer;
-        window.pdfEditorState.pdfDoc = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
+        window.pdfEditorState.pdfDoc = await pdfjs.getDocument({ data: arrayBuffer }).promise;
         window.pdfEditorState.currentPage = 1;
         window.pdfEditorState.pageCanvasMap = {};
         window.pdfEditorState.pageDimsMap = {};
@@ -1770,7 +1769,7 @@ window.saveAndDownloadEditedPdf = async function() {
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
 
     try {
-        await window.ensurePdfLibrariesLoaded();
+        await window.ensurePdfLibLoaded();
         const pdfLib = window.getPDFLib();
         if (!pdfLib || !pdfLib.PDFDocument) {
             throw new Error('PDF-Lib लाइब्रेरी उपलब्ध नहीं है। कृपया पेज रिफ्रेश करें।');
@@ -1926,7 +1925,7 @@ window.executePdfMerge = async function() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Merging...';
 
     try {
-        await window.ensurePdfLibrariesLoaded();
+        await window.ensurePdfLibLoaded();
         const pdfLib = window.getPDFLib();
         if (!pdfLib || !pdfLib.PDFDocument) {
             throw new Error('PDF-Lib लाइब्रेरी उपलब्ध नहीं है। कृपया पेज रिफ्रेश करें।');
@@ -2012,7 +2011,7 @@ window.executePdfUnlock = async function() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Unlocking...';
 
     try {
-        await window.ensurePdfLibrariesLoaded();
+        await window.ensurePdfLibLoaded();
         const pdfLib = window.getPDFLib();
         if (!pdfLib || !pdfLib.PDFDocument) {
             throw new Error('PDF-Lib लाइब्रेरी उपलब्ध नहीं है। कृपया पेज रिफ्रेश करें।');
