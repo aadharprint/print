@@ -5,6 +5,57 @@
 
 const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB limit
 
+// Global State Objects Initialization
+window.ppState = { originalImg: null, processedImageCanvas: null, bgColor: '#ffffff', activeMode: 'wand', brushSize: 20 };
+window.bgRemoverState = { img: null, targetColor: '#ffffff', viewZoom: 1.0, undoStack: [] };
+window.pdfToImgState = { pdfDoc: null, renderedImages: [] };
+window.imgToPdfList = [];
+window.pdfEditorState = {
+    pdfDoc: null, currentPage: 1, scale: 2.0, activeMode: 'click_edit',
+    currentActiveItem: null, boxStartX: 0, boxStartY: 0, isDraggingBox: false,
+    pageCanvasMap: {}, pageDimsMap: {}, viewZoom: 1.0, undoStack: []
+};
+window.pdfMergeList = [];
+window.pdfUnlockFileBytes = null;
+window.compressorState = { file: null, img: null, resultBlobUrl: null, viewZoom: 1.0 };
+
+// Universal Robust File Downloader
+window.triggerFileDownload = function(blobOrDataUrl, filename) {
+    try {
+        let url = '';
+        let shouldRevoke = false;
+        if (typeof blobOrDataUrl === 'string') {
+            url = blobOrDataUrl;
+        } else if (blobOrDataUrl instanceof Blob) {
+            url = URL.createObjectURL(blobOrDataUrl);
+            shouldRevoke = true;
+        } else {
+            console.error('Invalid download payload:', blobOrDataUrl);
+            return;
+        }
+
+        const link = document.createElement('a');
+        link.style.display = 'none';
+        link.href = url;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+
+        setTimeout(() => {
+            if (link.parentNode) {
+                document.body.removeChild(link);
+            }
+            if (shouldRevoke) {
+                URL.revokeObjectURL(url);
+            }
+        }, 300);
+    } catch (err) {
+        console.error('Download error:', err);
+        alert('डाउनलोड शुरू करने में समस्या आई: ' + err.message);
+    }
+};
+
+
 
 // ================= CUSTOM OJAS BRANDED ALERT MODAL =================
 window.alert = function(message) {
@@ -171,10 +222,12 @@ window.openToolWorkspace = function(toolId) {
     }
 
     if (container) {
-        container.innerHTML = '<div class="p-10 text-center text-slate-400 font-bold"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-royal-500"></i><br>Workspace लोड हो रहा है...</div>';
-        setTimeout(() => {
+        try {
             window.renderToolWorkspaceContent(toolId, container);
-        }, 50);
+        } catch (err) {
+            console.error('Error rendering tool workspace:', err);
+            container.innerHTML = `<div class="p-6 text-center text-red-500 font-bold">टूल लोड करने में समस्या आई: ${err.message}</div>`;
+        }
     }
 };
 
@@ -783,10 +836,8 @@ window.renderPassportStudio = function() {
 window.downloadPassportOutput = function(format = 'jpg') {
     const canvas = document.getElementById('ppMainCanvas');
     if (!canvas) return;
-    const link = document.createElement('a');
-    link.download = `Passport_Photos_${Date.now()}.${format}`;
-    link.href = canvas.toDataURL(format === 'png' ? 'image/png' : 'image/jpeg', 0.95);
-    link.click();
+    const dataUrl = canvas.toDataURL(format === 'png' ? 'image/png' : 'image/jpeg', 0.95);
+    window.triggerFileDownload(dataUrl, `Passport_Photos_${Date.now()}.${format}`);
 };
 
 window.downloadPassportPdf = async function() {
@@ -1019,10 +1070,8 @@ window.processBgRemoval = function() {
 window.downloadBgResult = function() {
     const canvas = document.getElementById('bgResultCanvas');
     if (!canvas) return;
-    const link = document.createElement('a');
-    link.download = `Clean_Photo_${Date.now()}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
+    const dataUrl = canvas.toDataURL('image/png');
+    window.triggerFileDownload(dataUrl, `Clean_Photo_${Date.now()}.png`);
 };
 
 // ============================================================================
@@ -1164,10 +1213,7 @@ window.downloadSinglePdfImage = function(pageNum) {
     const item = window.pdfToImgState.renderedImages.find(i => i.pageNum === pageNum);
     if (!item) return;
     const fmt = document.getElementById('pdfImgFormat')?.value || 'png';
-    const link = document.createElement('a');
-    link.download = `Page_${pageNum}_HighDPI.${fmt}`;
-    link.href = item.dataUrl;
-    link.click();
+    window.triggerFileDownload(item.dataUrl, `Page_${pageNum}_HighDPI.${fmt}`);
 };
 
 window.downloadAllPdfImagesZip = async function() {
@@ -1189,10 +1235,7 @@ window.downloadAllPdfImagesZip = async function() {
         });
 
         const content = await zip.generateAsync({ type: 'blob' });
-        const link = document.createElement('a');
-        link.download = `All_Pages_HighDPI_${Date.now()}.zip`;
-        link.href = URL.createObjectURL(content);
-        link.click();
+        window.triggerFileDownload(content, `All_Pages_HighDPI_${Date.now()}.zip`);
     } catch (e) {
         alert('ZIP बनाने में समस्या आई: ' + e.message);
     } finally {
@@ -1371,10 +1414,7 @@ window.generatePdfFromImages = async function() {
 
         const pdfBytes = await pdfDoc.save();
         const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-        const link = document.createElement('a');
-        link.download = `Images_${Date.now()}.pdf`;
-        link.href = URL.createObjectURL(blob);
-        link.click();
+        window.triggerFileDownload(blob, `Images_${Date.now()}.pdf`);
     } catch (e) {
         alert('PDF बनाने में त्रुटि: ' + e.message);
     } finally {
@@ -2202,10 +2242,7 @@ window.executePdfMerge = async function() {
 
         const mergedBytes = await mergedDoc.save();
         const blob = new Blob([mergedBytes], { type: 'application/pdf' });
-        const link = document.createElement('a');
-        link.download = `Merged_Document_${Date.now()}.pdf`;
-        link.href = URL.createObjectURL(blob);
-        link.click();
+        window.triggerFileDownload(blob, `Merged_Document_${Date.now()}.pdf`);
     } catch (e) {
         alert('मर्ज करने में त्रुटि: ' + e.message);
     } finally {
@@ -2325,11 +2362,8 @@ window.executePdfUnlock = async function() {
 
         const cleanBytes = await cleanDoc.save();
         const blob = new Blob([cleanBytes], { type: 'application/pdf' });
-        const link = document.createElement('a');
-        link.download = `Unlocked_Document_${Date.now()}.pdf`;
-        link.href = URL.createObjectURL(blob);
-        link.click();
-        alert('🎉 सफलता! आपकी PDF का पासवर्ड हमेशा के लिए हटा दिया गया है और अनलॉक PDF डाउनलोड हो गई है।');
+        window.triggerFileDownload(blob, `Unlocked_Document_${Date.now()}.pdf`);
+        setTimeout(() => alert('🎉 सफलता! आपकी PDF का पासवर्ड हमेशा के लिए हटा दिया गया है और अनलॉक PDF डाउनलोड हो गई है।'), 300);
     } catch (e) {
         alert(e.message || 'PDF अनलॉक करने में समस्या आई।');
     } finally {
@@ -2512,8 +2546,5 @@ window.executeSmartCompression = async function() {
 
 window.downloadCompressedImage = function() {
     if (!window.compressorState.resultBlobUrl) return alert('पहले इमेज कंप्रेस करें!');
-    const link = document.createElement('a');
-    link.download = `Compressed_${Date.now()}.jpg`;
-    link.href = window.compressorState.resultBlobUrl;
-    link.click();
+    window.triggerFileDownload(window.compressorState.resultBlobUrl, `Compressed_${Date.now()}.jpg`);
 };
